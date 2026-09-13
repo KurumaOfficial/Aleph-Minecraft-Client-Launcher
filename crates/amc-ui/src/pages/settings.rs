@@ -1,10 +1,10 @@
-use egui::{vec2, Color32, Rounding, ScrollArea, Stroke, TextEdit, Ui};
+use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
 use amc_auth::AccountManager;
 use amc_core::config::LauncherConfig;
 use amc_core::paths::LauncherPaths;
 use amc_core::Language;
 use crate::theme::{
-    BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT,
+    lerp_color, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT,
     TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
 
@@ -70,24 +70,25 @@ impl SettingsPage {
 
     fn subtab_btn(&mut self, ui: &mut Ui, label: &str, tab: SettingsSubTab) {
         let is_active = self.sub_tab == tab;
-        let (bg, stroke, text_color) = if is_active {
-            (RUBY, Stroke::new(1.0, RUBY_LIGHT), Color32::WHITE)
-        } else {
-            (BG_ELEVATED, Stroke::new(1.0, BORDER_DEFAULT), TEXT_MUTED)
-        };
+        let (rect, resp) = ui.allocate_exact_size(vec2(130.0, 32.0), Sense::click());
+        let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+        let act_t = ui.ctx().animate_bool(resp.id.with("act"), is_active);
 
-        let btn = egui::Button::new(
-            egui::RichText::new(label)
-                .font(egui::FontId::proportional(11.0))
-                .strong()
-                .color(text_color),
-        )
-        .fill(bg)
-        .stroke(stroke)
-        .rounding(Rounding::ZERO)
-        .min_size(vec2(130.0, 32.0));
+        let bg = lerp_color(lerp_color(BG_ELEVATED, BG_HOVER, hover_t), RUBY, act_t);
+        let stroke_col = lerp_color(lerp_color(BORDER_DEFAULT, RUBY, hover_t), RUBY_LIGHT, act_t);
+        let text_col = lerp_color(lerp_color(TEXT_MUTED, TEXT_PRIMARY, hover_t), Color32::WHITE, act_t);
 
-        if ui.add(btn).clicked() {
+        ui.painter().rect_filled(rect, Rounding::ZERO, bg);
+        ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
+        ui.painter().text(
+            rect.center(),
+            egui::Align2::CENTER_CENTER,
+            label,
+            egui::FontId::proportional(11.5),
+            text_col,
+        );
+
+        if resp.clicked() {
             self.sub_tab = tab;
         }
     }
@@ -108,24 +109,25 @@ impl SettingsPage {
             ui.horizontal(|ui| {
                 for l in Language::ALL {
                     let is_active = lang == l;
-                    let (bg, stroke, text_color) = if is_active {
-                        (RUBY, Stroke::new(1.0, RUBY_LIGHT), Color32::WHITE)
-                    } else {
-                        (BG_HOVER, Stroke::new(1.0, BORDER_DEFAULT), TEXT_MUTED)
-                    };
+                    let (rect, resp) = ui.allocate_exact_size(vec2(130.0, 34.0), Sense::click());
+                    let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+                    let act_t = ui.ctx().animate_bool(resp.id.with("act"), is_active);
 
-                    let btn = egui::Button::new(
-                        egui::RichText::new(l.display_with_flag())
-                            .font(egui::FontId::proportional(12.0))
-                            .strong()
-                            .color(text_color),
-                    )
-                    .fill(bg)
-                    .stroke(stroke)
-                    .rounding(Rounding::ZERO)
-                    .min_size(vec2(130.0, 32.0));
+                    let bg = lerp_color(lerp_color(BG_ELEVATED, BG_HOVER, hover_t), RUBY, act_t);
+                    let stroke_col = lerp_color(lerp_color(BORDER_DEFAULT, RUBY, hover_t), RUBY_LIGHT, act_t);
+                    let text_col = lerp_color(lerp_color(TEXT_MUTED, TEXT_PRIMARY, hover_t), Color32::WHITE, act_t);
 
-                    if ui.add(btn).clicked() {
+                    ui.painter().rect_filled(rect, Rounding::ZERO, bg);
+                    ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
+                    ui.painter().text(
+                        rect.center(),
+                        egui::Align2::CENTER_CENTER,
+                        l.display_with_flag(),
+                        egui::FontId::proportional(12.0),
+                        text_col,
+                    );
+
+                    if resp.clicked() {
                         config.ui.set_language(l);
                     }
                 }

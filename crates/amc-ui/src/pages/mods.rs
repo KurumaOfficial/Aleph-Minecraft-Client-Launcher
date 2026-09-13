@@ -4,8 +4,8 @@ use amc_core::Language;
 use std::collections::HashSet;
 use std::path::Path;
 use crate::theme::{
-    BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT, SUCCESS,
-    TEXT_HEADING, TEXT_MUTED,
+    lerp_color, BG_CARD, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT, SUCCESS,
+    TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -82,37 +82,41 @@ impl ModsPage {
             let local_active = self.sub_tab == ModsSubTab::Local;
             let search_active = self.sub_tab == ModsSubTab::Search;
 
-            let btn_local = egui::Button::new(
-                egui::RichText::new(lang.mods_tab_installed())
-                    .font(egui::FontId::proportional(12.0))
-                    .strong()
-                    .color(if local_active { Color32::WHITE } else { TEXT_MUTED }),
-            )
-            .fill(if local_active { RUBY } else { Color32::TRANSPARENT })
-            .stroke(Stroke::new(1.0, if local_active { RUBY } else { BORDER_DEFAULT }))
-            .min_size(vec2(130.0, 32.0));
+            // Local Tab Button
+            let (loc_rect, loc_resp) = ui.allocate_exact_size(vec2(130.0, 32.0), Sense::click());
+            let loc_hover = ui.ctx().animate_bool_responsive(loc_resp.id, loc_resp.hovered());
+            let loc_act = ui.ctx().animate_bool(loc_resp.id.with("act"), local_active);
+            let loc_bg = lerp_color(lerp_color(Color32::TRANSPARENT, BG_HOVER, loc_hover), RUBY, loc_act);
+            let loc_stroke = lerp_color(lerp_color(BORDER_DEFAULT, RUBY, loc_hover), RUBY_LIGHT, loc_act);
+            let loc_text = lerp_color(lerp_color(TEXT_MUTED, TEXT_PRIMARY, loc_hover), Color32::WHITE, loc_act);
 
-            if ui.add(btn_local).clicked() {
+            ui.painter().rect_filled(loc_rect, Rounding::ZERO, loc_bg);
+            ui.painter().rect_stroke(loc_rect, Rounding::ZERO, Stroke::new(1.0, loc_stroke));
+            ui.painter().text(loc_rect.center(), egui::Align2::CENTER_CENTER, lang.mods_tab_installed(), egui::FontId::proportional(12.0), loc_text);
+
+            if loc_resp.clicked() {
                 self.sub_tab = ModsSubTab::Local;
             }
 
+            // Search Tab Button
             let search_label = match self.search_provider {
                 ModSource::Modrinth => lang.mods_tab_search_modrinth(),
                 ModSource::CurseForge => lang.mods_tab_search_curseforge(),
                 _ => lang.mods_tab_search_generic(),
             };
 
-            let btn_search = egui::Button::new(
-                egui::RichText::new(search_label)
-                    .font(egui::FontId::proportional(12.0))
-                    .strong()
-                    .color(if search_active { Color32::WHITE } else { TEXT_MUTED }),
-            )
-            .fill(if search_active { RUBY } else { Color32::TRANSPARENT })
-            .stroke(Stroke::new(1.0, if search_active { RUBY } else { BORDER_DEFAULT }))
-            .min_size(vec2(160.0, 32.0));
+            let (sea_rect, sea_resp) = ui.allocate_exact_size(vec2(160.0, 32.0), Sense::click());
+            let sea_hover = ui.ctx().animate_bool_responsive(sea_resp.id, sea_resp.hovered());
+            let sea_act = ui.ctx().animate_bool(sea_resp.id.with("act"), search_active);
+            let sea_bg = lerp_color(lerp_color(Color32::TRANSPARENT, BG_HOVER, sea_hover), RUBY, sea_act);
+            let sea_stroke = lerp_color(lerp_color(BORDER_DEFAULT, RUBY, sea_hover), RUBY_LIGHT, sea_act);
+            let sea_text = lerp_color(lerp_color(TEXT_MUTED, TEXT_PRIMARY, sea_hover), Color32::WHITE, sea_act);
 
-            if ui.add(btn_search).clicked() {
+            ui.painter().rect_filled(sea_rect, Rounding::ZERO, sea_bg);
+            ui.painter().rect_stroke(sea_rect, Rounding::ZERO, Stroke::new(1.0, sea_stroke));
+            ui.painter().text(sea_rect.center(), egui::Align2::CENTER_CENTER, &search_label, egui::FontId::proportional(12.0), sea_text);
+
+            if sea_resp.clicked() {
                 self.sub_tab = ModsSubTab::Search;
             }
 
@@ -154,13 +158,16 @@ impl ModsPage {
                 let mut to_delete = None;
 
                 for (idx, m) in self.local_mods.iter().enumerate() {
-                    let (rect, _) = ui.allocate_exact_size(
+                    let (rect, resp) = ui.allocate_exact_size(
                         vec2(ui.available_width(), 62.0),
-                        Sense::hover(),
+                        Sense::click(),
                     );
+                    let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+                    let bg = lerp_color(BG_CARD, BG_HOVER, hover_t);
+                    let stroke_col = lerp_color(BORDER_DEFAULT, RUBY, hover_t);
 
-                    ui.painter().rect_filled(rect, Rounding::ZERO, BG_ELEVATED);
-                    ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, BORDER_DEFAULT));
+                    ui.painter().rect_filled(rect, Rounding::ZERO, bg);
+                    ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
 
                     let mut child = ui.new_child(
                         egui::UiBuilder::new()
@@ -364,13 +371,16 @@ impl ModsPage {
                 let mut to_install = None;
 
                 for item in &self.search_results {
-                    let (rect, _) = ui.allocate_exact_size(
+                    let (rect, resp) = ui.allocate_exact_size(
                         vec2(ui.available_width(), 70.0),
-                        Sense::hover(),
+                        Sense::click(),
                     );
+                    let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+                    let bg = lerp_color(BG_CARD, BG_HOVER, hover_t);
+                    let stroke_col = lerp_color(BORDER_DEFAULT, RUBY, hover_t);
 
-                    ui.painter().rect_filled(rect, Rounding::ZERO, BG_ELEVATED);
-                    ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, BORDER_DEFAULT));
+                    ui.painter().rect_filled(rect, Rounding::ZERO, bg);
+                    ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
 
                     let mut child = ui.new_child(
                         egui::UiBuilder::new()
@@ -461,17 +471,22 @@ impl ModsPage {
                         .min_size(vec2(100.0, 30.0));
                         child.add(badge);
                     } else {
-                        let btn = egui::Button::new(
-                            egui::RichText::new(lang.mods_btn_install())
-                                .font(egui::FontId::proportional(11.0))
-                                .strong()
-                                .color(Color32::WHITE),
-                        )
-                        .fill(RUBY)
-                        .stroke(Stroke::new(1.0, RUBY_LIGHT))
-                        .min_size(vec2(90.0, 30.0));
+                        let (ib_rect, ib_resp) = child.allocate_exact_size(vec2(90.0, 30.0), Sense::click());
+                        let ib_hover = child.ctx().animate_bool_responsive(ib_resp.id, ib_resp.hovered());
+                        let ib_bg = lerp_color(RUBY, RUBY_LIGHT, ib_hover);
+                        let ib_stroke = lerp_color(RUBY_LIGHT, Color32::WHITE, ib_hover);
 
-                        if child.add(btn).clicked() {
+                        child.painter().rect_filled(ib_rect, Rounding::ZERO, ib_bg);
+                        child.painter().rect_stroke(ib_rect, Rounding::ZERO, Stroke::new(1.0, ib_stroke));
+                        child.painter().text(
+                            ib_rect.center(),
+                            egui::Align2::CENTER_CENTER,
+                            lang.mods_btn_install(),
+                            egui::FontId::proportional(11.5),
+                            Color32::WHITE,
+                        );
+
+                        if ib_resp.clicked() {
                             self.installing_ids.insert(item.id.clone());
                             to_install = Some(item.clone());
                         }

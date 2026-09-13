@@ -1,5 +1,5 @@
-use egui::{vec2, Color32, Rounding, ScrollArea, Stroke, TextEdit};
-use crate::theme::{BG_ELEVATED, BORDER_DEFAULT, RUBY, RUBY_LIGHT, TEXT_MUTED, TEXT_PRIMARY};
+use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit};
+use crate::theme::{lerp_color, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT, TEXT_MUTED, TEXT_PRIMARY};
 use amc_core::Language;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -145,35 +145,50 @@ impl ConsoleModal {
 
                     ui.add_space(12.0);
 
-                    let copy_btn = egui::Button::new(
-                        egui::RichText::new(lang.console_copy()).color(TEXT_PRIMARY),
-                    )
-                    .fill(BG_ELEVATED)
-                    .stroke(Stroke::new(1.0, BORDER_DEFAULT));
+                    // Copy Button
+                    let (cp_rect, cp_resp) = ui.allocate_exact_size(vec2(78.0, 28.0), Sense::click());
+                    let cp_hover = ui.ctx().animate_bool_responsive(cp_resp.id, cp_resp.hovered());
+                    let cp_bg = lerp_color(BG_ELEVATED, BG_HOVER, cp_hover);
+                    let cp_stroke = lerp_color(BORDER_DEFAULT, RUBY, cp_hover);
+                    let cp_text = lerp_color(TEXT_PRIMARY, Color32::WHITE, cp_hover);
 
-                    if ui.add(copy_btn).clicked() {
+                    ui.painter().rect_filled(cp_rect, Rounding::ZERO, cp_bg);
+                    ui.painter().rect_stroke(cp_rect, Rounding::ZERO, Stroke::new(1.0, cp_stroke));
+                    ui.painter().text(cp_rect.center(), egui::Align2::CENTER_CENTER, lang.console_copy(), egui::FontId::proportional(11.0), cp_text);
+
+                    if cp_resp.clicked() {
                         let full_text = self.logs.join("\n");
                         ui.ctx().copy_text(full_text);
                     }
 
-                    let clear_btn = egui::Button::new(
-                        egui::RichText::new(lang.console_clear()).color(TEXT_MUTED),
-                    )
-                    .fill(BG_ELEVATED)
-                    .stroke(Stroke::new(1.0, BORDER_DEFAULT));
+                    // Clear Button
+                    let (cl_rect, cl_resp) = ui.allocate_exact_size(vec2(78.0, 28.0), Sense::click());
+                    let cl_hover = ui.ctx().animate_bool_responsive(cl_resp.id, cl_resp.hovered());
+                    let cl_bg = lerp_color(BG_ELEVATED, BG_HOVER, cl_hover);
+                    let cl_stroke = lerp_color(BORDER_DEFAULT, RUBY, cl_hover);
+                    let cl_text = lerp_color(TEXT_MUTED, TEXT_PRIMARY, cl_hover);
 
-                    if ui.add(clear_btn).clicked() {
+                    ui.painter().rect_filled(cl_rect, Rounding::ZERO, cl_bg);
+                    ui.painter().rect_stroke(cl_rect, Rounding::ZERO, Stroke::new(1.0, cl_stroke));
+                    ui.painter().text(cl_rect.center(), egui::Align2::CENTER_CENTER, lang.console_clear(), egui::FontId::proportional(11.0), cl_text);
+
+                    if cl_resp.clicked() {
                         self.logs.clear();
                         self.manual_diagnosis = None;
                     }
 
-                    let export_btn = egui::Button::new(
-                        egui::RichText::new(lang.console_export()).color(RUBY_LIGHT),
-                    )
-                    .fill(BG_ELEVATED)
-                    .stroke(Stroke::new(1.0, RUBY));
+                    // Export Button
+                    let (ex_rect, ex_resp) = ui.allocate_exact_size(vec2(86.0, 28.0), Sense::click());
+                    let ex_hover = ui.ctx().animate_bool_responsive(ex_resp.id, ex_resp.hovered());
+                    let ex_bg = lerp_color(BG_ELEVATED, RUBY, ex_hover);
+                    let ex_stroke = lerp_color(RUBY, RUBY_LIGHT, ex_hover);
+                    let ex_text = lerp_color(RUBY_LIGHT, Color32::WHITE, ex_hover);
 
-                    if ui.add(export_btn).clicked() {
+                    ui.painter().rect_filled(ex_rect, Rounding::ZERO, ex_bg);
+                    ui.painter().rect_stroke(ex_rect, Rounding::ZERO, Stroke::new(1.0, ex_stroke));
+                    ui.painter().text(ex_rect.center(), egui::Align2::CENTER_CENTER, lang.console_export(), egui::FontId::proportional(11.0), ex_text);
+
+                    if ex_resp.clicked() {
                         if let Some(dest) = rfd::FileDialog::new()
                             .set_file_name("minecraft-latest.log")
                             .save_file()
@@ -191,7 +206,7 @@ impl ConsoleModal {
                     egui::Frame::none()
                         .fill(Color32::from_rgb(26, 12, 16))
                         .stroke(Stroke::new(1.5, RUBY))
-                        .rounding(Rounding::same(8.0))
+                        .rounding(Rounding::ZERO)
                         .inner_margin(egui::Margin::same(10.0))
                         .show(ui, |ui| {
                             ui.horizontal(|ui| {

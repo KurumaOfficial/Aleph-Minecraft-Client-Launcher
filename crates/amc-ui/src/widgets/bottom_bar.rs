@@ -1,8 +1,8 @@
 use egui::{vec2, Color32, Pos2, Rect, Rounding, Sense, Stroke, Ui};
 use amc_auth::Account;
 use crate::theme::{
-    BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, BORDER_STRONG, RUBY, RUBY_DIM, RUBY_LIGHT, TEXT_HEADING,
-    TEXT_MUTED, TEXT_PRIMARY,
+    lerp_color, BG_ACTIVE, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, BORDER_STRONG, RUBY, RUBY_DIM,
+    RUBY_LIGHT, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -108,18 +108,23 @@ impl BottomBar {
 
         // Login / Switch account button
         let btn_label = if active_account.is_some() { lang.bottom_btn_switch() } else { lang.bottom_btn_login() };
-        let login_btn = egui::Button::new(
-            egui::RichText::new(btn_label)
-                .font(egui::FontId::proportional(11.0))
-                .strong()
-                .color(TEXT_PRIMARY),
-        )
-        .fill(BG_HOVER)
-        .stroke(Stroke::new(1.0, BORDER_STRONG))
-        .rounding(Rounding::ZERO)
-        .min_size(vec2(86.0, 34.0));
+        let (login_rect, login_resp) = left_ui.allocate_exact_size(vec2(96.0, 34.0), Sense::click());
+        let login_hover = left_ui.ctx().animate_bool_responsive(login_resp.id, login_resp.hovered());
+        let login_bg = lerp_color(BG_HOVER, BG_ACTIVE, login_hover);
+        let login_stroke = lerp_color(BORDER_STRONG, RUBY, login_hover);
+        let login_fg = lerp_color(TEXT_PRIMARY, Color32::WHITE, login_hover);
 
-        if left_ui.add(login_btn).clicked() {
+        left_ui.painter().rect_filled(login_rect, Rounding::ZERO, login_bg);
+        left_ui.painter().rect_stroke(login_rect, Rounding::ZERO, Stroke::new(1.0, login_stroke));
+        left_ui.painter().text(
+            login_rect.center(),
+            egui::Align2::CENTER_CENTER,
+            btn_label,
+            egui::FontId::proportional(11.5),
+            login_fg,
+        );
+
+        if login_resp.clicked() {
             response.login_clicked = true;
         }
 
@@ -138,14 +143,14 @@ impl BottomBar {
         right_ui.add_space(20.0);
 
         // Options dropdown button (48x48)
-        let (pa_rect, pa_resp) = right_ui.allocate_exact_size(vec2(48.0, 48.0), Sense::click());
-        let pa_bg = if pa_resp.hovered() { RUBY } else { Color32::TRANSPARENT };
-        let pa_fg = if pa_resp.hovered() { Color32::WHITE } else { RUBY };
+        let (pa_rect, pa_resp) = right_ui.allocate_exact_size(vec2(44.0, 48.0), Sense::click());
+        let pa_hover = right_ui.ctx().animate_bool_responsive(pa_resp.id, pa_resp.hovered());
+        let pa_bg = lerp_color(Color32::from_rgba_premultiplied(139, 26, 42, 10), RUBY, pa_hover);
+        let pa_fg = lerp_color(RUBY_LIGHT, Color32::WHITE, pa_hover);
+        let pa_stroke = lerp_color(RUBY, RUBY_LIGHT, pa_hover);
 
-        if pa_bg != Color32::TRANSPARENT {
-            right_ui.painter().rect_filled(pa_rect, Rounding::ZERO, pa_bg);
-        }
-        right_ui.painter().rect_stroke(pa_rect, Rounding::ZERO, Stroke::new(2.0, RUBY));
+        right_ui.painter().rect_filled(pa_rect, Rounding::ZERO, pa_bg);
+        right_ui.painter().rect_stroke(pa_rect, Rounding::ZERO, Stroke::new(1.5, pa_stroke));
         right_ui.painter().text(
             pa_rect.center(),
             egui::Align2::CENTER_CENTER,
@@ -164,18 +169,39 @@ impl BottomBar {
         let play_text = if is_launching { lang.bottom_btn_launching() } else { lang.bottom_btn_play() };
         let (pm_rect, pm_resp) = right_ui.allocate_exact_size(vec2(190.0, 48.0), Sense::click());
 
+        let hover_t = right_ui.ctx().animate_bool_responsive(pm_resp.id, pm_resp.hovered());
+        let press_t = right_ui.ctx().animate_bool_responsive(pm_resp.id.with("press"), pm_resp.is_pointer_button_down_on());
+
+        let base_bg = lerp_color(RUBY, RUBY_LIGHT, hover_t);
         let pm_bg = if is_launching {
             RUBY_DIM
-        } else if pm_resp.is_pointer_button_down_on() {
-            RUBY_DIM
-        } else if pm_resp.hovered() {
-            RUBY_LIGHT
         } else {
+            lerp_color(base_bg, RUBY_DIM, press_t)
+        };
+
+        let stroke_col = if is_launching {
             RUBY
+        } else {
+            lerp_color(RUBY, Color32::from_rgb(0xE8, 0x55, 0x70), hover_t)
         };
 
         right_ui.painter().rect_filled(pm_rect, Rounding::ZERO, pm_bg);
-        right_ui.painter().rect_stroke(pm_rect, Rounding::ZERO, Stroke::new(2.0, RUBY));
+        right_ui.painter().rect_stroke(pm_rect, Rounding::ZERO, Stroke::new(2.0, stroke_col));
+
+        // When launching: render sleek animated top scan-line (runs only during launch!)
+        if is_launching {
+            let time = right_ui.input(|i| i.time);
+            let cycle = (time * 1.5).fract() as f32;
+            let scan_w = 40.0;
+            let scan_x = pm_rect.left() + (pm_rect.width() + scan_w) * cycle - scan_w;
+            let scan_rect = Rect::from_min_size(
+                Pos2::new(scan_x.clamp(pm_rect.left(), pm_rect.right() - scan_w), pm_rect.top()),
+                vec2(scan_w, 2.0),
+            );
+            right_ui.painter().rect_filled(scan_rect, Rounding::ZERO, Color32::WHITE);
+            right_ui.ctx().request_repaint_after(std::time::Duration::from_millis(16));
+        }
+
         right_ui.painter().text(
             pm_rect.center(),
             egui::Align2::CENTER_CENTER,

@@ -4,8 +4,8 @@ use amc_core::Language;
 use std::path::Path;
 use uuid::Uuid;
 use crate::theme::{
-    BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_DIM, RUBY_LIGHT, TEXT_HEADING,
-    TEXT_MUTED, TEXT_PRIMARY,
+    lerp_color, BG_CARD, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_DIM, RUBY_LIGHT,
+    TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
 
 #[derive(Debug, Clone)]
@@ -90,17 +90,22 @@ impl InstancesPage {
 
             ui.add_space(10.0);
 
-            let create_btn = egui::Button::new(
-                egui::RichText::new(lang.inst_btn_create())
-                    .font(egui::FontId::proportional(12.0))
-                    .strong()
-                    .color(Color32::WHITE),
-            )
-            .fill(RUBY)
-            .stroke(Stroke::new(1.0, RUBY_LIGHT))
-            .min_size(vec2(160.0, 36.0));
+            let (cr_rect, cr_resp) = ui.allocate_exact_size(vec2(160.0, 36.0), Sense::click());
+            let cr_hover = ui.ctx().animate_bool_responsive(cr_resp.id, cr_resp.hovered());
+            let cr_bg = lerp_color(RUBY, RUBY_LIGHT, cr_hover);
+            let cr_stroke = lerp_color(RUBY_LIGHT, Color32::WHITE, cr_hover);
 
-            if ui.add(create_btn).clicked() {
+            ui.painter().rect_filled(cr_rect, Rounding::ZERO, cr_bg);
+            ui.painter().rect_stroke(cr_rect, Rounding::ZERO, Stroke::new(1.0, cr_stroke));
+            ui.painter().text(
+                cr_rect.center(),
+                egui::Align2::CENTER_CENTER,
+                lang.inst_btn_create(),
+                egui::FontId::proportional(12.0),
+                Color32::WHITE,
+            );
+
+            if cr_resp.clicked() {
                 self.show_create_modal = true;
             }
         });
@@ -170,24 +175,34 @@ impl InstancesPage {
                         Sense::click(),
                     );
 
-                    let bg = if is_selected {
-                        RUBY_DIM
-                    } else if resp.hovered() {
-                        BG_HOVER
-                    } else {
-                        BG_ELEVATED
-                    };
+                    let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+                    let sel_t = ui.ctx().animate_bool(resp.id.with("sel"), is_selected);
 
-                    let border = if is_selected {
-                        Stroke::new(1.5, RUBY)
-                    } else if resp.hovered() {
-                        Stroke::new(1.0, RUBY)
-                    } else {
-                        Stroke::new(1.0, BORDER_DEFAULT)
-                    };
+                    let base_bg = lerp_color(BG_CARD, BG_HOVER, hover_t);
+                    let bg = lerp_color(base_bg, RUBY_DIM, sel_t);
+
+                    let stroke_col = lerp_color(
+                        lerp_color(BORDER_DEFAULT, RUBY, hover_t),
+                        RUBY_LIGHT,
+                        sel_t,
+                    );
+                    let border_width = if is_selected { 1.5 } else { 1.0 };
 
                     ui.painter().rect_filled(rect, Rounding::ZERO, bg);
-                    ui.painter().rect_stroke(rect, Rounding::ZERO, border);
+                    ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(border_width, stroke_col));
+
+                    // Left loader accent stripe (Square motif from aleph.icu)
+                    let loader_color = match inst.loader {
+                        LoaderType::Vanilla => Color32::from_rgb(0x38, 0x8E, 0x3C),
+                        LoaderType::Fabric => RUBY_LIGHT,
+                        LoaderType::Quilt => Color32::from_rgb(0x9C, 0x27, 0xB0),
+                        LoaderType::Forge => Color32::from_rgb(0xE6, 0x51, 0x00),
+                        LoaderType::NeoForge => Color32::from_rgb(0xFF, 0x6D, 0x00),
+                        LoaderType::OptiFine => Color32::from_rgb(0x00, 0x83, 0x8F),
+                    };
+                    let bar_w = 3.0;
+                    let bar_rect = egui::Rect::from_min_max(rect.left_top(), egui::pos2(rect.left() + bar_w, rect.bottom()));
+                    ui.painter().rect_filled(bar_rect, Rounding::ZERO, loader_color);
 
                     let mut child = ui.new_child(
                         egui::UiBuilder::new()
@@ -304,17 +319,22 @@ impl InstancesPage {
                     child.add_space(6.0);
 
                     // Quick launch
-                    let play_btn = egui::Button::new(
-                        egui::RichText::new(lang.inst_btn_play())
-                            .font(egui::FontId::proportional(11.0))
-                            .strong()
-                            .color(Color32::WHITE),
-                    )
-                    .fill(RUBY)
-                    .stroke(Stroke::new(1.0, RUBY_LIGHT))
-                    .min_size(vec2(76.0, 28.0));
+                    let (pb_rect, pb_resp) = child.allocate_exact_size(vec2(76.0, 28.0), Sense::click());
+                    let pb_hover = child.ctx().animate_bool_responsive(pb_resp.id, pb_resp.hovered());
+                    let pb_bg = lerp_color(RUBY, RUBY_LIGHT, pb_hover);
+                    let pb_stroke = lerp_color(RUBY_LIGHT, Color32::WHITE, pb_hover);
 
-                    if child.add(play_btn).clicked() {
+                    child.painter().rect_filled(pb_rect, Rounding::ZERO, pb_bg);
+                    child.painter().rect_stroke(pb_rect, Rounding::ZERO, Stroke::new(1.0, pb_stroke));
+                    child.painter().text(
+                        pb_rect.center(),
+                        egui::Align2::CENTER_CENTER,
+                        lang.inst_btn_play(),
+                        egui::FontId::proportional(11.0),
+                        Color32::WHITE,
+                    );
+
+                    if pb_resp.clicked() {
                         action = InstanceAction::Launch(inst.id);
                     }
 

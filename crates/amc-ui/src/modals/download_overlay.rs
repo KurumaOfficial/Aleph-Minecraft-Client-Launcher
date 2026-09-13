@@ -79,7 +79,17 @@ impl DownloadOverlay {
 
                 ui.add_space(14.0);
 
-                if ui.button("Отмена").clicked() {
+                let (btn_rect, btn_resp) = ui.allocate_exact_size(vec2(100.0, 30.0), egui::Sense::click());
+                let btn_hover = ui.ctx().animate_bool_responsive(btn_resp.id, btn_resp.hovered());
+                let btn_bg = crate::theme::lerp_color(crate::theme::BG_ELEVATED, crate::theme::BG_HOVER, btn_hover);
+                let btn_stroke = crate::theme::lerp_color(crate::theme::BORDER_DEFAULT, RUBY, btn_hover);
+                let btn_text = crate::theme::lerp_color(TEXT_MUTED, TEXT_PRIMARY, btn_hover);
+
+                ui.painter().rect_filled(btn_rect, Rounding::ZERO, btn_bg);
+                ui.painter().rect_stroke(btn_rect, Rounding::ZERO, egui::Stroke::new(1.0, btn_stroke));
+                ui.painter().text(btn_rect.center(), egui::Align2::CENTER_CENTER, "Отмена", egui::FontId::proportional(11.5), btn_text);
+
+                if btn_resp.clicked() {
                     cancel_clicked = true;
                 }
             });

@@ -1,5 +1,5 @@
 use egui::{vec2, Color32, Pos2, Rect, Response, Rounding, Sense, Stroke, Ui, ViewportCommand};
-use crate::theme::{BORDER_SUBTLE, RUBY, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY};
+use crate::theme::{lerp_color, BORDER_SUBTLE, RUBY_DIM, RUBY_LIGHT, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TitleBarResponse {
@@ -86,34 +86,30 @@ impl TitleBar {
 
     fn draw_control_button(ui: &mut Ui, rect: Rect, symbol: &str, is_close: bool) -> Response {
         let resp = ui.allocate_rect(rect, Sense::click());
+        let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+        let press_t = ui.ctx().animate_bool_responsive(resp.id.with("pr"), resp.is_pointer_button_down_on());
 
-        let bg = if resp.is_pointer_button_down_on() {
-            if is_close {
-                RUBY
-            } else {
-                Color32::from_rgb(0x1e, 0x14, 0x15)
-            }
-        } else if resp.hovered() {
-            if is_close {
-                RUBY
-            } else {
-                Color32::from_rgb(0x16, 0x0D, 0x0E)
-            }
+        let target_bg = if is_close {
+            RUBY_LIGHT
         } else {
-            Color32::TRANSPARENT
+            Color32::from_rgb(0x18, 0x0E, 0x10)
         };
+
+        let mut bg = lerp_color(Color32::TRANSPARENT, target_bg, hover_t);
+        if is_close && press_t > 0.0 {
+            bg = lerp_color(bg, RUBY_DIM, press_t);
+        }
 
         if bg != Color32::TRANSPARENT {
             ui.painter().rect_filled(rect, Rounding::ZERO, bg);
         }
 
-        let text_color = if resp.hovered() && is_close {
+        let target_text = if is_close {
             Color32::WHITE
-        } else if resp.hovered() {
-            TEXT_PRIMARY
         } else {
-            TEXT_MUTED
+            TEXT_PRIMARY
         };
+        let text_color = lerp_color(TEXT_MUTED, target_text, hover_t);
 
         ui.painter().text(
             rect.center(),

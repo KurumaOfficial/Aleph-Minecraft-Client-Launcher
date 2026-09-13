@@ -1,8 +1,8 @@
-use egui::{vec2, Color32, Rounding, Stroke, TextEdit, Ui};
+use egui::{vec2, Color32, Rounding, Sense, Stroke, TextEdit, Ui};
 use amc_auth::{login_offline, Account, DeviceCodeResponse};
 use amc_core::Language;
 use crate::theme::{
-    BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT, TEXT_MUTED, TEXT_PRIMARY,
+    lerp_color, BG_ACTIVE, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT, TEXT_MUTED, TEXT_PRIMARY,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -103,17 +103,22 @@ impl LoginModal {
                         ui.add_space(16.0);
 
                         let enter = resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-                        let btn = egui::Button::new(
-                            egui::RichText::new(lang.login_btn_play())
-                                .font(egui::FontId::proportional(13.0))
-                                .strong()
-                                .color(Color32::WHITE),
-                        )
-                        .fill(RUBY)
-                        .stroke(Stroke::new(1.0, RUBY_LIGHT))
-                        .min_size(vec2(ui.available_width(), 40.0));
+                        let (btn_rect, btn_resp) = ui.allocate_exact_size(vec2(ui.available_width(), 38.0), Sense::click());
+                        let btn_hover = ui.ctx().animate_bool_responsive(btn_resp.id, btn_resp.hovered());
+                        let btn_bg = lerp_color(RUBY, RUBY_LIGHT, btn_hover);
+                        let btn_stroke = lerp_color(RUBY_LIGHT, Color32::WHITE, btn_hover);
 
-                        if (ui.add(btn).clicked() || enter) && !self.offline_nickname.trim().is_empty() {
+                        ui.painter().rect_filled(btn_rect, Rounding::ZERO, btn_bg);
+                        ui.painter().rect_stroke(btn_rect, Rounding::ZERO, Stroke::new(1.0, btn_stroke));
+                        ui.painter().text(
+                            btn_rect.center(),
+                            egui::Align2::CENTER_CENTER,
+                            lang.login_btn_play(),
+                            egui::FontId::proportional(12.5),
+                            Color32::WHITE,
+                        );
+
+                        if (btn_resp.clicked() || enter) && !self.offline_nickname.trim().is_empty() {
                             match login_offline(self.offline_nickname.trim()) {
                                 Ok(acc) => {
                                     success_account = Some(acc);
@@ -266,24 +271,25 @@ impl LoginModal {
 
     fn tab_btn(&mut self, ui: &mut Ui, label: &str, mode: LoginMode) {
         let is_active = self.mode == mode;
-        let (bg, stroke, text_color) = if is_active {
-            (RUBY, Stroke::new(1.0, RUBY_LIGHT), Color32::WHITE)
-        } else {
-            (BG_HOVER, Stroke::new(1.0, BORDER_DEFAULT), TEXT_MUTED)
-        };
+        let (rect, resp) = ui.allocate_exact_size(vec2(130.0, 30.0), Sense::click());
+        let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+        let act_t = ui.ctx().animate_bool(resp.id.with("act"), is_active);
 
-        let btn = egui::Button::new(
-            egui::RichText::new(label)
-                .font(egui::FontId::proportional(10.0))
-                .strong()
-                .color(text_color),
-        )
-        .fill(bg)
-        .stroke(stroke)
-        .rounding(Rounding::ZERO)
-        .min_size(vec2(120.0, 28.0));
+        let bg = lerp_color(lerp_color(BG_HOVER, BG_ACTIVE, hover_t), RUBY, act_t);
+        let stroke_col = lerp_color(lerp_color(BORDER_DEFAULT, RUBY, hover_t), RUBY_LIGHT, act_t);
+        let text_col = lerp_color(lerp_color(TEXT_MUTED, TEXT_PRIMARY, hover_t), Color32::WHITE, act_t);
 
-        if ui.add(btn).clicked() {
+        ui.painter().rect_filled(rect, Rounding::ZERO, bg);
+        ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
+        ui.painter().text(
+            rect.center(),
+            egui::Align2::CENTER_CENTER,
+            label,
+            egui::FontId::proportional(11.0),
+            text_col,
+        );
+
+        if resp.clicked() {
             self.mode = mode;
             self.error_msg = None;
         }

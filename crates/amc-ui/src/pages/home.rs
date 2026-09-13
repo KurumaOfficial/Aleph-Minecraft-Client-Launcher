@@ -2,7 +2,7 @@ use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
 use amc_core::types::{GameVersion, ReleaseType};
 use amc_minecraft::ServerStatus;
 use crate::theme::{
-    BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_DIM, RUBY_LIGHT,
+    lerp_color, BG_CARD, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_DIM, RUBY_LIGHT,
     TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
 use crate::widgets::draw_custom_badge;
@@ -93,16 +93,23 @@ impl HomePage {
                 SortOrder::Oldest => format!("{} ▴", lang.home_sort_oldest()),
             };
 
-            let sort_btn = egui::Button::new(
-                egui::RichText::new(sort_label)
-                    .font(egui::FontId::proportional(12.0))
-                    .color(TEXT_PRIMARY),
-            )
-            .fill(BG_ELEVATED)
-            .stroke(Stroke::new(1.0, BORDER_DEFAULT))
-            .min_size(vec2(140.0, 32.0));
+            let (sort_rect, sort_resp) = ui.allocate_exact_size(vec2(140.0, 32.0), Sense::click());
+            let sort_hover = ui.ctx().animate_bool_responsive(sort_resp.id, sort_resp.hovered());
+            let sort_bg = lerp_color(BG_ELEVATED, BG_HOVER, sort_hover);
+            let sort_stroke = lerp_color(BORDER_DEFAULT, RUBY, sort_hover);
+            let sort_text = lerp_color(TEXT_PRIMARY, Color32::WHITE, sort_hover);
 
-            if ui.add(sort_btn).clicked() {
+            ui.painter().rect_filled(sort_rect, Rounding::ZERO, sort_bg);
+            ui.painter().rect_stroke(sort_rect, Rounding::ZERO, Stroke::new(1.0, sort_stroke));
+            ui.painter().text(
+                sort_rect.center(),
+                egui::Align2::CENTER_CENTER,
+                &sort_label,
+                egui::FontId::proportional(12.0),
+                sort_text,
+            );
+
+            if sort_resp.clicked() {
                 self.sort_order = match self.sort_order {
                     SortOrder::Newest => SortOrder::Oldest,
                     SortOrder::Oldest => SortOrder::Newest,
@@ -199,24 +206,27 @@ impl HomePage {
                         Sense::click(),
                     );
 
-                    let bg = if is_selected {
-                        RUBY_DIM
-                    } else if resp.hovered() {
-                        BG_HOVER
-                    } else {
-                        BG_ELEVATED
-                    };
+                    let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+                    let sel_t = ui.ctx().animate_bool(resp.id.with("sel"), is_selected);
 
-                    let border_stroke = if is_selected {
-                        Stroke::new(1.5, RUBY)
-                    } else if resp.hovered() {
-                        Stroke::new(1.0, RUBY)
-                    } else {
-                        Stroke::new(1.0, BORDER_DEFAULT)
-                    };
+                    let base_bg = lerp_color(BG_CARD, BG_HOVER, hover_t);
+                    let bg = lerp_color(base_bg, RUBY_DIM, sel_t);
+
+                    let stroke_col = lerp_color(
+                        lerp_color(BORDER_DEFAULT, RUBY, hover_t),
+                        RUBY_LIGHT,
+                        sel_t,
+                    );
+                    let border_width = if is_selected { 1.5 } else { 1.0 };
 
                     ui.painter().rect_filled(rect, Rounding::ZERO, bg);
-                    ui.painter().rect_stroke(rect, Rounding::ZERO, border_stroke);
+                    ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(border_width, stroke_col));
+
+                    // Active left indicator bar (Square motif)
+                    if sel_t > 0.01 {
+                        let bar_rect = egui::Rect::from_min_max(rect.left_top(), egui::pos2(rect.left() + 3.0 * sel_t, rect.bottom()));
+                        ui.painter().rect_filled(bar_rect, Rounding::ZERO, RUBY_LIGHT);
+                    }
 
                     let mut child = ui.new_child(
                         egui::UiBuilder::new()
@@ -238,11 +248,16 @@ impl HomePage {
                     child.add_space(10.0);
 
                     // Version ID
+                    let ver_color = lerp_color(
+                        lerp_color(TEXT_HEADING, Color32::WHITE, hover_t),
+                        Color32::WHITE,
+                        sel_t,
+                    );
                     child.label(
                         egui::RichText::new(&v.id)
                             .font(egui::FontId::proportional(15.0))
                             .strong()
-                            .color(if is_selected { Color32::WHITE } else { TEXT_HEADING }),
+                            .color(ver_color),
                     );
 
                     child.add_space(12.0);
@@ -266,7 +281,7 @@ impl HomePage {
                     child.label(
                         egui::RichText::new(date_str)
                             .font(egui::FontId::proportional(12.0))
-                            .color(TEXT_MUTED),
+                            .color(lerp_color(TEXT_MUTED, TEXT_PRIMARY, hover_t)),
                     );
 
                     if resp.clicked() {
@@ -278,24 +293,37 @@ impl HomePage {
 
     fn filter_tab_btn(&mut self, ui: &mut Ui, label: &str, tab: FilterTab) {
         let is_active = self.active_filter == tab;
-        let (bg, stroke, text_color) = if is_active {
-            (RUBY, Stroke::new(1.0, RUBY_LIGHT), Color32::WHITE)
-        } else {
-            (BG_ELEVATED, Stroke::new(1.0, BORDER_DEFAULT), TEXT_MUTED)
-        };
+        let (rect, resp) = ui.allocate_exact_size(vec2(78.0, 28.0), Sense::click());
+        let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+        let active_t = ui.ctx().animate_bool(resp.id.with("act"), is_active);
 
-        let btn = egui::Button::new(
-            egui::RichText::new(label)
-                .font(egui::FontId::proportional(11.0))
-                .strong()
-                .color(text_color),
-        )
-        .fill(bg)
-        .stroke(stroke)
-        .rounding(Rounding::ZERO)
-        .min_size(vec2(72.0, 26.0));
+        let bg = lerp_color(
+            lerp_color(BG_ELEVATED, BG_HOVER, hover_t),
+            RUBY,
+            active_t,
+        );
+        let stroke_col = lerp_color(
+            lerp_color(BORDER_DEFAULT, RUBY, hover_t),
+            RUBY_LIGHT,
+            active_t,
+        );
+        let text_col = lerp_color(
+            lerp_color(TEXT_MUTED, TEXT_PRIMARY, hover_t),
+            Color32::WHITE,
+            active_t,
+        );
 
-        if ui.add(btn).clicked() {
+        ui.painter().rect_filled(rect, Rounding::ZERO, bg);
+        ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
+        ui.painter().text(
+            rect.center(),
+            egui::Align2::CENTER_CENTER,
+            label,
+            egui::FontId::proportional(11.0),
+            text_col,
+        );
+
+        if resp.clicked() {
             self.active_filter = tab;
         }
     }
