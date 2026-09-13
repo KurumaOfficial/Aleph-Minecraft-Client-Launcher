@@ -87,6 +87,8 @@ pub struct Instance {
     pub total_played_minutes: u64,
 }
 
+use crate::error::{LauncherError, Result};
+
 impl Instance {
     pub fn new(name: impl Into<String>, game_version: impl Into<String>, loader: LoaderType) -> Self {
         Self {
@@ -101,6 +103,56 @@ impl Instance {
             last_played: None,
             total_played_minutes: 0,
         }
+    }
+
+    pub fn load_all(path: &std::path::Path) -> Result<Vec<Self>> {
+        if !path.is_file() {
+            return Ok(Vec::new());
+        }
+        let content = std::fs::read_to_string(path).map_err(|e| LauncherError::Io {
+            path: path.to_path_buf(),
+            source: e,
+        })?;
+        serde_json::from_str(&content).map_err(LauncherError::Json)
+    }
+
+    pub fn save_all(path: &std::path::Path, instances: &[Self]) -> Result<()> {
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let content = serde_json::to_string_pretty(instances).map_err(LauncherError::Json)?;
+        std::fs::write(path, content).map_err(|e| LauncherError::Io {
+            path: path.to_path_buf(),
+            source: e,
+        })
+    }
+
+    pub fn get_game_dir(&self, base_instances_dir: &std::path::Path) -> PathBuf {
+        if let Some(custom) = &self.custom_dir {
+            custom.clone()
+        } else {
+            let sanitized: String = self
+                .name
+                .chars()
+                .map(|c| if c.is_alphanumeric() || c == '_' || c == '-' || c == ' ' { c } else { '_' })
+                .collect();
+            let folder_name = if sanitized.trim().is_empty() {
+                self.id.to_string()
+            } else {
+                sanitized.trim().to_string()
+            };
+            base_instances_dir.join(folder_name)
+        }
+    }
+
+    pub fn ensure_directories(&self, base_instances_dir: &std::path::Path) -> Result<PathBuf> {
+        let game_dir = self.get_game_dir(base_instances_dir);
+        let subdirs = ["mods", "saves", "resourcepacks", "shaderpacks", "config"];
+        for sub in subdirs {
+            let p = game_dir.join(sub);
+            let _ = std::fs::create_dir_all(&p);
+        }
+        Ok(game_dir)
     }
 }
 

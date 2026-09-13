@@ -65,6 +65,7 @@ flate2 = "1"
 walkdir = "2"
 parking_lot = "0.12"
 open = "5"
+rfd = "0.15"
 
 [package]
 name = "amc-launcher"

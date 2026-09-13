@@ -5,13 +5,13 @@ use tokio::sync::{mpsc, watch};
 use amc_auth::{Account, AccountManager, DeviceCodeResponse, MicrosoftAuthFlow};
 use amc_core::config::LauncherConfig;
 use amc_core::paths::LauncherPaths;
-use amc_core::types::{GameVersion, Instance};
+use amc_core::types::{GameVersion, Instance, LoaderType};
 use amc_downloader::{AdoptiumInstaller, DownloadEngine, DownloadProgress};
-use amc_minecraft::{GameEvent, MinecraftLauncher, VersionManifest};
+use amc_minecraft::{FabricLoader, GameEvent, MinecraftLauncher, VersionDetails, VersionManifest};
 use amc_mods::{LocalModManager, ModSearchResult, ModrinthClient};
 
 use crate::modals::{DownloadOverlay, LoginModal};
-use crate::pages::{HomePage, InstancesPage, ModsPage, SettingsPage, SkinsPage};
+use crate::pages::{HomePage, InstanceAction, InstancesPage, ModsPage, SettingsPage, SkinsPage};
 use crate::theme::{apply_aleph_theme, BG};
 use crate::widgets::{BottomBar, NavTab, Sidebar, TitleBar};
 
@@ -28,6 +28,7 @@ pub struct LauncherApp {
     versions: Vec<GameVersion>,
     instances: Vec<Instance>,
     is_launching: bool,
+    launch_status_text: String,
 
     // Pages
     home_page: HomePage,
@@ -42,6 +43,9 @@ pub struct LauncherApp {
     // Async channels
     versions_rx: Option<mpsc::Receiver<Vec<GameVersion>>>,
     mod_search_rx: Option<mpsc::Receiver<Vec<ModSearchResult>>>,
+    mod_install_rx: Option<mpsc::Receiver<Result<(String, String), String>>>,
+    progress_init_rx: Option<mpsc::Receiver<Option<watch::Receiver<DownloadProgress>>>>,
+    launch_status_rx: Option<mpsc::Receiver<String>>,
     download_progress_rx: Option<watch::Receiver<DownloadProgress>>,
     game_events_rx: Option<mpsc::Receiver<GameEvent>>,
     ms_code_rx: Option<mpsc::Receiver<Result<DeviceCodeResponse, String>>>,
@@ -50,7 +54,6 @@ pub struct LauncherApp {
 
 impl LauncherApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        // Apply theme ONCE at startup to avoid per-frame allocations
         apply_aleph_theme(&cc.egui_ctx);
 
         let paths = LauncherPaths::default_paths().expect("Failed to initialize launcher paths");
@@ -64,9 +67,16 @@ impl LauncherApp {
         // Pre-scan local mods
         let mods_dir = paths.root_dir.join("mods");
         let local_mods = LocalModManager::scan_mods(&mods_dir).unwrap_or_default();
-
         let mut mods_page = ModsPage::default();
         mods_page.local_mods = local_mods;
+
+        // Load persisted instances
+        let instances = Instance::load_all(&paths.instances_file()).unwrap_or_default();
+        let selected_instance = instances.first().map(|i| i.id);
+        let selected_version = instances
+            .first()
+            .map(|i| i.game_version.clone())
+            .or_else(|| Some("1.20.1".to_string()));
 
         Self {
             paths,
@@ -74,11 +84,12 @@ impl LauncherApp {
             account_mgr,
             download_engine,
             current_tab: NavTab::Home,
-            selected_version: Some("1.20.1".to_string()),
-            selected_instance: None,
+            selected_version,
+            selected_instance,
             versions: Vec::new(),
-            instances: Vec::new(),
+            instances,
             is_launching: false,
+            launch_status_text: "Подготовка к запуску...".to_string(),
             home_page: HomePage::default(),
             instances_page: InstancesPage::default(),
             mods_page,
@@ -87,6 +98,9 @@ impl LauncherApp {
             login_modal: LoginModal::default(),
             versions_rx: None,
             mod_search_rx: None,
+            mod_install_rx: None,
+            progress_init_rx: None,
+            launch_status_rx: None,
             download_progress_rx: None,
             game_events_rx: None,
             ms_code_rx: None,
@@ -131,17 +145,27 @@ impl LauncherApp {
     fn install_mod(&mut self, mod_item: ModSearchResult) {
         let mods_dir = self.paths.root_dir.join("mods");
         let engine = self.download_engine.clone();
+        let (tx, rx) = mpsc::channel(1);
+        self.mod_install_rx = Some(rx);
 
         tokio::spawn(async move {
             let client = ModrinthClient::default();
             tracing::info!("Resolving mod download for {}", mod_item.title);
-            if let Ok(file_info) = client.get_download_file(&mod_item.id, None, None).await {
-                let dest = mods_dir.join(&file_info.filename);
-                let item = amc_downloader::DownloadItem::new(&file_info.url, dest);
-                if let Err(e) = engine.download_one(&item, None).await {
-                    tracing::error!("Failed to download mod {}: {e}", file_info.filename);
-                } else {
-                    tracing::info!("Mod {} installed successfully!", file_info.filename);
+            match client.get_download_file(&mod_item.id, None, None).await {
+                Ok(file_info) => {
+                    let dest = mods_dir.join(&file_info.filename);
+                    let item = amc_downloader::DownloadItem::new(&file_info.url, dest);
+                    if let Err(e) = engine.download_one(&item, None).await {
+                        tracing::error!("Failed to download mod {}: {e}", file_info.filename);
+                        let _ = tx.send(Err(format!("Ошибка загрузки {}: {e}", file_info.filename))).await;
+                    } else {
+                        tracing::info!("Mod {} installed successfully!", file_info.filename);
+                        let _ = tx.send(Ok((mod_item.id, mod_item.title))).await;
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to get mod file info: {e}");
+                    let _ = tx.send(Err(format!("Не удалось получить файл мода: {e}"))).await;
                 }
             }
         });
@@ -196,58 +220,193 @@ impl LauncherApp {
             return;
         };
 
-        let ver_id = self.selected_version.clone().unwrap_or_else(|| "1.20.1".to_string());
-        tracing::info!("Preparing Minecraft launch for version {} (User: {})...", ver_id, session.username);
-        self.is_launching = true;
-
         let paths = self.paths.clone();
+        let (game_dir, ver_id, ram_override, loader) = if let Some(inst_id) = self.selected_instance {
+            if let Some(inst) = self.instances.iter().find(|i| i.id == inst_id) {
+                let _ = inst.ensure_directories(&paths.instances_dir());
+                (inst.get_game_dir(&paths.instances_dir()), inst.game_version.clone(), inst.ram_mb, inst.loader)
+            } else {
+                let ver = self.selected_version.clone().unwrap_or_else(|| "1.20.1".to_string());
+                (paths.instances_dir().join(&ver), ver, None, LoaderType::Vanilla)
+            }
+        } else {
+            let ver = self.selected_version.clone().unwrap_or_else(|| "1.20.1".to_string());
+            (paths.instances_dir().join(&ver), ver, None, LoaderType::Vanilla)
+        };
+
+        tracing::info!(
+            "Preparing Minecraft launch: Version={}, Loader={}, User={}...",
+            ver_id,
+            loader.as_str(),
+            session.username
+        );
+
+        self.is_launching = true;
+        self.launch_status_text = format!("Подготовка версии {}...", ver_id);
+
         let engine = self.download_engine.clone();
-        let options = self.config.default_launch_options.clone();
+        let mut options = self.config.default_launch_options.clone();
+        if let Some(ram) = ram_override {
+            options.memory_max_mb = ram;
+        }
 
         let (game_tx, game_rx) = mpsc::channel(256);
+        let (status_tx, status_rx) = mpsc::channel(32);
+        let (prog_tx, prog_rx) = mpsc::channel(8);
+
         self.game_events_rx = Some(game_rx);
+        self.launch_status_rx = Some(status_rx);
+        self.progress_init_rx = Some(prog_rx);
 
         tokio::spawn(async move {
-            let runtimes_dir = paths.runtimes_dir();
-            let java_bin = match AdoptiumInstaller::ensure_java(&runtimes_dir, 21, &engine, None).await {
+            let client = reqwest::Client::new();
+
+            // 1. Resolve Version Details
+            let _ = status_tx.send("Получение информации о версии...".to_string()).await;
+            let details = match loader {
+                LoaderType::Fabric => {
+                    let _ = status_tx.send("Поиск Fabric Loader...".to_string()).await;
+                    match FabricLoader::get_latest_loader_version(&client, &ver_id).await {
+                        Ok(loader_ver) => {
+                            let _ = status_tx.send(format!("Загрузка профиля Fabric {loader_ver}...")).await;
+                            match FabricLoader::fetch_profile_json(&client, &ver_id, &loader_ver).await {
+                                Ok(mut fab_details) => {
+                                    if let Ok(vanilla) = VersionDetails::fetch_or_load(&client, &ver_id, None, &paths.versions_dir()).await {
+                                        fab_details.merge_parent(vanilla);
+                                    }
+                                    fab_details
+                                }
+                                Err(e) => {
+                                    tracing::warn!("Fabric profile fetch error: {e}, falling back to Vanilla");
+                                    match VersionDetails::fetch_or_load(&client, &ver_id, None, &paths.versions_dir()).await {
+                                        Ok(d) => d,
+                                        Err(err) => {
+                                            let _ = game_tx.send(GameEvent::Crashed { message: format!("Ошибка загрузки версии {ver_id}: {err}") }).await;
+                                            return;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!("Fabric loader lookup error: {e}, falling back to Vanilla");
+                            match VersionDetails::fetch_or_load(&client, &ver_id, None, &paths.versions_dir()).await {
+                                Ok(d) => d,
+                                Err(err) => {
+                                    let _ = game_tx.send(GameEvent::Crashed { message: format!("Ошибка загрузки версии {ver_id}: {err}") }).await;
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    match VersionDetails::fetch_or_load(&client, &ver_id, None, &paths.versions_dir()).await {
+                        Ok(d) => d,
+                        Err(err) => {
+                            let _ = game_tx.send(GameEvent::Crashed { message: format!("Ошибка загрузки версии {ver_id}: {err}") }).await;
+                            return;
+                        }
+                    }
+                }
+            };
+
+            // 2. Resolve Java Runtime
+            let req_java = details.required_java_major();
+            let _ = status_tx.send(format!("Проверка Java {req_java}...")).await;
+            let java_bin = match AdoptiumInstaller::ensure_java(&paths.runtimes_dir(), req_java, &engine, None).await {
                 Ok(bin) => bin,
                 Err(e) => {
                     tracing::error!("Java installation failed: {e}");
-                    let _ = game_tx.send(GameEvent::Crashed { message: format!("Java error: {e}") }).await;
+                    let _ = game_tx.send(GameEvent::Crashed { message: format!("Ошибка установки Java {req_java}: {e}") }).await;
                     return;
                 }
             };
 
-            tracing::info!("Java ready: {}", java_bin.display());
-
-            let game_dir = paths.instances_dir().join(&ver_id);
-            let assets_dir = paths.assets_dir();
-            let natives_dir = paths.libraries_dir().join("natives");
+            // 3. Collect download items
+            let _ = status_tx.send("Проверка файлов Minecraft...".to_string()).await;
+            let mut download_items: Vec<amc_downloader::DownloadItem> = Vec::new();
             let client_jar = paths.versions_dir().join(&ver_id).join(format!("{ver_id}.jar"));
 
-            let dummy_details = amc_minecraft::VersionDetails {
-                id: ver_id.clone(),
-                downloads: None,
-                asset_index: None,
-                libraries: Vec::new(),
-                main_class: "net.minecraft.client.main.Main".to_string(),
-                arguments: None,
-                minecraft_arguments: None,
-                java_version: None,
-                inherits_from: None,
-            };
+            if let Some(downloads) = &details.downloads {
+                if let Some(client_file) = &downloads.client {
+                    if !client_jar.is_file() {
+                        let mut item = amc_downloader::DownloadItem::new(&client_file.url, &client_jar);
+                        if let Some(sha1) = &client_file.sha1 { item = item.with_sha1(sha1); }
+                        if let Some(size) = client_file.size { item = item.with_size(size); }
+                        download_items.push(item);
+                    }
+                }
+            }
 
-            let _ = tokio::fs::create_dir_all(&game_dir).await;
+            let features = std::collections::HashMap::new();
+            let mut classpath_libs: Vec<std::path::PathBuf> = Vec::new();
+            let mut natives_jars: Vec<std::path::PathBuf> = Vec::new();
+
+            for lib in &details.libraries {
+                if !lib.is_allowed(&features) {
+                    continue;
+                }
+                if let Some(item) = lib.to_download_item(&paths.libraries_dir()) {
+                    let dest = item.destination.clone();
+                    classpath_libs.push(dest.clone());
+                    if lib.natives.is_some() || dest.to_string_lossy().contains("natives") {
+                        natives_jars.push(dest.clone());
+                    }
+                    if !dest.is_file() {
+                        download_items.push(item);
+                    }
+                }
+            }
+
+            if let Some(asset_ref) = &details.asset_index {
+                let _ = status_tx.send("Проверка ассетов игры...".to_string()).await;
+                if let Ok(idx) = amc_minecraft::AssetIndex::fetch_or_load(&client, asset_ref, &paths.assets_dir()).await {
+                    let all_assets = idx.to_download_items(&paths.assets_dir());
+                    for a in all_assets {
+                        if !a.destination.is_file() {
+                            download_items.push(a);
+                        }
+                    }
+                }
+            }
+
+            // 4. Download missing components
+            if !download_items.is_empty() {
+                let count = download_items.len();
+                let _ = status_tx.send(format!("Загрузка {count} файлов...").to_string()).await;
+                let (tracker, progress_rx) = engine.create_tracker(&download_items);
+                let _ = prog_tx.send(Some(progress_rx)).await;
+
+                if let Err(e) = engine.download_all_with_progress(download_items, Some(tracker)).await {
+                    tracing::error!("Component download failed: {e}");
+                    let _ = prog_tx.send(None).await;
+                    let _ = game_tx.send(GameEvent::Crashed { message: format!("Ошибка скачивания компонентов: {e}") }).await;
+                    return;
+                }
+                let _ = prog_tx.send(None).await;
+            }
+
+            // 5. Unpack natives
+            let natives_dir = paths.libraries_dir().join("natives").join(&ver_id);
             let _ = tokio::fs::create_dir_all(&natives_dir).await;
+            let _ = status_tx.send("Распаковка natives...".to_string()).await;
+            for nat_jar in &natives_jars {
+                let _ = VersionDetails::extract_natives(nat_jar, &natives_dir);
+            }
+
+            // 6. Launch Minecraft
+            let _ = status_tx.send("Запуск процесса Minecraft...".to_string()).await;
+            let assets_dir = paths.assets_dir();
 
             match MinecraftLauncher::launch(
                 &java_bin,
                 &game_dir,
                 &assets_dir,
                 &natives_dir,
-                &[],
+                &classpath_libs,
                 &client_jar,
-                &dummy_details,
+                &details,
                 &session,
                 &options,
             ).await {
@@ -257,7 +416,7 @@ impl LauncherApp {
                     }
                 }
                 Err(e) => {
-                    let _ = game_tx.send(GameEvent::Crashed { message: format!("Launch error: {e}") }).await;
+                    let _ = game_tx.send(GameEvent::Crashed { message: format!("Ошибка запуска: {e}") }).await;
                 }
             }
         });
@@ -280,6 +439,39 @@ impl App for LauncherApp {
                 self.mods_page.search_results = results;
                 self.mods_page.is_searching = false;
                 self.mod_search_rx = None;
+            }
+        }
+
+        // Receive Mod installation result
+        if let Some(rx) = &mut self.mod_install_rx {
+            if let Ok(res) = rx.try_recv() {
+                match res {
+                    Ok((id, title)) => {
+                        self.mods_page.installing_ids.remove(&id);
+                        self.mods_page.installed_titles.insert(title.to_lowercase());
+                        let mods_dir = self.paths.root_dir.join("mods");
+                        self.mods_page.local_mods = LocalModManager::scan_mods(&mods_dir).unwrap_or_default();
+                        self.mods_page.status_message = Some((format!("Мод \"{title}\" успешно установлен!"), true));
+                    }
+                    Err(err) => {
+                        self.mods_page.status_message = Some((err, false));
+                    }
+                }
+                self.mod_install_rx = None;
+            }
+        }
+
+        // Receive launch step text
+        if let Some(rx) = &mut self.launch_status_rx {
+            while let Ok(msg) = rx.try_recv() {
+                self.launch_status_text = msg;
+            }
+        }
+
+        // Receive progress tracker handle
+        if let Some(rx) = &mut self.progress_init_rx {
+            if let Ok(maybe_rx) = rx.try_recv() {
+                self.download_progress_rx = maybe_rx;
             }
         }
 
@@ -324,10 +516,9 @@ impl App for LauncherApp {
         // Check incoming download progress updates
         if let Some(rx) = &self.download_progress_rx {
             let progress = rx.borrow().clone();
-            DownloadOverlay::show(ctx, &progress, "Загрузка компонентов...", || {
-                // Cancel callback
+            DownloadOverlay::show(ctx, &progress, &self.launch_status_text, || {
+                // Cancel
             });
-            // Keep rendering at 60 FPS while download is active
             ctx.request_repaint_after(std::time::Duration::from_millis(16));
         }
 
@@ -350,7 +541,7 @@ impl App for LauncherApp {
                         self.is_launching = false;
                     }
                     GameEvent::Crashed { message } => {
-                        tracing::error!("Minecraft process crashed: {message}");
+                        tracing::error!("Minecraft process error: {message}");
                         self.is_launching = false;
                     }
                 }
@@ -397,11 +588,10 @@ impl App for LauncherApp {
                 }
             });
 
-        // 4. Central content panel (fills all remaining area cleanly)
+        // 4. Central content panel
         CentralPanel::default()
             .frame(egui::Frame::none().fill(BG))
             .show(ctx, |ui| {
-                // Generous inner margins for the pages
                 let inner_rect = ui.available_rect_before_wrap().shrink2(egui::vec2(24.0, 12.0));
                 let mut content_ui = ui.new_child(
                     egui::UiBuilder::new()
@@ -414,11 +604,40 @@ impl App for LauncherApp {
                         self.home_page.show(&mut content_ui, &self.versions, &mut self.selected_version);
                     }
                     NavTab::Modpacks => {
-                        self.instances_page.show(
+                        let action = self.instances_page.show(
                             &mut content_ui,
                             &mut self.instances,
                             &mut self.selected_instance,
+                            &self.paths.instances_dir(),
                         );
+
+                        match action {
+                            InstanceAction::Created(inst) => {
+                                let _ = inst.ensure_directories(&self.paths.instances_dir());
+                                self.instances.push(inst);
+                                let _ = Instance::save_all(&self.paths.instances_file(), &self.instances);
+                            }
+                            InstanceAction::Deleted(id) => {
+                                self.instances.retain(|i| i.id != id);
+                                if self.selected_instance == Some(id) {
+                                    self.selected_instance = self.instances.first().map(|i| i.id);
+                                }
+                                let _ = Instance::save_all(&self.paths.instances_file(), &self.instances);
+                            }
+                            InstanceAction::Selected(id) => {
+                                if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
+                                    self.selected_version = Some(inst.game_version.clone());
+                                }
+                            }
+                            InstanceAction::Launch(id) => {
+                                self.selected_instance = Some(id);
+                                if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
+                                    self.selected_version = Some(inst.game_version.clone());
+                                }
+                                self.handle_launch();
+                            }
+                            InstanceAction::None => {}
+                        }
                     }
                     NavTab::Mods => {
                         let mods_dir = self.paths.root_dir.join("mods");

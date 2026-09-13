@@ -73,10 +73,18 @@ impl ArgumentBuilder {
     }
 
     fn replace_jvm_templates(arg: &str, natives_dir: &Path, classpath: &str) -> String {
+        let lib_dir = natives_dir
+            .parent()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let cp_sep = if cfg!(windows) { ";" } else { ":" };
+
         arg.replace("${natives_directory}", &natives_dir.to_string_lossy())
             .replace("${launcher_name}", "AlephLauncher")
             .replace("${launcher_version}", "1.0.0")
             .replace("${classpath}", classpath)
+            .replace("${library_directory}", &lib_dir)
+            .replace("${classpath_separator}", cp_sep)
     }
 
     pub fn build_game_args(

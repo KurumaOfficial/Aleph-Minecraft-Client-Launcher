@@ -1,8 +1,9 @@
 use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
 use amc_mods::types::{LocalMod, ModSearchResult};
+use std::collections::HashSet;
 use std::path::Path;
 use crate::theme::{
-    BG_ELEVATED, BORDER_DEFAULT, RUBY, RUBY_LIGHT, SUCCESS,
+    BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT, SUCCESS,
     TEXT_HEADING, TEXT_MUTED,
 };
 
@@ -19,7 +20,9 @@ pub struct ModsPage {
     pub is_searching: bool,
     pub search_results: Vec<ModSearchResult>,
     pub local_mods: Vec<LocalMod>,
-    pub status_message: Option<String>,
+    pub installing_ids: HashSet<String>,
+    pub installed_titles: HashSet<String>,
+    pub status_message: Option<(String, bool)>,
 }
 
 impl Default for ModsPage {
@@ -30,6 +33,8 @@ impl Default for ModsPage {
             is_searching: false,
             search_results: Vec::new(),
             local_mods: Vec::new(),
+            installing_ids: HashSet::new(),
+            installed_titles: HashSet::new(),
             status_message: None,
         }
     }
@@ -55,8 +60,19 @@ impl ModsPage {
 
         ui.add_space(14.0);
 
+        // Status banner if present
+        if let Some((msg, is_ok)) = &self.status_message {
+            let col = if *is_ok { SUCCESS } else { RUBY };
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new(format!("ℹ {msg}")).color(col).strong());
+            });
+            ui.add_space(8.0);
+        }
+
         // Subtabs: Локальные / Поиск
         ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing = vec2(8.0, 0.0);
+
             let local_active = self.sub_tab == ModsSubTab::Local;
             let search_active = self.sub_tab == ModsSubTab::Search;
 
@@ -88,9 +104,10 @@ impl ModsPage {
                 self.sub_tab = ModsSubTab::Search;
             }
 
-            ui.add_space(20.0);
+            ui.add_space(16.0);
 
             if ui.button("📂 Открыть папку mods/").clicked() {
+                let _ = std::fs::create_dir_all(mods_dir);
                 let _ = open::that(mods_dir);
             }
         });
@@ -297,25 +314,55 @@ impl ModsPage {
                         );
                     });
 
-                    // Install button
+                    // Install button or Installed status
+                    let is_downloading = self.installing_ids.contains(&item.id);
+                    let is_installed = self.installed_titles.contains(&item.title.to_lowercase())
+                        || self.local_mods.iter().any(|lm| {
+                            let lm_lower = lm.name.to_lowercase();
+                            let it_lower = item.title.to_lowercase();
+                            lm_lower == it_lower || lm_lower.contains(&it_lower)
+                        });
+
                     let btn_width = 110.0;
                     let avail = child.available_width() - btn_width - 16.0;
                     if avail > 0.0 {
                         child.add_space(avail);
                     }
 
-                    let btn = egui::Button::new(
-                        egui::RichText::new("СКАЧАТЬ")
-                            .font(egui::FontId::proportional(11.0))
-                            .strong()
-                            .color(Color32::WHITE),
-                    )
-                    .fill(RUBY)
-                    .stroke(Stroke::new(1.0, RUBY_LIGHT))
-                    .min_size(vec2(90.0, 30.0));
+                    if is_downloading {
+                        let btn = egui::Button::new(
+                            egui::RichText::new("⏳ СКАЧИВАНИЕ")
+                                .font(egui::FontId::proportional(11.0))
+                                .color(TEXT_MUTED),
+                        )
+                        .fill(BG_HOVER)
+                        .min_size(vec2(100.0, 30.0));
+                        child.add(btn);
+                    } else if is_installed {
+                        let badge = egui::Button::new(
+                            egui::RichText::new("✓ УСТАНОВЛЕН")
+                                .font(egui::FontId::proportional(11.0))
+                                .strong()
+                                .color(Color32::WHITE),
+                        )
+                        .fill(SUCCESS)
+                        .min_size(vec2(100.0, 30.0));
+                        child.add(badge);
+                    } else {
+                        let btn = egui::Button::new(
+                            egui::RichText::new("СКАЧАТЬ")
+                                .font(egui::FontId::proportional(11.0))
+                                .strong()
+                                .color(Color32::WHITE),
+                        )
+                        .fill(RUBY)
+                        .stroke(Stroke::new(1.0, RUBY_LIGHT))
+                        .min_size(vec2(90.0, 30.0));
 
-                    if child.add(btn).clicked() {
-                        to_install = Some(item.clone());
+                        if child.add(btn).clicked() {
+                            self.installing_ids.insert(item.id.clone());
+                            to_install = Some(item.clone());
+                        }
                     }
                 }
 

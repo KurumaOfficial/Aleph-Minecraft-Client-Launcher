@@ -75,25 +75,22 @@ impl DownloadEngine {
             .map(|f| f.to_string_lossy().to_string())
             .unwrap_or_else(|| "download".to_string());
 
-        // Check if file already exists with valid checksum
+        // Check if file already exists with valid checksum or size
         if item.destination.is_file() {
-            if let Some(expected) = &item.sha1 {
-                if let Ok(actual) = file_sha1(&item.destination).await {
-                    if actual.eq_ignore_ascii_case(expected) {
+            if let Some(expected_size) = item.size {
+                if let Ok(meta) = fs::metadata(&item.destination).await {
+                    if meta.len() == expected_size {
                         if let Some(t) = tracker {
-                            if let Some(size) = item.size {
-                                t.on_bytes(size, &filename);
-                            }
+                            t.on_bytes(expected_size, &filename);
                             t.on_file_completed();
                         }
                         return Ok(());
                     }
                 }
-            } else if item.size.is_some() {
-                if let Ok(meta) = fs::metadata(&item.destination).await {
-                    if meta.len() == item.size.unwrap() {
+            } else if let Some(expected) = &item.sha1 {
+                if let Ok(actual) = file_sha1(&item.destination).await {
+                    if actual.eq_ignore_ascii_case(expected) {
                         if let Some(t) = tracker {
-                            t.on_bytes(meta.len(), &filename);
                             t.on_file_completed();
                         }
                         return Ok(());
@@ -212,16 +209,26 @@ impl DownloadEngine {
         Ok(())
     }
 
-    pub async fn download_all(
+    pub fn create_tracker(
         &self,
-        items: Vec<DownloadItem>,
-    ) -> Result<watch::Receiver<DownloadProgress>> {
+        items: &[DownloadItem],
+    ) -> (Arc<ProgressTracker>, watch::Receiver<DownloadProgress>) {
         let total_items = items.len();
         let total_bytes: u64 = items.iter().filter_map(|i| i.size).sum();
+        ProgressTracker::new(total_items, total_bytes)
+    }
 
-        let (tracker, rx) = ProgressTracker::new(total_items, total_bytes);
+    pub async fn download_all_with_progress(
+        &self,
+        items: Vec<DownloadItem>,
+        tracker: Option<Arc<ProgressTracker>>,
+    ) -> Result<()> {
+        let total_items = items.len();
+        if total_items == 0 {
+            return Ok(());
+        }
+
         let semaphore = Arc::new(Semaphore::new(self.max_concurrency));
-
         let mut handles = Vec::with_capacity(total_items);
 
         for item in items {
@@ -234,8 +241,11 @@ impl DownloadEngine {
             };
 
             handles.push(tokio::spawn(async move {
-                let _permit = sem.acquire().await.unwrap();
-                engine.download_one(&item, Some(&trk)).await
+                let _permit = sem
+                    .acquire()
+                    .await
+                    .map_err(|e| LauncherError::Custom(format!("Semaphore error: {e}")))?;
+                engine.download_one(&item, trk.as_deref()).await
             }));
         }
 
@@ -246,6 +256,10 @@ impl DownloadEngine {
             res?;
         }
 
-        Ok(rx)
+        Ok(())
+    }
+
+    pub async fn download_all(&self, items: Vec<DownloadItem>) -> Result<()> {
+        self.download_all_with_progress(items, None).await
     }
 }

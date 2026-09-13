@@ -24,3 +24,4 @@ open = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
+rfd = { workspace = true }
