@@ -51,13 +51,14 @@ impl HomePage {
         ui: &mut Ui,
         versions: &[GameVersion],
         selected_version: &mut Option<String>,
+        lang: amc_core::Language,
     ) {
         ui.add_space(20.0);
 
         // Section Header: Versions + Selected Badge + Compact Server Ping
         ui.horizontal(|ui| {
             ui.label(
-                egui::RichText::new("Версии Minecraft")
+                egui::RichText::new(lang.home_title())
                     .font(egui::FontId::proportional(26.0))
                     .strong()
                     .color(TEXT_HEADING),
@@ -65,7 +66,7 @@ impl HomePage {
 
             if let Some(sel) = selected_version.as_deref() {
                 ui.add_space(12.0);
-                draw_custom_badge(ui, &format!("Выбрана: {sel}"), RUBY);
+                draw_custom_badge(ui, &lang.home_selected_badge(sel), RUBY);
             }
 
             // Compact server status on the right
@@ -88,7 +89,7 @@ impl HomePage {
                     ui.add_space(space);
                 }
                 ui.label(
-                    egui::RichText::new("⏳ Пинг сервера...")
+                    egui::RichText::new(lang.home_pinging())
                         .font(egui::FontId::proportional(12.0))
                         .color(TEXT_MUTED),
                 );
@@ -102,7 +103,7 @@ impl HomePage {
             // Search Input
             let search_width = (ui.available_width() - 170.0).max(180.0);
             let search_edit = TextEdit::singleline(&mut self.search_query)
-                .hint_text(egui::RichText::new("🔍 Поиск версий...").color(TEXT_MUTED))
+                .hint_text(egui::RichText::new(lang.home_search_hint()).color(TEXT_MUTED))
                 .desired_width(search_width)
                 .font(egui::FontId::proportional(13.0));
 
@@ -112,8 +113,8 @@ impl HomePage {
 
             // Sort Toggle Button
             let sort_label = match self.sort_order {
-                SortOrder::Newest => "Сначала новые ▾",
-                SortOrder::Oldest => "Сначала старые ▴",
+                SortOrder::Newest => format!("{} ▾", lang.home_sort_newest()),
+                SortOrder::Oldest => format!("{} ▴", lang.home_sort_oldest()),
             };
 
             let sort_btn = egui::Button::new(
@@ -138,12 +139,12 @@ impl HomePage {
         // Filter Tabs
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing = vec2(6.0, 0.0);
-            self.filter_tab_btn(ui, "ВСЕ", FilterTab::All);
-            self.filter_tab_btn(ui, "РЕЛИЗЫ", FilterTab::Releases);
-            self.filter_tab_btn(ui, "СНАПШОТЫ", FilterTab::Snapshots);
-            self.filter_tab_btn(ui, "БЕТА", FilterTab::Betas);
-            self.filter_tab_btn(ui, "АЛЬФА", FilterTab::Alphas);
-            self.filter_tab_btn(ui, "СТАРЫЕ", FilterTab::Old);
+            self.filter_tab_btn(ui, lang.home_tab_all(), FilterTab::All);
+            self.filter_tab_btn(ui, lang.home_tab_releases(), FilterTab::Releases);
+            self.filter_tab_btn(ui, lang.home_tab_snapshots(), FilterTab::Snapshots);
+            self.filter_tab_btn(ui, lang.home_tab_betas(), FilterTab::Betas);
+            self.filter_tab_btn(ui, lang.home_tab_alphas(), FilterTab::Alphas);
+            self.filter_tab_btn(ui, lang.home_tab_old(), FilterTab::Old);
         });
 
         ui.add_space(10.0);
@@ -183,14 +184,19 @@ impl HomePage {
                 if versions.is_empty() {
                     ui.spinner();
                     ui.add_space(8.0);
+                    let loading_msg = match lang {
+                        amc_core::Language::English => "Fetching Minecraft versions from Mojang...",
+                        amc_core::Language::Russian => "Загрузка списка версий от Mojang...",
+                        amc_core::Language::Ukrainian => "Завантаження списку версій від Mojang...",
+                    };
                     ui.label(
-                        egui::RichText::new("Загрузка списка версий от Mojang...")
+                        egui::RichText::new(loading_msg)
                             .font(egui::FontId::proportional(15.0))
                             .color(TEXT_MUTED),
                     );
                 } else {
                     ui.label(
-                        egui::RichText::new("Версии не найдены")
+                        egui::RichText::new(lang.home_empty())
                             .font(egui::FontId::proportional(15.0))
                             .color(TEXT_MUTED),
                     );

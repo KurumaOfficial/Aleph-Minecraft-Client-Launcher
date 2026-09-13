@@ -87,6 +87,8 @@ impl LauncherApp {
             .map(|i| i.game_version.clone())
             .or_else(|| Some("1.20.1".to_string()));
 
+        let lang = config.ui.language();
+
         Self {
             paths,
             config,
@@ -98,7 +100,7 @@ impl LauncherApp {
             versions: Vec::new(),
             instances,
             is_launching: false,
-            launch_status_text: "Подготовка к запуску...".to_string(),
+            launch_status_text: lang.status_preparing().to_string(),
             home_page: HomePage::default(),
             instances_page: InstancesPage::default(),
             mods_page,
@@ -294,8 +296,9 @@ impl LauncherApp {
             session.username
         );
 
+        let lang = self.config.ui.language();
         self.is_launching = true;
-        self.launch_status_text = format!("Подготовка версии {}...", ver_id);
+        self.launch_status_text = lang.status_preparing_version(&ver_id);
 
         let engine = self.download_engine.clone();
         let mut options = self.config.default_launch_options.clone();
@@ -315,10 +318,10 @@ impl LauncherApp {
             let client = reqwest::Client::new();
 
             // 1. Resolve Version Details
-            let _ = status_tx.send("Получение информации о версии...".to_string()).await;
+            let _ = status_tx.send(lang.status_fetching_manifest().to_string()).await;
             let details = match loader {
                 LoaderType::Fabric => {
-                    let _ = status_tx.send("Поиск Fabric Loader...".to_string()).await;
+                    let _ = status_tx.send("Fabric Loader...".to_string()).await;
                     match FabricLoader::get_latest_loader_version(&client, &ver_id).await {
                         Ok(loader_ver) => {
                             let _ = status_tx.send(format!("Загрузка профиля Fabric {loader_ver}...")).await;
@@ -402,7 +405,7 @@ impl LauncherApp {
 
             // 2. Resolve Java Runtime
             let req_java = details.required_java_major();
-            let _ = status_tx.send(format!("Проверка Java {req_java}...")).await;
+            let _ = status_tx.send(lang.status_checking_java().to_string()).await;
             let java_bin = if let Some(custom_java) = &options.java_path {
                 if custom_java.is_file() {
                     custom_java.clone()
@@ -421,7 +424,7 @@ impl LauncherApp {
             };
 
             // 3. Collect download items
-            let _ = status_tx.send("Проверка файлов Minecraft...".to_string()).await;
+            let _ = status_tx.send(lang.status_checking_assets().to_string()).await;
             let mut download_items: Vec<amc_downloader::DownloadItem> = Vec::new();
             let client_jar = paths.versions_dir().join(&ver_id).join(format!("{ver_id}.jar"));
 
@@ -457,7 +460,7 @@ impl LauncherApp {
             }
 
             if let Some(asset_ref) = &details.asset_index {
-                let _ = status_tx.send("Проверка ассетов игры...".to_string()).await;
+                let _ = status_tx.send(lang.status_checking_assets().to_string()).await;
                 if let Ok(idx) = amc_minecraft::AssetIndex::fetch_or_load(&client, asset_ref, &paths.assets_dir()).await {
                     let all_assets = idx.to_download_items(&paths.assets_dir());
                     for a in all_assets {
@@ -471,7 +474,7 @@ impl LauncherApp {
             // 4. Download missing components
             if !download_items.is_empty() {
                 let count = download_items.len();
-                let _ = status_tx.send(format!("Загрузка {count} файлов...").to_string()).await;
+                let _ = status_tx.send(lang.status_downloading_files(count)).await;
                 let (tracker, progress_rx) = engine.create_tracker(&download_items);
                 let _ = prog_tx.send(Some(progress_rx)).await;
 
@@ -487,13 +490,13 @@ impl LauncherApp {
             // 5. Unpack natives
             let natives_dir = paths.libraries_dir().join("natives").join(&ver_id);
             let _ = tokio::fs::create_dir_all(&natives_dir).await;
-            let _ = status_tx.send("Распаковка natives...".to_string()).await;
+            let _ = status_tx.send(lang.status_extracting_natives().to_string()).await;
             for nat_jar in &natives_jars {
                 let _ = VersionDetails::extract_natives(nat_jar, &natives_dir);
             }
 
             // 6. Launch Minecraft
-            let _ = status_tx.send("Запуск процесса Minecraft...".to_string()).await;
+            let _ = status_tx.send(lang.status_launching().to_string()).await;
             let assets_dir = paths.assets_dir();
 
             match MinecraftLauncher::launch(
@@ -647,7 +650,8 @@ impl App for LauncherApp {
                         self.console_modal.push_line(line);
                     }
                     GameEvent::Exited { code } => {
-                        let msg = format!("Процесс Minecraft завершен с кодом {:?}", code);
+                        let lang = self.config.ui.language();
+                        let msg = lang.status_process_exited(code);
                         tracing::info!("{msg}");
                         self.console_modal.push_line(format!("[ALEPH] {msg}"));
                         self.is_launching = false;
@@ -663,8 +667,10 @@ impl App for LauncherApp {
                         }
                     }
                     GameEvent::Crashed { message } => {
-                        tracing::error!("Ошибка процесса Minecraft: {message}");
-                        self.console_modal.push_line(format!("[ERROR] {message}"));
+                        let lang = self.config.ui.language();
+                        let msg = lang.status_process_crashed(&message);
+                        tracing::error!("{msg}");
+                        self.console_modal.push_line(format!("[ERROR] {msg}"));
                         self.is_launching = false;
                         if let Some(start) = self.session_start_time.take() {
                             let elapsed_mins = (start.elapsed().as_secs() / 60).max(1);
@@ -681,6 +687,8 @@ impl App for LauncherApp {
             }
         }
 
+        let lang = self.config.ui.language();
+
         // Update avatar texture if needed
         if self.skins_page.avatar_dirty || self.avatar_texture.is_none() {
             let avatar_img = crate::pages::skins::extract_head_avatar(
@@ -696,7 +704,7 @@ impl App for LauncherApp {
             .exact_height(36.0)
             .frame(egui::Frame::none())
             .show(ctx, |ui| {
-                let tb_resp = TitleBar::show(ui, "Aleph Launcher");
+                let tb_resp = TitleBar::show(ui, "Aleph Launcher", lang);
                 if tb_resp.console_clicked {
                     self.console_modal.is_open = !self.console_modal.is_open;
                 }
@@ -710,7 +718,7 @@ impl App for LauncherApp {
                 let active_acc = self.account_mgr.active_account();
                 let is_launching = self.is_launching;
 
-                let bbar_resp = BottomBar::show(ui, active_acc, is_launching, self.avatar_texture.as_ref());
+                let bbar_resp = BottomBar::show(ui, active_acc, is_launching, self.avatar_texture.as_ref(), lang);
                 if bbar_resp.login_clicked {
                     self.login_modal.is_open = true;
                 }
@@ -728,7 +736,7 @@ impl App for LauncherApp {
             .resizable(false)
             .frame(egui::Frame::none())
             .show(ctx, |ui| {
-                let exit_clicked = Sidebar::show(ui, &mut self.current_tab);
+                let exit_clicked = Sidebar::show(ui, &mut self.current_tab, lang);
                 if exit_clicked {
                     ui.ctx().send_viewport_cmd(ViewportCommand::Close);
                 }
@@ -747,7 +755,7 @@ impl App for LauncherApp {
 
                 match self.current_tab {
                     NavTab::Home => {
-                        self.home_page.show(&mut content_ui, &self.versions, &mut self.selected_version);
+                        self.home_page.show(&mut content_ui, &self.versions, &mut self.selected_version, lang);
                     }
                     NavTab::Modpacks => {
                         let action = self.instances_page.show(
@@ -755,6 +763,7 @@ impl App for LauncherApp {
                             &mut self.instances,
                             &mut self.selected_instance,
                             &self.paths.instances_dir(),
+                            lang,
                         );
 
                         match action {
@@ -802,6 +811,7 @@ impl App for LauncherApp {
                         self.mods_page.show(
                             &mut content_ui,
                             &mods_dir,
+                            lang,
                             |query, provider| {
                                 search_req = Some((query, provider));
                             },
@@ -819,7 +829,7 @@ impl App for LauncherApp {
                     }
                     NavTab::Skins => {
                         let acc = self.account_mgr.active_account();
-                        self.skins_page.show(&mut content_ui, acc);
+                        self.skins_page.show(&mut content_ui, acc, lang);
                     }
                     NavTab::Settings => {
                         self.settings_page.show(&mut content_ui, &mut self.config, &mut self.account_mgr, &self.paths);
@@ -833,6 +843,7 @@ impl App for LauncherApp {
         let mut request_ms = false;
         self.login_modal.show(
             ctx,
+            lang,
             |account| {
                 let _ = self.account_mgr.add_or_update_account(account);
             },
@@ -846,6 +857,6 @@ impl App for LauncherApp {
         }
 
         // Game Console Modal
-        self.console_modal.show(ctx);
+        self.console_modal.show(ctx, lang);
     }
 }

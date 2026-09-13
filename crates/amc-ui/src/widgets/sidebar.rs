@@ -17,7 +17,7 @@ pub enum NavTab {
 pub struct Sidebar;
 
 impl Sidebar {
-    pub fn show(ui: &mut Ui, current_tab: &mut NavTab) -> bool {
+    pub fn show(ui: &mut Ui, current_tab: &mut NavTab, lang: amc_core::Language) -> bool {
         let mut exit_clicked = false;
         let rect = ui.available_rect_before_wrap();
 
@@ -34,16 +34,16 @@ impl Sidebar {
 
             // Navigation Items
             ui.add_space(8.0);
-            if Self::nav_item(ui, "Главная", "⌂", *current_tab == NavTab::Home) {
+            if Self::nav_item(ui, lang.nav_home(), "⌂", *current_tab == NavTab::Home) {
                 *current_tab = NavTab::Home;
             }
-            if Self::nav_item(ui, "Сборки", "⊞", *current_tab == NavTab::Modpacks) {
+            if Self::nav_item(ui, lang.nav_instances(), "⊞", *current_tab == NavTab::Modpacks) {
                 *current_tab = NavTab::Modpacks;
             }
-            if Self::nav_item(ui, "Моды", "◈", *current_tab == NavTab::Mods) {
+            if Self::nav_item(ui, lang.nav_mods(), "◈", *current_tab == NavTab::Mods) {
                 *current_tab = NavTab::Mods;
             }
-            if Self::nav_item(ui, "Скины", "👤", *current_tab == NavTab::Skins) {
+            if Self::nav_item(ui, lang.nav_skins(), "👤", *current_tab == NavTab::Skins) {
                 *current_tab = NavTab::Skins;
             }
 
@@ -62,11 +62,11 @@ impl Sidebar {
             );
             ui.add_space(10.0);
 
-            if Self::nav_item(ui, "Настройки", "⚙", *current_tab == NavTab::Settings) {
+            if Self::nav_item(ui, lang.nav_settings(), "⚙", *current_tab == NavTab::Settings) {
                 *current_tab = NavTab::Settings;
             }
 
-            if Self::nav_item(ui, "Выход", "⏻", false) {
+            if Self::nav_item(ui, lang.nav_exit(), "⏻", false) {
                 exit_clicked = true;
             }
         });

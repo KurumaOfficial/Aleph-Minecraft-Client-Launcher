@@ -1,5 +1,6 @@
 use egui::{vec2, Color32, Rounding, Stroke, TextEdit, Ui};
 use amc_auth::{login_offline, Account, DeviceCodeResponse};
+use amc_core::Language;
 use crate::theme::{
     BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT, TEXT_MUTED, TEXT_PRIMARY,
 };
@@ -49,6 +50,7 @@ impl LoginModal {
     pub fn show(
         &mut self,
         ctx: &egui::Context,
+        lang: Language,
         on_success: impl FnOnce(Account),
         on_request_ms_code: impl FnOnce(),
     ) {
@@ -59,7 +61,7 @@ impl LoginModal {
         let mut success_account = None;
         let mut request_ms = false;
 
-        egui::Window::new("Авторизация")
+        egui::Window::new(lang.login_modal_title())
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, vec2(0.0, 0.0))
@@ -69,9 +71,9 @@ impl LoginModal {
 
                 // Mode Tabs
                 ui.horizontal(|ui| {
-                    self.tab_btn(ui, "БЕСПЛАТНО / НИК", LoginMode::Offline);
-                    self.tab_btn(ui, "WETID (ALEPH)", LoginMode::WetId);
-                    self.tab_btn(ui, "MICROSOFT ЛИЦЕНЗИЯ", LoginMode::Microsoft);
+                    self.tab_btn(ui, lang.login_tab_offline(), LoginMode::Offline);
+                    self.tab_btn(ui, lang.login_tab_wetid(), LoginMode::WetId);
+                    self.tab_btn(ui, lang.login_tab_microsoft(), LoginMode::Microsoft);
                 });
 
                 ui.add_space(16.0);
@@ -83,7 +85,7 @@ impl LoginModal {
 
                 match self.mode {
                     LoginMode::Offline => {
-                        ui.label(egui::RichText::new("Введите никнейм для игры:").color(TEXT_PRIMARY));
+                        ui.label(egui::RichText::new(lang.login_offline_prompt()).color(TEXT_PRIMARY));
                         let resp = ui.add(
                             TextEdit::singleline(&mut self.offline_nickname)
                                 .hint_text("Player")
@@ -93,7 +95,7 @@ impl LoginModal {
 
                         ui.add_space(6.0);
                         ui.label(
-                            egui::RichText::new("Подходит для любых пиратских и локальных серверов")
+                            egui::RichText::new(lang.login_offline_hint())
                                 .font(egui::FontId::proportional(11.0))
                                 .color(TEXT_MUTED),
                         );
@@ -102,7 +104,7 @@ impl LoginModal {
 
                         let enter = resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
                         let btn = egui::Button::new(
-                            egui::RichText::new("ВОЙТИ ПО НИКУ")
+                            egui::RichText::new(lang.login_btn_play())
                                 .font(egui::FontId::proportional(13.0))
                                 .strong()
                                 .color(Color32::WHITE),
@@ -112,7 +114,7 @@ impl LoginModal {
                         .min_size(vec2(ui.available_width(), 40.0));
 
                         if (ui.add(btn).clicked() || enter) && !self.offline_nickname.trim().is_empty() {
-                            match login_offline(&self.offline_nickname.trim()) {
+                            match login_offline(self.offline_nickname.trim()) {
                                 Ok(acc) => {
                                     success_account = Some(acc);
                                     self.is_open = false;
@@ -124,17 +126,22 @@ impl LoginModal {
                         }
                     }
                     LoginMode::WetId => {
-                        ui.label(egui::RichText::new("Логин или E-mail WetID:").color(TEXT_PRIMARY));
+                        ui.label(egui::RichText::new(lang.login_wetid_login()).color(TEXT_PRIMARY));
                         ui.add(TextEdit::singleline(&mut self.wetid_login).desired_width(400.0));
 
                         ui.add_space(10.0);
 
-                        ui.label(egui::RichText::new("Пароль:").color(TEXT_PRIMARY));
+                        ui.label(egui::RichText::new(lang.login_wetid_pass()).color(TEXT_PRIMARY));
                         ui.add(TextEdit::singleline(&mut self.wetid_pass).password(true).desired_width(400.0));
 
                         ui.add_space(6.0);
+                        let wetid_hint = match lang {
+                            Language::English => "Access to AlephTrust servers, cloud skins and stats",
+                            Language::Russian => "Доступ к серверам AlephTrust, облачным скинам и статистике",
+                            Language::Ukrainian => "Доступ до серверів AlephTrust, хмарних скінів та статистики",
+                        };
                         ui.label(
-                            egui::RichText::new("Доступ к серверам AlephTrust, облачным скинам и статистике")
+                            egui::RichText::new(wetid_hint)
                                 .font(egui::FontId::proportional(11.0))
                                 .color(TEXT_MUTED),
                         );
@@ -142,7 +149,7 @@ impl LoginModal {
                         ui.add_space(16.0);
 
                         let btn = egui::Button::new(
-                            egui::RichText::new("ВОЙТИ В WETID")
+                            egui::RichText::new(lang.login_btn_wetid())
                                 .font(egui::FontId::proportional(13.0))
                                 .strong()
                                 .color(Color32::WHITE),
@@ -165,7 +172,7 @@ impl LoginModal {
                     LoginMode::Microsoft => {
                         if let Some(code_data) = &self.ms_device_code {
                             ui.label(
-                                egui::RichText::new("Перейдите по ссылке и введите код:")
+                                egui::RichText::new(lang.login_ms_instructions(&code_data.verification_uri))
                                     .font(egui::FontId::proportional(14.0))
                                     .color(TEXT_PRIMARY),
                             );
@@ -188,23 +195,33 @@ impl LoginModal {
 
                             ui.add_space(14.0);
 
-                            if ui.button("🌐 Открыть страницу авторизации").clicked() {
+                            if ui.button(lang.login_btn_open_browser()).clicked() {
                                 let _ = open::that(&code_data.verification_uri);
                             }
 
                             ui.add_space(10.0);
                             ui.horizontal(|ui| {
                                 ui.spinner();
-                                ui.label(egui::RichText::new("Ожидание подтверждения в браузере...").color(TEXT_MUTED));
+                                ui.label(egui::RichText::new(lang.login_ms_waiting()).color(TEXT_MUTED));
                             });
                         } else {
+                            let ms_prompt = match lang {
+                                Language::English => "Sign in via official Microsoft OAuth2 Device Code Flow:",
+                                Language::Russian => "Вход через официальный OAuth2 Device Code Flow:",
+                                Language::Ukrainian => "Вхід через офіційний OAuth2 Device Code Flow:",
+                            };
+                            let ms_hint = match lang {
+                                Language::English => "Required for playing on official licensed servers (Hypixel, etc.)",
+                                Language::Russian => "Требуется для игры на официальных лицензионных серверах (Hypixel и др.)",
+                                Language::Ukrainian => "Потрібно для гри на офіційних ліцензійних серверах (Hypixel тощо)",
+                            };
                             ui.label(
-                                egui::RichText::new("Вход через официальный OAuth2 Device Code Flow:")
+                                egui::RichText::new(ms_prompt)
                                     .color(TEXT_PRIMARY),
                             );
                             ui.add_space(6.0);
                             ui.label(
-                                egui::RichText::new("Требуется для игры на официальных лицензионных серверах (Hypixel и др.)")
+                                egui::RichText::new(ms_hint)
                                     .font(egui::FontId::proportional(11.0))
                                     .color(TEXT_MUTED),
                             );
@@ -212,7 +229,7 @@ impl LoginModal {
                             ui.add_space(16.0);
 
                             let btn = egui::Button::new(
-                                egui::RichText::new("ПОЛУЧИТЬ КОД АВТОРИЗАЦИИ")
+                                egui::RichText::new(lang.login_btn_get_code())
                                     .font(egui::FontId::proportional(13.0))
                                     .strong()
                                     .color(Color32::WHITE),
@@ -231,7 +248,7 @@ impl LoginModal {
                 ui.add_space(12.0);
                 ui.separator();
                 ui.horizontal(|ui| {
-                    if ui.button("Закрыть").clicked() {
+                    if ui.button(lang.login_btn_cancel()).clicked() {
                         self.is_open = false;
                         self.error_msg = None;
                     }

@@ -58,6 +58,10 @@ Most modern Minecraft launchers suffer from two extremes: they are either sluggi
 - **Syntax color-coding:** Fatal errors and exceptions highlighted in ruby red, warnings in amber, debug logs in muted gray.
 - **Built-in tools:** Real-time log search, autoscroll lock, clipboard copying, and single-click export to a `.log` file.
 
+### 🌐 Multi-Language Localization
+- **Instant runtime switching:** Seamless live toggling between **English**, **Русский** (Russian), and **Українська** (Ukrainian) directly in settings with zero launcher restart required.
+- **Type-safe architecture:** Zero-cost compiled dictionary system in pure Rust ensuring complete coverage and consistent typography across all views, controls, and dialogs.
+
 ### 🚀 JVM GC Tuning Presets
 - **Aikar's G1GC Preset:** Battle-tested Java Virtual Machine flags configured to eliminate chunk-loading micro-stutters and frame drops.
 - **Generational ZGC Preset:** Ultra-low pause garbage collector with sub-millisecond pauses for modern Java 17+.
@@ -125,6 +129,7 @@ The compiled binary will be located at: `target/release/amc-launcher.exe`.
 - [x] 2D composite skin preview with dynamic status-bar avatar slicing.
 - [x] Interactive game console with log export and live filtering.
 - [x] Curated JVM garbage collection presets (Aikar's G1GC & Generational ZGC).
+- [x] Full tri-lingual localization (English, Русский, Українська).
 - [x] TCP Server List Ping (SLP) status and latency monitor.
 - [ ] 3D skin model viewport.
 - [ ] Modpack export/import support (`.mrpack` and CurseForge `.zip`).

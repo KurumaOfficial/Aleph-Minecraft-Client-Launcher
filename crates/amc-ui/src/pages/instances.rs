@@ -1,5 +1,6 @@
 use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
 use amc_core::types::{Instance, LoaderType};
+use amc_core::Language;
 use std::path::Path;
 use uuid::Uuid;
 use crate::theme::{
@@ -39,7 +40,7 @@ impl Default for InstancesPage {
         Self {
             search_query: String::new(),
             show_create_modal: false,
-            new_instance_name: "Новая сборка".to_string(),
+            new_instance_name: "My Instance".to_string(),
             new_instance_version: "1.20.1".to_string(),
             new_instance_loader: LoaderType::Fabric,
             new_instance_ram: 4096,
@@ -61,13 +62,14 @@ impl InstancesPage {
         instances: &mut Vec<Instance>,
         selected_instance: &mut Option<Uuid>,
         instances_dir: &Path,
+        lang: Language,
     ) -> InstanceAction {
         let mut action = InstanceAction::None;
         ui.add_space(20.0);
 
         // Header
         ui.label(
-            egui::RichText::new("Сборки Minecraft")
+            egui::RichText::new(lang.inst_title())
                 .font(egui::FontId::proportional(26.0))
                 .strong()
                 .color(TEXT_HEADING),
@@ -80,7 +82,7 @@ impl InstancesPage {
             let search_width = (ui.available_width() - 180.0).max(200.0);
             ui.add(
                 TextEdit::singleline(&mut self.search_query)
-                    .hint_text(egui::RichText::new("🔍 Поиск сборок...").color(TEXT_MUTED))
+                    .hint_text(egui::RichText::new(lang.inst_search_hint()).color(TEXT_MUTED))
                     .desired_width(search_width)
                     .font(egui::FontId::proportional(14.0)),
             );
@@ -88,7 +90,7 @@ impl InstancesPage {
             ui.add_space(10.0);
 
             let create_btn = egui::Button::new(
-                egui::RichText::new("+ СОЗДАТЬ СБОРКУ")
+                egui::RichText::new(lang.inst_btn_create())
                     .font(egui::FontId::proportional(12.0))
                     .strong()
                     .color(Color32::WHITE),
@@ -131,13 +133,13 @@ impl InstancesPage {
                     ui.add_space(50.0);
                     ui.vertical_centered(|ui| {
                         ui.label(
-                            egui::RichText::new("У вас пока нет созданных сборок")
+                            egui::RichText::new(lang.inst_empty())
                                 .font(egui::FontId::proportional(16.0))
                                 .color(TEXT_MUTED),
                         );
                         ui.add_space(10.0);
                         if ui
-                            .button(egui::RichText::new("Создать первую сборку").color(RUBY_LIGHT))
+                            .button(egui::RichText::new(lang.inst_btn_create()).color(RUBY_LIGHT))
                             .clicked()
                         {
                             self.show_create_modal = true;
@@ -150,7 +152,7 @@ impl InstancesPage {
                     ui.add_space(30.0);
                     ui.vertical_centered(|ui| {
                         ui.label(
-                            egui::RichText::new("Сборки по запросу не найдены")
+                            egui::RichText::new(lang.home_empty())
                                 .font(egui::FontId::proportional(14.0))
                                 .color(TEXT_MUTED),
                         );
@@ -226,21 +228,27 @@ impl InstancesPage {
                             );
                             if let Some(ram) = inst.ram_mb {
                                 ui.label(
-                                    egui::RichText::new(format!("• {} МБ RAM", ram))
+                                    egui::RichText::new(format!("• {} MB RAM", ram))
                                         .font(egui::FontId::proportional(12.0))
                                         .color(TEXT_MUTED),
                                 );
                             }
 
                             let play_time_str = if inst.total_played_minutes == 0 {
-                                "Не запускалась".to_string()
+                                lang.inst_never_played().to_string()
                             } else if inst.total_played_minutes < 60 {
-                                format!("{} мин", inst.total_played_minutes)
+                                format!("{} {}", inst.total_played_minutes, lang.inst_mins_suffix())
                             } else {
-                                format!("{} ч {} мин", inst.total_played_minutes / 60, inst.total_played_minutes % 60)
+                                format!(
+                                    "{} {} {} {}",
+                                    inst.total_played_minutes / 60,
+                                    lang.inst_hours_suffix(),
+                                    inst.total_played_minutes % 60,
+                                    lang.inst_mins_suffix()
+                                )
                             };
                             ui.label(
-                                egui::RichText::new(format!("• ⏱ {play_time_str}"))
+                                egui::RichText::new(format!("• ⏱ {}", lang.inst_playtime_label(&play_time_str)))
                                     .font(egui::FontId::proportional(11.0))
                                     .color(TEXT_MUTED),
                             );
@@ -258,7 +266,7 @@ impl InstancesPage {
                     let inst_dir = inst.get_game_dir(instances_dir);
                     if child
                         .button(egui::RichText::new("📁").color(TEXT_PRIMARY))
-                        .on_hover_text("Открыть папку сборки")
+                        .on_hover_text(lang.inst_btn_folder())
                         .clicked()
                     {
                         let _ = std::fs::create_dir_all(&inst_dir);
@@ -270,7 +278,7 @@ impl InstancesPage {
                     // Edit instance button
                     if child
                         .button(egui::RichText::new("⚙").color(TEXT_PRIMARY))
-                        .on_hover_text("Редактировать сборку")
+                        .on_hover_text(lang.inst_btn_edit())
                         .clicked()
                     {
                         self.edit_instance_id = Some(inst.id);
@@ -285,7 +293,7 @@ impl InstancesPage {
 
                     // Quick launch
                     let play_btn = egui::Button::new(
-                        egui::RichText::new("▶ ИГРАТЬ")
+                        egui::RichText::new(lang.inst_btn_play())
                             .font(egui::FontId::proportional(11.0))
                             .strong()
                             .color(Color32::WHITE),
@@ -303,7 +311,7 @@ impl InstancesPage {
                     // Delete button
                     if child
                         .button(egui::RichText::new("🗑").color(TEXT_MUTED))
-                        .on_hover_text("Удалить сборку")
+                        .on_hover_text(lang.inst_btn_delete())
                         .clicked()
                     {
                         action = InstanceAction::Deleted(inst.id);
@@ -318,22 +326,22 @@ impl InstancesPage {
 
         // Create Instance Modal Dialog
         if self.show_create_modal {
-            egui::Window::new("Создание новой сборки")
+            egui::Window::new(lang.inst_modal_create_title())
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, vec2(0.0, 0.0))
                 .min_width(420.0)
                 .show(ui.ctx(), |ui| {
                     ui.add_space(8.0);
-                    ui.label(egui::RichText::new("Название сборки:").color(TEXT_PRIMARY));
+                    ui.label(egui::RichText::new(lang.inst_modal_name()).color(TEXT_PRIMARY));
                     ui.add(TextEdit::singleline(&mut self.new_instance_name).desired_width(400.0));
 
                     ui.add_space(10.0);
-                    ui.label(egui::RichText::new("Версия Minecraft:").color(TEXT_PRIMARY));
+                    ui.label(egui::RichText::new(lang.inst_modal_version()).color(TEXT_PRIMARY));
                     ui.add(TextEdit::singleline(&mut self.new_instance_version).desired_width(400.0));
 
                     ui.add_space(10.0);
-                    ui.label(egui::RichText::new("Загрузчик модов:").color(TEXT_PRIMARY));
+                    ui.label(egui::RichText::new(lang.inst_modal_loader()).color(TEXT_PRIMARY));
                     egui::ComboBox::from_id_salt("loader_select")
                         .selected_text(self.new_instance_loader.as_str())
                         .show_ui(ui, |ui| {
@@ -346,13 +354,13 @@ impl InstancesPage {
                         });
 
                     ui.add_space(10.0);
-                    ui.label(egui::RichText::new(format!("Выделение RAM: {} МБ", self.new_instance_ram)).color(TEXT_PRIMARY));
+                    ui.label(egui::RichText::new(format!("{}: {} MB", lang.inst_modal_ram(), self.new_instance_ram)).color(TEXT_PRIMARY));
                     ui.add(egui::Slider::new(&mut self.new_instance_ram, 1024..=16384).step_by(512.0));
 
                     ui.add_space(18.0);
                     ui.horizontal(|ui| {
                         if ui
-                            .button(egui::RichText::new("СОЗДАТЬ").strong().color(Color32::WHITE))
+                            .button(egui::RichText::new(lang.inst_modal_btn_create()).strong().color(Color32::WHITE))
                             .clicked()
                         {
                             let mut inst = Instance::new(
@@ -366,7 +374,7 @@ impl InstancesPage {
                             self.show_create_modal = false;
                         }
 
-                        if ui.button("Отмена").clicked() {
+                        if ui.button(lang.inst_modal_btn_cancel()).clicked() {
                             self.show_create_modal = false;
                         }
                     });
@@ -378,22 +386,22 @@ impl InstancesPage {
             let mut close_edit = false;
             let mut save_edit = false;
 
-            egui::Window::new("Настройки сборки")
+            egui::Window::new(lang.inst_modal_edit_title())
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, vec2(0.0, 0.0))
                 .min_width(420.0)
                 .show(ui.ctx(), |ui| {
                     ui.add_space(8.0);
-                    ui.label(egui::RichText::new("Название сборки:").color(TEXT_PRIMARY));
+                    ui.label(egui::RichText::new(lang.inst_modal_name()).color(TEXT_PRIMARY));
                     ui.add(TextEdit::singleline(&mut self.edit_instance_name).desired_width(400.0));
 
                     ui.add_space(10.0);
-                    ui.label(egui::RichText::new("Версия Minecraft:").color(TEXT_PRIMARY));
+                    ui.label(egui::RichText::new(lang.inst_modal_version()).color(TEXT_PRIMARY));
                     ui.add(TextEdit::singleline(&mut self.edit_instance_version).desired_width(400.0));
 
                     ui.add_space(10.0);
-                    ui.label(egui::RichText::new("Загрузчик модов:").color(TEXT_PRIMARY));
+                    ui.label(egui::RichText::new(lang.inst_modal_loader()).color(TEXT_PRIMARY));
                     egui::ComboBox::from_id_salt("edit_loader_select")
                         .selected_text(self.edit_instance_loader.as_str())
                         .show_ui(ui, |ui| {
@@ -406,19 +414,19 @@ impl InstancesPage {
                         });
 
                     ui.add_space(10.0);
-                    ui.label(egui::RichText::new(format!("Выделение RAM: {} МБ", self.edit_instance_ram)).color(TEXT_PRIMARY));
+                    ui.label(egui::RichText::new(format!("{}: {} MB", lang.inst_modal_ram(), self.edit_instance_ram)).color(TEXT_PRIMARY));
                     ui.add(egui::Slider::new(&mut self.edit_instance_ram, 1024..=32768).step_by(512.0));
 
                     ui.add_space(18.0);
                     ui.horizontal(|ui| {
                         if ui
-                            .button(egui::RichText::new("СОХРАНИТЬ").strong().color(Color32::WHITE))
+                            .button(egui::RichText::new(lang.inst_modal_btn_save()).strong().color(Color32::WHITE))
                             .clicked()
                         {
                             save_edit = true;
                         }
 
-                        if ui.button("Отмена").clicked() {
+                        if ui.button(lang.inst_modal_btn_cancel()).clicked() {
                             close_edit = true;
                         }
                     });

@@ -20,6 +20,7 @@ impl BottomBar {
         active_account: Option<&Account>,
         is_launching: bool,
         avatar_texture: Option<&egui::TextureHandle>,
+        lang: amc_core::Language,
     ) -> BottomBarResponse {
         let mut response = BottomBarResponse::default();
         let bar_height = 76.0;
@@ -85,7 +86,7 @@ impl BottomBar {
                 },
             )
         } else {
-            ("Не авторизован", "Войдите для игры")
+            (lang.bottom_not_authorized(), lang.bottom_login_prompt())
         };
 
         left_ui.vertical(|ui| {
@@ -106,7 +107,7 @@ impl BottomBar {
         left_ui.add_space(16.0);
 
         // Login / Switch account button
-        let btn_label = if active_account.is_some() { "СМЕНИТЬ" } else { "ВОЙТИ" };
+        let btn_label = if active_account.is_some() { lang.bottom_btn_switch() } else { lang.bottom_btn_login() };
         let login_btn = egui::Button::new(
             egui::RichText::new(btn_label)
                 .font(egui::FontId::proportional(11.0))
@@ -160,7 +161,7 @@ impl BottomBar {
         right_ui.add_space(8.0);
 
         // Main PLAY button (190x48)
-        let play_text = if is_launching { "ЗАПУСК..." } else { "▶  ИГРАТЬ" };
+        let play_text = if is_launching { lang.bottom_btn_launching() } else { lang.bottom_btn_play() };
         let (pm_rect, pm_resp) = right_ui.allocate_exact_size(vec2(190.0, 48.0), Sense::click());
 
         let pm_bg = if is_launching {

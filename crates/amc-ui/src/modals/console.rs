@@ -27,12 +27,12 @@ impl ConsoleModal {
         self.logs.push(line);
     }
 
-    pub fn show(&mut self, ctx: &egui::Context) {
+    pub fn show(&mut self, ctx: &egui::Context, lang: amc_core::Language) {
         if !self.is_open {
             return;
         }
 
-        egui::Window::new("Консоль игры (Логи процесса)")
+        egui::Window::new(lang.console_title())
             .open(&mut self.is_open)
             .default_size(vec2(780.0, 500.0))
             .min_size(vec2(500.0, 300.0))
@@ -43,18 +43,18 @@ impl ConsoleModal {
                 ui.horizontal(|ui| {
                     ui.add(
                         TextEdit::singleline(&mut self.filter)
-                            .hint_text(egui::RichText::new("🔍 Фильтр логов...").color(TEXT_MUTED))
+                            .hint_text(egui::RichText::new(lang.console_filter_hint()).color(TEXT_MUTED))
                             .desired_width(220.0),
                     );
 
                     ui.add_space(8.0);
 
-                    ui.checkbox(&mut self.autoscroll, "Автоскролл вниз");
+                    ui.checkbox(&mut self.autoscroll, lang.console_autoscroll());
 
                     ui.add_space(12.0);
 
                     let copy_btn = egui::Button::new(
-                        egui::RichText::new("📋 Копировать").color(TEXT_PRIMARY),
+                        egui::RichText::new(lang.console_copy()).color(TEXT_PRIMARY),
                     )
                     .fill(BG_ELEVATED)
                     .stroke(Stroke::new(1.0, BORDER_DEFAULT));
@@ -65,7 +65,7 @@ impl ConsoleModal {
                     }
 
                     let clear_btn = egui::Button::new(
-                        egui::RichText::new("🧹 Очистить").color(TEXT_MUTED),
+                        egui::RichText::new(lang.console_clear()).color(TEXT_MUTED),
                     )
                     .fill(BG_ELEVATED)
                     .stroke(Stroke::new(1.0, BORDER_DEFAULT));
@@ -75,7 +75,7 @@ impl ConsoleModal {
                     }
 
                     let export_btn = egui::Button::new(
-                        egui::RichText::new("💾 Экспорт").color(RUBY_LIGHT),
+                        egui::RichText::new(lang.console_export()).color(RUBY_LIGHT),
                     )
                     .fill(BG_ELEVATED)
                     .stroke(Stroke::new(1.0, RUBY));

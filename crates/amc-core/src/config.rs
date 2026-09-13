@@ -16,6 +16,16 @@ pub struct UiSettings {
     pub language: String,
 }
 
+impl UiSettings {
+    pub fn language(&self) -> crate::i18n::Language {
+        crate::i18n::Language::parse_code(&self.language)
+    }
+
+    pub fn set_language(&mut self, lang: crate::i18n::Language) {
+        self.language = lang.code().to_string();
+    }
+}
+
 impl Default for UiSettings {
     fn default() -> Self {
         Self {
@@ -30,6 +40,7 @@ impl Default for UiSettings {
         }
     }
 }
+
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LauncherConfig {

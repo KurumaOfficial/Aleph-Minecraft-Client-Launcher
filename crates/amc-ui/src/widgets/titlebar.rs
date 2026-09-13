@@ -9,7 +9,7 @@ pub struct TitleBarResponse {
 pub struct TitleBar;
 
 impl TitleBar {
-    pub fn show(ui: &mut Ui, title: &str) -> TitleBarResponse {
+    pub fn show(ui: &mut Ui, title: &str, lang: amc_core::Language) -> TitleBarResponse {
         let mut response = TitleBarResponse::default();
         let height = 36.0;
         let rect = ui.available_rect_before_wrap();
@@ -57,7 +57,7 @@ impl TitleBar {
         if con_resp.clicked() {
             response.console_clicked = true;
         }
-        con_resp.on_hover_text("Консоль / Логи игры");
+        con_resp.on_hover_text(lang.titlebar_console_tooltip());
 
         // Minimize Button
         let min_rect = Rect::from_min_size(Pos2::new(controls_start_x + button_w, bar_rect.top()), vec2(button_w, height));

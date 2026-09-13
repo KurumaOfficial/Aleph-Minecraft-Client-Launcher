@@ -2,8 +2,9 @@ use egui::{vec2, Color32, Rounding, ScrollArea, Stroke, TextEdit, Ui};
 use amc_auth::AccountManager;
 use amc_core::config::LauncherConfig;
 use amc_core::paths::LauncherPaths;
+use amc_core::Language;
 use crate::theme::{
-    BG_ELEVATED, BORDER_DEFAULT, RUBY, RUBY_LIGHT,
+    BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT,
     TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
 
@@ -37,10 +38,11 @@ impl SettingsPage {
         account_mgr: &mut AccountManager,
         paths: &LauncherPaths,
     ) {
+        let lang = config.ui.language();
         ui.add_space(20.0);
 
         ui.label(
-            egui::RichText::new("Настройки")
+            egui::RichText::new(lang.settings_title())
                 .font(egui::FontId::proportional(26.0))
                 .strong()
                 .color(TEXT_HEADING),
@@ -50,9 +52,9 @@ impl SettingsPage {
 
         // Subtabs
         ui.horizontal(|ui| {
-            self.subtab_btn(ui, "ОСНОВНЫЕ", SettingsSubTab::General);
-            self.subtab_btn(ui, "JAVA И ПАМЯТЬ", SettingsSubTab::Java);
-            self.subtab_btn(ui, "АККАУНТЫ", SettingsSubTab::Accounts);
+            self.subtab_btn(ui, lang.settings_tab_general(), SettingsSubTab::General);
+            self.subtab_btn(ui, lang.settings_tab_java(), SettingsSubTab::Java);
+            self.subtab_btn(ui, lang.settings_tab_accounts(), SettingsSubTab::Accounts);
         });
 
         ui.add_space(16.0);
@@ -62,7 +64,7 @@ impl SettingsPage {
             .show(ui, |ui| match self.sub_tab {
                 SettingsSubTab::General => self.show_general(ui, config, paths),
                 SettingsSubTab::Java => self.show_java(ui, config),
-                SettingsSubTab::Accounts => self.show_accounts(ui, account_mgr),
+                SettingsSubTab::Accounts => self.show_accounts(ui, account_mgr, lang),
             });
     }
 
@@ -91,9 +93,50 @@ impl SettingsPage {
     }
 
     fn show_general(&mut self, ui: &mut Ui, config: &mut LauncherConfig, paths: &LauncherPaths) {
+        let lang = config.ui.language();
+
+        // Language selection group
         ui.group(|ui| {
             ui.label(
-                egui::RichText::new("Поведение лаунчера")
+                egui::RichText::new(lang.settings_language_title())
+                    .font(egui::FontId::proportional(16.0))
+                    .strong()
+                    .color(TEXT_HEADING),
+            );
+            ui.add_space(8.0);
+
+            ui.horizontal(|ui| {
+                for l in Language::ALL {
+                    let is_active = lang == l;
+                    let (bg, stroke, text_color) = if is_active {
+                        (RUBY, Stroke::new(1.0, RUBY_LIGHT), Color32::WHITE)
+                    } else {
+                        (BG_HOVER, Stroke::new(1.0, BORDER_DEFAULT), TEXT_MUTED)
+                    };
+
+                    let btn = egui::Button::new(
+                        egui::RichText::new(l.display_with_flag())
+                            .font(egui::FontId::proportional(12.0))
+                            .strong()
+                            .color(text_color),
+                    )
+                    .fill(bg)
+                    .stroke(stroke)
+                    .rounding(Rounding::ZERO)
+                    .min_size(vec2(130.0, 32.0));
+
+                    if ui.add(btn).clicked() {
+                        config.ui.set_language(l);
+                    }
+                }
+            });
+        });
+
+        ui.add_space(14.0);
+
+        ui.group(|ui| {
+            ui.label(
+                egui::RichText::new(lang.settings_behavior_title())
                     .font(egui::FontId::proportional(16.0))
                     .strong()
                     .color(TEXT_HEADING),
@@ -102,21 +145,21 @@ impl SettingsPage {
 
             ui.checkbox(
                 &mut config.ui.close_after_launch,
-                egui::RichText::new("Закрывать лаунчер после запуска Minecraft").color(TEXT_PRIMARY),
+                egui::RichText::new(lang.settings_close_after_launch()).color(TEXT_PRIMARY),
             );
 
             ui.add_space(6.0);
 
             ui.checkbox(
                 &mut config.ui.show_snapshots,
-                egui::RichText::new("Отображать снапшоты в списке версий").color(TEXT_PRIMARY),
+                egui::RichText::new(lang.settings_show_snapshots()).color(TEXT_PRIMARY),
             );
 
             ui.add_space(6.0);
 
             ui.checkbox(
                 &mut config.ui.show_old,
-                egui::RichText::new("Отображать старые версии (Alpha / Beta)").color(TEXT_PRIMARY),
+                egui::RichText::new(lang.settings_show_old()).color(TEXT_PRIMARY),
             );
         });
 
@@ -124,7 +167,7 @@ impl SettingsPage {
 
         ui.group(|ui| {
             ui.label(
-                egui::RichText::new("Разрешение окна игры")
+                egui::RichText::new(lang.settings_resolution_title())
                     .font(egui::FontId::proportional(16.0))
                     .strong()
                     .color(TEXT_HEADING),
@@ -132,17 +175,17 @@ impl SettingsPage {
             ui.add_space(8.0);
 
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("Ширина:").color(TEXT_MUTED));
+                ui.label(egui::RichText::new(lang.settings_width()).color(TEXT_MUTED));
                 ui.add(egui::DragValue::new(&mut config.default_launch_options.window_width).speed(10));
                 ui.add_space(20.0);
-                ui.label(egui::RichText::new("Высота:").color(TEXT_MUTED));
+                ui.label(egui::RichText::new(lang.settings_height()).color(TEXT_MUTED));
                 ui.add(egui::DragValue::new(&mut config.default_launch_options.window_height).speed(10));
             });
 
             ui.add_space(6.0);
             ui.checkbox(
                 &mut config.default_launch_options.fullscreen,
-                egui::RichText::new("Запускать в полноэкранном режиме").color(TEXT_PRIMARY),
+                egui::RichText::new(lang.settings_fullscreen()).color(TEXT_PRIMARY),
             );
         });
 
@@ -150,7 +193,7 @@ impl SettingsPage {
 
         ui.group(|ui| {
             ui.label(
-                egui::RichText::new("Папки и файлы лаунчера")
+                egui::RichText::new(lang.settings_folders_title())
                     .font(egui::FontId::proportional(16.0))
                     .strong()
                     .color(TEXT_HEADING),
@@ -158,13 +201,13 @@ impl SettingsPage {
             ui.add_space(8.0);
 
             ui.horizontal(|ui| {
-                if ui.button("📂 Корневая папка").clicked() {
+                if ui.button(lang.settings_folder_root()).clicked() {
                     let _ = open::that(&paths.root_dir);
                 }
-                if ui.button("📂 Логи").clicked() {
+                if ui.button(lang.settings_folder_logs()).clicked() {
                     let _ = open::that(paths.logs_dir());
                 }
-                if ui.button("📂 Сборки").clicked() {
+                if ui.button(lang.settings_folder_instances()).clicked() {
                     let _ = open::that(paths.instances_dir());
                 }
             });
@@ -172,9 +215,11 @@ impl SettingsPage {
     }
 
     fn show_java(&mut self, ui: &mut Ui, config: &mut LauncherConfig) {
+        let lang = config.ui.language();
+
         ui.group(|ui| {
             ui.label(
-                egui::RichText::new("Оперативная память (RAM)")
+                egui::RichText::new(lang.settings_ram_title())
                     .font(egui::FontId::proportional(16.0))
                     .strong()
                     .color(TEXT_HEADING),
@@ -182,12 +227,8 @@ impl SettingsPage {
             ui.add_space(8.0);
 
             ui.label(
-                egui::RichText::new(format!(
-                    "Минимальная память: {} МБ ({:.1} ГБ)",
-                    config.default_launch_options.memory_min_mb,
-                    config.default_launch_options.memory_min_mb as f64 / 1024.0
-                ))
-                .color(TEXT_PRIMARY),
+                egui::RichText::new(lang.settings_min_ram(config.default_launch_options.memory_min_mb))
+                    .color(TEXT_PRIMARY),
             );
             ui.add(
                 egui::Slider::new(
@@ -200,12 +241,8 @@ impl SettingsPage {
             ui.add_space(10.0);
 
             ui.label(
-                egui::RichText::new(format!(
-                    "Максимальная память: {} МБ ({:.1} ГБ)",
-                    config.default_launch_options.memory_max_mb,
-                    config.default_launch_options.memory_max_mb as f64 / 1024.0
-                ))
-                .color(TEXT_PRIMARY),
+                egui::RichText::new(lang.settings_max_ram(config.default_launch_options.memory_max_mb))
+                    .color(TEXT_PRIMARY),
             );
             ui.add(
                 egui::Slider::new(
@@ -220,7 +257,7 @@ impl SettingsPage {
 
         ui.group(|ui| {
             ui.label(
-                egui::RichText::new("Среда выполнения Java")
+                egui::RichText::new(lang.settings_java_title())
                     .font(egui::FontId::proportional(16.0))
                     .strong()
                     .color(TEXT_HEADING),
@@ -232,10 +269,10 @@ impl SettingsPage {
                 .java_path
                 .as_ref()
                 .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_else(|| "Автоопределение (Adoptium OpenJDK 8 / 17 / 21)".to_string());
+                .unwrap_or_else(|| lang.settings_java_auto().to_string());
 
             ui.label(
-                egui::RichText::new(format!("Текущий путь: {java_display}"))
+                egui::RichText::new(lang.settings_java_path(&java_display))
                     .font(egui::FontId::proportional(12.0))
                     .color(TEXT_PRIMARY),
             );
@@ -244,7 +281,7 @@ impl SettingsPage {
 
             ui.horizontal(|ui| {
                 let btn = egui::Button::new(
-                    egui::RichText::new("ВЫБРАТЬ JAVA.EXE")
+                    egui::RichText::new(lang.settings_btn_select_java())
                         .font(egui::FontId::proportional(11.0))
                         .strong()
                         .color(Color32::WHITE),
@@ -263,7 +300,7 @@ impl SettingsPage {
                 }
 
                 if config.default_launch_options.java_path.is_some() {
-                    if ui.button("Сбросить на автовыбор").clicked() {
+                    if ui.button(lang.settings_btn_reset_java()).clicked() {
                         config.default_launch_options.java_path = None;
                     }
                 }
@@ -274,7 +311,7 @@ impl SettingsPage {
 
         ui.group(|ui| {
             ui.label(
-                egui::RichText::new("Пользовательские JVM аргументы")
+                egui::RichText::new(lang.settings_jvm_args_title())
                     .font(egui::FontId::proportional(16.0))
                     .strong()
                     .color(TEXT_HEADING),
@@ -302,17 +339,17 @@ impl SettingsPage {
                         .hint_text("-XX:+...")
                         .desired_width(300.0),
                 );
-                if ui.button("+ Добавить").clicked() && !self.custom_jvm_arg_input.trim().is_empty() {
+                if ui.button(lang.settings_btn_add_arg()).clicked() && !self.custom_jvm_arg_input.trim().is_empty() {
                     config.default_launch_options.custom_jvm_args.push(self.custom_jvm_arg_input.trim().to_string());
                     self.custom_jvm_arg_input.clear();
                 }
             });
 
             ui.add_space(8.0);
-            ui.label(egui::RichText::new("Готовые пресеты оптимизации:").font(egui::FontId::proportional(12.0)).color(TEXT_MUTED));
+            ui.label(egui::RichText::new(lang.settings_gc_presets_title()).font(egui::FontId::proportional(12.0)).color(TEXT_MUTED));
             ui.horizontal(|ui| {
-                if ui.button("⚡ Пресет G1GC (Высокий FPS)")
-                    .on_hover_text("Оптимизированные флаги сборщика мусора для максимального FPS и плавной игры без фризов")
+                if ui.button(lang.settings_btn_preset_g1gc())
+                    .on_hover_text(lang.settings_tooltip_preset_g1gc())
                     .clicked()
                 {
                     config.default_launch_options.custom_jvm_args = vec![
@@ -329,8 +366,8 @@ impl SettingsPage {
                     ];
                 }
 
-                if ui.button("🚀 Пресет ZGC (Низкие задержки)")
-                    .on_hover_text("Сверхбыстрый сборщик мусора ZGC с субмиллисекундными паузами (для Java 17 и 21)")
+                if ui.button(lang.settings_btn_preset_zgc())
+                    .on_hover_text(lang.settings_tooltip_preset_zgc())
                     .clicked()
                 {
                     config.default_launch_options.custom_jvm_args = vec![
@@ -340,8 +377,8 @@ impl SettingsPage {
                     ];
                 }
 
-                if ui.button("Сбросить")
-                    .on_hover_text("Очистить все пользовательские флаги")
+                if ui.button(lang.settings_btn_reset_args())
+                    .on_hover_text(lang.settings_tooltip_reset_args())
                     .clicked()
                 {
                     config.default_launch_options.custom_jvm_args.clear();
@@ -350,10 +387,10 @@ impl SettingsPage {
         });
     }
 
-    fn show_accounts(&mut self, ui: &mut Ui, account_mgr: &mut AccountManager) {
+    fn show_accounts(&mut self, ui: &mut Ui, account_mgr: &mut AccountManager, lang: Language) {
         ui.group(|ui| {
             ui.label(
-                egui::RichText::new("Сохраненные аккаунты")
+                egui::RichText::new(lang.settings_accounts_title())
                     .font(egui::FontId::proportional(16.0))
                     .strong()
                     .color(TEXT_HEADING),
@@ -391,12 +428,12 @@ impl SettingsPage {
                     );
 
                     if is_active {
-                        ui.label(egui::RichText::new("✔ (Активен)").color(Color32::from_rgb(0x50, 0xB0, 0x50)));
-                    } else if ui.button("Сделать активным").clicked() {
+                        ui.label(egui::RichText::new(lang.settings_account_active()).color(Color32::from_rgb(0x50, 0xB0, 0x50)));
+                    } else if ui.button(lang.settings_btn_set_active()).clicked() {
                         set_active_id = Some(acc.id);
                     }
 
-                    if ui.button(egui::RichText::new("Удалить").color(TEXT_MUTED)).clicked() {
+                    if ui.button(egui::RichText::new(lang.settings_btn_delete_acc()).color(TEXT_MUTED)).clicked() {
                         remove_id = Some(acc.id);
                     }
                 });

@@ -32,11 +32,11 @@ impl Default for SkinsPage {
 }
 
 impl SkinsPage {
-    pub fn show(&mut self, ui: &mut Ui, account: Option<&Account>) {
+    pub fn show(&mut self, ui: &mut Ui, account: Option<&Account>, lang: amc_core::Language) {
         ui.add_space(20.0);
 
         ui.label(
-            egui::RichText::new("Управление скинами")
+            egui::RichText::new(lang.skins_title())
                 .font(egui::FontId::proportional(26.0))
                 .strong()
                 .color(TEXT_HEADING),
@@ -80,7 +80,7 @@ impl SkinsPage {
             let slim_active = self.is_slim_model;
 
             let btn_classic = egui::Button::new(
-                egui::RichText::new("Classic (4px)")
+                egui::RichText::new(lang.skins_classic())
                     .font(egui::FontId::proportional(11.0))
                     .strong()
                     .color(if classic_active { Color32::WHITE } else { TEXT_MUTED }),
@@ -96,7 +96,7 @@ impl SkinsPage {
             }
 
             let btn_slim = egui::Button::new(
-                egui::RichText::new("Slim (Alex 3px)")
+                egui::RichText::new(lang.skins_slim())
                     .font(egui::FontId::proportional(11.0))
                     .strong()
                     .color(if slim_active { Color32::WHITE } else { TEXT_MUTED }),
@@ -143,7 +143,7 @@ impl SkinsPage {
             ui.spacing_mut().item_spacing = vec2(10.0, 0.0);
 
             let btn_upload = egui::Button::new(
-                egui::RichText::new("ВЫБРАТЬ ФАЙЛ (.PNG)")
+                egui::RichText::new(lang.skins_btn_load())
                     .font(egui::FontId::proportional(11.0))
                     .strong()
                     .color(Color32::WHITE),
@@ -162,7 +162,7 @@ impl SkinsPage {
                         self.active_skin_name = path
                             .file_name()
                             .map(|f| f.to_string_lossy().to_string())
-                            .unwrap_or_else(|| "Кастомный скин".to_string());
+                            .unwrap_or_else(|| "Custom Skin".to_string());
                         self.custom_skin_path = Some(path);
                         self.dirty = true;
                         self.avatar_dirty = true;
@@ -170,8 +170,9 @@ impl SkinsPage {
                 }
             }
 
+            let reset_label = if self.is_slim_model { lang.skins_btn_reset_alex() } else { lang.skins_btn_reset_steve() };
             let btn_reset = egui::Button::new(
-                egui::RichText::new("СБРОСИТЬ СКИН")
+                egui::RichText::new(reset_label)
                     .font(egui::FontId::proportional(11.0))
                     .strong()
                     .color(TEXT_PRIMARY),
@@ -184,9 +185,9 @@ impl SkinsPage {
                 self.skin_image = None;
                 self.custom_skin_path = None;
                 self.active_skin_name = if self.is_slim_model {
-                    "Alex (По умолчанию)".to_string()
+                    "Alex".to_string()
                 } else {
-                    "Steve (По умолчанию)".to_string()
+                    "Steve".to_string()
                 };
                 self.dirty = true;
                 self.avatar_dirty = true;
@@ -197,8 +198,13 @@ impl SkinsPage {
 
         // Account status info
         if let Some(acc) = account {
+            let acc_label = match lang {
+                amc_core::Language::English => "Account",
+                amc_core::Language::Russian => "Аккаунт",
+                amc_core::Language::Ukrainian => "Акаунт",
+            };
             ui.label(
-                egui::RichText::new(format!("Аккаунт: {} ({})", acc.username, acc.account_type.as_str()))
+                egui::RichText::new(format!("{acc_label}: {} ({})", acc.username, acc.account_type.as_str()))
                     .font(egui::FontId::proportional(13.0))
                     .color(TEXT_MUTED),
             );

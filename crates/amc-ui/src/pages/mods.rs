@@ -1,5 +1,6 @@
 use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
 use amc_mods::types::{LocalMod, ModSearchResult, ModSource};
+use amc_core::Language;
 use std::collections::HashSet;
 use std::path::Path;
 use crate::theme::{
@@ -47,6 +48,7 @@ impl ModsPage {
         &mut self,
         ui: &mut Ui,
         mods_dir: &Path,
+        lang: Language,
         on_search: impl FnOnce(String, ModSource),
         on_install: impl FnOnce(ModSearchResult),
     ) {
@@ -54,7 +56,7 @@ impl ModsPage {
 
         // Header
         ui.label(
-            egui::RichText::new("Управление модами")
+            egui::RichText::new(lang.mods_title())
                 .font(egui::FontId::proportional(26.0))
                 .strong()
                 .color(TEXT_HEADING),
@@ -71,7 +73,7 @@ impl ModsPage {
             ui.add_space(8.0);
         }
 
-        // Subtabs: Локальные / Поиск
+        // Subtabs: Local / Search
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing = vec2(8.0, 0.0);
 
@@ -79,7 +81,7 @@ impl ModsPage {
             let search_active = self.sub_tab == ModsSubTab::Search;
 
             let btn_local = egui::Button::new(
-                egui::RichText::new("УСТАНОВЛЕННЫЕ")
+                egui::RichText::new(lang.mods_tab_installed())
                     .font(egui::FontId::proportional(12.0))
                     .strong()
                     .color(if local_active { Color32::WHITE } else { TEXT_MUTED }),
@@ -93,9 +95,9 @@ impl ModsPage {
             }
 
             let search_label = match self.search_provider {
-                ModSource::Modrinth => "ПОИСК (MODRINTH)",
-                ModSource::CurseForge => "ПОИСК (CURSEFORGE)",
-                _ => "ПОИСК МОДОВ",
+                ModSource::Modrinth => lang.mods_tab_search_modrinth(),
+                ModSource::CurseForge => lang.mods_tab_search_curseforge(),
+                _ => lang.mods_tab_search_generic(),
             };
 
             let btn_search = egui::Button::new(
@@ -114,7 +116,7 @@ impl ModsPage {
 
             ui.add_space(16.0);
 
-            if ui.button("📂 Открыть папку mods/").clicked() {
+            if ui.button(lang.mods_btn_open_folder()).clicked() {
                 let _ = std::fs::create_dir_all(mods_dir);
                 let _ = open::that(mods_dir);
             }
@@ -123,23 +125,18 @@ impl ModsPage {
         ui.add_space(14.0);
 
         match self.sub_tab {
-            ModsSubTab::Local => self.show_local_mods(ui),
-            ModsSubTab::Search => self.show_search(ui, on_search, on_install),
+            ModsSubTab::Local => self.show_local_mods(ui, lang),
+            ModsSubTab::Search => self.show_search(ui, lang, on_search, on_install),
         }
     }
 
-    fn show_local_mods(&mut self, ui: &mut Ui) {
+    fn show_local_mods(&mut self, ui: &mut Ui, lang: Language) {
         if self.local_mods.is_empty() {
             ui.add_space(50.0);
             ui.vertical_centered(|ui| {
                 ui.label(
-                    egui::RichText::new("Папка mods/ пуста")
-                        .font(egui::FontId::proportional(16.0))
-                        .color(TEXT_MUTED),
-                );
-                ui.label(
-                    egui::RichText::new("Перейдите на вкладку Поиск или перетащите .jar файлы в папку mods")
-                        .font(egui::FontId::proportional(13.0))
+                    egui::RichText::new(lang.mods_no_installed())
+                        .font(egui::FontId::proportional(15.0))
                         .color(TEXT_MUTED),
                 );
             });
@@ -175,7 +172,7 @@ impl ModsPage {
                     child.add_space(10.0);
 
                     // Name + version with truncation
-                    let max_text_w = (child.available_width() - 130.0).max(120.0);
+                    let max_text_w = (child.available_width() - 150.0).max(120.0);
                     child.vertical(|ui| {
                         ui.set_max_width(max_text_w);
                         ui.add(
@@ -188,21 +185,21 @@ impl ModsPage {
                             .truncate(),
                         );
                         ui.label(
-                            egui::RichText::new(format!("v{} • {:.1} КБ", m.version, m.file_size as f64 / 1024.0))
+                            egui::RichText::new(format!("v{} • {:.1} KB", m.version, m.file_size as f64 / 1024.0))
                                 .font(egui::FontId::proportional(11.0))
                                 .color(TEXT_MUTED),
                         );
                     });
 
                     // Controls on the right
-                    let controls_width = 110.0;
+                    let controls_width = 130.0;
                     let avail = child.available_width() - controls_width - 16.0;
                     if avail > 0.0 {
                         child.add_space(avail);
                     }
 
                     // Toggle Button
-                    let toggle_text = if m.enabled { "ВКЛ" } else { "ВЫКЛ" };
+                    let toggle_text = if m.enabled { lang.mods_status_enabled() } else { lang.mods_status_disabled() };
                     let toggle_color = if m.enabled { SUCCESS } else { TEXT_MUTED };
                     let toggle_btn = egui::Button::new(
                         egui::RichText::new(toggle_text)
@@ -211,7 +208,7 @@ impl ModsPage {
                             .color(Color32::WHITE),
                     )
                     .fill(toggle_color)
-                    .min_size(vec2(50.0, 26.0));
+                    .min_size(vec2(60.0, 26.0));
 
                     if child.add(toggle_btn).clicked() {
                         to_toggle = Some(idx);
@@ -242,6 +239,7 @@ impl ModsPage {
     fn show_search(
         &mut self,
         ui: &mut Ui,
+        lang: Language,
         on_search: impl FnOnce(String, ModSource),
         on_install: impl FnOnce(ModSearchResult),
     ) {
@@ -280,9 +278,9 @@ impl ModsPage {
 
             let search_width = (ui.available_width() - 100.0).max(180.0);
             let hint = match self.search_provider {
-                ModSource::Modrinth => "🔍 Поиск в Modrinth...",
-                ModSource::CurseForge => "🔍 Поиск в CurseForge...",
-                _ => "🔍 Поиск модов...",
+                ModSource::Modrinth => lang.mods_search_hint("Modrinth"),
+                ModSource::CurseForge => lang.mods_search_hint("CurseForge"),
+                _ => lang.mods_search_hint("Mods"),
             };
 
             let search_edit = TextEdit::singleline(&mut self.search_query)
@@ -296,7 +294,7 @@ impl ModsPage {
             ui.add_space(8.0);
 
             if ui
-                .button(egui::RichText::new("НАЙТИ").strong().color(Color32::WHITE))
+                .button(egui::RichText::new(lang.mods_btn_search()).strong().color(Color32::WHITE))
                 .clicked()
                 || enter_pressed
             {
@@ -310,7 +308,7 @@ impl ModsPage {
             ui.add_space(30.0);
             ui.vertical_centered(|ui| {
                 ui.spinner();
-                ui.label(egui::RichText::new("Поиск модов...").color(TEXT_MUTED));
+                ui.label(egui::RichText::new(lang.mods_searching()).color(TEXT_MUTED));
             });
             return;
         }
@@ -348,7 +346,7 @@ impl ModsPage {
                     child.add_space(12.0);
 
                     // Title & Description with truncation
-                    let max_card_text_w = (child.available_width() - 130.0).max(120.0);
+                    let max_card_text_w = (child.available_width() - 140.0).max(120.0);
                     child.vertical(|ui| {
                         ui.set_max_width(max_card_text_w);
                         ui.horizontal(|ui| {
@@ -359,7 +357,7 @@ impl ModsPage {
                                     .color(TEXT_HEADING),
                             );
                             ui.label(
-                                egui::RichText::new(format!("от {}", item.author))
+                                egui::RichText::new(format!("by {}", item.author))
                                     .font(egui::FontId::proportional(11.0))
                                     .color(TEXT_MUTED),
                             );
@@ -394,7 +392,7 @@ impl ModsPage {
                             lm_lower == it_lower || lm_lower.contains(&it_lower)
                         });
 
-                    let btn_width = 110.0;
+                    let btn_width = 120.0;
                     let avail = child.available_width() - btn_width - 16.0;
                     if avail > 0.0 {
                         child.add_space(avail);
@@ -402,7 +400,7 @@ impl ModsPage {
 
                     if is_downloading {
                         let btn = egui::Button::new(
-                            egui::RichText::new("⏳ СКАЧИВАНИЕ")
+                            egui::RichText::new(lang.mods_btn_downloading())
                                 .font(egui::FontId::proportional(11.0))
                                 .color(TEXT_MUTED),
                         )
@@ -411,7 +409,7 @@ impl ModsPage {
                         child.add(btn);
                     } else if is_installed {
                         let badge = egui::Button::new(
-                            egui::RichText::new("✓ УСТАНОВЛЕН")
+                            egui::RichText::new(lang.mods_badge_installed())
                                 .font(egui::FontId::proportional(11.0))
                                 .strong()
                                 .color(Color32::WHITE),
@@ -421,7 +419,7 @@ impl ModsPage {
                         child.add(badge);
                     } else {
                         let btn = egui::Button::new(
-                            egui::RichText::new("СКАЧАТЬ")
+                            egui::RichText::new(lang.mods_btn_install())
                                 .font(egui::FontId::proportional(11.0))
                                 .strong()
                                 .color(Color32::WHITE),
