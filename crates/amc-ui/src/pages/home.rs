@@ -2,7 +2,7 @@ use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
 use amc_core::types::{GameVersion, ReleaseType};
 use amc_minecraft::ServerStatus;
 use crate::theme::{
-    BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_DIM, RUBY_LIGHT, SUCCESS,
+    BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_DIM, RUBY_LIGHT,
     TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
 use crate::widgets::draw_custom_badge;
@@ -57,7 +57,7 @@ impl HomePage {
     ) {
         ui.add_space(20.0);
 
-        // Section Header: Versions + Selected Badge + Compact Server Ping & Direct Play
+        // Section Header: Versions + Selected Badge
         ui.horizontal(|ui| {
             ui.label(
                 egui::RichText::new(lang.home_title())
@@ -69,45 +69,6 @@ impl HomePage {
             if let Some(sel) = selected_version.as_deref() {
                 ui.add_space(12.0);
                 draw_custom_badge(ui, &lang.home_selected_badge(sel), RUBY);
-            }
-
-            // Compact server status on the right with 1-click Direct Play
-            if let Some(srv) = &self.featured_server {
-                let srv_label_w = 320.0;
-                let space = ui.available_width() - srv_label_w;
-                if space > 0.0 {
-                    ui.add_space(space);
-                }
-                let (dot, col) = if srv.is_online { ("🟢", SUCCESS) } else { ("🔴", RUBY) };
-                ui.label(
-                    egui::RichText::new(format!("{dot} {} • {} мс", srv.host, srv.ping_ms))
-                        .font(egui::FontId::proportional(12.0))
-                        .color(col),
-                );
-                if srv.is_online {
-                    ui.add_space(6.0);
-                    let dp_btn = egui::Button::new(
-                        egui::RichText::new(format!("⚡ {}", lang.home_direct_play()))
-                            .font(egui::FontId::proportional(11.0))
-                            .color(Color32::WHITE),
-                    )
-                    .fill(RUBY)
-                    .stroke(Stroke::new(1.0, RUBY_LIGHT));
-                    if ui.add(dp_btn).on_hover_text(format!("Launch & Connect to {}", srv.host)).clicked() {
-                        self.direct_connect_request = Some((srv.host.clone(), srv.port));
-                    }
-                }
-            } else if self.is_pinging {
-                let srv_label_w = 160.0;
-                let space = ui.available_width() - srv_label_w;
-                if space > 0.0 {
-                    ui.add_space(space);
-                }
-                ui.label(
-                    egui::RichText::new(lang.home_pinging())
-                        .font(egui::FontId::proportional(12.0))
-                        .color(TEXT_MUTED),
-                );
             }
         });
 
