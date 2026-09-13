@@ -1,6 +1,7 @@
 use egui::{vec2, Color32, Rounding, ScrollArea, Stroke, TextEdit, Ui};
 use amc_auth::AccountManager;
 use amc_core::config::LauncherConfig;
+use amc_core::paths::LauncherPaths;
 use crate::theme::{
     BG_ELEVATED, BORDER_DEFAULT, RUBY, RUBY_LIGHT,
     TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
@@ -34,6 +35,7 @@ impl SettingsPage {
         ui: &mut Ui,
         config: &mut LauncherConfig,
         account_mgr: &mut AccountManager,
+        paths: &LauncherPaths,
     ) {
         ui.add_space(20.0);
 
@@ -58,7 +60,7 @@ impl SettingsPage {
         ScrollArea::vertical()
             .auto_shrink([false, false])
             .show(ui, |ui| match self.sub_tab {
-                SettingsSubTab::General => self.show_general(ui, config),
+                SettingsSubTab::General => self.show_general(ui, config, paths),
                 SettingsSubTab::Java => self.show_java(ui, config),
                 SettingsSubTab::Accounts => self.show_accounts(ui, account_mgr),
             });
@@ -88,7 +90,7 @@ impl SettingsPage {
         }
     }
 
-    fn show_general(&mut self, ui: &mut Ui, config: &mut LauncherConfig) {
+    fn show_general(&mut self, ui: &mut Ui, config: &mut LauncherConfig, paths: &LauncherPaths) {
         ui.group(|ui| {
             ui.label(
                 egui::RichText::new("Поведение лаунчера")
@@ -143,6 +145,30 @@ impl SettingsPage {
                 egui::RichText::new("Запускать в полноэкранном режиме").color(TEXT_PRIMARY),
             );
         });
+
+        ui.add_space(14.0);
+
+        ui.group(|ui| {
+            ui.label(
+                egui::RichText::new("Папки и файлы лаунчера")
+                    .font(egui::FontId::proportional(16.0))
+                    .strong()
+                    .color(TEXT_HEADING),
+            );
+            ui.add_space(8.0);
+
+            ui.horizontal(|ui| {
+                if ui.button("📂 Корневая папка").clicked() {
+                    let _ = open::that(&paths.root_dir);
+                }
+                if ui.button("📂 Логи").clicked() {
+                    let _ = open::that(paths.logs_dir());
+                }
+                if ui.button("📂 Сборки").clicked() {
+                    let _ = open::that(paths.instances_dir());
+                }
+            });
+        });
     }
 
     fn show_java(&mut self, ui: &mut Ui, config: &mut LauncherConfig) {
@@ -188,6 +214,60 @@ impl SettingsPage {
                 )
                 .step_by(512.0),
             );
+        });
+
+        ui.add_space(14.0);
+
+        ui.group(|ui| {
+            ui.label(
+                egui::RichText::new("Среда выполнения Java")
+                    .font(egui::FontId::proportional(16.0))
+                    .strong()
+                    .color(TEXT_HEADING),
+            );
+            ui.add_space(8.0);
+
+            let java_display = config
+                .default_launch_options
+                .java_path
+                .as_ref()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|| "Автоопределение (Adoptium OpenJDK 8 / 17 / 21)".to_string());
+
+            ui.label(
+                egui::RichText::new(format!("Текущий путь: {java_display}"))
+                    .font(egui::FontId::proportional(12.0))
+                    .color(TEXT_PRIMARY),
+            );
+
+            ui.add_space(6.0);
+
+            ui.horizontal(|ui| {
+                let btn = egui::Button::new(
+                    egui::RichText::new("ВЫБРАТЬ JAVA.EXE")
+                        .font(egui::FontId::proportional(11.0))
+                        .strong()
+                        .color(Color32::WHITE),
+                )
+                .fill(RUBY)
+                .stroke(Stroke::new(1.0, RUBY_LIGHT));
+
+                if ui.add(btn).clicked() {
+                    let ext_filter: &[&str] = if cfg!(windows) { &["exe"] } else { &["*"] };
+                    if let Some(path) = rfd::FileDialog::new()
+                        .add_filter("Java Executable", ext_filter)
+                        .pick_file()
+                    {
+                        config.default_launch_options.java_path = Some(path);
+                    }
+                }
+
+                if config.default_launch_options.java_path.is_some() {
+                    if ui.button("Сбросить на автовыбор").clicked() {
+                        config.default_launch_options.java_path = None;
+                    }
+                }
+            });
         });
 
         ui.add_space(14.0);

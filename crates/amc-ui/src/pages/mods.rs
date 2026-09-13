@@ -1,5 +1,5 @@
 use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
-use amc_mods::types::{LocalMod, ModSearchResult};
+use amc_mods::types::{LocalMod, ModSearchResult, ModSource};
 use std::collections::HashSet;
 use std::path::Path;
 use crate::theme::{
@@ -16,6 +16,7 @@ pub enum ModsSubTab {
 
 pub struct ModsPage {
     pub sub_tab: ModsSubTab,
+    pub search_provider: ModSource,
     pub search_query: String,
     pub is_searching: bool,
     pub search_results: Vec<ModSearchResult>,
@@ -29,6 +30,7 @@ impl Default for ModsPage {
     fn default() -> Self {
         Self {
             sub_tab: ModsSubTab::Local,
+            search_provider: ModSource::Modrinth,
             search_query: String::new(),
             is_searching: false,
             search_results: Vec::new(),
@@ -45,7 +47,7 @@ impl ModsPage {
         &mut self,
         ui: &mut Ui,
         mods_dir: &Path,
-        on_search: impl FnOnce(String),
+        on_search: impl FnOnce(String, ModSource),
         on_install: impl FnOnce(ModSearchResult),
     ) {
         ui.add_space(20.0);
@@ -90,15 +92,21 @@ impl ModsPage {
                 self.sub_tab = ModsSubTab::Local;
             }
 
+            let search_label = match self.search_provider {
+                ModSource::Modrinth => "ПОИСК (MODRINTH)",
+                ModSource::CurseForge => "ПОИСК (CURSEFORGE)",
+                _ => "ПОИСК МОДОВ",
+            };
+
             let btn_search = egui::Button::new(
-                egui::RichText::new("ПОИСК (MODRINTH)")
+                egui::RichText::new(search_label)
                     .font(egui::FontId::proportional(12.0))
                     .strong()
                     .color(if search_active { Color32::WHITE } else { TEXT_MUTED }),
             )
             .fill(if search_active { RUBY } else { Color32::TRANSPARENT })
             .stroke(Stroke::new(1.0, if search_active { RUBY } else { BORDER_DEFAULT }))
-            .min_size(vec2(150.0, 32.0));
+            .min_size(vec2(160.0, 32.0));
 
             if ui.add(btn_search).clicked() {
                 self.sub_tab = ModsSubTab::Search;
@@ -229,13 +237,51 @@ impl ModsPage {
     fn show_search(
         &mut self,
         ui: &mut Ui,
-        on_search: impl FnOnce(String),
+        on_search: impl FnOnce(String, ModSource),
         on_install: impl FnOnce(ModSearchResult),
     ) {
         ui.horizontal(|ui| {
-            let search_width = (ui.available_width() - 120.0).max(200.0);
+            // Source switch buttons
+            let mr_active = self.search_provider == ModSource::Modrinth;
+            let cf_active = self.search_provider == ModSource::CurseForge;
+
+            let mr_btn = egui::Button::new(
+                egui::RichText::new("Modrinth")
+                    .font(egui::FontId::proportional(11.0))
+                    .strong()
+                    .color(if mr_active { Color32::WHITE } else { TEXT_MUTED }),
+            )
+            .fill(if mr_active { RUBY } else { BG_HOVER })
+            .min_size(vec2(80.0, 30.0));
+
+            if ui.add(mr_btn).clicked() {
+                self.search_provider = ModSource::Modrinth;
+            }
+
+            let cf_btn = egui::Button::new(
+                egui::RichText::new("CurseForge")
+                    .font(egui::FontId::proportional(11.0))
+                    .strong()
+                    .color(if cf_active { Color32::WHITE } else { TEXT_MUTED }),
+            )
+            .fill(if cf_active { RUBY } else { BG_HOVER })
+            .min_size(vec2(90.0, 30.0));
+
+            if ui.add(cf_btn).clicked() {
+                self.search_provider = ModSource::CurseForge;
+            }
+
+            ui.add_space(8.0);
+
+            let search_width = (ui.available_width() - 100.0).max(180.0);
+            let hint = match self.search_provider {
+                ModSource::Modrinth => "🔍 Поиск в Modrinth...",
+                ModSource::CurseForge => "🔍 Поиск в CurseForge...",
+                _ => "🔍 Поиск модов...",
+            };
+
             let search_edit = TextEdit::singleline(&mut self.search_query)
-                .hint_text(egui::RichText::new("🔍 Поиск модов в Modrinth...").color(TEXT_MUTED))
+                .hint_text(egui::RichText::new(hint).color(TEXT_MUTED))
                 .desired_width(search_width)
                 .font(egui::FontId::proportional(14.0));
 
@@ -249,7 +295,7 @@ impl ModsPage {
                 .clicked()
                 || enter_pressed
             {
-                on_search(self.search_query.clone());
+                on_search(self.search_query.clone(), self.search_provider);
             }
         });
 
@@ -288,7 +334,12 @@ impl ModsPage {
                     child.add_space(14.0);
 
                     // Icon placeholder
-                    child.label(egui::RichText::new("🌐").font(egui::FontId::proportional(22.0)));
+                    let icon_glyph = match item.source {
+                        ModSource::Modrinth => "🌐",
+                        ModSource::CurseForge => "🔥",
+                        ModSource::Local => "🧩",
+                    };
+                    child.label(egui::RichText::new(icon_glyph).font(egui::FontId::proportional(22.0)));
                     child.add_space(12.0);
 
                     // Title & Description
@@ -304,6 +355,16 @@ impl ModsPage {
                                 egui::RichText::new(format!("от {}", item.author))
                                     .font(egui::FontId::proportional(11.0))
                                     .color(TEXT_MUTED),
+                            );
+                            let src_tag = match item.source {
+                                ModSource::Modrinth => "Modrinth",
+                                ModSource::CurseForge => "CurseForge",
+                                ModSource::Local => "Local",
+                            };
+                            ui.label(
+                                egui::RichText::new(format!("• {src_tag}"))
+                                    .font(egui::FontId::proportional(10.0))
+                                    .color(RUBY_LIGHT),
                             );
                         });
 

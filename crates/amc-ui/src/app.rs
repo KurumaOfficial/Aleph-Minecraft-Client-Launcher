@@ -7,10 +7,10 @@ use amc_core::config::LauncherConfig;
 use amc_core::paths::LauncherPaths;
 use amc_core::types::{GameVersion, Instance, LoaderType};
 use amc_downloader::{AdoptiumInstaller, DownloadEngine, DownloadProgress};
-use amc_minecraft::{FabricLoader, GameEvent, MinecraftLauncher, VersionDetails, VersionManifest};
-use amc_mods::{LocalModManager, ModSearchResult, ModrinthClient};
+use amc_minecraft::{FabricLoader, GameEvent, MinecraftLauncher, QuiltLoader, VersionDetails, VersionManifest};
+use amc_mods::{CurseForgeClient, LocalModManager, ModSearchResult, ModSource, ModrinthClient};
 
-use crate::modals::{DownloadOverlay, LoginModal};
+use crate::modals::{ConsoleModal, DownloadOverlay, LoginModal};
 use crate::pages::{HomePage, InstanceAction, InstancesPage, ModsPage, SettingsPage, SkinsPage};
 use crate::theme::{apply_aleph_theme, BG};
 use crate::widgets::{BottomBar, NavTab, Sidebar, TitleBar};
@@ -39,6 +39,7 @@ pub struct LauncherApp {
 
     // Modals
     login_modal: LoginModal,
+    console_modal: ConsoleModal,
 
     // Async channels
     versions_rx: Option<mpsc::Receiver<Vec<GameVersion>>>,
@@ -96,6 +97,7 @@ impl LauncherApp {
             skins_page: SkinsPage::default(),
             settings_page: SettingsPage::default(),
             login_modal: LoginModal::default(),
+            console_modal: ConsoleModal::default(),
             versions_rx: None,
             mod_search_rx: None,
             mod_install_rx: None,
@@ -123,20 +125,36 @@ impl LauncherApp {
         });
     }
 
-    fn search_modrinth(&mut self, query: String) {
+    fn search_mods(&mut self, query: String, provider: ModSource) {
         self.mods_page.is_searching = true;
         let (tx, rx) = mpsc::channel(1);
         self.mod_search_rx = Some(rx);
 
         tokio::spawn(async move {
-            let client = ModrinthClient::default();
-            match client.search(&query, None, None, 30).await {
-                Ok(results) => {
-                    let _ = tx.send(results).await;
+            match provider {
+                ModSource::CurseForge => {
+                    let client = CurseForgeClient::default();
+                    match client.search(&query, None, None, 30).await {
+                        Ok(results) => {
+                            let _ = tx.send(results).await;
+                        }
+                        Err(e) => {
+                            tracing::error!("CurseForge search failed: {e}");
+                            let _ = tx.send(Vec::new()).await;
+                        }
+                    }
                 }
-                Err(e) => {
-                    tracing::error!("Modrinth search failed: {e}");
-                    let _ = tx.send(Vec::new()).await;
+                _ => {
+                    let client = ModrinthClient::default();
+                    match client.search(&query, None, None, 30).await {
+                        Ok(results) => {
+                            let _ = tx.send(results).await;
+                        }
+                        Err(e) => {
+                            tracing::error!("Modrinth search failed: {e}");
+                            let _ = tx.send(Vec::new()).await;
+                        }
+                    }
                 }
             }
         });
@@ -149,9 +167,18 @@ impl LauncherApp {
         self.mod_install_rx = Some(rx);
 
         tokio::spawn(async move {
-            let client = ModrinthClient::default();
-            tracing::info!("Resolving mod download for {}", mod_item.title);
-            match client.get_download_file(&mod_item.id, None, None).await {
+            let file_result = match mod_item.source {
+                ModSource::CurseForge => {
+                    let client = CurseForgeClient::default();
+                    client.get_download_file(&mod_item.id, None, None).await
+                }
+                _ => {
+                    let client = ModrinthClient::default();
+                    client.get_download_file(&mod_item.id, None, None).await
+                }
+            };
+
+            match file_result {
                 Ok(file_info) => {
                     let dest = mods_dir.join(&file_info.filename);
                     let item = amc_downloader::DownloadItem::new(&file_info.url, dest);
@@ -300,6 +327,42 @@ impl LauncherApp {
                         }
                     }
                 }
+                LoaderType::Quilt => {
+                    let _ = status_tx.send("Поиск Quilt Loader...".to_string()).await;
+                    match QuiltLoader::get_latest_loader_version(&client, &ver_id).await {
+                        Ok(loader_ver) => {
+                            let _ = status_tx.send(format!("Загрузка профиля Quilt {loader_ver}...")).await;
+                            match QuiltLoader::fetch_profile_json(&client, &ver_id, &loader_ver).await {
+                                Ok(mut quilt_details) => {
+                                    if let Ok(vanilla) = VersionDetails::fetch_or_load(&client, &ver_id, None, &paths.versions_dir()).await {
+                                        quilt_details.merge_parent(vanilla);
+                                    }
+                                    quilt_details
+                                }
+                                Err(e) => {
+                                    tracing::warn!("Quilt profile fetch error: {e}, falling back to Vanilla");
+                                    match VersionDetails::fetch_or_load(&client, &ver_id, None, &paths.versions_dir()).await {
+                                        Ok(d) => d,
+                                        Err(err) => {
+                                            let _ = game_tx.send(GameEvent::Crashed { message: format!("Ошибка загрузки версии {ver_id}: {err}") }).await;
+                                            return;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!("Quilt loader lookup error: {e}, falling back to Vanilla");
+                            match VersionDetails::fetch_or_load(&client, &ver_id, None, &paths.versions_dir()).await {
+                                Ok(d) => d,
+                                Err(err) => {
+                                    let _ = game_tx.send(GameEvent::Crashed { message: format!("Ошибка загрузки версии {ver_id}: {err}") }).await;
+                                    return;
+                                }
+                            }
+                        }
+                    }
+                }
                 _ => {
                     match VersionDetails::fetch_or_load(&client, &ver_id, None, &paths.versions_dir()).await {
                         Ok(d) => d,
@@ -314,12 +377,20 @@ impl LauncherApp {
             // 2. Resolve Java Runtime
             let req_java = details.required_java_major();
             let _ = status_tx.send(format!("Проверка Java {req_java}...")).await;
-            let java_bin = match AdoptiumInstaller::ensure_java(&paths.runtimes_dir(), req_java, &engine, None).await {
-                Ok(bin) => bin,
-                Err(e) => {
-                    tracing::error!("Java installation failed: {e}");
-                    let _ = game_tx.send(GameEvent::Crashed { message: format!("Ошибка установки Java {req_java}: {e}") }).await;
-                    return;
+            let java_bin = if let Some(custom_java) = &options.java_path {
+                if custom_java.is_file() {
+                    custom_java.clone()
+                } else {
+                    AdoptiumInstaller::ensure_java(&paths.runtimes_dir(), req_java, &engine, None).await.unwrap_or_else(|_| custom_java.clone())
+                }
+            } else {
+                match AdoptiumInstaller::ensure_java(&paths.runtimes_dir(), req_java, &engine, None).await {
+                    Ok(bin) => bin,
+                    Err(e) => {
+                        tracing::error!("Java installation failed: {e}");
+                        let _ = game_tx.send(GameEvent::Crashed { message: format!("Ошибка установки Java {req_java}: {e}") }).await;
+                        return;
+                    }
                 }
             };
 
@@ -433,7 +504,7 @@ impl App for LauncherApp {
             }
         }
 
-        // Receive Modrinth search results
+        // Receive mod search results
         if let Some(rx) = &mut self.mod_search_rx {
             if let Ok(results) = rx.try_recv() {
                 self.mods_page.search_results = results;
@@ -527,7 +598,9 @@ impl App for LauncherApp {
             while let Ok(event) = rx.try_recv() {
                 match event {
                     GameEvent::Started { pid } => {
-                        tracing::info!("Minecraft process started with PID {pid}");
+                        let msg = format!("Minecraft успешно запущен с PID {pid}");
+                        tracing::info!("{msg}");
+                        self.console_modal.push_line(format!("[ALEPH] {msg}"));
                         self.is_launching = false;
                         if self.config.ui.close_after_launch {
                             ctx.send_viewport_cmd(ViewportCommand::Close);
@@ -535,13 +608,17 @@ impl App for LauncherApp {
                     }
                     GameEvent::LogLine(line) => {
                         tracing::debug!("[MC] {line}");
+                        self.console_modal.push_line(line);
                     }
                     GameEvent::Exited { code } => {
-                        tracing::info!("Minecraft process exited with code {:?}", code);
+                        let msg = format!("Процесс Minecraft завершен с кодом {:?}", code);
+                        tracing::info!("{msg}");
+                        self.console_modal.push_line(format!("[ALEPH] {msg}"));
                         self.is_launching = false;
                     }
                     GameEvent::Crashed { message } => {
-                        tracing::error!("Minecraft process error: {message}");
+                        tracing::error!("Ошибка процесса Minecraft: {message}");
+                        self.console_modal.push_line(format!("[ERROR] {message}"));
                         self.is_launching = false;
                     }
                 }
@@ -553,7 +630,10 @@ impl App for LauncherApp {
             .exact_height(36.0)
             .frame(egui::Frame::none())
             .show(ctx, |ui| {
-                TitleBar::show(ui, "Aleph Launcher");
+                let tb_resp = TitleBar::show(ui, "Aleph Launcher");
+                if tb_resp.console_clicked {
+                    self.console_modal.is_open = !self.console_modal.is_open;
+                }
             });
 
         // 2. Bottom control bar
@@ -641,22 +721,22 @@ impl App for LauncherApp {
                     }
                     NavTab::Mods => {
                         let mods_dir = self.paths.root_dir.join("mods");
-                        let mut query_to_search = None;
+                        let mut search_req = None;
                         let mut mod_to_install = None;
 
                         self.mods_page.show(
                             &mut content_ui,
                             &mods_dir,
-                            |query| {
-                                query_to_search = Some(query);
+                            |query, provider| {
+                                search_req = Some((query, provider));
                             },
                             |result| {
                                 mod_to_install = Some(result);
                             },
                         );
 
-                        if let Some(q) = query_to_search {
-                            self.search_modrinth(q);
+                        if let Some((q, prov)) = search_req {
+                            self.search_mods(q, prov);
                         }
                         if let Some(item) = mod_to_install {
                             self.install_mod(item);
@@ -667,12 +747,14 @@ impl App for LauncherApp {
                         self.skins_page.show(&mut content_ui, acc);
                     }
                     NavTab::Settings => {
-                        self.settings_page.show(&mut content_ui, &mut self.config, &mut self.account_mgr);
+                        self.settings_page.show(&mut content_ui, &mut self.config, &mut self.account_mgr, &self.paths);
+                        // Auto-save configuration changes
+                        let _ = self.config.save_to_path(&self.paths.config_file());
                     }
                 }
             });
 
-        // Login Modal Dialog
+        // Modals
         let mut request_ms = false;
         self.login_modal.show(
             ctx,
@@ -687,5 +769,8 @@ impl App for LauncherApp {
         if request_ms {
             self.request_ms_device_code();
         }
+
+        // Game Console Modal
+        self.console_modal.show(ctx);
     }
 }
