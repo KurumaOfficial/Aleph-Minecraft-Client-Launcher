@@ -19,6 +19,7 @@ impl BottomBar {
         ui: &mut Ui,
         active_account: Option<&Account>,
         is_launching: bool,
+        avatar_texture: Option<&egui::TextureHandle>,
     ) -> BottomBarResponse {
         let mut response = BottomBarResponse::default();
         let bar_height = 76.0;
@@ -53,13 +54,23 @@ impl BottomBar {
         let (av_rect, _) = left_ui.allocate_exact_size(vec2(av_size, av_size), Sense::hover());
         left_ui.painter().rect_filled(av_rect, Rounding::ZERO, RUBY_DIM);
         left_ui.painter().rect_stroke(av_rect, Rounding::ZERO, Stroke::new(2.0, RUBY));
-        left_ui.painter().text(
-            av_rect.center(),
-            egui::Align2::CENTER_CENTER,
-            "👤",
-            egui::FontId::proportional(20.0),
-            RUBY_LIGHT,
-        );
+
+        if let Some(tex) = avatar_texture {
+            left_ui.painter().image(
+                tex.id(),
+                av_rect.shrink(2.0),
+                egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                Color32::WHITE,
+            );
+        } else {
+            left_ui.painter().text(
+                av_rect.center(),
+                egui::Align2::CENTER_CENTER,
+                "👤",
+                egui::FontId::proportional(20.0),
+                RUBY_LIGHT,
+            );
+        }
 
         left_ui.add_space(14.0);
 
@@ -95,16 +106,17 @@ impl BottomBar {
         left_ui.add_space(16.0);
 
         // Login / Switch account button
+        let btn_label = if active_account.is_some() { "СМЕНИТЬ" } else { "ВОЙТИ" };
         let login_btn = egui::Button::new(
-            egui::RichText::new("ВОЙТИ")
-                .font(egui::FontId::proportional(12.0))
+            egui::RichText::new(btn_label)
+                .font(egui::FontId::proportional(11.0))
                 .strong()
                 .color(TEXT_PRIMARY),
         )
         .fill(BG_HOVER)
         .stroke(Stroke::new(1.0, BORDER_STRONG))
         .rounding(Rounding::ZERO)
-        .min_size(vec2(80.0, 34.0));
+        .min_size(vec2(86.0, 34.0));
 
         if left_ui.add(login_btn).clicked() {
             response.login_clicked = true;

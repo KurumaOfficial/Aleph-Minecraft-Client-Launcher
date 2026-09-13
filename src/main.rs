@@ -53,6 +53,7 @@ async fn main() -> Result<(), eframe::Error> {
             setup_fonts(&cc.egui_ctx);
             let mut app = LauncherApp::new(cc);
             app.load_initial_manifest();
+            app.ping_featured_server();
             Ok(Box::new(app))
         }),
     )

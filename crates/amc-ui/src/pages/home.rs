@@ -1,10 +1,11 @@
-use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
+use egui::{vec2, Color32, Pos2, Rect, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
 use amc_core::types::{GameVersion, ReleaseType};
+use amc_minecraft::ServerStatus;
 use crate::theme::{
-    BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_DIM, RUBY_LIGHT, TEXT_HEADING,
-    TEXT_MUTED, TEXT_PRIMARY,
+    BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, BORDER_STRONG, RUBY, RUBY_DIM, RUBY_LIGHT, SUCCESS,
+    TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
-use crate::widgets::draw_badge;
+use crate::widgets::draw_custom_badge;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FilterTab {
@@ -28,6 +29,8 @@ pub struct HomePage {
     pub search_query: String,
     pub active_filter: FilterTab,
     pub sort_order: SortOrder,
+    pub featured_server: Option<ServerStatus>,
+    pub is_pinging: bool,
 }
 
 impl Default for HomePage {
@@ -36,6 +39,8 @@ impl Default for HomePage {
             search_query: String::new(),
             active_filter: FilterTab::Releases,
             sort_order: SortOrder::Newest,
+            featured_server: None,
+            is_pinging: false,
         }
     }
 }
@@ -49,13 +54,25 @@ impl HomePage {
     ) {
         ui.add_space(14.0);
 
-        // Page title
-        ui.label(
-            egui::RichText::new("Версии Minecraft")
-                .font(egui::FontId::proportional(24.0))
-                .strong()
-                .color(TEXT_HEADING),
-        );
+        // 1. Hero Banner Card
+        self.draw_hero_banner(ui);
+
+        ui.add_space(16.0);
+
+        // 2. Section Header: Versions
+        ui.horizontal(|ui| {
+            ui.label(
+                egui::RichText::new("Версии Minecraft")
+                    .font(egui::FontId::proportional(22.0))
+                    .strong()
+                    .color(TEXT_HEADING),
+            );
+
+            if let Some(sel) = selected_version.as_deref() {
+                ui.add_space(12.0);
+                draw_custom_badge(ui, &format!("Выбрана: {sel}"), RUBY);
+            }
+        });
 
         ui.add_space(12.0);
 
@@ -114,7 +131,6 @@ impl HomePage {
         let mut filtered: Vec<&GameVersion> = versions
             .iter()
             .filter(|v| {
-                // Filter tab
                 let matches_filter = match self.active_filter {
                     FilterTab::All => true,
                     FilterTab::Releases => v.release_type == ReleaseType::Release,
@@ -124,7 +140,6 @@ impl HomePage {
                     FilterTab::Old => v.release_type == ReleaseType::Old,
                 };
 
-                // Search query
                 let matches_search = if self.search_query.trim().is_empty() {
                     true
                 } else {
@@ -163,24 +178,214 @@ impl HomePage {
             return;
         }
 
-        let row_height = 46.0;
-        let mut new_selection = None;
+        // Virtualized ScrollArea
+        let row_height = 56.0;
+        let num_rows = filtered.len();
 
-        // Blazing-fast virtualized scrolling (only renders visible rows)
         ScrollArea::vertical()
             .auto_shrink([false, false])
-            .show_rows(ui, row_height, filtered.len(), |ui, row_range| {
+            .show_rows(ui, row_height, num_rows, |ui, row_range| {
+                ui.spacing_mut().item_spacing = vec2(0.0, 6.0);
+
                 for idx in row_range {
-                    let version = filtered[idx];
-                    let is_selected = selected_version.as_deref() == Some(&version.id);
-                    if self.version_row(ui, version, is_selected, row_height) {
-                        new_selection = Some(version.id.clone());
+                    let v = filtered[idx];
+                    let is_selected = selected_version.as_deref() == Some(&v.id);
+
+                    let (rect, resp) = ui.allocate_exact_size(
+                        vec2(ui.available_width(), 50.0),
+                        Sense::click(),
+                    );
+
+                    let bg = if is_selected {
+                        RUBY_DIM
+                    } else if resp.hovered() {
+                        BG_HOVER
+                    } else {
+                        BG_ELEVATED
+                    };
+
+                    let border_stroke = if is_selected {
+                        Stroke::new(1.5, RUBY)
+                    } else if resp.hovered() {
+                        Stroke::new(1.0, RUBY)
+                    } else {
+                        Stroke::new(1.0, BORDER_DEFAULT)
+                    };
+
+                    ui.painter().rect_filled(rect, Rounding::ZERO, bg);
+                    ui.painter().rect_stroke(rect, Rounding::ZERO, border_stroke);
+
+                    let mut child = ui.new_child(
+                        egui::UiBuilder::new()
+                            .max_rect(rect)
+                            .layout(egui::Layout::left_to_right(egui::Align::Center)),
+                    );
+
+                    child.add_space(14.0);
+
+                    // Version type icon
+                    let icon_glyph = match v.release_type {
+                        ReleaseType::Release => "📦",
+                        ReleaseType::Snapshot => "🧪",
+                        ReleaseType::Beta => "⚙",
+                        ReleaseType::Alpha => "🔨",
+                        ReleaseType::Old => "📜",
+                    };
+                    child.label(egui::RichText::new(icon_glyph).font(egui::FontId::proportional(18.0)));
+                    child.add_space(10.0);
+
+                    // Version ID
+                    child.label(
+                        egui::RichText::new(&v.id)
+                            .font(egui::FontId::proportional(15.0))
+                            .strong()
+                            .color(if is_selected { Color32::WHITE } else { TEXT_HEADING }),
+                    );
+
+                    child.add_space(12.0);
+
+                    // Release type badge
+                    let badge_color = match v.release_type {
+                        ReleaseType::Release => RUBY,
+                        ReleaseType::Snapshot => Color32::from_rgb(0xB8, 0x86, 0x0B),
+                        _ => Color32::from_rgb(0x4A, 0x55, 0x68),
+                    };
+                    draw_custom_badge(&mut child, v.release_type.as_str(), badge_color);
+
+                    // Release date on right
+                    let date_str = v.release_time.format("%d.%m.%Y").to_string();
+                    let date_width = 80.0;
+                    let space = child.available_width() - date_width - 16.0;
+                    if space > 0.0 {
+                        child.add_space(space);
+                    }
+
+                    child.label(
+                        egui::RichText::new(date_str)
+                            .font(egui::FontId::proportional(12.0))
+                            .color(TEXT_MUTED),
+                    );
+
+                    if resp.clicked() {
+                        *selected_version = Some(v.id.clone());
                     }
                 }
             });
+    }
 
-        if let Some(id) = new_selection {
-            *selected_version = Some(id);
+    fn draw_hero_banner(&self, ui: &mut Ui) {
+        let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 94.0), Sense::hover());
+
+        // Dark Ruby Gradient card
+        ui.painter().rect_filled(rect, Rounding::ZERO, Color32::from_rgb(0x13, 0x0B, 0x0D));
+        ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, BORDER_STRONG));
+
+        // Ruby accent bar on left
+        let accent = Rect::from_min_max(rect.left_top(), Pos2::new(rect.left() + 4.0, rect.bottom()));
+        ui.painter().rect_filled(accent, Rounding::ZERO, RUBY);
+
+        let mut child = ui.new_child(
+            egui::UiBuilder::new()
+                .max_rect(rect)
+                .layout(egui::Layout::left_to_right(egui::Align::Center)),
+        );
+        child.add_space(18.0);
+
+        // Emblem
+        let (logo_rect, _) = child.allocate_exact_size(vec2(52.0, 52.0), Sense::hover());
+        child.painter().rect_filled(logo_rect, Rounding::ZERO, RUBY_DIM);
+        child.painter().rect_stroke(logo_rect, Rounding::ZERO, Stroke::new(1.5, RUBY));
+        child.painter().text(
+            logo_rect.center(),
+            egui::Align2::CENTER_CENTER,
+            "ℵ",
+            egui::FontId::proportional(30.0),
+            RUBY_LIGHT,
+        );
+
+        child.add_space(14.0);
+
+        child.vertical(|ui| {
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new("ALEPH MINECRAFT CLIENT")
+                        .font(egui::FontId::proportional(16.0))
+                        .strong()
+                        .color(TEXT_HEADING),
+                );
+                draw_custom_badge(ui, "v0.2.0 OPEN-SOURCE", RUBY);
+            });
+
+            ui.add_space(2.0);
+
+            ui.label(
+                egui::RichText::new("Высокопроизводительный модульный лаунчер с поддержкой Fabric, Quilt, Forge, скинов и модов")
+                    .font(egui::FontId::proportional(12.0))
+                    .color(TEXT_MUTED),
+            );
+
+            ui.add_space(4.0);
+
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new("⚡ 60-144+ FPS").font(egui::FontId::proportional(11.0)).color(RUBY_LIGHT));
+                ui.label(egui::RichText::new("•").color(TEXT_MUTED));
+                ui.label(egui::RichText::new("🛡 WetID & Microsoft").font(egui::FontId::proportional(11.0)).color(TEXT_PRIMARY));
+                ui.label(egui::RichText::new("•").color(TEXT_MUTED));
+                ui.label(egui::RichText::new("🌐 Modrinth & CurseForge").font(egui::FontId::proportional(11.0)).color(SUCCESS));
+            });
+        });
+
+        // Right side: Featured Server Status Widget
+        let srv_width = 210.0;
+        let space = child.available_width() - srv_width - 16.0;
+        if space > 0.0 {
+            child.add_space(space);
+        }
+
+        let (srv_box, _) = child.allocate_exact_size(vec2(srv_width, 68.0), Sense::hover());
+        child.painter().rect_filled(srv_box, Rounding::ZERO, Color32::from_rgb(0x1B, 0x10, 0x13));
+        child.painter().rect_stroke(srv_box, Rounding::ZERO, Stroke::new(1.0, BORDER_DEFAULT));
+
+        let mut srv_ui = child.new_child(
+            egui::UiBuilder::new()
+                .max_rect(srv_box)
+                .layout(egui::Layout::top_down(egui::Align::Min)),
+        );
+        srv_ui.add_space(8.0);
+
+        if let Some(srv) = &self.featured_server {
+            srv_ui.horizontal(|ui| {
+                ui.add_space(10.0);
+                ui.label(egui::RichText::new(&srv.host).font(egui::FontId::proportional(13.0)).strong().color(TEXT_HEADING));
+            });
+            srv_ui.add_space(2.0);
+            srv_ui.horizontal(|ui| {
+                ui.add_space(10.0);
+                let (dot, col) = if srv.is_online { ("🟢", SUCCESS) } else { ("🔴", RUBY) };
+                ui.label(egui::RichText::new(format!("{dot} {} мс", srv.ping_ms)).font(egui::FontId::proportional(11.0)).color(col));
+                ui.label(egui::RichText::new("•").color(TEXT_MUTED));
+                ui.label(egui::RichText::new(format!("{} онлайн", srv.online_players)).font(egui::FontId::proportional(11.0)).color(TEXT_PRIMARY));
+            });
+        } else if self.is_pinging {
+            srv_ui.horizontal(|ui| {
+                ui.add_space(10.0);
+                ui.label(egui::RichText::new("mc.hypixel.net").font(egui::FontId::proportional(13.0)).strong().color(TEXT_HEADING));
+            });
+            srv_ui.add_space(4.0);
+            srv_ui.horizontal(|ui| {
+                ui.add_space(10.0);
+                ui.label(egui::RichText::new("⏳ Пинг сервера...").font(egui::FontId::proportional(11.0)).color(TEXT_MUTED));
+            });
+        } else {
+            srv_ui.horizontal(|ui| {
+                ui.add_space(10.0);
+                ui.label(egui::RichText::new("mc.hypixel.net").font(egui::FontId::proportional(13.0)).strong().color(TEXT_HEADING));
+            });
+            srv_ui.add_space(4.0);
+            srv_ui.horizontal(|ui| {
+                ui.add_space(10.0);
+                ui.label(egui::RichText::new("🔴 Недоступен").font(egui::FontId::proportional(11.0)).color(RUBY));
+            });
         }
     }
 
@@ -194,80 +399,17 @@ impl HomePage {
 
         let btn = egui::Button::new(
             egui::RichText::new(label)
-                .font(egui::FontId::proportional(10.0))
+                .font(egui::FontId::proportional(11.0))
                 .strong()
                 .color(text_color),
         )
         .fill(bg)
         .stroke(stroke)
         .rounding(Rounding::ZERO)
-        .min_size(vec2(72.0, 28.0));
+        .min_size(vec2(72.0, 26.0));
 
         if ui.add(btn).clicked() {
             self.active_filter = tab;
         }
-    }
-
-    fn version_row(&self, ui: &mut Ui, version: &GameVersion, is_selected: bool, height: f32) -> bool {
-        let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), height), Sense::click());
-
-        let bg = if is_selected {
-            RUBY_DIM
-        } else if resp.hovered() {
-            BG_HOVER
-        } else {
-            BG_ELEVATED
-        };
-
-        let border_stroke = if is_selected {
-            Stroke::new(1.5, RUBY_LIGHT)
-        } else if resp.hovered() {
-            Stroke::new(1.0, RUBY)
-        } else {
-            Stroke::new(1.0, BORDER_DEFAULT)
-        };
-
-        ui.painter().rect_filled(rect, Rounding::ZERO, bg);
-        ui.painter().rect_stroke(rect, Rounding::ZERO, border_stroke);
-
-        let mut child = ui.new_child(
-            egui::UiBuilder::new()
-                .max_rect(rect)
-                .layout(egui::Layout::left_to_right(egui::Align::Center)),
-        );
-        child.add_space(14.0);
-
-        // Icon placeholder
-        child.label(egui::RichText::new("🟩").font(egui::FontId::proportional(15.0)));
-        child.add_space(10.0);
-
-        // Version ID
-        child.label(
-            egui::RichText::new(&version.id)
-                .font(egui::FontId::proportional(15.0))
-                .strong()
-                .color(TEXT_HEADING),
-        );
-
-        child.add_space(12.0);
-
-        // Badge
-        draw_badge(&mut child, version.release_type);
-
-        // Date right aligned
-        let date_str = version.release_time.format("%d.%m.%Y").to_string();
-        let date_width = 80.0;
-        let available = child.available_width() - date_width - 16.0;
-        if available > 0.0 {
-            child.add_space(available);
-        }
-
-        child.label(
-            egui::RichText::new(date_str)
-                .font(egui::FontId::proportional(12.0))
-                .color(TEXT_MUTED),
-        );
-
-        resp.clicked()
     }
 }

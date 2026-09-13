@@ -11,6 +11,7 @@ use crate::theme::{
 pub enum InstanceAction {
     None,
     Created(Instance),
+    Updated(Instance),
     Deleted(Uuid),
     Selected(Uuid),
     Launch(Uuid),
@@ -23,6 +24,14 @@ pub struct InstancesPage {
     pub new_instance_version: String,
     pub new_instance_loader: LoaderType,
     pub new_instance_ram: u32,
+
+    // Edit modal
+    pub show_edit_modal: bool,
+    pub edit_instance_id: Option<Uuid>,
+    pub edit_instance_name: String,
+    pub edit_instance_version: String,
+    pub edit_instance_loader: LoaderType,
+    pub edit_instance_ram: u32,
 }
 
 impl Default for InstancesPage {
@@ -34,6 +43,13 @@ impl Default for InstancesPage {
             new_instance_version: "1.20.1".to_string(),
             new_instance_loader: LoaderType::Fabric,
             new_instance_ram: 4096,
+
+            show_edit_modal: false,
+            edit_instance_id: None,
+            edit_instance_name: String::new(),
+            edit_instance_version: String::new(),
+            edit_instance_loader: LoaderType::Vanilla,
+            edit_instance_ram: 4096,
         }
     }
 }
@@ -207,11 +223,24 @@ impl InstancesPage {
                                         .color(TEXT_MUTED),
                                 );
                             }
+
+                            let play_time_str = if inst.total_played_minutes == 0 {
+                                "Не запускалась".to_string()
+                            } else if inst.total_played_minutes < 60 {
+                                format!("{} мин", inst.total_played_minutes)
+                            } else {
+                                format!("{} ч {} мин", inst.total_played_minutes / 60, inst.total_played_minutes % 60)
+                            };
+                            ui.label(
+                                egui::RichText::new(format!("• ⏱ {play_time_str}"))
+                                    .font(egui::FontId::proportional(11.0))
+                                    .color(TEXT_MUTED),
+                            );
                         });
                     });
 
                     // Action buttons on the right
-                    let actions_width = 170.0;
+                    let actions_width = 205.0;
                     let avail = child.available_width() - actions_width - 16.0;
                     if avail > 0.0 {
                         child.add_space(avail);
@@ -226,6 +255,22 @@ impl InstancesPage {
                     {
                         let _ = std::fs::create_dir_all(&inst_dir);
                         let _ = open::that(&inst_dir);
+                    }
+
+                    child.add_space(6.0);
+
+                    // Edit instance button
+                    if child
+                        .button(egui::RichText::new("⚙").color(TEXT_PRIMARY))
+                        .on_hover_text("Редактировать сборку")
+                        .clicked()
+                    {
+                        self.edit_instance_id = Some(inst.id);
+                        self.edit_instance_name = inst.name.clone();
+                        self.edit_instance_version = inst.game_version.clone();
+                        self.edit_instance_loader = inst.loader;
+                        self.edit_instance_ram = inst.ram_mb.unwrap_or(4096);
+                        self.show_edit_modal = true;
                     }
 
                     child.add_space(6.0);
@@ -318,6 +363,75 @@ impl InstancesPage {
                         }
                     });
                 });
+        }
+
+        // Edit Instance Modal Dialog
+        if self.show_edit_modal {
+            let mut close_edit = false;
+            let mut save_edit = false;
+
+            egui::Window::new("Настройки сборки")
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, vec2(0.0, 0.0))
+                .min_width(420.0)
+                .show(ui.ctx(), |ui| {
+                    ui.add_space(8.0);
+                    ui.label(egui::RichText::new("Название сборки:").color(TEXT_PRIMARY));
+                    ui.add(TextEdit::singleline(&mut self.edit_instance_name).desired_width(400.0));
+
+                    ui.add_space(10.0);
+                    ui.label(egui::RichText::new("Версия Minecraft:").color(TEXT_PRIMARY));
+                    ui.add(TextEdit::singleline(&mut self.edit_instance_version).desired_width(400.0));
+
+                    ui.add_space(10.0);
+                    ui.label(egui::RichText::new("Загрузчик модов:").color(TEXT_PRIMARY));
+                    egui::ComboBox::from_id_salt("edit_loader_select")
+                        .selected_text(self.edit_instance_loader.as_str())
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.edit_instance_loader, LoaderType::Vanilla, "Vanilla");
+                            ui.selectable_value(&mut self.edit_instance_loader, LoaderType::Fabric, "Fabric");
+                            ui.selectable_value(&mut self.edit_instance_loader, LoaderType::Quilt, "Quilt");
+                            ui.selectable_value(&mut self.edit_instance_loader, LoaderType::Forge, "Forge");
+                            ui.selectable_value(&mut self.edit_instance_loader, LoaderType::NeoForge, "NeoForge");
+                            ui.selectable_value(&mut self.edit_instance_loader, LoaderType::OptiFine, "OptiFine");
+                        });
+
+                    ui.add_space(10.0);
+                    ui.label(egui::RichText::new(format!("Выделение RAM: {} МБ", self.edit_instance_ram)).color(TEXT_PRIMARY));
+                    ui.add(egui::Slider::new(&mut self.edit_instance_ram, 1024..=32768).step_by(512.0));
+
+                    ui.add_space(18.0);
+                    ui.horizontal(|ui| {
+                        if ui
+                            .button(egui::RichText::new("СОХРАНИТЬ").strong().color(Color32::WHITE))
+                            .clicked()
+                        {
+                            save_edit = true;
+                        }
+
+                        if ui.button("Отмена").clicked() {
+                            close_edit = true;
+                        }
+                    });
+                });
+
+            if save_edit {
+                if let Some(target_id) = self.edit_instance_id {
+                    if let Some(inst) = instances.iter_mut().find(|i| i.id == target_id) {
+                        inst.name = self.edit_instance_name.clone();
+                        inst.game_version = self.edit_instance_version.clone();
+                        inst.loader = self.edit_instance_loader;
+                        inst.ram_mb = Some(self.edit_instance_ram);
+                        action = InstanceAction::Updated(inst.clone());
+                    }
+                }
+                self.show_edit_modal = false;
+            }
+
+            if close_edit {
+                self.show_edit_modal = false;
+            }
         }
 
         action

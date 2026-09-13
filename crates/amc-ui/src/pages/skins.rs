@@ -14,6 +14,7 @@ pub struct SkinsPage {
     pub skin_image: Option<RgbaImage>,
     pub texture_handle: Option<egui::TextureHandle>,
     pub dirty: bool,
+    pub avatar_dirty: bool,
 }
 
 impl Default for SkinsPage {
@@ -25,6 +26,7 @@ impl Default for SkinsPage {
             skin_image: None,
             texture_handle: None,
             dirty: true,
+            avatar_dirty: true,
         }
     }
 }
@@ -90,6 +92,7 @@ impl SkinsPage {
             if ui.add(btn_classic).clicked() && self.is_slim_model {
                 self.is_slim_model = false;
                 self.dirty = true;
+                self.avatar_dirty = true;
             }
 
             let btn_slim = egui::Button::new(
@@ -105,6 +108,7 @@ impl SkinsPage {
             if ui.add(btn_slim).clicked() && !self.is_slim_model {
                 self.is_slim_model = true;
                 self.dirty = true;
+                self.avatar_dirty = true;
             }
         });
 
@@ -161,6 +165,7 @@ impl SkinsPage {
                             .unwrap_or_else(|| "Кастомный скин".to_string());
                         self.custom_skin_path = Some(path);
                         self.dirty = true;
+                        self.avatar_dirty = true;
                     }
                 }
             }
@@ -184,6 +189,7 @@ impl SkinsPage {
                     "Steve (По умолчанию)".to_string()
                 };
                 self.dirty = true;
+                self.avatar_dirty = true;
             }
         });
 
@@ -198,6 +204,49 @@ impl SkinsPage {
             );
         }
     }
+}
+
+pub fn extract_head_avatar(skin: Option<&RgbaImage>, is_slim: bool) -> egui::ColorImage {
+    let default_img;
+    let img = match skin {
+        Some(s) => s,
+        None => {
+            default_img = generate_default_skin(is_slim);
+            &default_img
+        }
+    };
+
+    let mut head = RgbaImage::new(8, 8);
+    for y in 0..8 {
+        for x in 0..8 {
+            let px = 8 + x;
+            let py = 8 + y;
+            if px < img.width() && py < img.height() {
+                head.put_pixel(x, y, *img.get_pixel(px, py));
+            }
+        }
+    }
+
+    for y in 0..8 {
+        for x in 0..8 {
+            let px = 40 + x;
+            let py = 8 + y;
+            if px < img.width() && py < img.height() {
+                let pixel = img.get_pixel(px, py);
+                if pixel[3] > 10 {
+                    head.put_pixel(x, y, *pixel);
+                }
+            }
+        }
+    }
+
+    let size = [head.width() as usize, head.height() as usize];
+    let pixels: Vec<Color32> = head
+        .pixels()
+        .map(|p| Color32::from_rgba_premultiplied(p[0], p[1], p[2], p[3]))
+        .collect();
+
+    egui::ColorImage { size, pixels }
 }
 
 fn composite_front_skin(skin: &RgbaImage, is_slim: bool) -> egui::ColorImage {

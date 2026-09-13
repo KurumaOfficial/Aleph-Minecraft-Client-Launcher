@@ -41,8 +41,16 @@ pub struct LauncherApp {
     login_modal: LoginModal,
     console_modal: ConsoleModal,
 
+    // Dynamic textures
+    avatar_texture: Option<egui::TextureHandle>,
+
+    // Session stats & tracking
+    session_start_time: Option<std::time::Instant>,
+    launched_instance_id: Option<uuid::Uuid>,
+
     // Async channels
     versions_rx: Option<mpsc::Receiver<Vec<GameVersion>>>,
+    server_ping_rx: Option<mpsc::Receiver<amc_minecraft::ServerStatus>>,
     mod_search_rx: Option<mpsc::Receiver<Vec<ModSearchResult>>>,
     mod_install_rx: Option<mpsc::Receiver<Result<(String, String), String>>>,
     progress_init_rx: Option<mpsc::Receiver<Option<watch::Receiver<DownloadProgress>>>>,
@@ -98,7 +106,11 @@ impl LauncherApp {
             settings_page: SettingsPage::default(),
             login_modal: LoginModal::default(),
             console_modal: ConsoleModal::default(),
+            avatar_texture: None,
+            session_start_time: None,
+            launched_instance_id: None,
             versions_rx: None,
+            server_ping_rx: None,
             mod_search_rx: None,
             mod_install_rx: None,
             progress_init_rx: None,
@@ -108,6 +120,18 @@ impl LauncherApp {
             ms_code_rx: None,
             ms_poll_rx: None,
         }
+    }
+
+    pub fn ping_featured_server(&mut self) {
+        self.home_page.is_pinging = true;
+        let (tx, rx) = mpsc::channel(1);
+        self.server_ping_rx = Some(rx);
+
+        tokio::spawn(async move {
+            if let Ok(status) = amc_minecraft::ServerPinger::ping("mc.hypixel.net", 25565).await {
+                let _ = tx.send(status).await;
+            }
+        });
     }
 
     pub fn load_initial_manifest(&mut self) {
@@ -246,6 +270,8 @@ impl LauncherApp {
             self.login_modal.is_open = true;
             return;
         };
+
+        self.launched_instance_id = self.selected_instance;
 
         let paths = self.paths.clone();
         let (game_dir, ver_id, ram_override, loader) = if let Some(inst_id) = self.selected_instance {
@@ -584,6 +610,15 @@ impl App for LauncherApp {
             }
         }
 
+        // Receive server ping result
+        if let Some(rx) = &mut self.server_ping_rx {
+            if let Ok(status) = rx.try_recv() {
+                self.home_page.featured_server = Some(status);
+                self.home_page.is_pinging = false;
+                self.server_ping_rx = None;
+            }
+        }
+
         // Check incoming download progress updates
         if let Some(rx) = &self.download_progress_rx {
             let progress = rx.borrow().clone();
@@ -601,6 +636,7 @@ impl App for LauncherApp {
                         let msg = format!("Minecraft успешно запущен с PID {pid}");
                         tracing::info!("{msg}");
                         self.console_modal.push_line(format!("[ALEPH] {msg}"));
+                        self.session_start_time = Some(std::time::Instant::now());
                         self.is_launching = false;
                         if self.config.ui.close_after_launch {
                             ctx.send_viewport_cmd(ViewportCommand::Close);
@@ -615,14 +651,44 @@ impl App for LauncherApp {
                         tracing::info!("{msg}");
                         self.console_modal.push_line(format!("[ALEPH] {msg}"));
                         self.is_launching = false;
+                        if let Some(start) = self.session_start_time.take() {
+                            let elapsed_mins = (start.elapsed().as_secs() / 60).max(1);
+                            if let Some(inst_id) = self.launched_instance_id {
+                                if let Some(inst) = self.instances.iter_mut().find(|i| i.id == inst_id) {
+                                    inst.total_played_minutes += elapsed_mins;
+                                    inst.last_played = Some(chrono::Utc::now());
+                                    let _ = Instance::save_all(&self.paths.instances_file(), &self.instances);
+                                }
+                            }
+                        }
                     }
                     GameEvent::Crashed { message } => {
                         tracing::error!("Ошибка процесса Minecraft: {message}");
                         self.console_modal.push_line(format!("[ERROR] {message}"));
                         self.is_launching = false;
+                        if let Some(start) = self.session_start_time.take() {
+                            let elapsed_mins = (start.elapsed().as_secs() / 60).max(1);
+                            if let Some(inst_id) = self.launched_instance_id {
+                                if let Some(inst) = self.instances.iter_mut().find(|i| i.id == inst_id) {
+                                    inst.total_played_minutes += elapsed_mins;
+                                    inst.last_played = Some(chrono::Utc::now());
+                                    let _ = Instance::save_all(&self.paths.instances_file(), &self.instances);
+                                }
+                            }
+                        }
                     }
                 }
             }
+        }
+
+        // Update avatar texture if needed
+        if self.skins_page.avatar_dirty || self.avatar_texture.is_none() {
+            let avatar_img = crate::pages::skins::extract_head_avatar(
+                self.skins_page.skin_image.as_ref(),
+                self.skins_page.is_slim_model,
+            );
+            self.avatar_texture = Some(ctx.load_texture("player_avatar", avatar_img, egui::TextureOptions::NEAREST));
+            self.skins_page.avatar_dirty = false;
         }
 
         // 1. Top custom titlebar
@@ -644,7 +710,7 @@ impl App for LauncherApp {
                 let active_acc = self.account_mgr.active_account();
                 let is_launching = self.is_launching;
 
-                let bbar_resp = BottomBar::show(ui, active_acc, is_launching);
+                let bbar_resp = BottomBar::show(ui, active_acc, is_launching, self.avatar_texture.as_ref());
                 if bbar_resp.login_clicked {
                     self.login_modal.is_open = true;
                 }
@@ -695,6 +761,15 @@ impl App for LauncherApp {
                             InstanceAction::Created(inst) => {
                                 let _ = inst.ensure_directories(&self.paths.instances_dir());
                                 self.instances.push(inst);
+                                let _ = Instance::save_all(&self.paths.instances_file(), &self.instances);
+                            }
+                            InstanceAction::Updated(inst) => {
+                                if let Some(existing) = self.instances.iter_mut().find(|i| i.id == inst.id) {
+                                    *existing = inst.clone();
+                                }
+                                if self.selected_instance == Some(inst.id) {
+                                    self.selected_version = Some(inst.game_version.clone());
+                                }
                                 let _ = Instance::save_all(&self.paths.instances_file(), &self.instances);
                             }
                             InstanceAction::Deleted(id) => {

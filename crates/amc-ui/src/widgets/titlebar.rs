@@ -34,6 +34,10 @@ impl TitleBar {
         if drag_resp.dragged() {
             ui.ctx().send_viewport_cmd(ViewportCommand::StartDrag);
         }
+        if drag_resp.double_clicked() {
+            let is_maximized = ui.input(|i| i.viewport().maximized.unwrap_or(false));
+            ui.ctx().send_viewport_cmd(ViewportCommand::Maximized(!is_maximized));
+        }
 
         // Draw title inside drag area
         ui.painter().text(
@@ -62,9 +66,10 @@ impl TitleBar {
         }
 
         // Maximize Button
+        let is_maximized = ui.input(|i| i.viewport().maximized.unwrap_or(false));
+        let max_symbol = if is_maximized { "❐" } else { "□" };
         let max_rect = Rect::from_min_size(Pos2::new(controls_start_x + button_w * 2.0, bar_rect.top()), vec2(button_w, height));
-        if Self::draw_control_button(ui, max_rect, "□", false).clicked() {
-            let is_maximized = ui.input(|i| i.viewport().maximized.unwrap_or(false));
+        if Self::draw_control_button(ui, max_rect, max_symbol, false).clicked() {
             ui.ctx().send_viewport_cmd(ViewportCommand::Maximized(!is_maximized));
         }
 

@@ -90,6 +90,13 @@ impl Sidebar {
             vec2(sq_size, sq_size),
         );
         ui.painter().rect_stroke(sq_rect, Rounding::ZERO, Stroke::new(2.0, RUBY));
+        ui.painter().text(
+            sq_rect.center(),
+            egui::Align2::CENTER_CENTER,
+            "ℵ",
+            egui::FontId::proportional(15.0),
+            RUBY_LIGHT,
+        );
 
         // Title text
         ui.painter().text(
