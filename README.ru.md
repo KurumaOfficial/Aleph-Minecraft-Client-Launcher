@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="assets/social_preview.png" alt="Aleph Minecraft Client Launcher" width="100%">
-</p>
-
 # ℵ Aleph Minecraft Client Launcher (AMC Launcher)
 
 <div align="center">
@@ -19,6 +15,10 @@
 ---
 
 </div>
+
+<p align="center">
+  <img src="assets/social_preview.png" alt="Aleph Minecraft Client Launcher" width="100%">
+</p>
 
 ## 📌 О проекте
 
