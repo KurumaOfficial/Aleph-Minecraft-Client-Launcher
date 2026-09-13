@@ -162,6 +162,19 @@ impl ArgumentBuilder {
             args.push(options.window_height.to_string());
         }
 
+        // Direct Server / Quick Play
+        if let Some(server) = &options.quick_play_server {
+            let port = options.quick_play_port.unwrap_or(25565);
+            // Modern 1.20+ Quick Play argument
+            args.push("--quickPlayMultiplayer".to_string());
+            args.push(format!("{server}:{port}"));
+            // Legacy 1.12-1.19 server/port argument
+            args.push("--server".to_string());
+            args.push(server.clone());
+            args.push("--port".to_string());
+            args.push(port.to_string());
+        }
+
         args
     }
 

@@ -31,6 +31,7 @@ pub struct HomePage {
     pub sort_order: SortOrder,
     pub featured_server: Option<ServerStatus>,
     pub is_pinging: bool,
+    pub direct_connect_request: Option<(String, u16)>,
 }
 
 impl Default for HomePage {
@@ -41,6 +42,7 @@ impl Default for HomePage {
             sort_order: SortOrder::Newest,
             featured_server: None,
             is_pinging: false,
+            direct_connect_request: None,
         }
     }
 }
@@ -55,7 +57,7 @@ impl HomePage {
     ) {
         ui.add_space(20.0);
 
-        // Section Header: Versions + Selected Badge + Compact Server Ping
+        // Section Header: Versions + Selected Badge + Compact Server Ping & Direct Play
         ui.horizontal(|ui| {
             ui.label(
                 egui::RichText::new(lang.home_title())
@@ -69,9 +71,9 @@ impl HomePage {
                 draw_custom_badge(ui, &lang.home_selected_badge(sel), RUBY);
             }
 
-            // Compact server status on the right
+            // Compact server status on the right with 1-click Direct Play
             if let Some(srv) = &self.featured_server {
-                let srv_label_w = 200.0;
+                let srv_label_w = 320.0;
                 let space = ui.available_width() - srv_label_w;
                 if space > 0.0 {
                     ui.add_space(space);
@@ -82,6 +84,19 @@ impl HomePage {
                         .font(egui::FontId::proportional(12.0))
                         .color(col),
                 );
+                if srv.is_online {
+                    ui.add_space(6.0);
+                    let dp_btn = egui::Button::new(
+                        egui::RichText::new(format!("⚡ {}", lang.home_direct_play()))
+                            .font(egui::FontId::proportional(11.0))
+                            .color(Color32::WHITE),
+                    )
+                    .fill(RUBY)
+                    .stroke(Stroke::new(1.0, RUBY_LIGHT));
+                    if ui.add(dp_btn).on_hover_text(format!("Launch & Connect to {}", srv.host)).clicked() {
+                        self.direct_connect_request = Some((srv.host.clone(), srv.port));
+                    }
+                }
             } else if self.is_pinging {
                 let srv_label_w = 160.0;
                 let space = ui.available_width() - srv_label_w;

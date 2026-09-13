@@ -8,7 +8,7 @@ use amc_core::paths::LauncherPaths;
 use amc_core::types::{GameVersion, Instance, LoaderType};
 use amc_downloader::{AdoptiumInstaller, DownloadEngine, DownloadProgress};
 use amc_minecraft::{FabricLoader, GameEvent, MinecraftLauncher, QuiltLoader, VersionDetails, VersionManifest};
-use amc_mods::{CurseForgeClient, LocalModManager, ModSearchResult, ModSource, ModrinthClient};
+use amc_mods::{CurseForgeClient, LocalModManager, ModCategory, ModSearchResult, ModSource, ModrinthClient};
 
 use crate::modals::{ConsoleModal, DownloadOverlay, LoginModal};
 use crate::pages::{HomePage, InstanceAction, InstancesPage, ModsPage, SettingsPage, SkinsPage};
@@ -47,6 +47,7 @@ pub struct LauncherApp {
     // Session stats & tracking
     session_start_time: Option<std::time::Instant>,
     launched_instance_id: Option<uuid::Uuid>,
+    pending_direct_connect: Option<(String, u16)>,
 
     // Async channels
     versions_rx: Option<mpsc::Receiver<Vec<GameVersion>>>,
@@ -121,6 +122,7 @@ impl LauncherApp {
             game_events_rx: None,
             ms_code_rx: None,
             ms_poll_rx: None,
+            pending_direct_connect: None,
         }
     }
 
@@ -151,7 +153,7 @@ impl LauncherApp {
         });
     }
 
-    fn search_mods(&mut self, query: String, provider: ModSource) {
+    fn search_mods(&mut self, query: String, provider: ModSource, category: ModCategory) {
         self.mods_page.is_searching = true;
         let (tx, rx) = mpsc::channel(1);
         self.mod_search_rx = Some(rx);
@@ -172,7 +174,7 @@ impl LauncherApp {
                 }
                 _ => {
                     let client = ModrinthClient::default();
-                    match client.search(&query, None, None, 30).await {
+                    match client.search(&query, None, None, category, 30).await {
                         Ok(results) => {
                             let _ = tx.send(results).await;
                         }
@@ -187,7 +189,23 @@ impl LauncherApp {
     }
 
     fn install_mod(&mut self, mod_item: ModSearchResult) {
-        let mods_dir = self.paths.root_dir.join("mods");
+        let base_dir = if let Some(id) = self.selected_instance {
+            if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
+                inst.get_game_dir(&self.paths.instances_dir())
+            } else {
+                self.paths.root_dir.clone()
+            }
+        } else {
+            self.paths.root_dir.clone()
+        };
+
+        let target_dir = match mod_item.category {
+            ModCategory::ResourcePack => base_dir.join("resourcepacks"),
+            ModCategory::Shader => base_dir.join("shaderpacks"),
+            ModCategory::Mod => base_dir.join("mods"),
+        };
+        let _ = std::fs::create_dir_all(&target_dir);
+
         let engine = self.download_engine.clone();
         let (tx, rx) = mpsc::channel(1);
         self.mod_install_rx = Some(rx);
@@ -206,22 +224,27 @@ impl LauncherApp {
 
             match file_result {
                 Ok(file_info) => {
-                    let dest = mods_dir.join(&file_info.filename);
+                    let dest = target_dir.join(&file_info.filename);
                     let item = amc_downloader::DownloadItem::new(&file_info.url, dest);
                     if let Err(e) = engine.download_one(&item, None).await {
-                        tracing::error!("Failed to download mod {}: {e}", file_info.filename);
+                        tracing::error!("Failed to download {}: {e}", file_info.filename);
                         let _ = tx.send(Err(format!("Ошибка загрузки {}: {e}", file_info.filename))).await;
                     } else {
-                        tracing::info!("Mod {} installed successfully!", file_info.filename);
+                        tracing::info!("Item {} installed successfully!", file_info.filename);
                         let _ = tx.send(Ok((mod_item.id, mod_item.title))).await;
                     }
                 }
                 Err(e) => {
-                    tracing::error!("Failed to get mod file info: {e}");
-                    let _ = tx.send(Err(format!("Не удалось получить файл мода: {e}"))).await;
+                    tracing::error!("Failed to get file info: {e}");
+                    let _ = tx.send(Err(format!("Не удалось получить файл: {e}"))).await;
                 }
             }
         });
+    }
+
+    fn handle_direct_connect(&mut self, server: String, port: u16) {
+        self.pending_direct_connect = Some((server, port));
+        self.handle_launch();
     }
 
     fn request_ms_device_code(&mut self) {
@@ -304,6 +327,10 @@ impl LauncherApp {
         let mut options = self.config.default_launch_options.clone();
         if let Some(ram) = ram_override {
             options.memory_max_mb = ram;
+        }
+        if let Some((srv, port)) = self.pending_direct_connect.take() {
+            options.quick_play_server = Some(srv);
+            options.quick_play_port = Some(port);
         }
 
         let (game_tx, game_rx) = mpsc::channel(256);
@@ -670,7 +697,7 @@ impl App for LauncherApp {
                         let lang = self.config.ui.language();
                         let msg = lang.status_process_crashed(&message);
                         tracing::error!("{msg}");
-                        self.console_modal.push_line(format!("[ERROR] {msg}"));
+                        self.console_modal.set_crash_message(msg, lang);
                         self.is_launching = false;
                         if let Some(start) = self.session_start_time.take() {
                             let elapsed_mins = (start.elapsed().as_secs() / 60).max(1);
@@ -756,6 +783,9 @@ impl App for LauncherApp {
                 match self.current_tab {
                     NavTab::Home => {
                         self.home_page.show(&mut content_ui, &self.versions, &mut self.selected_version, lang);
+                        if let Some((server, port)) = self.home_page.direct_connect_request.take() {
+                            self.handle_direct_connect(server, port);
+                        }
                     }
                     NavTab::Modpacks => {
                         let action = self.instances_page.show(
@@ -781,6 +811,21 @@ impl App for LauncherApp {
                                 }
                                 let _ = Instance::save_all(&self.paths.instances_file(), &self.instances);
                             }
+                            InstanceAction::Cloned(id) => {
+                                if let Some(inst) = self.instances.iter().find(|i| i.id == id).cloned() {
+                                    let copy_name = match lang {
+                                        amc_core::Language::English => format!("{} (Copy)", inst.name),
+                                        amc_core::Language::Russian => format!("{} (Копия)", inst.name),
+                                        amc_core::Language::Ukrainian => format!("{} (Копія)", inst.name),
+                                    };
+                                    if let Ok(cloned) = inst.clone_instance(&copy_name, &self.paths.instances_dir()) {
+                                        let new_id = cloned.id;
+                                        self.instances.push(cloned);
+                                        self.selected_instance = Some(new_id);
+                                        let _ = Instance::save_all(&self.paths.instances_file(), &self.instances);
+                                    }
+                                }
+                            }
                             InstanceAction::Deleted(id) => {
                                 self.instances.retain(|i| i.id != id);
                                 if self.selected_instance == Some(id) {
@@ -804,7 +849,16 @@ impl App for LauncherApp {
                         }
                     }
                     NavTab::Mods => {
-                        let mods_dir = self.paths.root_dir.join("mods");
+                        let base_dir = if let Some(id) = self.selected_instance {
+                            if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
+                                inst.get_game_dir(&self.paths.instances_dir())
+                            } else {
+                                self.paths.root_dir.clone()
+                            }
+                        } else {
+                            self.paths.root_dir.clone()
+                        };
+                        let mods_dir = base_dir.join("mods");
                         let mut search_req = None;
                         let mut mod_to_install = None;
 
@@ -812,16 +866,16 @@ impl App for LauncherApp {
                             &mut content_ui,
                             &mods_dir,
                             lang,
-                            |query, provider| {
-                                search_req = Some((query, provider));
+                            |query, provider, category| {
+                                search_req = Some((query, provider, category));
                             },
                             |result| {
                                 mod_to_install = Some(result);
                             },
                         );
 
-                        if let Some((q, prov)) = search_req {
-                            self.search_mods(q, prov);
+                        if let Some((q, prov, cat)) = search_req {
+                            self.search_mods(q, prov, cat);
                         }
                         if let Some(item) = mod_to_install {
                             self.install_mod(item);

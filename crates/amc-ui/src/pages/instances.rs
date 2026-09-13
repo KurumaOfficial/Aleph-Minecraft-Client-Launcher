@@ -15,6 +15,7 @@ pub enum InstanceAction {
     Updated(Instance),
     Deleted(Uuid),
     Selected(Uuid),
+    Cloned(Uuid),
     Launch(Uuid),
 }
 
@@ -287,6 +288,17 @@ impl InstancesPage {
                         self.edit_instance_loader = inst.loader;
                         self.edit_instance_ram = inst.ram_mb.unwrap_or(4096);
                         self.show_edit_modal = true;
+                    }
+
+                    child.add_space(6.0);
+
+                    // Clone / Duplicate instance button
+                    if child
+                        .button(egui::RichText::new("📋").color(TEXT_PRIMARY))
+                        .on_hover_text(lang.inst_btn_clone())
+                        .clicked()
+                    {
+                        action = InstanceAction::Cloned(inst.id);
                     }
 
                     child.add_space(6.0);

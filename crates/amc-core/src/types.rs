@@ -145,15 +145,57 @@ impl Instance {
         }
     }
 
+    pub fn clone_instance(&self, new_name: &str, base_instances_dir: &std::path::Path) -> Result<Self> {
+        let mut cloned = self.clone();
+        cloned.id = Uuid::new_v4();
+        cloned.name = new_name.to_string();
+        cloned.created_at = Utc::now();
+        cloned.last_played = None;
+        cloned.total_played_minutes = 0;
+        cloned.custom_dir = None;
+
+        let src_dir = self.get_game_dir(base_instances_dir);
+        let dst_dir = cloned.get_game_dir(base_instances_dir);
+
+        if src_dir.is_dir() {
+            let _ = std::fs::create_dir_all(&dst_dir);
+            for sub in &["config", "mods", "resourcepacks", "shaderpacks"] {
+                let src_sub = src_dir.join(sub);
+                let dst_sub = dst_dir.join(sub);
+                if src_sub.is_dir() {
+                    let _ = copy_dir_recursive(&src_sub, &dst_sub);
+                }
+            }
+        } else {
+            cloned.ensure_directories(base_instances_dir)?;
+        }
+
+        Ok(cloned)
+    }
+
     pub fn ensure_directories(&self, base_instances_dir: &std::path::Path) -> Result<PathBuf> {
         let game_dir = self.get_game_dir(base_instances_dir);
-        let subdirs = ["mods", "saves", "resourcepacks", "shaderpacks", "config"];
+        let subdirs = ["mods", "saves", "resourcepacks", "shaderpacks", "config", "screenshots"];
         for sub in subdirs {
             let p = game_dir.join(sub);
             let _ = std::fs::create_dir_all(&p);
         }
         Ok(game_dir)
     }
+}
+
+fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let ty = entry.file_type()?;
+        if ty.is_dir() {
+            copy_dir_recursive(&entry.path(), &dst.join(entry.file_name()))?;
+        } else {
+            std::fs::copy(entry.path(), dst.join(entry.file_name()))?;
+        }
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -165,6 +207,8 @@ pub struct LaunchOptions {
     pub window_width: u32,
     pub window_height: u32,
     pub fullscreen: bool,
+    pub quick_play_server: Option<String>,
+    pub quick_play_port: Option<u16>,
 }
 
 impl Default for LaunchOptions {
@@ -184,6 +228,44 @@ impl Default for LaunchOptions {
             window_width: 1280,
             window_height: 720,
             fullscreen: false,
+            quick_play_server: None,
+            quick_play_port: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_instance_creation_and_clone() {
+        let temp_dir = std::env::temp_dir().join(format!("amc_test_{}", Uuid::new_v4()));
+        let _ = std::fs::create_dir_all(&temp_dir);
+
+        let original = Instance::new("Test Pack", "1.20.1", LoaderType::Fabric);
+        let _ = original.ensure_directories(&temp_dir);
+
+        let cloned = original.clone_instance("Test Pack (Copy)", &temp_dir).unwrap();
+        assert_ne!(original.id, cloned.id);
+        assert_eq!(cloned.name, "Test Pack (Copy)");
+        assert_eq!(cloned.game_version, "1.20.1");
+        assert_eq!(cloned.loader, LoaderType::Fabric);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_launch_options_quick_play() {
+        let mut opts = LaunchOptions::default();
+        assert!(opts.quick_play_server.is_none());
+        opts.quick_play_server = Some("hypixel.net".to_string());
+        opts.quick_play_port = Some(25565);
+
+        let json = serde_json::to_string(&opts).unwrap();
+        assert!(json.contains("hypixel.net"));
+        let deserialized: LaunchOptions = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.quick_play_server.as_deref(), Some("hypixel.net"));
+        assert_eq!(deserialized.quick_play_port, Some(25565));
     }
 }

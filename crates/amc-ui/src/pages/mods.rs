@@ -1,5 +1,5 @@
 use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
-use amc_mods::types::{LocalMod, ModSearchResult, ModSource};
+use amc_mods::types::{LocalMod, ModCategory, ModSearchResult, ModSource};
 use amc_core::Language;
 use std::collections::HashSet;
 use std::path::Path;
@@ -18,6 +18,7 @@ pub enum ModsSubTab {
 pub struct ModsPage {
     pub sub_tab: ModsSubTab,
     pub search_provider: ModSource,
+    pub search_category: ModCategory,
     pub search_query: String,
     pub is_searching: bool,
     pub search_results: Vec<ModSearchResult>,
@@ -32,6 +33,7 @@ impl Default for ModsPage {
         Self {
             sub_tab: ModsSubTab::Local,
             search_provider: ModSource::Modrinth,
+            search_category: ModCategory::Mod,
             search_query: String::new(),
             is_searching: false,
             search_results: Vec::new(),
@@ -49,7 +51,7 @@ impl ModsPage {
         ui: &mut Ui,
         mods_dir: &Path,
         lang: Language,
-        on_search: impl FnOnce(String, ModSource),
+        on_search: impl FnOnce(String, ModSource, ModCategory),
         on_install: impl FnOnce(ModSearchResult),
     ) {
         ui.add_space(20.0);
@@ -240,7 +242,7 @@ impl ModsPage {
         &mut self,
         ui: &mut Ui,
         lang: Language,
-        on_search: impl FnOnce(String, ModSource),
+        on_search: impl FnOnce(String, ModSource, ModCategory),
         on_install: impl FnOnce(ModSearchResult),
     ) {
         ui.horizontal(|ui| {
@@ -272,6 +274,7 @@ impl ModsPage {
 
             if ui.add(cf_btn).clicked() {
                 self.search_provider = ModSource::CurseForge;
+                self.search_category = ModCategory::Mod;
             }
 
             ui.add_space(8.0);
@@ -298,9 +301,49 @@ impl ModsPage {
                 .clicked()
                 || enter_pressed
             {
-                on_search(self.search_query.clone(), self.search_provider);
+                on_search(self.search_query.clone(), self.search_provider, self.search_category);
             }
         });
+
+        // Category selection row for Modrinth
+        if self.search_provider == ModSource::Modrinth {
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                let cat_mod = self.search_category == ModCategory::Mod;
+                let cat_rp = self.search_category == ModCategory::ResourcePack;
+                let cat_sh = self.search_category == ModCategory::Shader;
+
+                let b_mod = egui::Button::new(
+                    egui::RichText::new(format!("🧩 {}", lang.mods_cat_mods()))
+                        .font(egui::FontId::proportional(11.0))
+                        .color(if cat_mod { Color32::WHITE } else { TEXT_MUTED }),
+                )
+                .fill(if cat_mod { RUBY } else { BG_ELEVATED });
+                if ui.add(b_mod).clicked() {
+                    self.search_category = ModCategory::Mod;
+                }
+
+                let b_rp = egui::Button::new(
+                    egui::RichText::new(format!("🎨 {}", lang.mods_cat_resourcepacks()))
+                        .font(egui::FontId::proportional(11.0))
+                        .color(if cat_rp { Color32::WHITE } else { TEXT_MUTED }),
+                )
+                .fill(if cat_rp { RUBY } else { BG_ELEVATED });
+                if ui.add(b_rp).clicked() {
+                    self.search_category = ModCategory::ResourcePack;
+                }
+
+                let b_sh = egui::Button::new(
+                    egui::RichText::new(format!("☀️ {}", lang.mods_cat_shaders()))
+                        .font(egui::FontId::proportional(11.0))
+                        .color(if cat_sh { Color32::WHITE } else { TEXT_MUTED }),
+                )
+                .fill(if cat_sh { RUBY } else { BG_ELEVATED });
+                if ui.add(b_sh).clicked() {
+                    self.search_category = ModCategory::Shader;
+                }
+            });
+        }
 
         ui.add_space(14.0);
 

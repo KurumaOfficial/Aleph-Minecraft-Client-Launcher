@@ -2,7 +2,7 @@ use reqwest::Client;
 use serde::Deserialize;
 use std::time::Duration;
 use amc_core::error::{LauncherError, Result};
-use crate::types::{ModDownloadFile, ModSearchResult, ModSource};
+use crate::types::{ModCategory, ModDownloadFile, ModSearchResult, ModSource};
 
 const API_BASE: &str = "https://api.modrinth.com/v2";
 
@@ -65,12 +65,18 @@ impl ModrinthClient {
         query: &str,
         loader: Option<&str>,
         mc_version: Option<&str>,
+        category: ModCategory,
         limit: usize,
     ) -> Result<Vec<ModSearchResult>> {
-        let mut facets: Vec<Vec<String>> = vec![vec!["project_type:mod".to_string()]];
+        let proj_type = match category {
+            ModCategory::Mod => "project_type:mod",
+            ModCategory::ResourcePack => "project_type:resourcepack",
+            ModCategory::Shader => "project_type:shader",
+        };
+        let mut facets: Vec<Vec<String>> = vec![vec![proj_type.to_string()]];
 
         if let Some(l) = loader {
-            if !l.is_empty() {
+            if !l.is_empty() && category == ModCategory::Mod {
                 facets.push(vec![format!("categories:{}", l.to_lowercase())]);
             }
         }
@@ -114,6 +120,7 @@ impl ModrinthClient {
                 downloads: h.downloads,
                 description: h.description,
                 icon_url: h.icon_url,
+                category,
             })
             .collect())
     }

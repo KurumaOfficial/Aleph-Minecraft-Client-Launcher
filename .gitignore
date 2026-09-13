@@ -4,6 +4,7 @@
 # Cargo build artifacts
 /target/
 **/target/
+*.exe
 
 # One-off debug logs
 *.log

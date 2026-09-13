@@ -2,7 +2,7 @@ use reqwest::Client;
 use serde::Deserialize;
 use std::time::Duration;
 use amc_core::error::{LauncherError, Result};
-use crate::types::{ModDownloadFile, ModSearchResult, ModSource};
+use crate::types::{ModCategory, ModDownloadFile, ModSearchResult, ModSource};
 
 const API_BASE: &str = "https://api.curse.tools/v1/cf";
 const GAME_ID: u32 = 432;
@@ -134,6 +134,7 @@ impl CurseForgeClient {
                 downloads: item.downloads,
                 description: item.summary,
                 icon_url: item.logo.map(|l| l.url),
+                category: ModCategory::Mod,
             })
             .collect())
     }

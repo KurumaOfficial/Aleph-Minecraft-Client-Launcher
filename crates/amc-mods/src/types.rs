@@ -8,6 +8,14 @@ pub enum ModSource {
     Local,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum ModCategory {
+    #[default]
+    Mod,
+    ResourcePack,
+    Shader,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModSearchResult {
     pub source: ModSource,
@@ -17,6 +25,7 @@ pub struct ModSearchResult {
     pub downloads: u64,
     pub description: String,
     pub icon_url: Option<String>,
+    pub category: ModCategory,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

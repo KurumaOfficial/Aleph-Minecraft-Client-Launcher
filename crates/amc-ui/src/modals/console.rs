@@ -1,11 +1,31 @@
-use egui::{vec2, Color32, ScrollArea, Stroke, TextEdit};
+use egui::{vec2, Color32, Rounding, ScrollArea, Stroke, TextEdit};
 use crate::theme::{BG_ELEVATED, BORDER_DEFAULT, RUBY, RUBY_LIGHT, TEXT_MUTED, TEXT_PRIMARY};
+use amc_core::Language;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CrashCategory {
+    OutOfMemory,
+    JavaVersionMismatch,
+    FabricMissingDependency,
+    MixinConflict,
+    GraphicsDriverGlfw,
+}
+
+#[derive(Debug, Clone)]
+pub struct CrashDiagnosis {
+    pub category: CrashCategory,
+    pub title: String,
+    pub description: String,
+    pub solution: String,
+    pub raw_cause: String,
+}
 
 pub struct ConsoleModal {
     pub is_open: bool,
     pub logs: Vec<String>,
     pub filter: String,
     pub autoscroll: bool,
+    pub manual_diagnosis: Option<CrashDiagnosis>,
 }
 
 impl Default for ConsoleModal {
@@ -15,6 +35,7 @@ impl Default for ConsoleModal {
             logs: Vec::new(),
             filter: String::new(),
             autoscroll: true,
+            manual_diagnosis: None,
         }
     }
 }
@@ -27,15 +48,86 @@ impl ConsoleModal {
         self.logs.push(line);
     }
 
-    pub fn show(&mut self, ctx: &egui::Context, lang: amc_core::Language) {
+    pub fn set_crash_message(&mut self, msg: String, lang: Language) {
+        self.is_open = true;
+        self.logs.push(format!("[AMC CRASH] {msg}"));
+        if let Some(diag) = self.analyze_crash(lang) {
+            self.manual_diagnosis = Some(diag);
+        }
+    }
+
+    pub fn analyze_crash(&self, lang: Language) -> Option<CrashDiagnosis> {
+        for line in self.logs.iter().rev() {
+            if line.contains("java.lang.OutOfMemoryError") || line.contains("OutOfMemory") {
+                return Some(CrashDiagnosis {
+                    category: CrashCategory::OutOfMemory,
+                    title: lang.diag_oom_title().to_string(),
+                    description: lang.diag_oom_desc().to_string(),
+                    solution: lang.diag_oom_solution().to_string(),
+                    raw_cause: line.trim().to_string(),
+                });
+            }
+            if line.contains("UnsupportedClassVersionError")
+                || line.contains("has been compiled by a more recent version of the Java Runtime")
+            {
+                return Some(CrashDiagnosis {
+                    category: CrashCategory::JavaVersionMismatch,
+                    title: lang.diag_java_title().to_string(),
+                    description: lang.diag_java_desc().to_string(),
+                    solution: lang.diag_java_solution().to_string(),
+                    raw_cause: line.trim().to_string(),
+                });
+            }
+            if line.contains("net.fabricmc.loader.impl.FormattedException")
+                || line.contains("ModResolutionException")
+            {
+                return Some(CrashDiagnosis {
+                    category: CrashCategory::FabricMissingDependency,
+                    title: lang.diag_fabric_dep_title().to_string(),
+                    description: lang.diag_fabric_dep_desc().to_string(),
+                    solution: lang.diag_fabric_dep_solution().to_string(),
+                    raw_cause: line.trim().to_string(),
+                });
+            }
+            if line.contains("org.spongepowered.asm.mixin.throwables.MixinApplyError")
+                || line.contains("MixinTransformationException")
+            {
+                return Some(CrashDiagnosis {
+                    category: CrashCategory::MixinConflict,
+                    title: lang.diag_mixin_title().to_string(),
+                    description: lang.diag_mixin_desc().to_string(),
+                    solution: lang.diag_mixin_solution().to_string(),
+                    raw_cause: line.trim().to_string(),
+                });
+            }
+            if line.contains("GLFW error 65542")
+                || line.contains("Pixel format not accelerated")
+                || line.contains("WGL:")
+            {
+                return Some(CrashDiagnosis {
+                    category: CrashCategory::GraphicsDriverGlfw,
+                    title: lang.diag_gpu_title().to_string(),
+                    description: lang.diag_gpu_desc().to_string(),
+                    solution: lang.diag_gpu_solution().to_string(),
+                    raw_cause: line.trim().to_string(),
+                });
+            }
+        }
+        None
+    }
+
+    pub fn show(&mut self, ctx: &egui::Context, lang: Language) {
         if !self.is_open {
             return;
         }
 
+        let mut is_open = self.is_open;
+        let diagnosis = self.manual_diagnosis.clone().or_else(|| self.analyze_crash(lang));
+
         egui::Window::new(lang.console_title())
-            .open(&mut self.is_open)
-            .default_size(vec2(780.0, 500.0))
-            .min_size(vec2(500.0, 300.0))
+            .open(&mut is_open)
+            .default_size(vec2(820.0, 520.0))
+            .min_size(vec2(540.0, 320.0))
             .resizable(true)
             .collapsible(false)
             .show(ctx, |ui| {
@@ -72,6 +164,7 @@ impl ConsoleModal {
 
                     if ui.add(clear_btn).clicked() {
                         self.logs.clear();
+                        self.manual_diagnosis = None;
                     }
 
                     let export_btn = egui::Button::new(
@@ -92,6 +185,51 @@ impl ConsoleModal {
                 });
 
                 ui.add_space(8.0);
+
+                // Crash Diagnostic Card (if detected)
+                if let Some(diag) = &diagnosis {
+                    egui::Frame::none()
+                        .fill(Color32::from_rgb(26, 12, 16))
+                        .stroke(Stroke::new(1.5, RUBY))
+                        .rounding(Rounding::same(8.0))
+                        .inner_margin(egui::Margin::same(10.0))
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                ui.label(egui::RichText::new("⚠️").font(egui::FontId::proportional(22.0)));
+                                ui.vertical(|ui| {
+                                    ui.horizontal(|ui| {
+                                        ui.label(
+                                            egui::RichText::new(lang.diag_header_label())
+                                                .font(egui::FontId::proportional(11.0))
+                                                .strong()
+                                                .color(RUBY_LIGHT),
+                                        );
+                                        ui.label(
+                                            egui::RichText::new(format!("• {}", diag.title))
+                                                .font(egui::FontId::proportional(13.0))
+                                                .strong()
+                                                .color(Color32::WHITE),
+                                        );
+                                    });
+                                    ui.add_space(2.0);
+                                    ui.label(
+                                        egui::RichText::new(&diag.description)
+                                            .font(egui::FontId::proportional(12.0))
+                                            .color(TEXT_PRIMARY),
+                                    );
+                                    ui.add_space(2.0);
+                                    ui.label(
+                                        egui::RichText::new(format!("💡 {}", diag.solution))
+                                            .font(egui::FontId::proportional(12.0))
+                                            .strong()
+                                            .color(Color32::from_rgb(255, 204, 100)),
+                                    );
+                                });
+                            });
+                        });
+                    ui.add_space(6.0);
+                }
+
                 ui.separator();
                 ui.add_space(4.0);
 
@@ -118,6 +256,7 @@ impl ConsoleModal {
                                 || line.contains("Exception")
                                 || line.contains("Caused by")
                                 || line.contains("Crash")
+                                || line.contains("[AMC CRASH]")
                             {
                                 Color32::from_rgb(230, 80, 80)
                             } else if line.contains("[WARN]") {
@@ -136,5 +275,6 @@ impl ConsoleModal {
                         }
                     });
             });
+        self.is_open = is_open;
     }
 }

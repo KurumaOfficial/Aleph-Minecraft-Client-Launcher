@@ -1323,6 +1323,180 @@ impl Language {
             Self::Ukrainian => format!("Помилка процесу Minecraft: {msg}"),
         }
     }
+
+    // ==========================================
+    // Crash Diagnostic Assistant
+    // ==========================================
+    pub fn diag_header_label(&self) -> &'static str {
+        match self {
+            Self::English => "Crash Diagnostic Assistant",
+            Self::Russian => "Диагностика сбоя игры",
+            Self::Ukrainian => "Діагностика збою гри",
+        }
+    }
+
+    pub fn diag_oom_title(&self) -> &'static str {
+        match self {
+            Self::English => "Out of Memory (Java Heap)",
+            Self::Russian => "Нехватка оперативной памяти (OOM)",
+            Self::Ukrainian => "Нестача оперативної пам'яті (OOM)",
+        }
+    }
+
+    pub fn diag_oom_desc(&self) -> &'static str {
+        match self {
+            Self::English => "Minecraft ran out of allocated Java heap memory.",
+            Self::Russian => "Процессу Minecraft не хватило выделенной памяти Java Heap.",
+            Self::Ukrainian => "Процесу Minecraft не вистачило виділеної пам'яті Java Heap.",
+        }
+    }
+
+    pub fn diag_oom_solution(&self) -> &'static str {
+        match self {
+            Self::English => "Increase maximum RAM allocation in Instance Settings (4096–6144 MB recommended).",
+            Self::Russian => "Увеличьте выделение ОЗУ в параметрах сборки (рекомендуется 4096–6144 МБ).",
+            Self::Ukrainian => "Збільшіть виділення ОЗП у параметрах збірки (рекомендовано 4096–6144 МБ).",
+        }
+    }
+
+    pub fn diag_java_title(&self) -> &'static str {
+        match self {
+            Self::English => "Java Version Incompatibility",
+            Self::Russian => "Несовместимая версия Java",
+            Self::Ukrainian => "Несумісна версія Java",
+        }
+    }
+
+    pub fn diag_java_desc(&self) -> &'static str {
+        match self {
+            Self::English => "The game or one of its mods requires a different Java runtime version.",
+            Self::Russian => "Игра или один из модов скомпилированы под другую версию Java Runtime.",
+            Self::Ukrainian => "Гра або один із модів скомпільовані під іншу версію Java Runtime.",
+        }
+    }
+
+    pub fn diag_java_solution(&self) -> &'static str {
+        match self {
+            Self::English => "Ensure appropriate Java is selected (Java 8 for ≤1.12, Java 17 for 1.18+, Java 21 for 1.20.5+).",
+            Self::Russian => "Проверьте версию Java (Java 8 для ≤1.12, Java 17 для 1.18+, Java 21 для 1.20.5+).",
+            Self::Ukrainian => "Перевірте версію Java (Java 8 для ≤1.12, Java 17 для 1.18+, Java 21 для 1.20.5+).",
+        }
+    }
+
+    pub fn diag_fabric_dep_title(&self) -> &'static str {
+        match self {
+            Self::English => "Missing Fabric Mod Dependencies",
+            Self::Russian => "Отсутствуют зависимости Fabric",
+            Self::Ukrainian => "Відсутні залежності Fabric",
+        }
+    }
+
+    pub fn diag_fabric_dep_desc(&self) -> &'static str {
+        match self {
+            Self::English => "One or more mods require additional libraries or Fabric API.",
+            Self::Russian => "Один или несколько модов требуют дополнительные библиотеки или Fabric API.",
+            Self::Ukrainian => "Один або кілька модів вимагають додаткові бібліотеки або Fabric API.",
+        }
+    }
+
+    pub fn diag_fabric_dep_solution(&self) -> &'static str {
+        match self {
+            Self::English => "Install missing dependencies (such as Fabric API) from the Mods tab.",
+            Self::Russian => "Установите недостающие моды (например, Fabric API) во вкладке «Моды».",
+            Self::Ukrainian => "Встановіть відсутні моди (наприклад, Fabric API) у вкладці «Моди».",
+        }
+    }
+
+    pub fn diag_mixin_title(&self) -> &'static str {
+        match self {
+            Self::English => "Mixin Conflict Between Mods",
+            Self::Russian => "Конфликт Mixin между модами",
+            Self::Ukrainian => "Конфлікт Mixin між модами",
+        }
+    }
+
+    pub fn diag_mixin_desc(&self) -> &'static str {
+        match self {
+            Self::English => "Two or more mods are trying to inject conflicting bytecode patches into the same class.",
+            Self::Russian => "Два или более мода пытаются применить конфликтующие патчи к одному и тому же классу игры.",
+            Self::Ukrainian => "Два або більше модів намагаються застосувати конфліктні патчі до одного й того самого класу гри.",
+        }
+    }
+
+    pub fn diag_mixin_solution(&self) -> &'static str {
+        match self {
+            Self::English => "Disable recently installed mods one by one in the Mods tab to find the conflict.",
+            Self::Russian => "Отключайте недавно добавленные моды по одному во вкладке «Моды», чтобы изолировать конфликт.",
+            Self::Ukrainian => "Вимикайте нещодавно додані моди по одному у вкладці «Моди», щоб ізолювати конфлікт.",
+        }
+    }
+
+    pub fn diag_gpu_title(&self) -> &'static str {
+        match self {
+            Self::English => "OpenGL / GPU Driver Error",
+            Self::Russian => "Сбой графического драйвера OpenGL",
+            Self::Ukrainian => "Збій графічного драйвера OpenGL",
+        }
+    }
+
+    pub fn diag_gpu_desc(&self) -> &'static str {
+        match self {
+            Self::English => "The graphics driver failed to create a valid OpenGL context (GLFW error 65542).",
+            Self::Russian => "Видеодрайвер не смог создать контекст OpenGL (ошибка GLFW 65542).",
+            Self::Ukrainian => "Відеодрайвер не зміг створити контекст OpenGL (помилка GLFW 65542).",
+        }
+    }
+
+    pub fn diag_gpu_solution(&self) -> &'static str {
+        match self {
+            Self::English => "Update your GPU driver and ensure Minecraft runs on your dedicated GPU.",
+            Self::Russian => "Обновите драйвер видеокарты и убедитесь, что игра запускается на дискретном GPU.",
+            Self::Ukrainian => "Оновіть драйвер відеокарти та переконайтеся, що гра запускається на дискретному GPU.",
+        }
+    }
+
+    // ==========================================
+    // Instance Clone & Content Categories
+    // ==========================================
+    pub fn inst_btn_clone(&self) -> &'static str {
+        match self {
+            Self::English => "Duplicate",
+            Self::Russian => "Клонировать",
+            Self::Ukrainian => "Дублювати",
+        }
+    }
+
+    pub fn mods_cat_mods(&self) -> &'static str {
+        match self {
+            Self::English => "Mods",
+            Self::Russian => "Моды",
+            Self::Ukrainian => "Моди",
+        }
+    }
+
+    pub fn mods_cat_resourcepacks(&self) -> &'static str {
+        match self {
+            Self::English => "Resource Packs",
+            Self::Russian => "Ресурспаки",
+            Self::Ukrainian => "Ресурспаки",
+        }
+    }
+
+    pub fn mods_cat_shaders(&self) -> &'static str {
+        match self {
+            Self::English => "Shaders",
+            Self::Russian => "Шейдеры",
+            Self::Ukrainian => "Шейдери",
+        }
+    }
+
+    pub fn home_direct_play(&self) -> &'static str {
+        match self {
+            Self::English => "Direct Connect",
+            Self::Russian => "Быстрый вход",
+            Self::Ukrainian => "Швидкий вхід",
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1368,6 +1542,17 @@ mod tests {
             assert!(!lang.skins_title().is_empty());
             assert!(!lang.login_modal_title().is_empty());
             assert!(!lang.console_title().is_empty());
+            assert!(!lang.diag_header_label().is_empty());
+            assert!(!lang.diag_oom_title().is_empty());
+            assert!(!lang.diag_java_title().is_empty());
+            assert!(!lang.diag_fabric_dep_title().is_empty());
+            assert!(!lang.diag_mixin_title().is_empty());
+            assert!(!lang.diag_gpu_title().is_empty());
+            assert!(!lang.inst_btn_clone().is_empty());
+            assert!(!lang.mods_cat_mods().is_empty());
+            assert!(!lang.mods_cat_resourcepacks().is_empty());
+            assert!(!lang.mods_cat_shaders().is_empty());
+            assert!(!lang.home_direct_play().is_empty());
         }
     }
 }
