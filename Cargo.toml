@@ -82,6 +82,7 @@ amc-downloader = { workspace = true }
 amc-minecraft = { workspace = true }
 amc-mods = { workspace = true }
 amc-ui = { workspace = true }
+image = { workspace = true }
 
 tokio = { workspace = true }
 eframe = { workspace = true }

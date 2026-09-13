@@ -109,6 +109,7 @@ dependencies = [
  "anyhow",
  "eframe",
  "egui",
+ "image",
  "tokio",
  "tracing",
  "tracing-subscriber",

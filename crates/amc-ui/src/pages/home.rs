@@ -1,7 +1,7 @@
 use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
 use amc_core::types::{GameVersion, ReleaseType};
 use crate::theme::{
-    BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_DIM, TEXT_HEADING,
+    BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_DIM, RUBY_LIGHT, TEXT_HEADING,
     TEXT_MUTED, TEXT_PRIMARY,
 };
 use crate::widgets::draw_badge;
@@ -47,30 +47,30 @@ impl HomePage {
         versions: &[GameVersion],
         selected_version: &mut Option<String>,
     ) {
-        ui.add_space(20.0);
+        ui.add_space(14.0);
 
         // Page title
         ui.label(
             egui::RichText::new("Версии Minecraft")
-                .font(egui::FontId::proportional(26.0))
+                .font(egui::FontId::proportional(24.0))
                 .strong()
                 .color(TEXT_HEADING),
         );
 
-        ui.add_space(14.0);
+        ui.add_space(12.0);
 
         // Control Row (Search + Sort)
         ui.horizontal(|ui| {
             // Search Input
-            let search_width = (ui.available_width() - 170.0).max(200.0);
+            let search_width = (ui.available_width() - 170.0).max(180.0);
             let search_edit = TextEdit::singleline(&mut self.search_query)
                 .hint_text(egui::RichText::new("🔍 Поиск версий...").color(TEXT_MUTED))
                 .desired_width(search_width)
-                .font(egui::FontId::proportional(14.0));
+                .font(egui::FontId::proportional(13.0));
 
             ui.add(search_edit);
 
-            ui.add_space(10.0);
+            ui.add_space(8.0);
 
             // Sort Toggle Button
             let sort_label = match self.sort_order {
@@ -80,12 +80,12 @@ impl HomePage {
 
             let sort_btn = egui::Button::new(
                 egui::RichText::new(sort_label)
-                    .font(egui::FontId::proportional(13.0))
+                    .font(egui::FontId::proportional(12.0))
                     .color(TEXT_PRIMARY),
             )
             .fill(BG_ELEVATED)
             .stroke(Stroke::new(1.0, BORDER_DEFAULT))
-            .min_size(vec2(150.0, 36.0));
+            .min_size(vec2(140.0, 32.0));
 
             if ui.add(sort_btn).clicked() {
                 self.sort_order = match self.sort_order {
@@ -95,7 +95,7 @@ impl HomePage {
             }
         });
 
-        ui.add_space(12.0);
+        ui.add_space(10.0);
 
         // Filter Tabs
         ui.horizontal(|ui| {
@@ -108,7 +108,7 @@ impl HomePage {
             self.filter_tab_btn(ui, "СТАРЫЕ", FilterTab::Old);
         });
 
-        ui.add_space(12.0);
+        ui.add_space(10.0);
 
         // Filter and sort version list
         let mut filtered: Vec<&GameVersion> = versions
@@ -141,60 +141,75 @@ impl HomePage {
             filtered.sort_by_key(|v| std::cmp::Reverse(v.release_time));
         }
 
-        // Versions List
+        if filtered.is_empty() {
+            ui.add_space(50.0);
+            ui.vertical_centered(|ui| {
+                if versions.is_empty() {
+                    ui.spinner();
+                    ui.add_space(8.0);
+                    ui.label(
+                        egui::RichText::new("Загрузка списка версий от Mojang...")
+                            .font(egui::FontId::proportional(15.0))
+                            .color(TEXT_MUTED),
+                    );
+                } else {
+                    ui.label(
+                        egui::RichText::new("Версии не найдены")
+                            .font(egui::FontId::proportional(15.0))
+                            .color(TEXT_MUTED),
+                    );
+                }
+            });
+            return;
+        }
+
+        let row_height = 46.0;
+        let mut new_selection = None;
+
+        // Blazing-fast virtualized scrolling (only renders visible rows)
         ScrollArea::vertical()
             .auto_shrink([false, false])
-            .show(ui, |ui| {
-                ui.spacing_mut().item_spacing = vec2(0.0, 6.0);
-
-                if filtered.is_empty() {
-                    ui.add_space(40.0);
-                    ui.vertical_centered(|ui| {
-                        ui.label(
-                            egui::RichText::new("Версии не найдены")
-                                .font(egui::FontId::proportional(16.0))
-                                .color(TEXT_MUTED),
-                        );
-                    });
-                    return;
-                }
-
-                for version in filtered {
+            .show_rows(ui, row_height, filtered.len(), |ui, row_range| {
+                for idx in row_range {
+                    let version = filtered[idx];
                     let is_selected = selected_version.as_deref() == Some(&version.id);
-                    if self.version_row(ui, version, is_selected) {
-                        *selected_version = Some(version.id.clone());
+                    if self.version_row(ui, version, is_selected, row_height) {
+                        new_selection = Some(version.id.clone());
                     }
                 }
             });
+
+        if let Some(id) = new_selection {
+            *selected_version = Some(id);
+        }
     }
 
     fn filter_tab_btn(&mut self, ui: &mut Ui, label: &str, tab: FilterTab) {
         let is_active = self.active_filter == tab;
         let (bg, stroke, text_color) = if is_active {
-            (RUBY, Stroke::new(2.0, RUBY), Color32::WHITE)
+            (RUBY, Stroke::new(1.0, RUBY_LIGHT), Color32::WHITE)
         } else {
-            (Color32::TRANSPARENT, Stroke::new(1.0, BORDER_DEFAULT), TEXT_MUTED)
+            (BG_ELEVATED, Stroke::new(1.0, BORDER_DEFAULT), TEXT_MUTED)
         };
 
         let btn = egui::Button::new(
             egui::RichText::new(label)
-                .font(egui::FontId::proportional(11.0))
+                .font(egui::FontId::proportional(10.0))
                 .strong()
                 .color(text_color),
         )
         .fill(bg)
         .stroke(stroke)
         .rounding(Rounding::ZERO)
-        .min_size(vec2(76.0, 30.0));
+        .min_size(vec2(72.0, 28.0));
 
         if ui.add(btn).clicked() {
             self.active_filter = tab;
         }
     }
 
-    fn version_row(&self, ui: &mut Ui, version: &GameVersion, is_selected: bool) -> bool {
-        let row_height = 46.0;
-        let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), row_height), Sense::click());
+    fn version_row(&self, ui: &mut Ui, version: &GameVersion, is_selected: bool, height: f32) -> bool {
+        let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), height), Sense::click());
 
         let bg = if is_selected {
             RUBY_DIM
@@ -205,7 +220,7 @@ impl HomePage {
         };
 
         let border_stroke = if is_selected {
-            Stroke::new(1.5, RUBY)
+            Stroke::new(1.5, RUBY_LIGHT)
         } else if resp.hovered() {
             Stroke::new(1.0, RUBY)
         } else {
@@ -223,7 +238,7 @@ impl HomePage {
         child.add_space(14.0);
 
         // Icon placeholder
-        child.label(egui::RichText::new("🟩").font(egui::FontId::proportional(16.0)));
+        child.label(egui::RichText::new("🟩").font(egui::FontId::proportional(15.0)));
         child.add_space(10.0);
 
         // Version ID

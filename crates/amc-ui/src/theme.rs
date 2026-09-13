@@ -1,20 +1,26 @@
-use egui::{Color32, Context, FontFamily, FontId, Rounding, Stroke, Style, TextStyle, Visuals};
+use egui::{
+    Color32, Context, FontData, FontDefinitions, FontFamily, FontId, Rounding, Stroke, Style,
+    TextStyle, Visuals,
+};
 
 pub const BG: Color32 = Color32::from_rgb(0x08, 0x06, 0x06);
 pub const BG_ELEVATED: Color32 = Color32::from_rgb(0x0F, 0x0B, 0x0B);
-pub const BG_HOVER: Color32 = Color32::from_rgb(0x11, 0x0A, 0x0A);
+pub const BG_HOVER: Color32 = Color32::from_rgb(0x14, 0x0D, 0x0E);
+pub const BG_INPUT: Color32 = Color32::from_rgb(0x0A, 0x07, 0x08);
 
 pub const RUBY: Color32 = Color32::from_rgb(0x8B, 0x1A, 0x2A);
 pub const RUBY_LIGHT: Color32 = Color32::from_rgb(0xB5, 0x22, 0x39);
 pub const RUBY_DIM: Color32 = Color32::from_rgb(0x5C, 0x10, 0x19);
+pub const RUBY_SOFT: Color32 = Color32::from_rgb(0x16, 0x0A, 0x0C);
 
 pub const TEXT_PRIMARY: Color32 = Color32::from_rgb(0xE8, 0xDA, 0xDA);
 pub const TEXT_HEADING: Color32 = Color32::from_rgb(0xD4, 0xC4, 0xBB);
-pub const TEXT_MUTED: Color32 = Color32::from_rgb(0x5A, 0x4A, 0x44);
+pub const TEXT_MUTED: Color32 = Color32::from_rgb(0x7C, 0x6B, 0x64);
+pub const TEXT_DIM: Color32 = Color32::from_rgb(0x5A, 0x4A, 0x44);
 
-pub const BORDER_SUBTLE: Color32 = Color32::from_rgba_premultiplied(139, 26, 42, 25);
-pub const BORDER_DEFAULT: Color32 = Color32::from_rgba_premultiplied(139, 26, 42, 40);
-pub const BORDER_STRONG: Color32 = Color32::from_rgba_premultiplied(139, 26, 42, 65);
+pub const BORDER_SUBTLE: Color32 = Color32::from_rgba_premultiplied(139, 26, 42, 28);
+pub const BORDER_DEFAULT: Color32 = Color32::from_rgba_premultiplied(139, 26, 42, 45);
+pub const BORDER_STRONG: Color32 = Color32::from_rgba_premultiplied(139, 26, 42, 75);
 
 pub const SUCCESS: Color32 = Color32::from_rgb(0x50, 0xB0, 0x50);
 pub const BADGE_SNAPSHOT: Color32 = Color32::from_rgb(0x70, 0x90, 0xC8);
@@ -23,33 +29,38 @@ pub const BADGE_ALPHA: Color32 = Color32::from_rgb(0xC0, 0x7A, 0x30);
 pub const BADGE_OLD: Color32 = Color32::from_rgb(0x5A, 0x4A, 0x44);
 
 pub fn setup_fonts(ctx: &Context) {
-    let mut fonts = egui::FontDefinitions::default();
+    let mut fonts = FontDefinitions::default();
 
-    // Check if custom fonts exist in assets/fonts/
-    let fonts_dir = std::path::Path::new("assets/fonts");
-    let segoe_path = fonts_dir.join("SegoeUI.ttf");
-    let segoe_bold_path = fonts_dir.join("SegoeUI-Bold.ttf");
-    let jetbrains_path = fonts_dir.join("JetBrainsMono-Regular.ttf");
+    fonts.font_data.insert(
+        "segoe".to_owned(),
+        FontData::from_static(include_bytes!("../../../assets/fonts/SegoeUI.ttf")),
+    );
+    fonts.font_data.insert(
+        "segoe_bold".to_owned(),
+        FontData::from_static(include_bytes!("../../../assets/fonts/SegoeUI-Bold.ttf")),
+    );
+    fonts.font_data.insert(
+        "unbounded_bold".to_owned(),
+        FontData::from_static(include_bytes!("../../../assets/fonts/Unbounded-Bold.ttf")),
+    );
+    fonts.font_data.insert(
+        "jetbrains".to_owned(),
+        FontData::from_static(include_bytes!("../../../assets/fonts/JetBrainsMono-Medium.ttf")),
+    );
 
-    if segoe_path.is_file() {
-        if let Ok(data) = std::fs::read(&segoe_path) {
-            fonts.font_data.insert("segoe".to_owned(), egui::FontData::from_owned(data));
-            fonts.families.get_mut(&FontFamily::Proportional).unwrap().insert(0, "segoe".to_owned());
-        }
-    }
+    // Primary proportional font
+    fonts
+        .families
+        .entry(FontFamily::Proportional)
+        .or_default()
+        .insert(0, "segoe".to_owned());
 
-    if segoe_bold_path.is_file() {
-        if let Ok(data) = std::fs::read(&segoe_bold_path) {
-            fonts.font_data.insert("segoe_bold".to_owned(), egui::FontData::from_owned(data));
-        }
-    }
-
-    if jetbrains_path.is_file() {
-        if let Ok(data) = std::fs::read(&jetbrains_path) {
-            fonts.font_data.insert("jetbrains".to_owned(), egui::FontData::from_owned(data));
-            fonts.families.get_mut(&FontFamily::Monospace).unwrap().insert(0, "jetbrains".to_owned());
-        }
-    }
+    // Monospace font
+    fonts
+        .families
+        .entry(FontFamily::Monospace)
+        .or_default()
+        .insert(0, "jetbrains".to_owned());
 
     ctx.set_fonts(fonts);
 }
@@ -60,8 +71,11 @@ pub fn apply_aleph_theme(ctx: &Context) {
     visuals.override_text_color = Some(TEXT_PRIMARY);
     visuals.panel_fill = BG;
     visuals.window_fill = BG_ELEVATED;
+    visuals.extreme_bg_color = BG_INPUT;
+    visuals.faint_bg_color = RUBY_SOFT;
     visuals.window_stroke = Stroke::new(1.0, BORDER_DEFAULT);
     visuals.window_rounding = Rounding::ZERO;
+    visuals.menu_rounding = Rounding::ZERO;
 
     visuals.widgets.noninteractive.bg_fill = BG_ELEVATED;
     visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0, BORDER_SUBTLE);
@@ -78,26 +92,34 @@ pub fn apply_aleph_theme(ctx: &Context) {
     visuals.widgets.hovered.fg_stroke = Stroke::new(1.0, Color32::WHITE);
     visuals.widgets.hovered.rounding = Rounding::ZERO;
 
-    visuals.widgets.active.bg_fill = RUBY;
+    visuals.widgets.active.bg_fill = RUBY_DIM;
     visuals.widgets.active.bg_stroke = Stroke::new(1.0, RUBY_LIGHT);
     visuals.widgets.active.fg_stroke = Stroke::new(1.0, Color32::WHITE);
     visuals.widgets.active.rounding = Rounding::ZERO;
 
+    visuals.widgets.open.bg_fill = BG_HOVER;
+    visuals.widgets.open.bg_stroke = Stroke::new(1.0, RUBY);
+    visuals.widgets.open.fg_stroke = Stroke::new(1.0, TEXT_HEADING);
+    visuals.widgets.open.rounding = Rounding::ZERO;
+
     visuals.selection.bg_fill = RUBY_DIM;
     visuals.selection.stroke = Stroke::new(1.0, RUBY);
+    visuals.hyperlink_color = RUBY_LIGHT;
 
     ctx.set_visuals(visuals);
 
     let mut style: Style = (*ctx.style()).clone();
     style.spacing.item_spacing = egui::vec2(8.0, 8.0);
-    style.spacing.button_padding = egui::vec2(12.0, 8.0);
+    style.spacing.button_padding = egui::vec2(14.0, 8.0);
+    style.spacing.scroll.bar_width = 6.0;
+    style.spacing.scroll.bar_inner_margin = 2.0;
 
     style.text_styles = [
-        (TextStyle::Heading, FontId::new(22.0, FontFamily::Proportional)),
-        (TextStyle::Body, FontId::new(13.0, FontFamily::Proportional)),
+        (TextStyle::Heading, FontId::new(24.0, FontFamily::Proportional)),
+        (TextStyle::Body, FontId::new(14.0, FontFamily::Proportional)),
         (TextStyle::Button, FontId::new(13.0, FontFamily::Proportional)),
         (TextStyle::Small, FontId::new(11.0, FontFamily::Proportional)),
-        (TextStyle::Monospace, FontId::new(12.0, FontFamily::Monospace)),
+        (TextStyle::Monospace, FontId::new(13.0, FontFamily::Monospace)),
     ]
     .into();
 

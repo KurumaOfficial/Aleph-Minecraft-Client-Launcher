@@ -1,5 +1,5 @@
 use eframe::App;
-use egui::{CentralPanel, Context, TopBottomPanel};
+use egui::{CentralPanel, Context, SidePanel, TopBottomPanel, ViewportCommand};
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
 use amc_auth::{Account, AccountManager, DeviceCodeResponse, MicrosoftAuthFlow};
@@ -12,7 +12,7 @@ use amc_mods::{LocalModManager, ModSearchResult, ModrinthClient};
 
 use crate::modals::{DownloadOverlay, LoginModal};
 use crate::pages::{HomePage, InstancesPage, ModsPage, SettingsPage, SkinsPage};
-use crate::theme::apply_aleph_theme;
+use crate::theme::{apply_aleph_theme, BG};
 use crate::widgets::{BottomBar, NavTab, Sidebar, TitleBar};
 
 pub struct LauncherApp {
@@ -49,7 +49,10 @@ pub struct LauncherApp {
 }
 
 impl LauncherApp {
-    pub fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        // Apply theme ONCE at startup to avoid per-frame allocations
+        apply_aleph_theme(&cc.egui_ctx);
+
         let paths = LauncherPaths::default_paths().expect("Failed to initialize launcher paths");
         let config = LauncherConfig::load_from_path(&paths.config_file()).unwrap_or_default();
         let account_mgr = AccountManager::load_from_path(paths.accounts_file()).unwrap_or_else(|_| {
@@ -97,7 +100,6 @@ impl LauncherApp {
         let (tx, rx) = mpsc::channel(1);
         self.versions_rx = Some(rx);
 
-        // Spawn version manifest fetch
         tokio::spawn(async move {
             if let Ok(manifest) = VersionManifest::fetch(&client, Some(&cache_dir)).await {
                 let versions = manifest.to_game_versions();
@@ -169,7 +171,7 @@ impl LauncherApp {
 
         tokio::spawn(async move {
             let flow = MicrosoftAuthFlow::default();
-            let mut attempts = 60; // 5 minutes with 5 sec interval
+            let mut attempts = 60;
             while attempts > 0 {
                 tokio::time::sleep(std::time::Duration::from_secs(5)).await;
                 match flow.poll_device_token(&device_code).await {
@@ -177,9 +179,7 @@ impl LauncherApp {
                         let _ = tx.send(Ok(acc)).await;
                         break;
                     }
-                    Ok(None) => {
-                        // Pending user confirmation
-                    }
+                    Ok(None) => {}
                     Err(e) => {
                         let _ = tx.send(Err(e.to_string())).await;
                         break;
@@ -208,7 +208,6 @@ impl LauncherApp {
         self.game_events_rx = Some(game_rx);
 
         tokio::spawn(async move {
-            // 1. Ensure Adoptium Java
             let runtimes_dir = paths.runtimes_dir();
             let java_bin = match AdoptiumInstaller::ensure_java(&runtimes_dir, 21, &engine, None).await {
                 Ok(bin) => bin,
@@ -221,7 +220,6 @@ impl LauncherApp {
 
             tracing::info!("Java ready: {}", java_bin.display());
 
-            // 2. Launch Minecraft game process
             let game_dir = paths.instances_dir().join(&ver_id);
             let assets_dir = paths.assets_dir();
             let natives_dir = paths.libraries_dir().join("natives");
@@ -239,8 +237,8 @@ impl LauncherApp {
                 inherits_from: None,
             };
 
-            let _ = fs_err_create(&game_dir).await;
-            let _ = fs_err_create(&natives_dir).await;
+            let _ = tokio::fs::create_dir_all(&game_dir).await;
+            let _ = tokio::fs::create_dir_all(&natives_dir).await;
 
             match MinecraftLauncher::launch(
                 &java_bin,
@@ -266,14 +264,8 @@ impl LauncherApp {
     }
 }
 
-async fn fs_err_create(path: &std::path::Path) -> std::io::Result<()> {
-    tokio::fs::create_dir_all(path).await
-}
-
 impl App for LauncherApp {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
-        apply_aleph_theme(ctx);
-
         // Receive version manifest updates
         if let Some(rx) = &mut self.versions_rx {
             if let Ok(versions) = rx.try_recv() {
@@ -335,6 +327,8 @@ impl App for LauncherApp {
             DownloadOverlay::show(ctx, &progress, "Загрузка компонентов...", || {
                 // Cancel callback
             });
+            // Keep rendering at 60 FPS while download is active
+            ctx.request_repaint_after(std::time::Duration::from_millis(16));
         }
 
         // Check game events
@@ -345,7 +339,7 @@ impl App for LauncherApp {
                         tracing::info!("Minecraft process started with PID {pid}");
                         self.is_launching = false;
                         if self.config.ui.close_after_launch {
-                            ctx.send_viewport_cmd(egui::ViewportCommand::Close);
+                            ctx.send_viewport_cmd(ViewportCommand::Close);
                         }
                     }
                     GameEvent::LogLine(line) => {
@@ -363,16 +357,18 @@ impl App for LauncherApp {
             }
         }
 
-        // Top custom titlebar
+        // 1. Top custom titlebar
         TopBottomPanel::top("title_bar")
             .exact_height(36.0)
+            .frame(egui::Frame::none())
             .show(ctx, |ui| {
                 TitleBar::show(ui, "Aleph Launcher");
             });
 
-        // Bottom control bar
+        // 2. Bottom control bar
         TopBottomPanel::bottom("bottom_bar")
             .exact_height(76.0)
+            .frame(egui::Frame::none())
             .show(ctx, |ui| {
                 let active_acc = self.account_mgr.active_account();
                 let is_launching = self.is_launching;
@@ -389,62 +385,73 @@ impl App for LauncherApp {
                 }
             });
 
-        // Left sidebar
-        CentralPanel::default().show(ctx, |ui| {
-            ui.horizontal(|ui| {
+        // 3. Left sidebar dock panel
+        SidePanel::left("sidebar_panel")
+            .exact_width(170.0)
+            .resizable(false)
+            .frame(egui::Frame::none())
+            .show(ctx, |ui| {
                 let exit_clicked = Sidebar::show(ui, &mut self.current_tab);
                 if exit_clicked {
-                    ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
+                    ui.ctx().send_viewport_cmd(ViewportCommand::Close);
                 }
+            });
 
-                // Main Page Content Area
-                ui.vertical(|ui| {
-                    ui.add_space(8.0);
-                    match self.current_tab {
-                        NavTab::Home => {
-                            self.home_page.show(ui, &self.versions, &mut self.selected_version);
-                        }
-                        NavTab::Modpacks => {
-                            self.instances_page.show(
-                                ui,
-                                &mut self.instances,
-                                &mut self.selected_instance,
-                            );
-                        }
-                        NavTab::Mods => {
-                            let mods_dir = self.paths.root_dir.join("mods");
-                            let mut query_to_search = None;
-                            let mut mod_to_install = None;
+        // 4. Central content panel (fills all remaining area cleanly)
+        CentralPanel::default()
+            .frame(egui::Frame::none().fill(BG))
+            .show(ctx, |ui| {
+                // Generous inner margins for the pages
+                let inner_rect = ui.available_rect_before_wrap().shrink2(egui::vec2(24.0, 12.0));
+                let mut content_ui = ui.new_child(
+                    egui::UiBuilder::new()
+                        .max_rect(inner_rect)
+                        .layout(egui::Layout::top_down(egui::Align::Min)),
+                );
 
-                            self.mods_page.show(
-                                ui,
-                                &mods_dir,
-                                |query| {
-                                    query_to_search = Some(query);
-                                },
-                                |result| {
-                                    mod_to_install = Some(result);
-                                },
-                            );
+                match self.current_tab {
+                    NavTab::Home => {
+                        self.home_page.show(&mut content_ui, &self.versions, &mut self.selected_version);
+                    }
+                    NavTab::Modpacks => {
+                        self.instances_page.show(
+                            &mut content_ui,
+                            &mut self.instances,
+                            &mut self.selected_instance,
+                        );
+                    }
+                    NavTab::Mods => {
+                        let mods_dir = self.paths.root_dir.join("mods");
+                        let mut query_to_search = None;
+                        let mut mod_to_install = None;
 
-                            if let Some(q) = query_to_search {
-                                self.search_modrinth(q);
-                            }
-                            if let Some(item) = mod_to_install {
-                                self.install_mod(item);
-                            }
+                        self.mods_page.show(
+                            &mut content_ui,
+                            &mods_dir,
+                            |query| {
+                                query_to_search = Some(query);
+                            },
+                            |result| {
+                                mod_to_install = Some(result);
+                            },
+                        );
+
+                        if let Some(q) = query_to_search {
+                            self.search_modrinth(q);
                         }
-                        NavTab::Skins => {
-                            let acc = self.account_mgr.active_account();
-                            self.skins_page.show(ui, acc);
-                        }
-                        NavTab::Settings => {
-                            self.settings_page.show(ui, &mut self.config, &mut self.account_mgr);
+                        if let Some(item) = mod_to_install {
+                            self.install_mod(item);
                         }
                     }
-                });
+                    NavTab::Skins => {
+                        let acc = self.account_mgr.active_account();
+                        self.skins_page.show(&mut content_ui, acc);
+                    }
+                    NavTab::Settings => {
+                        self.settings_page.show(&mut content_ui, &mut self.config, &mut self.account_mgr);
+                    }
+                }
             });
-        });
 
         // Login Modal Dialog
         let mut request_ms = false;
@@ -461,7 +468,5 @@ impl App for LauncherApp {
         if request_ms {
             self.request_ms_device_code();
         }
-
-        ctx.request_repaint_after(std::time::Duration::from_millis(100));
     }
 }
