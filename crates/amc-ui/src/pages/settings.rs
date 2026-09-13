@@ -307,6 +307,46 @@ impl SettingsPage {
                     self.custom_jvm_arg_input.clear();
                 }
             });
+
+            ui.add_space(8.0);
+            ui.label(egui::RichText::new("Готовые пресеты оптимизации:").font(egui::FontId::proportional(12.0)).color(TEXT_MUTED));
+            ui.horizontal(|ui| {
+                if ui.button("⚡ Пресет G1GC (Высокий FPS)")
+                    .on_hover_text("Оптимизированные флаги сборщика мусора для максимального FPS и плавной игры без фризов")
+                    .clicked()
+                {
+                    config.default_launch_options.custom_jvm_args = vec![
+                        "-XX:+UseG1GC".to_string(),
+                        "-XX:+ParallelRefProcEnabled".to_string(),
+                        "-XX:MaxGCPauseMillis=200".to_string(),
+                        "-XX:+UnlockExperimentalVMOptions".to_string(),
+                        "-XX:+DisableExplicitGC".to_string(),
+                        "-XX:+AlwaysPreTouch".to_string(),
+                        "-XX:G1NewSizePercent=30".to_string(),
+                        "-XX:G1MaxNewSizePercent=40".to_string(),
+                        "-XX:G1ReservePercent=20".to_string(),
+                        "-XX:G1HeapWastePercent=5".to_string(),
+                    ];
+                }
+
+                if ui.button("🚀 Пресет ZGC (Низкие задержки)")
+                    .on_hover_text("Сверхбыстрый сборщик мусора ZGC с субмиллисекундными паузами (для Java 17 и 21)")
+                    .clicked()
+                {
+                    config.default_launch_options.custom_jvm_args = vec![
+                        "-XX:+UseZGC".to_string(),
+                        "-XX:+AlwaysPreTouch".to_string(),
+                        "-XX:+UnlockExperimentalVMOptions".to_string(),
+                    ];
+                }
+
+                if ui.button("Сбросить")
+                    .on_hover_text("Очистить все пользовательские флаги")
+                    .clicked()
+                {
+                    config.default_launch_options.custom_jvm_args.clear();
+                }
+            });
         });
     }
 

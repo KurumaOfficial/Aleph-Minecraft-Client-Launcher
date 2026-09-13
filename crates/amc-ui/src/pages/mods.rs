@@ -174,13 +174,18 @@ impl ModsPage {
                     child.label(egui::RichText::new("🧩").font(egui::FontId::proportional(20.0)));
                     child.add_space(10.0);
 
-                    // Name + version
+                    // Name + version with truncation
+                    let max_text_w = (child.available_width() - 130.0).max(120.0);
                     child.vertical(|ui| {
-                        ui.label(
-                            egui::RichText::new(&m.name)
-                                .font(egui::FontId::proportional(14.0))
-                                .strong()
-                                .color(TEXT_HEADING),
+                        ui.set_max_width(max_text_w);
+                        ui.add(
+                            egui::Label::new(
+                                egui::RichText::new(&m.name)
+                                    .font(egui::FontId::proportional(14.0))
+                                    .strong()
+                                    .color(TEXT_HEADING),
+                            )
+                            .truncate(),
                         );
                         ui.label(
                             egui::RichText::new(format!("v{} • {:.1} КБ", m.version, m.file_size as f64 / 1024.0))
@@ -342,8 +347,10 @@ impl ModsPage {
                     child.label(egui::RichText::new(icon_glyph).font(egui::FontId::proportional(22.0)));
                     child.add_space(12.0);
 
-                    // Title & Description
+                    // Title & Description with truncation
+                    let max_card_text_w = (child.available_width() - 130.0).max(120.0);
                     child.vertical(|ui| {
+                        ui.set_max_width(max_card_text_w);
                         ui.horizontal(|ui| {
                             ui.label(
                                 egui::RichText::new(&item.title)
@@ -368,10 +375,13 @@ impl ModsPage {
                             );
                         });
 
-                        ui.label(
-                            egui::RichText::new(&item.description)
-                                .font(egui::FontId::proportional(12.0))
-                                .color(TEXT_MUTED),
+                        ui.add(
+                            egui::Label::new(
+                                egui::RichText::new(&item.description)
+                                    .font(egui::FontId::proportional(12.0))
+                                    .color(TEXT_MUTED),
+                            )
+                            .truncate(),
                         );
                     });
 

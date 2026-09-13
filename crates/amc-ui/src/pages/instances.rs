@@ -193,8 +193,16 @@ impl InstancesPage {
                     );
                     child.add_space(16.0);
 
-                    // Icon
-                    child.label(egui::RichText::new("📦").font(egui::FontId::proportional(22.0)));
+                    // Dynamic loader icon
+                    let icon_glyph = match inst.loader {
+                        LoaderType::Vanilla => "🟩",
+                        LoaderType::Fabric => "🧵",
+                        LoaderType::Quilt => "🪡",
+                        LoaderType::Forge => "🔨",
+                        LoaderType::NeoForge => "⚡",
+                        LoaderType::OptiFine => "✨",
+                    };
+                    child.label(egui::RichText::new(icon_glyph).font(egui::FontId::proportional(22.0)));
                     child.add_space(12.0);
 
                     // Name + version

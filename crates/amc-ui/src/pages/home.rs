@@ -1,8 +1,8 @@
-use egui::{vec2, Color32, Pos2, Rect, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
+use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
 use amc_core::types::{GameVersion, ReleaseType};
 use amc_minecraft::ServerStatus;
 use crate::theme::{
-    BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, BORDER_STRONG, RUBY, RUBY_DIM, RUBY_LIGHT, SUCCESS,
+    BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_DIM, RUBY_LIGHT, SUCCESS,
     TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
 use crate::widgets::draw_custom_badge;
@@ -52,18 +52,13 @@ impl HomePage {
         versions: &[GameVersion],
         selected_version: &mut Option<String>,
     ) {
-        ui.add_space(14.0);
+        ui.add_space(20.0);
 
-        // 1. Hero Banner Card
-        self.draw_hero_banner(ui);
-
-        ui.add_space(16.0);
-
-        // 2. Section Header: Versions
+        // Section Header: Versions + Selected Badge + Compact Server Ping
         ui.horizontal(|ui| {
             ui.label(
                 egui::RichText::new("Версии Minecraft")
-                    .font(egui::FontId::proportional(22.0))
+                    .font(egui::FontId::proportional(26.0))
                     .strong()
                     .color(TEXT_HEADING),
             );
@@ -72,9 +67,35 @@ impl HomePage {
                 ui.add_space(12.0);
                 draw_custom_badge(ui, &format!("Выбрана: {sel}"), RUBY);
             }
+
+            // Compact server status on the right
+            if let Some(srv) = &self.featured_server {
+                let srv_label_w = 200.0;
+                let space = ui.available_width() - srv_label_w;
+                if space > 0.0 {
+                    ui.add_space(space);
+                }
+                let (dot, col) = if srv.is_online { ("🟢", SUCCESS) } else { ("🔴", RUBY) };
+                ui.label(
+                    egui::RichText::new(format!("{dot} {} • {} мс", srv.host, srv.ping_ms))
+                        .font(egui::FontId::proportional(12.0))
+                        .color(col),
+                );
+            } else if self.is_pinging {
+                let srv_label_w = 160.0;
+                let space = ui.available_width() - srv_label_w;
+                if space > 0.0 {
+                    ui.add_space(space);
+                }
+                ui.label(
+                    egui::RichText::new("⏳ Пинг сервера...")
+                        .font(egui::FontId::proportional(12.0))
+                        .color(TEXT_MUTED),
+                );
+            }
         });
 
-        ui.add_space(12.0);
+        ui.add_space(14.0);
 
         // Control Row (Search + Sort)
         ui.horizontal(|ui| {
@@ -271,122 +292,6 @@ impl HomePage {
                     }
                 }
             });
-    }
-
-    fn draw_hero_banner(&self, ui: &mut Ui) {
-        let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 94.0), Sense::hover());
-
-        // Dark Ruby Gradient card
-        ui.painter().rect_filled(rect, Rounding::ZERO, Color32::from_rgb(0x13, 0x0B, 0x0D));
-        ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, BORDER_STRONG));
-
-        // Ruby accent bar on left
-        let accent = Rect::from_min_max(rect.left_top(), Pos2::new(rect.left() + 4.0, rect.bottom()));
-        ui.painter().rect_filled(accent, Rounding::ZERO, RUBY);
-
-        let mut child = ui.new_child(
-            egui::UiBuilder::new()
-                .max_rect(rect)
-                .layout(egui::Layout::left_to_right(egui::Align::Center)),
-        );
-        child.add_space(18.0);
-
-        // Emblem
-        let (logo_rect, _) = child.allocate_exact_size(vec2(52.0, 52.0), Sense::hover());
-        child.painter().rect_filled(logo_rect, Rounding::ZERO, RUBY_DIM);
-        child.painter().rect_stroke(logo_rect, Rounding::ZERO, Stroke::new(1.5, RUBY));
-        child.painter().text(
-            logo_rect.center(),
-            egui::Align2::CENTER_CENTER,
-            "ℵ",
-            egui::FontId::proportional(30.0),
-            RUBY_LIGHT,
-        );
-
-        child.add_space(14.0);
-
-        child.vertical(|ui| {
-            ui.horizontal(|ui| {
-                ui.label(
-                    egui::RichText::new("ALEPH MINECRAFT CLIENT")
-                        .font(egui::FontId::proportional(16.0))
-                        .strong()
-                        .color(TEXT_HEADING),
-                );
-                draw_custom_badge(ui, "v0.2.0 OPEN-SOURCE", RUBY);
-            });
-
-            ui.add_space(2.0);
-
-            ui.label(
-                egui::RichText::new("Высокопроизводительный модульный лаунчер с поддержкой Fabric, Quilt, Forge, скинов и модов")
-                    .font(egui::FontId::proportional(12.0))
-                    .color(TEXT_MUTED),
-            );
-
-            ui.add_space(4.0);
-
-            ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("⚡ 60-144+ FPS").font(egui::FontId::proportional(11.0)).color(RUBY_LIGHT));
-                ui.label(egui::RichText::new("•").color(TEXT_MUTED));
-                ui.label(egui::RichText::new("🛡 WetID & Microsoft").font(egui::FontId::proportional(11.0)).color(TEXT_PRIMARY));
-                ui.label(egui::RichText::new("•").color(TEXT_MUTED));
-                ui.label(egui::RichText::new("🌐 Modrinth & CurseForge").font(egui::FontId::proportional(11.0)).color(SUCCESS));
-            });
-        });
-
-        // Right side: Featured Server Status Widget
-        let srv_width = 210.0;
-        let space = child.available_width() - srv_width - 16.0;
-        if space > 0.0 {
-            child.add_space(space);
-        }
-
-        let (srv_box, _) = child.allocate_exact_size(vec2(srv_width, 68.0), Sense::hover());
-        child.painter().rect_filled(srv_box, Rounding::ZERO, Color32::from_rgb(0x1B, 0x10, 0x13));
-        child.painter().rect_stroke(srv_box, Rounding::ZERO, Stroke::new(1.0, BORDER_DEFAULT));
-
-        let mut srv_ui = child.new_child(
-            egui::UiBuilder::new()
-                .max_rect(srv_box)
-                .layout(egui::Layout::top_down(egui::Align::Min)),
-        );
-        srv_ui.add_space(8.0);
-
-        if let Some(srv) = &self.featured_server {
-            srv_ui.horizontal(|ui| {
-                ui.add_space(10.0);
-                ui.label(egui::RichText::new(&srv.host).font(egui::FontId::proportional(13.0)).strong().color(TEXT_HEADING));
-            });
-            srv_ui.add_space(2.0);
-            srv_ui.horizontal(|ui| {
-                ui.add_space(10.0);
-                let (dot, col) = if srv.is_online { ("🟢", SUCCESS) } else { ("🔴", RUBY) };
-                ui.label(egui::RichText::new(format!("{dot} {} мс", srv.ping_ms)).font(egui::FontId::proportional(11.0)).color(col));
-                ui.label(egui::RichText::new("•").color(TEXT_MUTED));
-                ui.label(egui::RichText::new(format!("{} онлайн", srv.online_players)).font(egui::FontId::proportional(11.0)).color(TEXT_PRIMARY));
-            });
-        } else if self.is_pinging {
-            srv_ui.horizontal(|ui| {
-                ui.add_space(10.0);
-                ui.label(egui::RichText::new("mc.hypixel.net").font(egui::FontId::proportional(13.0)).strong().color(TEXT_HEADING));
-            });
-            srv_ui.add_space(4.0);
-            srv_ui.horizontal(|ui| {
-                ui.add_space(10.0);
-                ui.label(egui::RichText::new("⏳ Пинг сервера...").font(egui::FontId::proportional(11.0)).color(TEXT_MUTED));
-            });
-        } else {
-            srv_ui.horizontal(|ui| {
-                ui.add_space(10.0);
-                ui.label(egui::RichText::new("mc.hypixel.net").font(egui::FontId::proportional(13.0)).strong().color(TEXT_HEADING));
-            });
-            srv_ui.add_space(4.0);
-            srv_ui.horizontal(|ui| {
-                ui.add_space(10.0);
-                ui.label(egui::RichText::new("🔴 Недоступен").font(egui::FontId::proportional(11.0)).color(RUBY));
-            });
-        }
     }
 
     fn filter_tab_btn(&mut self, ui: &mut Ui, label: &str, tab: FilterTab) {
