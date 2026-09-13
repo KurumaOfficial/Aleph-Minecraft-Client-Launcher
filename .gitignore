@@ -1,0 +1,31 @@
+# Author: Kuruma
+# AMC (Aleph Minecraft Client Launcher) — .gitignore
+
+# Cargo build artifacts
+/target/
+**/target/
+
+# One-off debug logs
+*.log
+build_errors*.log
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets & Environment
+.env
+*.pem
+*.key
+
+# Local Minecraft runtime test instances & cache
+/run/
+/instances/
+/cache/
+/runtimes/

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="120" viewBox="0 0 320 120">
+  <rect width="320" height="120" fill="#101012"/>
+  <g stroke="#1B1B20" stroke-width="1">
+    <line x1="32" y1="0" x2="32" y2="120"/>
+    <line x1="64" y1="0" x2="64" y2="120"/>
+    <line x1="96" y1="0" x2="96" y2="120"/>
+    <line x1="128" y1="0" x2="128" y2="120"/>
+    <line x1="160" y1="0" x2="160" y2="120"/>
+    <line x1="192" y1="0" x2="192" y2="120"/>
+    <line x1="224" y1="0" x2="224" y2="120"/>
+    <line x1="256" y1="0" x2="256" y2="120"/>
+    <line x1="288" y1="0" x2="288" y2="120"/>
+    <line x1="0" y1="40" x2="320" y2="40"/>
+    <line x1="0" y1="80" x2="320" y2="80"/>
+  </g>
+  <g fill="#E8202A" opacity="0.10">
+    <polygon points="0,120 40,0 76,0 36,120"/>
+    <polygon points="90,120 130,0 166,0 126,120"/>
+    <polygon points="180,120 220,0 256,0 216,120"/>
+    <polygon points="270,120 310,0 320,0 320,20 300,120"/>
+  </g>
+  <rect x="0.5" y="0.5" width="319" height="119" fill="none" stroke="#26262C"/>
+  <rect x="0" y="0" width="320" height="4" fill="#E8202A"/>
+</svg>

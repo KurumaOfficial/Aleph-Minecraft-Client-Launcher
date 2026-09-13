@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <g transform="translate(32 32)">
+    <g fill="#FFFFFF">
+      <rect x="-5.5" y="-30" width="11" height="14" rx="5"/>
+      <rect x="-5.5" y="-30" width="11" height="14" rx="5" transform="rotate(45)"/>
+      <rect x="-5.5" y="-30" width="11" height="14" rx="5" transform="rotate(90)"/>
+      <rect x="-5.5" y="-30" width="11" height="14" rx="5" transform="rotate(135)"/>
+      <rect x="-5.5" y="-30" width="11" height="14" rx="5" transform="rotate(180)"/>
+      <rect x="-5.5" y="-30" width="11" height="14" rx="5" transform="rotate(225)"/>
+      <rect x="-5.5" y="-30" width="11" height="14" rx="5" transform="rotate(270)"/>
+      <rect x="-5.5" y="-30" width="11" height="14" rx="5" transform="rotate(315)"/>
+    </g>
+    <circle cx="0" cy="0" r="17" fill="none" stroke="#FFFFFF" stroke-width="12"/>
+  </g>
+</svg>

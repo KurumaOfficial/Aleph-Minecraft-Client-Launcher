@@ -1,0 +1,2175 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Aleph Launcher</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+    /* Цвета из Aleph Studio */
+    --bg:#080606;
+    --bg-elevated:#0f0b0b;
+    --bg-hover:#110a0a;
+    
+    --ruby:#8b1a2a;
+    --ruby-light:#b52239;
+    --ruby-dim:#5c1019;
+    
+    --text-primary:#e8dada;
+    --text-heading:#d4c4bb;
+    --text-muted:#5a4a44;
+    
+    --border-subtle:rgba(139,26,42,0.10);
+    --border-default:rgba(139,26,42,0.15);
+    --border-strong:rgba(139,26,42,0.25);
+    
+    --success:#50b050;
+}
+html,body{
+    width:100%;
+    height:100%;
+    overflow:hidden;
+    background:var(--bg);
+    font-family:'Segoe UI',system-ui,sans-serif;
+    color:var(--text-primary);
+}
+.app{
+    display:flex;
+    width:100vw;
+    height:100vh;
+    overflow:hidden;
+}
+
+/* Sidebar */
+.sb{
+    width:170px;
+    flex-shrink:0;
+    background:var(--bg-elevated);
+    border-right:1px solid var(--border-default);
+    display:flex;
+    flex-direction:column;
+}
+.sb-logo{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:18px 16px 20px;
+    border-bottom:1px solid var(--border-subtle);
+}
+.sb-logo-sq{
+    width:28px;
+    height:28px;
+    background:transparent;
+    border:2px solid var(--ruby);
+    flex-shrink:0;
+}
+.sb-logo-text{
+    font-size:13px;
+    font-weight:700;
+    color:var(--text-heading);
+}
+.nav{
+    display:flex;
+    flex-direction:column;
+    padding:12px 0;
+}
+.ni{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 16px;
+    cursor:pointer;
+    font-size:13px;
+    font-weight:500;
+    color:var(--text-muted);
+    position:relative;
+    transition:color .2s,background .2s;
+    user-select:none;
+    border-left:3px solid transparent;
+}
+.ni:hover{
+    color:var(--text-primary);
+    background:rgba(139,26,42,0.05);
+}
+.ni.active{
+    color:var(--ruby-light);
+    background:rgba(139,26,42,0.12);
+    border-left-color:var(--ruby);
+}
+.ni svg{
+    width:18px;
+    height:18px;
+    stroke:currentColor;
+    fill:none;
+    stroke-width:2;
+    flex-shrink:0;
+}
+.sb-sp{
+    flex:1;
+}
+
+/* Main */
+.main{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    min-width:0;
+    background:var(--bg);
+}
+.tb{
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    height:36px;
+    padding:0 6px;
+    border-bottom:1px solid var(--border-subtle);
+}
+.wb{
+    width:36px;
+    height:36px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    color:var(--text-muted);
+    border:none;
+    background:none;
+    transition:background .2s,color .2s;
+}
+.wb:hover{
+    background:var(--bg-hover);
+    color:var(--text-primary);
+}
+.wb.cl:hover{
+    background:var(--ruby);
+    color:#fff;
+}
+.wb svg{
+    width:12px;
+    height:12px;
+    stroke:currentColor;
+    fill:none;
+    stroke-width:2;
+    stroke-linecap:square;
+}
+
+/* Content */
+.content{
+    flex:1;
+    padding:28px 40px 0;
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+    overflow:hidden;
+}
+.ptitle{
+    font-size:28px;
+    font-weight:700;
+    color:var(--text-heading);
+    margin-bottom:18px;
+    letter-spacing:-0.3px;
+}
+.ctrl-row{
+    display:flex;
+    gap:10px;
+    margin-bottom:16px;
+}
+.srch{
+    flex:1;
+    display:flex;
+    align-items:center;
+    background:var(--bg-elevated);
+    border:1px solid var(--border-default);
+    padding:0 14px;
+    height:40px;
+    gap:10px;
+}
+.srch svg{
+    width:16px;
+    height:16px;
+    stroke:var(--text-muted);
+    fill:none;
+    stroke-width:2;
+    stroke-linecap:square;
+    flex-shrink:0;
+}
+.srch input{
+    flex:1;
+    background:none;
+    border:none;
+    outline:none;
+    color:var(--text-primary);
+    font-size:14px;
+    font-family:inherit;
+}
+.srch input::placeholder{
+    color:var(--text-muted);
+}
+.dd{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:var(--bg-elevated);
+    border:1px solid var(--border-default);
+    padding:0 14px;
+    height:40px;
+    min-width:160px;
+    cursor:pointer;
+    color:var(--text-muted);
+    font-size:13px;
+    user-select:none;
+    position:relative;
+}
+.dd:hover{
+    border-color:var(--border-strong);
+}
+.dd svg{
+    width:12px;
+    height:12px;
+    stroke:var(--text-muted);
+    fill:none;
+    stroke-width:2;
+    margin-left:auto;
+}
+.dd-menu{
+    display:none;
+    position:absolute;
+    top:44px;
+    right:0;
+    background:var(--bg-elevated);
+    border:1px solid var(--border-default);
+    min-width:160px;
+    z-index:100;
+}
+.dd-menu.open{
+    display:block;
+}
+.dd-opt{
+    padding:10px 14px;
+    font-size:13px;
+    color:var(--text-muted);
+    cursor:pointer;
+    transition:all .2s;
+}
+.dd-opt:hover{
+    background:var(--bg-hover);
+    color:var(--text-primary);
+}
+.dd-opt.sel{
+    color:var(--ruby-light);
+    background:rgba(139,26,42,0.08);
+}
+.tabs{
+    display:flex;
+    gap:6px;
+    margin-bottom:16px;
+}
+.tab{
+    padding:8px 16px;
+    font-size:12px;
+    font-weight:600;
+    cursor:pointer;
+    border:2px solid var(--border-default);
+    background:transparent;
+    color:var(--text-muted);
+    font-family:inherit;
+    transition:all .2s;
+    white-space:nowrap;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+}
+.tab.active{
+    background:var(--ruby);
+    border-color:var(--ruby);
+    color:#fff;
+}
+.tab:not(.active):hover{
+    border-color:var(--border-strong);
+    color:var(--text-primary);
+}
+
+/* List */
+.vlist{
+    flex:1;
+    overflow-y:auto;
+    overflow-x:hidden;
+    padding-right:6px;
+}
+.vlist::-webkit-scrollbar{
+    width:6px;
+}
+.vlist::-webkit-scrollbar-track{
+    background:transparent;
+}
+.vlist::-webkit-scrollbar-thumb{
+    background:var(--border-strong);
+}
+.vlist::-webkit-scrollbar-thumb:hover{
+    background:var(--ruby-dim);
+}
+.vrow{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    background:var(--bg-elevated);
+    border:1px solid var(--border-default);
+    padding:12px 14px;
+    margin-bottom:6px;
+    cursor:pointer;
+    transition:all .2s;
+    user-select:none;
+}
+.vrow:hover{
+    border-color:var(--ruby);
+    transform:translateX(3px);
+}
+.vicon{
+    width:36px;
+    height:36px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-shrink:0;
+}
+.grass-icon{
+    width:32px;
+    height:32px;
+}
+.vname{
+    font-size:16px;
+    font-weight:700;
+    color:var(--text-heading);
+    min-width:80px;
+}
+.vbadge{
+    font-size:10px;
+    font-weight:700;
+    padding:4px 10px;
+    white-space:nowrap;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+}
+.badge-r{background:var(--ruby);color:#fff}
+.badge-s{background:#7090c8;color:#fff}
+.badge-b{background:var(--success);color:#fff}
+.badge-a{background:#c07a30;color:#fff}
+.badge-o{background:var(--text-muted);color:#fff}
+.vdate{
+    margin-left:auto;
+    font-size:13px;
+    color:var(--text-muted);
+    white-space:nowrap;
+}
+.vdots{
+    width:32px;
+    height:32px;
+    background:var(--bg-hover);
+    border:1px solid var(--border-default);
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:var(--text-muted);
+    flex-shrink:0;
+    transition:all .2s;
+}
+.vdots:hover{
+    background:var(--ruby);
+    border-color:var(--ruby);
+    color:#fff;
+}
+.vdots svg{
+    width:14px;
+    height:3px;
+}
+.empty{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:150px;
+    color:var(--text-muted);
+    font-size:14px;
+}
+
+/* Bottom Bar */
+.bbar{
+    height:76px;
+    background:var(--bg-elevated);
+    border-top:1px solid var(--border-default);
+    display:flex;
+    align-items:center;
+    padding:0 20px;
+    gap:14px;
+    flex-shrink:0;
+}
+.av{
+    width:44px;
+    height:44px;
+    overflow:hidden;
+    flex-shrink:0;
+    background:var(--ruby-dim);
+    border:2px solid var(--ruby);
+}
+.ui-col{
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+}
+.un{
+    font-size:13px;
+    font-weight:700;
+    color:var(--text-heading);
+}
+.uh{
+    font-size:11px;
+    color:var(--text-muted);
+}
+.login-btn{
+    background:var(--bg-hover);
+    border:2px solid var(--border-default);
+    color:var(--text-primary);
+    padding:10px 20px;
+    font-size:12px;
+    font-weight:600;
+    cursor:pointer;
+    font-family:inherit;
+    transition:all .2s;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+}
+.login-btn:hover{
+    background:var(--ruby);
+    border-color:var(--ruby);
+    color:#fff;
+}
+.pg{
+    margin-left:auto;
+    display:flex;
+    gap:10px;
+}
+.pm{
+    width:200px;
+    height:50px;
+    border:2px solid var(--ruby);
+    background:var(--ruby);
+    color:#fff;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    font-size:14px;
+    font-weight:700;
+    cursor:pointer;
+    transition:all .2s;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+}
+.pm:hover{
+    background:var(--ruby-light);
+    border-color:var(--ruby-light);
+    transform:translateY(-2px);
+}
+.pa{
+    width:50px;
+    height:50px;
+    border:2px solid var(--ruby);
+    background:transparent;
+    color:var(--ruby);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    transition:all .2s;
+}
+.pa:hover{
+    background:var(--ruby);
+    color:#fff;
+    transform:translateY(-2px);
+}
+.pa svg{
+    width:18px;
+    height:18px;
+    stroke:currentColor;
+    fill:none;
+    stroke-width:2;
+}
+
+/* Pages */
+.page-content{
+    display:none;
+    flex:1;
+    flex-direction:column;
+    min-height:0;
+}
+.page-content.active{
+    display:flex;
+}
+
+/* Settings */
+.settings-group{
+    background:var(--bg-elevated);
+    border:1px solid var(--border-default);
+    padding:24px;
+    margin-bottom:18px;
+}
+.settings-group-title{
+    font-size:20px;
+    font-weight:700;
+    color:var(--text-heading);
+    margin-bottom:18px;
+    padding-bottom:12px;
+    border-bottom:2px solid var(--border-default);
+}
+.setting-item{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:14px 0;
+    border-bottom:1px solid var(--border-subtle);
+}
+.setting-item:last-child{
+    border-bottom:none;
+}
+.setting-info{
+    flex:1;
+}
+.setting-label{
+    font-size:14px;
+    font-weight:600;
+    color:var(--text-heading);
+    margin-bottom:3px;
+}
+.setting-desc{
+    font-size:12px;
+    color:var(--text-muted);
+}
+.toggle{
+    width:50px;
+    height:24px;
+    background:var(--bg-hover);
+    border:2px solid var(--border-default);
+    position:relative;
+    cursor:pointer;
+    transition:all .2s;
+}
+.toggle.active{
+    background:var(--ruby);
+    border-color:var(--ruby);
+}
+.toggle-handle{
+    width:16px;
+    height:16px;
+    background:#fff;
+    position:absolute;
+    top:2px;
+    left:2px;
+    transition:left .2s;
+}
+.toggle.active .toggle-handle{
+    left:28px;
+}
+.select-box{
+    background:var(--bg-elevated);
+    border:2px solid var(--border-default);
+    padding:10px 14px;
+    color:var(--text-primary);
+    font-size:13px;
+    font-family:inherit;
+    cursor:pointer;
+    min-width:180px;
+}
+.select-box:focus{
+    outline:none;
+    border-color:var(--ruby);
+}
+
+/* Mods */
+.mod-card{
+    background:var(--bg-elevated);
+    border:1px solid var(--border-default);
+    padding:16px;
+    margin-bottom:10px;
+    display:flex;
+    align-items:center;
+    gap:16px;
+    transition:all .2s;
+}
+.mod-card:hover{
+    border-color:var(--ruby);
+    transform:translateX(3px);
+}
+.mod-icon{
+    width:48px;
+    height:48px;
+    background:var(--ruby-dim);
+    border:2px solid var(--ruby);
+    flex-shrink:0;
+}
+.mod-info{
+    flex:1;
+}
+.mod-name{
+    font-size:16px;
+    font-weight:700;
+    color:var(--text-heading);
+    margin-bottom:5px;
+}
+.mod-desc{
+    font-size:13px;
+    color:var(--text-muted);
+    margin-bottom:3px;
+}
+.mod-version{
+    font-size:11px;
+    color:var(--text-muted);
+    font-weight:600;
+}
+.mod-toggle{
+    width:44px;
+    height:22px;
+    background:var(--bg-hover);
+    border:2px solid var(--border-default);
+    position:relative;
+    cursor:pointer;
+    transition:all .2s;
+}
+.mod-toggle.active{
+    background:var(--success);
+    border-color:var(--success);
+}
+.mod-toggle-handle{
+    width:14px;
+    height:14px;
+    background:#fff;
+    position:absolute;
+    top:2px;
+    left:2px;
+    transition:left .2s;
+}
+.mod-toggle.active .mod-toggle-handle{
+    left:24px;
+}
+
+/* Skins */
+.skin-preview{
+    background:var(--bg-elevated);
+    border:2px solid var(--border-default);
+    padding:48px;
+    text-align:center;
+    margin-bottom:24px;
+}
+.skin-model{
+    width:160px;
+    height:240px;
+    background:var(--bg-hover);
+    border:2px solid var(--border-strong);
+    margin:0 auto 24px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:var(--text-muted);
+    font-size:13px;
+    font-weight:600;
+}
+.skin-actions{
+    display:flex;
+    gap:12px;
+    justify-content:center;
+}
+.btn-secondary{
+    padding:12px 28px;
+    background:transparent;
+    border:2px solid var(--border-default);
+    color:var(--text-primary);
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+    font-family:inherit;
+    transition:all .2s;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+}
+.btn-secondary:hover{
+    background:var(--ruby);
+    border-color:var(--ruby);
+    color:#fff;
+}
+
+/* Modpacks */
+.modpack-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+    gap:16px;
+}
+.modpack-card{
+    background:var(--bg-elevated);
+    border:2px solid var(--border-default);
+    padding:20px;
+    cursor:pointer;
+    transition:all .2s;
+    position:relative;
+}
+.modpack-card:hover{
+    border-color:var(--ruby);
+    transform:translateY(-3px);
+}
+.modpack-card.selected{
+    border-color:var(--ruby-light);
+    background:rgba(139,26,42,0.08);
+}
+.modpack-icon{
+    width:60px;
+    height:60px;
+    background:var(--ruby-dim);
+    border:2px solid var(--ruby);
+    margin-bottom:16px;
+}
+.modpack-name{
+    font-size:18px;
+    font-weight:700;
+    color:var(--text-heading);
+    margin-bottom:10px;
+}
+.modpack-desc{
+    font-size:13px;
+    color:var(--text-muted);
+    line-height:1.5;
+    margin-bottom:14px;
+}
+.modpack-badge{
+    display:inline-block;
+    padding:5px 10px;
+    font-size:10px;
+    font-weight:700;
+    background:var(--ruby);
+    color:#fff;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+}
+.modpack-settings{
+    position:absolute;
+    top:16px;
+    right:16px;
+    width:28px;
+    height:28px;
+    background:var(--bg-hover);
+    border:1px solid var(--border-default);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    transition:all .2s;
+}
+.modpack-settings:hover{
+    background:var(--ruby);
+    border-color:var(--ruby);
+    color:#fff;
+}
+.modpack-settings svg{
+    width:14px;
+    height:14px;
+    stroke:currentColor;
+    fill:none;
+    stroke-width:2;
+}
+
+/* Modal */
+.modal{
+    display:none;
+    position:fixed;
+    top:0;
+    left:0;
+    width:100%;
+    height:100%;
+    background:rgba(0,0,0,0.7);
+    z-index:1000;
+    align-items:center;
+    justify-content:center;
+}
+.modal.open{
+    display:flex;
+}
+.modal-content{
+    background:var(--bg-elevated);
+    border:2px solid var(--border-default);
+    width:90%;
+    max-width:600px;
+    max-height:90vh;
+    overflow-y:auto;
+    padding:32px;
+}
+.modal-content::-webkit-scrollbar{
+    width:6px;
+}
+.modal-content::-webkit-scrollbar-thumb{
+    background:var(--border-strong);
+}
+.modal-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:24px;
+}
+.modal-title{
+    font-size:24px;
+    font-weight:700;
+    color:var(--text-heading);
+}
+.modal-close{
+    width:32px;
+    height:32px;
+    background:var(--bg-hover);
+    border:1px solid var(--border-default);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    transition:all .2s;
+}
+.modal-close:hover{
+    background:var(--ruby);
+    border-color:var(--ruby);
+    color:#fff;
+}
+.modal-close svg{
+    width:14px;
+    height:14px;
+    stroke:currentColor;
+    fill:none;
+    stroke-width:2;
+}
+.form-group{
+    margin-bottom:20px;
+}
+.form-label{
+    display:block;
+    font-size:14px;
+    font-weight:600;
+    color:var(--text-heading);
+    margin-bottom:8px;
+}
+.form-input{
+    width:100%;
+    background:var(--bg-hover);
+    border:2px solid var(--border-default);
+    padding:12px 14px;
+    color:var(--text-primary);
+    font-size:14px;
+    font-family:inherit;
+    transition:border .2s;
+}
+.form-input:focus{
+    outline:none;
+    border-color:var(--ruby);
+}
+.form-select{
+    width:100%;
+    background:var(--bg-hover);
+    border:2px solid var(--border-default);
+    padding:12px 14px;
+    color:var(--text-primary);
+    font-size:14px;
+    font-family:inherit;
+    cursor:pointer;
+}
+.form-select:focus{
+    outline:none;
+    border-color:var(--ruby);
+}
+.form-actions{
+    display:flex;
+    gap:12px;
+    margin-top:24px;
+}
+.btn-primary-full{
+    flex:1;
+    padding:14px;
+    background:var(--ruby);
+    border:2px solid var(--ruby);
+    color:#fff;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    font-family:inherit;
+    transition:all .2s;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+}
+.btn-primary-full:hover{
+    background:var(--ruby-light);
+    border-color:var(--ruby-light);
+}
+.btn-secondary-full{
+    flex:1;
+    padding:14px;
+    background:transparent;
+    border:2px solid var(--border-default);
+    color:var(--text-primary);
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    font-family:inherit;
+    transition:all .2s;
+    text-transform:uppercase;
+    letter-spacing:0.5px;
+}
+.btn-secondary-full:hover{
+    border-color:var(--ruby);
+    color:var(--ruby-light);
+}
+.tabs-settings{
+    display:flex;
+    gap:2px;
+    margin-bottom:20px;
+    border-bottom:2px solid var(--border-default);
+}
+.tab-settings{
+    padding:12px 20px;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+    border:none;
+    background:transparent;
+    color:var(--text-muted);
+    font-family:inherit;
+    transition:all .2s;
+    border-bottom:2px solid transparent;
+    margin-bottom:-2px;
+}
+.tab-settings.active{
+    color:var(--ruby-light);
+    border-bottom-color:var(--ruby);
+}
+.tab-settings:hover{
+    color:var(--text-primary);
+}
+.tab-content-settings{
+    display:none;
+}
+.tab-content-settings.active{
+    display:block;
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sb">
+    <div class="sb-logo">
+      <div class="sb-logo-sq"></div>
+      <span class="sb-logo-text">Aleph Launcher</span>
+    </div>
+    <nav class="nav">
+      <div class="ni active" onclick="showPage('home')">
+        <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        Главная
+      </div>
+      <div class="ni" onclick="showPage('modpacks')">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        Сборки
+      </div>
+      <div class="ni" onclick="showPage('mods')">
+        <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>
+        Моды
+      </div>
+      <div class="ni" onclick="showPage('skins')">
+        <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        Скины
+      </div>
+    </nav>
+    <div class="sb-sp"></div>
+    <nav class="nav" style="border-top:1px solid var(--border-subtle);padding-top:16px">
+      <div class="ni" onclick="showPage('settings')">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v10M1 12h6m6 0h10"/></svg>
+        Настройки
+      </div>
+      <div class="ni" onclick="if(confirm('Выйти из лаунчера?')) alert('Выход')">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        Выход
+      </div>
+    </nav>
+  </aside>
+
+  <div class="main">
+    <div class="tb">
+      <button class="wb" title="Свернуть" onclick="alert('Сворачивание')"><svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg></button>
+      <button class="wb" title="Развернуть" onclick="alert('Развертывание')"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18"/></svg></button>
+      <button class="wb cl" title="Закрыть" onclick="if(confirm('Закрыть?')) alert('Закрытие')"><svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+
+    <!-- Home -->
+    <div id="page-home" class="page-content active">
+      <div class="content">
+        <h1 class="ptitle">Версии Minecraft</h1>
+        <div class="ctrl-row">
+          <div class="srch">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="searchInput" type="text" placeholder="Поиск версий..." oninput="onSearch()"/>
+          </div>
+          <div class="dd" id="ddBtn" onclick="toggleDD()">
+            <span id="ddLabel">Сначала новые</span>
+            <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            <div class="dd-menu" id="ddMenu">
+              <div class="dd-opt sel" onclick="setSort('newest',event)">Сначала новые</div>
+              <div class="dd-opt" onclick="setSort('oldest',event)">Сначала старые</div>
+            </div>
+          </div>
+        </div>
+        <div class="tabs">
+          <button class="tab" data-filter="all" onclick="setFilter(this)">Все</button>
+          <button class="tab active" data-filter="releases" onclick="setFilter(this)">Релизы</button>
+          <button class="tab" data-filter="snapshots" onclick="setFilter(this)">Снапшоты</button>
+          <button class="tab" data-filter="betas" onclick="setFilter(this)">Бета</button>
+          <button class="tab" data-filter="alphas" onclick="setFilter(this)">Альфа</button>
+          <button class="tab" data-filter="old" onclick="setFilter(this)">Старые</button>
+        </div>
+        <div class="vlist" id="vlist"></div>
+      </div>
+      
+      <div class="bbar">
+        <div class="av"></div>
+        <div class="ui-col">
+          <span class="un">Не авторизован</span>
+          <span class="uh">Войдите для игры</span>
+        </div>
+        <button class="login-btn" onclick="loginUser()">Войти</button>
+        <div class="pg">
+          <button class="pm" onclick="launchGame()">▶ Играть</button>
+          <button class="pa" onclick="showGameOptions()"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modpacks -->
+    <div id="page-modpacks" class="page-content">
+      <div class="content">
+        <h1 class="ptitle">Сборки Minecraft</h1>
+        <div class="ctrl-row">
+          <div class="srch">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" placeholder="Поиск сборок..." id="searchInstances" oninput="filterInstances()"/>
+          </div>
+          <button class="btn-secondary" onclick="showCreateInstance()">Создать сборку</button>
+        </div>
+        <div class="vlist" id="instancesList"></div>
+      </div>
+      <div class="bbar">
+        <div class="av"></div>
+        <div class="ui-col">
+          <span class="un">Не авторизован</span>
+          <span class="uh">Войдите для игры</span>
+        </div>
+        <button class="login-btn" onclick="loginUser()">Войти</button>
+        <div class="pg">
+          <button class="pm" onclick="launchInstance()">▶ Играть</button>
+          <button class="pa" onclick="showGameOptions()"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mods -->
+    <div id="page-mods" class="page-content">
+      <div class="content">
+        <h1 class="ptitle">Управление модами</h1>
+        <div class="ctrl-row">
+          <div class="srch">
+            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" placeholder="Поиск модов..."/>
+          </div>
+          <button class="btn-secondary" onclick="alert('Добавление мода:\n1. Выберите .jar файл\n2. Мод скопируется в папку mods/\n3. Появится в списке')">Добавить мод</button>
+        </div>
+        <div class="vlist">
+          <div class="mod-card">
+            <div class="mod-icon"></div>
+            <div class="mod-info">
+              <div class="mod-name">OptiFine</div>
+              <div class="mod-desc">Улучшение производительности и графики</div>
+              <div class="mod-version">v1.20.1 HD U I6</div>
+            </div>
+            <div class="mod-toggle active" onclick="this.classList.toggle('active')">
+              <div class="mod-toggle-handle"></div>
+            </div>
+          </div>
+          <div class="mod-card">
+            <div class="mod-icon"></div>
+            <div class="mod-info">
+              <div class="mod-name">JEI (Just Enough Items)</div>
+              <div class="mod-desc">Просмотр рецептов крафта</div>
+              <div class="mod-version">v15.3.0.4</div>
+            </div>
+            <div class="mod-toggle" onclick="this.classList.toggle('active')">
+              <div class="mod-toggle-handle"></div>
+            </div>
+          </div>
+          <div class="mod-card">
+            <div class="mod-icon"></div>
+            <div class="mod-info">
+              <div class="mod-name">Biomes O' Plenty</div>
+              <div class="mod-desc">Более 80 новых биомов</div>
+              <div class="mod-version">v18.0.0.592</div>
+            </div>
+            <div class="mod-toggle active" onclick="this.classList.toggle('active')">
+              <div class="mod-toggle-handle"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="bbar">
+        <div class="av"></div>
+        <div class="ui-col">
+          <span class="un">Не авторизован</span>
+          <span class="uh">Войдите для игры</span>
+        </div>
+        <button class="login-btn" onclick="loginUser()">Войти</button>
+        <div class="pg">
+          <button class="pm" onclick="launchGame()">▶ Играть</button>
+          <button class="pa" onclick="showGameOptions()"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Skins -->
+    <div id="page-skins" class="page-content">
+      <div class="content">
+        <h1 class="ptitle">Управление скинами</h1>
+        <div class="skin-preview">
+          <div class="skin-model">Предпросмотр скина</div>
+          <div class="skin-actions">
+            <button class="btn-secondary" onclick="alert('Загрузка скина:\n1. Выберите PNG файл 64x64\n2. Предпросмотр обновится\n3. Загрузится на сервер Microsoft')">Загрузить скин</button>
+            <button class="btn-secondary" onclick="alert('Скин сброшен на стандартный Steve')">Сбросить</button>
+          </div>
+        </div>
+      </div>
+      <div class="bbar">
+        <div class="av"></div>
+        <div class="ui-col">
+          <span class="un">Не авторизован</span>
+          <span class="uh">Войдите для игры</span>
+        </div>
+        <button class="login-btn" onclick="loginUser()">Войти</button>
+        <div class="pg">
+          <button class="pm" onclick="launchGame()">▶ Играть</button>
+          <button class="pa" onclick="showGameOptions()"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Settings -->
+    <div id="page-settings" class="page-content">
+      <div class="content">
+        <h1 class="ptitle">Настройки</h1>
+        <div class="vlist">
+          <div class="settings-group">
+            <div class="settings-group-title">Игра</div>
+            <div class="setting-item">
+              <div class="setting-info">
+                <div class="setting-label">Полноэкранный режим</div>
+                <div class="setting-desc">Запускать игру в полноэкранном режиме</div>
+              </div>
+              <div class="toggle active" onclick="this.classList.toggle('active')">
+                <div class="toggle-handle"></div>
+              </div>
+            </div>
+            <div class="setting-item">
+              <div class="setting-info">
+                <div class="setting-label">Выделение памяти</div>
+                <div class="setting-desc">Максимальный объём RAM для Java</div>
+              </div>
+              <select class="select-box" onchange="alert('RAM изменен на: ' + this.value)">
+                <option>2 GB</option>
+                <option selected>4 GB</option>
+                <option>8 GB</option>
+                <option>16 GB</option>
+              </select>
+            </div>
+          </div>
+          <div class="settings-group">
+            <div class="settings-group-title">Лаунчер</div>
+            <div class="setting-item">
+              <div class="setting-info">
+                <div class="setting-label">Закрывать после запуска</div>
+                <div class="setting-desc">Закрывать лаунчер при запуске игры</div>
+              </div>
+              <div class="toggle" onclick="this.classList.toggle('active')">
+                <div class="toggle-handle"></div>
+              </div>
+            </div>
+            <div class="setting-item">
+              <div class="setting-info">
+                <div class="setting-label">Автообновление</div>
+                <div class="setting-desc">Автоматически проверять обновления</div>
+              </div>
+              <div class="toggle active" onclick="this.classList.toggle('active')">
+                <div class="toggle-handle"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="bbar">
+        <div class="av"></div>
+        <div class="ui-col">
+          <span class="un">Не авторизован</span>
+          <span class="uh">Войдите для игры</span>
+        </div>
+        <button class="login-btn" onclick="loginUser()">Войти</button>
+        <div class="pg">
+          <button class="pm" onclick="launchGame()">▶ Играть</button>
+          <button class="pa" onclick="showGameOptions()"><svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Create Instance -->
+<div id="modalCreateInstance" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title">Создать сборку</div>
+      <button class="modal-close" onclick="closeModal('modalCreateInstance')">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Название сборки</label>
+      <input type="text" class="form-input" id="instanceName" placeholder="Моя сборка Minecraft"/>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Группа</label>
+      <select class="form-select" id="instanceGroup">
+        <option value="Без группы">Без группы</option>
+        <option value="Vanilla">Vanilla</option>
+        <option value="Моды">Моды</option>
+        <option value="Сервера">Сервера</option>
+        <option value="Творчество">Творчество</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Версия Minecraft</label>
+      <select class="form-select" id="instanceVersion"></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Загрузчик модов</label>
+      <select class="form-select" id="instanceLoader">
+        <option value="Vanilla">Vanilla (без модов)</option>
+        <option value="Forge">Forge</option>
+        <option value="Fabric">Fabric</option>
+        <option value="Quilt">Quilt</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Выделение памяти (RAM)</label>
+      <select class="form-select" id="instanceRAM">
+        <option value="2048">2 GB</option>
+        <option value="4096" selected>4 GB</option>
+        <option value="6144">6 GB</option>
+        <option value="8192">8 GB</option>
+        <option value="12288">12 GB</option>
+        <option value="16384">16 GB</option>
+      </select>
+    </div>
+    <div class="form-actions">
+      <button class="btn-secondary-full" onclick="closeModal('modalCreateInstance')">Отмена</button>
+      <button class="btn-primary-full" onclick="createInstance()">Создать</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Instance Settings -->
+<div id="modalInstanceSettings" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <div class="modal-title" id="instanceSettingsTitle">Настройки сборки</div>
+      <button class="modal-close" onclick="closeModal('modalInstanceSettings')">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    
+    <div class="tabs-settings">
+      <button class="tab-settings active" onclick="switchSettingsTab(0)">Основные</button>
+      <button class="tab-settings" onclick="switchSettingsTab(1)">Java</button>
+      <button class="tab-settings" onclick="switchSettingsTab(2)">Игра</button>
+      <button class="tab-settings" onclick="switchSettingsTab(3)">Дополнительно</button>
+    </div>
+
+    <!-- Tab 0: Основные -->
+    <div class="tab-content-settings active">
+      <div class="form-group">
+        <label class="form-label">Название сборки</label>
+        <input type="text" class="form-input" id="editInstanceName"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Группа</label>
+        <select class="form-select" id="editInstanceGroup">
+          <option value="Без группы">Без группы</option>
+          <option value="Vanilla">Vanilla</option>
+          <option value="Моды">Моды</option>
+          <option value="Сервера">Сервера</option>
+          <option value="Творчество">Творчество</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Версия Minecraft</label>
+        <select class="form-select" id="editInstanceVersion"></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Загрузчик модов</label>
+        <select class="form-select" id="editInstanceLoader">
+          <option value="Vanilla">Vanilla (без модов)</option>
+          <option value="Forge">Forge</option>
+          <option value="Fabric">Fabric</option>
+          <option value="Quilt">Quilt</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Tab 1: Java -->
+    <div class="tab-content-settings">
+      <div class="form-group">
+        <label class="form-label">Выделение памяти (RAM)</label>
+        <select class="form-select" id="editInstanceRAM">
+          <option value="2048">2 GB</option>
+          <option value="4096">4 GB</option>
+          <option value="6144">6 GB</option>
+          <option value="8192">8 GB</option>
+          <option value="12288">12 GB</option>
+          <option value="16384">16 GB</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Путь к Java</label>
+        <input type="text" class="form-input" placeholder="Автоматически" id="editInstanceJava"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">JVM аргументы</label>
+        <input type="text" class="form-input" placeholder="-XX:+UseG1GC -XX:+ParallelRefProcEnabled" id="editInstanceJVMArgs"/>
+      </div>
+    </div>
+
+    <!-- Tab 2: Игра -->
+    <div class="tab-content-settings">
+      <div class="form-group">
+        <label class="form-label">Ширина окна</label>
+        <input type="number" class="form-input" placeholder="854" id="editInstanceWidth"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Высота окна</label>
+        <input type="number" class="form-input" placeholder="480" id="editInstanceHeight"/>
+      </div>
+      <div class="setting-item">
+        <div class="setting-info">
+          <div class="setting-label">Полноэкранный режим</div>
+        </div>
+        <div class="toggle" id="editInstanceFullscreen" onclick="this.classList.toggle('active')">
+          <div class="toggle-handle"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 3: Дополнительно -->
+    <div class="tab-content-settings">
+      <div class="form-group">
+        <label class="form-label">Путь к сборке</label>
+        <input type="text" class="form-input" readonly id="editInstancePath"/>
+      </div>
+      <div class="form-group">
+        <button class="btn-secondary-full" onclick="openInstanceFolder()">Открыть папку</button>
+      </div>
+      <div class="form-group">
+        <button class="btn-secondary-full" style="background:var(--ruby-dim);border-color:var(--ruby);color:var(--ruby-light)" onclick="deleteCurrentInstance()">Удалить сборку</button>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button class="btn-secondary-full" onclick="closeModal('modalInstanceSettings')">Отмена</button>
+      <button class="btn-primary-full" onclick="saveInstanceSettings()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const VERSIONS = {
+  releases: [],
+  snapshots: [],
+  betas: [],
+  alphas: [],
+  old: []
+};
+
+let instances = [
+  {id: 1, name: 'Vanilla 1.20.1', group: 'Vanilla', version: '1.20.1', loader: 'Vanilla', ram: 4096, path: 'instances/vanilla-1.20.1'},
+  {id: 2, name: 'Модпак с друзьями', group: 'Моды', version: '1.19.2', loader: 'Forge', ram: 8192, path: 'instances/modpack-friends'},
+  {id: 3, name: 'Сервер выживания', group: 'Сервера', version: '1.20.4', loader: 'Fabric', ram: 6144, path: 'instances/survival-server'}
+];
+let selectedInstanceId = null;
+let currentEditingInstanceId = null;
+
+async function loadVersions() {
+  try {
+    const res = await fetch("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
+    const data = await res.json();
+
+    VERSIONS.releases = [];
+    VERSIONS.snapshots = [];
+    VERSIONS.betas = [];
+    VERSIONS.alphas = [];
+    VERSIONS.old = [];
+
+    data.versions.forEach(v => {
+      const date = new Date(v.releaseTime).toLocaleDateString('ru-RU');
+
+      if (v.type === "release") {
+        VERSIONS.releases.push([v.id, date]);
+      }
+      else if (v.type === "snapshot") {
+        VERSIONS.snapshots.push([v.id, date]);
+      }
+      else if (v.type === "old_beta") {
+        VERSIONS.betas.push([v.id, date]);
+      }
+      else if (v.type === "old_alpha") {
+        if (v.id.startsWith("c") || v.id.startsWith("rd-") || v.id.startsWith("inf-") || v.id.startsWith("0.31")) {
+          VERSIONS.old.push([v.id, date]);
+        }
+        else if (v.id.startsWith("a")) {
+          VERSIONS.alphas.push([v.id, date]);
+        }
+      }
+    });
+
+    VERSIONS.old.unshift(
+      ["rd-131655", "13.05.2009"],
+      ["rd-132211", "13.05.2009"],
+      ["rd-132328", "13.05.2009"],
+      ["mc-161607", "16.05.2009"],
+      ["mc-161616", "16.05.2009"],
+      ["mc-161625", "16.05.2009"],
+      ["mc-161648", "16.05.2009"],
+      ["c0.0.11a", "17.05.2009"],
+      ["c0.0.12a", "17.05.2009"],
+      ["c0.0.13a", "21.05.2009"],
+      ["c0.0.13a_03", "21.05.2009"],
+      ["c0.0.14a_08", "30.05.2009"],
+      ["c0.0.15a-1", "31.05.2009"],
+      ["c0.0.16a", "11.06.2009"],
+      ["c0.0.18a_02", "16.06.2009"],
+      ["c0.0.19a_06", "18.06.2009"],
+      ["c0.0.20a-c0.27", "23.06.2009"],
+      ["c0.0.21a", "24.06.2009"],
+      ["c0.0.22a_05", "10.08.2009"],
+      ["c0.0.23a_01", "11.08.2009"],
+      ["c0.0.24a", "12.08.2009"],
+      ["c0.0.25a", "13.08.2009"],
+      ["c0.0.28a", "20.08.2009"],
+      ["c0.0.29a", "27.08.2009"],
+      ["c0.0.30a", "29.08.2009"],
+      ["c0.30_01c", "31.08.2009"],
+      ["inf-20100618", "18.06.2010"],
+      ["inf-20100624", "24.06.2010"],
+      ["inf-20100625-1", "25.06.2010"],
+      ["inf-20100627", "27.06.2010"],
+      ["inf-20100630-1", "30.06.2010"],
+      ["inf-20100727", "27.07.2010"]
+    );
+
+    VERSIONS.old = [...new Map(VERSIONS.old.map(v => [v[0], v])).values()];
+
+    populateVersionSelects();
+    render();
+    renderInstances();
+  } catch (error) {
+    console.error('Ошибка загрузки версий:', error);
+    document.getElementById('vlist').innerHTML = '<div class="empty">Ошибка загрузки версий</div>';
+  }
+}
+
+function populateVersionSelects() {
+  const selects = ['instanceVersion', 'editInstanceVersion'];
+  selects.forEach(selectId => {
+    const select = document.getElementById(selectId);
+    if (select) {
+      select.innerHTML = '';
+      const releases = VERSIONS.releases.slice(0, 20);
+      releases.forEach(([version]) => {
+        const opt = document.createElement('option');
+        opt.value = version;
+        opt.textContent = version;
+        select.appendChild(opt);
+      });
+    }
+  });
+}
+
+loadVersions();
+
+const BADGE = {
+  releases: ['badge-r','Релиз'],
+  snapshots: ['badge-s','Снапшот'],
+  betas: ['badge-b','Бета'],
+  alphas: ['badge-a','Альфа'],
+  old: ['badge-o','Старая']
+};
+
+let currentFilter = 'releases';
+let currentSort = 'newest';
+let searchQ = '';
+
+function parseDate(d) {
+  const [dd,mm,yyyy] = d.split('.');
+  return new Date(+yyyy, +mm-1, +dd);
+}
+
+function getFiltered() {
+  let arr = [];
+  if (currentFilter === 'all') {
+    for (const k of ['releases','snapshots','betas','alphas','old']) {
+      VERSIONS[k].forEach(v => arr.push([v[0], v[1], k]));
+    }
+  } else {
+    VERSIONS[currentFilter].forEach(v => arr.push([v[0], v[1], currentFilter]));
+  }
+  
+  if (searchQ) {
+    arr = arr.filter(v => v[0].toLowerCase().includes(searchQ));
+  }
+  
+  if (currentSort === 'newest') {
+    arr.sort((a,b) => parseDate(b[1]) - parseDate(a[1]));
+  } else if (currentSort === 'oldest') {
+    arr.sort((a,b) => parseDate(a[1]) - parseDate(b[1]));
+  }
+  
+  return arr;
+}
+
+function render() {
+  const list = document.getElementById('vlist');
+  const data = getFiltered();
+  
+  if (!data.length) {
+    list.innerHTML = '<div class="empty">Версии не найдены</div>';
+    return;
+  }
+  
+  list.innerHTML = data.map(([name, date, type]) => {
+    const [bClass, bLabel] = BADGE[type];
+    return `<div class="vrow" onclick="selectVersion('${name}')">
+      <div class="vicon">
+        <svg class="grass-icon" viewBox="0 0 16 16">
+          <defs><clipPath id="r"><rect width="16" height="16" rx="3"/></clipPath></defs>
+          <g clip-path="url(#r)">
+            <rect x="0" y="0" width="16" height="4" fill="#6BC349"/>
+            <rect x="1" y="0" width="1" height="1" fill="#8EEA68"/>
+            <rect x="4" y="1" width="1" height="1" fill="#7DD95A"/>
+            <rect x="7" y="0" width="1" height="1" fill="#92F16D"/>
+            <rect x="10" y="2" width="1" height="1" fill="#4E9A32"/>
+            <rect x="13" y="1" width="1" height="1" fill="#83E35F"/>
+            <rect x="0" y="4" width="16" height="1" fill="#3A7E24"/>
+            <rect x="0" y="5" width="16" height="11" fill="#7A4D28"/>
+            <rect x="0" y="6" width="2" height="2" fill="#8B6038"/>
+            <rect x="3" y="5" width="2" height="1" fill="#9E7246"/>
+            <rect x="6" y="7" width="1" height="2" fill="#5E381D"/>
+            <rect x="8" y="6" width="2" height="2" fill="#8F643D"/>
+            <rect x="11" y="5" width="1" height="1" fill="#A9794A"/>
+            <rect x="13" y="7" width="2" height="2" fill="#6B4223"/>
+            <rect x="1" y="10" width="2" height="1" fill="#5A341B"/>
+            <rect x="4" y="9" width="1" height="2" fill="#9C7145"/>
+            <rect x="6" y="11" width="2" height="2" fill="#6B4324"/>
+            <rect x="9" y="10" width="1" height="1" fill="#AA7B4D"/>
+            <rect x="11" y="12" width="2" height="1" fill="#5A351C"/>
+            <rect x="14" y="10" width="1" height="2" fill="#9E7246"/>
+            <rect x="2" y="13" width="1" height="1" fill="#B18354"/>
+            <rect x="5" y="14" width="2" height="1" fill="#5C361D"/>
+            <rect x="8" y="13" width="1" height="2" fill="#8E623B"/>
+            <rect x="12" y="14" width="2" height="1" fill="#A77748"/>
+          </g>
+        </svg>
+      </div>
+      <span class="vname">${name}</span>
+      <span class="vbadge ${bClass}">${bLabel}</span>
+      <span class="vdate">${date}</span>
+      <button class="vdots" title="Опции" onclick="event.stopPropagation();showVersionOptions('${name}')">
+        <svg viewBox="0 0 16 4" fill="currentColor"><circle cx="2" cy="2" r="1.5"/><circle cx="8" cy="2" r="1.5"/><circle cx="14" cy="2" r="1.5"/></svg>
+      </button>
+    </div>`;
+  }).join('');
+}
+
+let selectedVersion = null;
+
+function selectVersion(version) {
+  selectedVersion = version;
+  console.log('Выбрана версия:', version);
+}
+
+function showVersionOptions(version) {
+  alert(`Опции для версии ${version}:\n- Установить\n- Удалить\n- Настройки`);
+}
+
+function launchGame() {
+  if (!selectedVersion) {
+    alert('Сначала выберите версию Minecraft');
+    return;
+  }
+  alert(`Запуск Minecraft ${selectedVersion}...\n\nВ реальном лаунчере здесь будет:\n- Проверка файлов\n- Загрузка недостающих ресурсов\n- Запуск Java процесса`);
+}
+
+function launchInstance() {
+  if (!selectedInstanceId) {
+    alert('Сначала выберите сборку');
+    return;
+  }
+  const instance = instances.find(i => i.id === selectedInstanceId);
+  if (instance) {
+    alert(`Запуск сборки "${instance.name}"...\n\nВерсия: ${instance.version}\nЗагрузчик: ${instance.loader}\nRAM: ${instance.ram}MB\n\nВ реальном лаунчере:\n- Проверка файлов\n- Загрузка модов\n- Запуск игры`);
+  }
+}
+
+function showGameOptions() {
+  if (!selectedVersion && !selectedInstanceId) {
+    alert('Сначала выберите версию или сборку');
+    return;
+  }
+  const options = [
+    '⚙️ Настройки JVM',
+    '📁 Открыть папку .minecraft',
+    '🔧 Параметры запуска',
+    '📊 Логи последнего запуска'
+  ].join('\n');
+  alert(`Дополнительные опции:\n\n${options}`);
+}
+
+function loginUser() {
+  const username = prompt('Введите имя пользователя Microsoft:');
+  if (username) {
+    alert(`Авторизация через Microsoft...\n\nВ реальном лаунчере:\n- Откроется браузер для OAuth\n- Вы войдете через Microsoft\n- Лаунчер получит токен доступа\n\nДобро пожаловать, ${username}!`);
+    
+    document.querySelectorAll('.un').forEach(el => el.textContent = username);
+    document.querySelectorAll('.uh').forEach(el => el.textContent = 'Microsoft аккаунт');
+    document.querySelectorAll('.login-btn').forEach(btn => {
+      btn.textContent = 'Выйти';
+      btn.onclick = () => {
+        if (confirm('Выйти из аккаунта?')) {
+          document.querySelectorAll('.un').forEach(el => el.textContent = 'Не авторизован');
+          document.querySelectorAll('.uh').forEach(el => el.textContent = 'Войдите для игры');
+          document.querySelectorAll('.login-btn').forEach(b => {
+            b.textContent = 'Войти';
+            b.onclick = loginUser;
+          });
+        }
+      };
+    });
+  }
+}
+
+function setFilter(btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  currentFilter = btn.dataset.filter;
+  render();
+}
+
+function onSearch() {
+  searchQ = document.getElementById('searchInput').value.toLowerCase().trim();
+  render();
+}
+
+let ddOpen = false;
+function toggleDD() {
+  ddOpen = !ddOpen;
+  document.getElementById('ddMenu').classList.toggle('open', ddOpen);
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#ddBtn')) {
+    ddOpen = false;
+    document.getElementById('ddMenu').classList.remove('open');
+  }
+});
+
+const SORT_LABELS = {
+  newest:'Сначала новые',
+  oldest:'Сначала старые'
+};
+
+function setSort(s, e) {
+  e.stopPropagation();
+  currentSort = s;
+  document.getElementById('ddLabel').textContent = SORT_LABELS[s];
+  document.querySelectorAll('.dd-opt').forEach(o => o.classList.remove('sel'));
+  e.target.classList.add('sel');
+  ddOpen = false;
+  document.getElementById('ddMenu').classList.remove('open');
+  render();
+}
+
+function showPage(pageId) {
+  document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + pageId).classList.add('active');
+  
+  document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
+  event.target.closest('.ni').classList.add('active');
+}
+
+// Instances Management
+function renderInstances() {
+  const list = document.getElementById('instancesList');
+  if (!instances.length) {
+    list.innerHTML = '<div class="empty">Нет созданных сборок. Создайте первую!</div>';
+    return;
+  }
+  
+  list.innerHTML = '<div class="modpack-grid">' + instances.map(inst => `
+    <div class="modpack-card ${inst.id === selectedInstanceId ? 'selected' : ''}" onclick="selectInstance(${inst.id})">
+      <button class="modpack-settings" onclick="event.stopPropagation();editInstance(${inst.id})">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v10M1 12h6m6 0h10"/></svg>
+      </button>
+      <div class="modpack-icon"></div>
+      <div class="modpack-name">${inst.name}</div>
+      <div class="modpack-desc">${inst.group} • ${inst.loader}</div>
+      <span class="modpack-badge">${inst.version}</span>
+    </div>
+  `).join('') + '</div>';
+}
+
+function selectInstance(id) {
+  selectedInstanceId = id;
+  renderInstances();
+}
+
+function filterInstances() {
+  const query = document.getElementById('searchInstances').value.toLowerCase();
+  const filtered = instances.filter(i => 
+    i.name.toLowerCase().includes(query) || 
+    i.version.toLowerCase().includes(query)
+  );
+  
+  const list = document.getElementById('instancesList');
+  if (!filtered.length) {
+    list.innerHTML = '<div class="empty">Сборки не найдены</div>';
+    return;
+  }
+  
+  list.innerHTML = '<div class="modpack-grid">' + filtered.map(inst => `
+    <div class="modpack-card ${inst.id === selectedInstanceId ? 'selected' : ''}" onclick="selectInstance(${inst.id})">
+      <button class="modpack-settings" onclick="event.stopPropagation();editInstance(${inst.id})">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v6m0 6v10M1 12h6m6 0h10"/></svg>
+      </button>
+      <div class="modpack-icon"></div>
+      <div class="modpack-name">${inst.name}</div>
+      <div class="modpack-desc">${inst.group} • ${inst.loader}</div>
+      <span class="modpack-badge">${inst.version}</span>
+    </div>
+  `).join('') + '</div>';
+}
+
+function showCreateInstance() {
+  document.getElementById('modalCreateInstance').classList.add('open');
+}
+
+function createInstance() {
+  const name = document.getElementById('instanceName').value.trim();
+  const group = document.getElementById('instanceGroup').value;
+  const version = document.getElementById('instanceVersion').value;
+  const loader = document.getElementById('instanceLoader').value;
+  const ram = parseInt(document.getElementById('instanceRAM').value);
+  
+  if (!name) {
+    alert('Введите название сборки');
+    return;
+  }
+  
+  const newInstance = {
+    id: instances.length ? Math.max(...instances.map(i => i.id)) + 1 : 1,
+    name: name,
+    group: group,
+    version: version,
+    loader: loader,
+    ram: ram,
+    path: `instances/${name.toLowerCase().replace(/\s/g, '-')}`
+  };
+  
+  instances.push(newInstance);
+  renderInstances();
+  closeModal('modalCreateInstance');
+  
+  document.getElementById('instanceName').value = '';
+  
+  alert(`Сборка "${name}" успешно создана!\n\nПуть: ${newInstance.path}`);
+}
+
+function editInstance(id) {
+  currentEditingInstanceId = id;
+  const inst = instances.find(i => i.id === id);
+  if (!inst) return;
+  
+  document.getElementById('instanceSettingsTitle').textContent = `Настройки: ${inst.name}`;
+  document.getElementById('editInstanceName').value = inst.name;
+  document.getElementById('editInstanceGroup').value = inst.group;
+  document.getElementById('editInstanceVersion').value = inst.version;
+  document.getElementById('editInstanceLoader').value = inst.loader;
+  document.getElementById('editInstanceRAM').value = inst.ram;
+  document.getElementById('editInstancePath').value = inst.path;
+  
+  document.getElementById('modalInstanceSettings').classList.add('open');
+}
+
+function saveInstanceSettings() {
+  if (!currentEditingInstanceId) return;
+  
+  const inst = instances.find(i => i.id === currentEditingInstanceId);
+  if (!inst) return;
+  
+  inst.name = document.getElementById('editInstanceName').value;
+  inst.group = document.getElementById('editInstanceGroup').value;
+  inst.version = document.getElementById('editInstanceVersion').value;
+  inst.loader = document.getElementById('editInstanceLoader').value;
+  inst.ram = parseInt(document.getElementById('editInstanceRAM').value);
+  
+  renderInstances();
+  closeModal('modalInstanceSettings');
+  alert('Настройки сохранены!');
+}
+
+function deleteCurrentInstance() {
+  if (!currentEditingInstanceId) return;
+  
+  const inst = instances.find(i => i.id === currentEditingInstanceId);
+  if (!inst) return;
+  
+  if (confirm(`Удалить сборку "${inst.name}"?\n\nЭто действие нельзя отменить!`)) {
+    instances = instances.filter(i => i.id !== currentEditingInstanceId);
+    if (selectedInstanceId === currentEditingInstanceId) {
+      selectedInstanceId = null;
+    }
+    renderInstances();
+    closeModal('modalInstanceSettings');
+    alert('Сборка удалена');
+  }
+}
+
+function openInstanceFolder() {
+  if (!currentEditingInstanceId) return;
+  const inst = instances.find(i => i.id === currentEditingInstanceId);
+  if (inst) {
+    alert(`Открытие папки:\n${inst.path}\n\nВ реальном лаунчере откроется проводник`);
+  }
+}
+
+function switchSettingsTab(index) {
+  document.querySelectorAll('.tab-settings').forEach((t, i) => {
+    if (i === index) {
+      t.classList.add('active');
+    } else {
+      t.classList.remove('active');
+    }
+  });
+  
+  document.querySelectorAll('.tab-content-settings').forEach((t, i) => {
+    if (i === index) {
+      t.classList.add('active');
+    } else {
+      t.classList.remove('active');
+    }
+  });
+}
+
+function closeModal(modalId) {
+  document.getElementById(modalId).classList.remove('open');
+}
+
+// Close modal on background click
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('modal')) {
+    e.target.classList.remove('open');
+  }
+});
+</script>
+const VERSIONS = {
+  releases: [],
+  snapshots: [],
+  betas: [],
+  alphas: [],
+  old: []
+};
+
+async function loadVersions() {
+  try {
+    const res = await fetch("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json");
+    const data = await res.json();
+
+    VERSIONS.releases = [];
+    VERSIONS.snapshots = [];
+    VERSIONS.betas = [];
+    VERSIONS.alphas = [];
+    VERSIONS.old = [];
+
+    data.versions.forEach(v => {
+      const date = new Date(v.releaseTime).toLocaleDateString('ru-RU');
+
+      if (v.type === "release") {
+        VERSIONS.releases.push([v.id, date]);
+      }
+      else if (v.type === "snapshot") {
+        VERSIONS.snapshots.push([v.id, date]);
+      }
+      else if (v.type === "old_beta") {
+        VERSIONS.betas.push([v.id, date]);
+      }
+      else if (v.type === "old_alpha") {
+        if (v.id.startsWith("c") || v.id.startsWith("rd-") || v.id.startsWith("inf-") || v.id.startsWith("0.31")) {
+          VERSIONS.old.push([v.id, date]);
+        }
+        else if (v.id.startsWith("a")) {
+          VERSIONS.alphas.push([v.id, date]);
+        }
+      }
+    });
+
+    VERSIONS.old.unshift(
+      ["rd-131655", "13.05.2009"],
+      ["rd-132211", "13.05.2009"],
+      ["rd-132328", "13.05.2009"],
+      ["mc-161607", "16.05.2009"],
+      ["mc-161616", "16.05.2009"],
+      ["mc-161625", "16.05.2009"],
+      ["mc-161648", "16.05.2009"],
+      ["c0.0.11a", "17.05.2009"],
+      ["c0.0.12a", "17.05.2009"],
+      ["c0.0.13a", "21.05.2009"],
+      ["c0.0.13a_03", "21.05.2009"],
+      ["c0.0.14a_08", "30.05.2009"],
+      ["c0.0.15a-1", "31.05.2009"],
+      ["c0.0.16a", "11.06.2009"],
+      ["c0.0.18a_02", "16.06.2009"],
+      ["c0.0.19a_06", "18.06.2009"],
+      ["c0.0.20a-c0.27", "23.06.2009"],
+      ["c0.0.21a", "24.06.2009"],
+      ["c0.0.22a_05", "10.08.2009"],
+      ["c0.0.23a_01", "11.08.2009"],
+      ["c0.0.24a", "12.08.2009"],
+      ["c0.0.25a", "13.08.2009"],
+      ["c0.0.28a", "20.08.2009"],
+      ["c0.0.29a", "27.08.2009"],
+      ["c0.0.30a", "29.08.2009"],
+      ["c0.30_01c", "31.08.2009"],
+      ["inf-20100618", "18.06.2010"],
+      ["inf-20100624", "24.06.2010"],
+      ["inf-20100625-1", "25.06.2010"],
+      ["inf-20100627", "27.06.2010"],
+      ["inf-20100630-1", "30.06.2010"],
+      ["inf-20100727", "27.07.2010"]
+    );
+
+    VERSIONS.old = [...new Map(VERSIONS.old.map(v => [v[0], v])).values()];
+
+    render();
+  } catch (error) {
+    console.error('Ошибка загрузки версий:', error);
+    document.getElementById('vlist').innerHTML = '<div class="empty">Ошибка загрузки версий</div>';
+  }
+}
+
+loadVersions();
+
+const BADGE = {
+  releases: ['badge-r','Релиз'],
+  snapshots: ['badge-s','Снапшот'],
+  betas: ['badge-b','Бета'],
+  alphas: ['badge-a','Альфа'],
+  old: ['badge-o','Старая']
+};
+
+let currentFilter = 'releases';
+let currentSort = 'newest';
+let searchQ = '';
+
+function parseDate(d) {
+  const [dd,mm,yyyy] = d.split('.');
+  return new Date(+yyyy, +mm-1, +dd);
+}
+
+function getFiltered() {
+  let arr = [];
+  if (currentFilter === 'all') {
+    for (const k of ['releases','snapshots','betas','alphas','old']) {
+      VERSIONS[k].forEach(v => arr.push([v[0], v[1], k]));
+    }
+  } else {
+    VERSIONS[currentFilter].forEach(v => arr.push([v[0], v[1], currentFilter]));
+  }
+  
+  if (searchQ) {
+    arr = arr.filter(v => v[0].toLowerCase().includes(searchQ));
+  }
+  
+  if (currentSort === 'newest') {
+    arr.sort((a,b) => parseDate(b[1]) - parseDate(a[1]));
+  } else if (currentSort === 'oldest') {
+    arr.sort((a,b) => parseDate(a[1]) - parseDate(b[1]));
+  }
+  
+  return arr;
+}
+
+function render() {
+  const list = document.getElementById('vlist');
+  const data = getFiltered();
+  
+  if (!data.length) {
+    list.innerHTML = '<div class="empty">Версии не найдены</div>';
+    return;
+  }
+  
+  list.innerHTML = data.map(([name, date, type]) => {
+    const [bClass, bLabel] = BADGE[type];
+    return `<div class="vrow" onclick="selectVersion('${name}')">
+      <div class="vicon">
+        <svg class="grass-icon" viewBox="0 0 16 16">
+          <defs><clipPath id="r"><rect width="16" height="16" rx="3"/></clipPath></defs>
+          <g clip-path="url(#r)">
+            <rect x="0" y="0" width="16" height="4" fill="#6BC349"/>
+            <rect x="1" y="0" width="1" height="1" fill="#8EEA68"/>
+            <rect x="4" y="1" width="1" height="1" fill="#7DD95A"/>
+            <rect x="7" y="0" width="1" height="1" fill="#92F16D"/>
+            <rect x="10" y="2" width="1" height="1" fill="#4E9A32"/>
+            <rect x="13" y="1" width="1" height="1" fill="#83E35F"/>
+            <rect x="0" y="4" width="16" height="1" fill="#3A7E24"/>
+            <rect x="0" y="5" width="16" height="11" fill="#7A4D28"/>
+            <rect x="0" y="6" width="2" height="2" fill="#8B6038"/>
+            <rect x="3" y="5" width="2" height="1" fill="#9E7246"/>
+            <rect x="6" y="7" width="1" height="2" fill="#5E381D"/>
+            <rect x="8" y="6" width="2" height="2" fill="#8F643D"/>
+            <rect x="11" y="5" width="1" height="1" fill="#A9794A"/>
+            <rect x="13" y="7" width="2" height="2" fill="#6B4223"/>
+            <rect x="1" y="10" width="2" height="1" fill="#5A341B"/>
+            <rect x="4" y="9" width="1" height="2" fill="#9C7145"/>
+            <rect x="6" y="11" width="2" height="2" fill="#6B4324"/>
+            <rect x="9" y="10" width="1" height="1" fill="#AA7B4D"/>
+            <rect x="11" y="12" width="2" height="1" fill="#5A351C"/>
+            <rect x="14" y="10" width="1" height="2" fill="#9E7246"/>
+            <rect x="2" y="13" width="1" height="1" fill="#B18354"/>
+            <rect x="5" y="14" width="2" height="1" fill="#5C361D"/>
+            <rect x="8" y="13" width="1" height="2" fill="#8E623B"/>
+            <rect x="12" y="14" width="2" height="1" fill="#A77748"/>
+          </g>
+        </svg>
+      </div>
+      <span class="vname">${name}</span>
+      <span class="vbadge ${bClass}">${bLabel}</span>
+      <span class="vdate">${date}</span>
+      <button class="vdots" title="Опции" onclick="event.stopPropagation();showVersionOptions('${name}')">
+        <svg viewBox="0 0 16 4" fill="currentColor"><circle cx="2" cy="2" r="1.5"/><circle cx="8" cy="2" r="1.5"/><circle cx="14" cy="2" r="1.5"/></svg>
+      </button>
+    </div>`;
+  }).join('');
+}
+
+let selectedVersion = null;
+
+function selectVersion(version) {
+  selectedVersion = version;
+  console.log('Выбрана версия:', version);
+}
+
+function showVersionOptions(version) {
+  alert(`Опции для версии ${version}:\n- Установить\n- Удалить\n- Настройки`);
+}
+
+function launchGame() {
+  if (!selectedVersion) {
+    alert('Сначала выберите версию Minecraft');
+    return;
+  }
+  alert(`Запуск Minecraft ${selectedVersion}...\n\nВ реальном лаунчере здесь будет:\n- Проверка файлов\n- Загрузка недостающих ресурсов\n- Запуск Java процесса`);
+}
+
+function showGameOptions() {
+  if (!selectedVersion) {
+    alert('Сначала выберите версию');
+    return;
+  }
+  const options = [
+    '⚙️ Настройки JVM',
+    '📁 Открыть папку .minecraft',
+    '🔧 Параметры запуска',
+    '📊 Логи последнего запуска'
+  ].join('\n');
+  alert(`Дополнительные опции для ${selectedVersion}:\n\n${options}`);
+}
+
+function loginUser() {
+  const username = prompt('Введите имя пользователя Microsoft:');
+  if (username) {
+    alert(`Авторизация через Microsoft...\n\nВ реальном лаунчере:\n- Откроется браузер для OAuth\n- Вы войдете через Microsoft\n- Лаунчер получит токен доступа\n\nДобро пожаловать, ${username}!`);
+    
+    document.querySelectorAll('.un').forEach(el => el.textContent = username);
+    document.querySelectorAll('.uh').forEach(el => el.textContent = 'Microsoft аккаунт');
+    document.querySelectorAll('.login-btn').forEach(btn => {
+      btn.textContent = 'Выйти';
+      btn.onclick = () => {
+        if (confirm('Выйти из аккаунта?')) {
+          document.querySelectorAll('.un').forEach(el => el.textContent = 'Не авторизован');
+          document.querySelectorAll('.uh').forEach(el => el.textContent = 'Войдите для игры');
+          document.querySelectorAll('.login-btn').forEach(b => {
+            b.textContent = 'Войти';
+            b.onclick = loginUser;
+          });
+        }
+      };
+    });
+  }
+}
+
+function setFilter(btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  currentFilter = btn.dataset.filter;
+  render();
+}
+
+function onSearch() {
+  searchQ = document.getElementById('searchInput').value.toLowerCase().trim();
+  render();
+}
+
+let ddOpen = false;
+function toggleDD() {
+  ddOpen = !ddOpen;
+  document.getElementById('ddMenu').classList.toggle('open', ddOpen);
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#ddBtn')) {
+    ddOpen = false;
+    document.getElementById('ddMenu').classList.remove('open');
+  }
+});
+
+const SORT_LABELS = {
+  newest:'Сначала новые',
+  oldest:'Сначала старые'
+};
+
+function setSort(s, e) {
+  e.stopPropagation();
+  currentSort = s;
+  document.getElementById('ddLabel').textContent = SORT_LABELS[s];
+  document.querySelectorAll('.dd-opt').forEach(o => o.classList.remove('sel'));
+  e.target.classList.add('sel');
+  ddOpen = false;
+  document.getElementById('ddMenu').classList.remove('open');
+  render();
+}
+
+function showPage(pageId) {
+  document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + pageId).classList.add('active');
+  
+  document.querySelectorAll('.ni').forEach(n => n.classList.remove('active'));
+  event.target.closest('.ni').classList.add('active');
+}
+</script>
+</body>
+</html>

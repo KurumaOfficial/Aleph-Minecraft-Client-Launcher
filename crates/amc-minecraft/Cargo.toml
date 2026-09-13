@@ -1,0 +1,22 @@
+[package]
+name = "amc-minecraft"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Minecraft version manifests, asset/library resolution, mod loaders and game launcher"
+
+[dependencies]
+amc-core = { workspace = true }
+amc-auth = { workspace = true }
+amc-downloader = { workspace = true }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+zip = { workspace = true }
