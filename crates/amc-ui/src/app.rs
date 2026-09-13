@@ -2,12 +2,13 @@ use eframe::App;
 use egui::{CentralPanel, Context, TopBottomPanel};
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
-use amc_auth::AccountManager;
+use amc_auth::{Account, AccountManager, DeviceCodeResponse, MicrosoftAuthFlow};
 use amc_core::config::LauncherConfig;
 use amc_core::paths::LauncherPaths;
 use amc_core::types::{GameVersion, Instance};
-use amc_downloader::{DownloadEngine, DownloadProgress};
-use amc_minecraft::{GameEvent, VersionManifest};
+use amc_downloader::{AdoptiumInstaller, DownloadEngine, DownloadProgress};
+use amc_minecraft::{GameEvent, MinecraftLauncher, VersionManifest};
+use amc_mods::{LocalModManager, ModSearchResult, ModrinthClient};
 
 use crate::modals::{DownloadOverlay, LoginModal};
 use crate::pages::{HomePage, InstancesPage, ModsPage, SettingsPage, SkinsPage};
@@ -18,7 +19,6 @@ pub struct LauncherApp {
     paths: LauncherPaths,
     config: LauncherConfig,
     account_mgr: AccountManager,
-    #[allow(dead_code)]
     download_engine: Arc<DownloadEngine>,
 
     // App state
@@ -40,8 +40,12 @@ pub struct LauncherApp {
     login_modal: LoginModal,
 
     // Async channels
+    versions_rx: Option<mpsc::Receiver<Vec<GameVersion>>>,
+    mod_search_rx: Option<mpsc::Receiver<Vec<ModSearchResult>>>,
     download_progress_rx: Option<watch::Receiver<DownloadProgress>>,
     game_events_rx: Option<mpsc::Receiver<GameEvent>>,
+    ms_code_rx: Option<mpsc::Receiver<Result<DeviceCodeResponse, String>>>,
+    ms_poll_rx: Option<mpsc::Receiver<Result<Account, String>>>,
 }
 
 impl LauncherApp {
@@ -53,6 +57,13 @@ impl LauncherApp {
         });
 
         let download_engine = Arc::new(DownloadEngine::new(16));
+
+        // Pre-scan local mods
+        let mods_dir = paths.root_dir.join("mods");
+        let local_mods = LocalModManager::scan_mods(&mods_dir).unwrap_or_default();
+
+        let mut mods_page = ModsPage::default();
+        mods_page.local_mods = local_mods;
 
         Self {
             paths,
@@ -67,24 +78,114 @@ impl LauncherApp {
             is_launching: false,
             home_page: HomePage::default(),
             instances_page: InstancesPage::default(),
-            mods_page: ModsPage::default(),
+            mods_page,
             skins_page: SkinsPage::default(),
             settings_page: SettingsPage::default(),
             login_modal: LoginModal::default(),
+            versions_rx: None,
+            mod_search_rx: None,
             download_progress_rx: None,
             game_events_rx: None,
+            ms_code_rx: None,
+            ms_poll_rx: None,
         }
     }
 
     pub fn load_initial_manifest(&mut self) {
         let client = reqwest::Client::new();
         let cache_dir = self.paths.cache_dir();
+        let (tx, rx) = mpsc::channel(1);
+        self.versions_rx = Some(rx);
 
         // Spawn version manifest fetch
         tokio::spawn(async move {
             if let Ok(manifest) = VersionManifest::fetch(&client, Some(&cache_dir)).await {
-                let _versions = manifest.to_game_versions();
-                tracing::info!("Loaded {} versions from Mojang manifest", _versions.len());
+                let versions = manifest.to_game_versions();
+                tracing::info!("Loaded {} versions from Mojang manifest", versions.len());
+                let _ = tx.send(versions).await;
+            }
+        });
+    }
+
+    fn search_modrinth(&mut self, query: String) {
+        self.mods_page.is_searching = true;
+        let (tx, rx) = mpsc::channel(1);
+        self.mod_search_rx = Some(rx);
+
+        tokio::spawn(async move {
+            let client = ModrinthClient::default();
+            match client.search(&query, None, None, 30).await {
+                Ok(results) => {
+                    let _ = tx.send(results).await;
+                }
+                Err(e) => {
+                    tracing::error!("Modrinth search failed: {e}");
+                    let _ = tx.send(Vec::new()).await;
+                }
+            }
+        });
+    }
+
+    fn install_mod(&mut self, mod_item: ModSearchResult) {
+        let mods_dir = self.paths.root_dir.join("mods");
+        let engine = self.download_engine.clone();
+
+        tokio::spawn(async move {
+            let client = ModrinthClient::default();
+            tracing::info!("Resolving mod download for {}", mod_item.title);
+            if let Ok(file_info) = client.get_download_file(&mod_item.id, None, None).await {
+                let dest = mods_dir.join(&file_info.filename);
+                let item = amc_downloader::DownloadItem::new(&file_info.url, dest);
+                if let Err(e) = engine.download_one(&item, None).await {
+                    tracing::error!("Failed to download mod {}: {e}", file_info.filename);
+                } else {
+                    tracing::info!("Mod {} installed successfully!", file_info.filename);
+                }
+            }
+        });
+    }
+
+    fn request_ms_device_code(&mut self) {
+        let (tx, rx) = mpsc::channel(1);
+        self.ms_code_rx = Some(rx);
+
+        tokio::spawn(async move {
+            let flow = MicrosoftAuthFlow::default();
+            match flow.request_device_code().await {
+                Ok(resp) => {
+                    let _ = tx.send(Ok(resp)).await;
+                }
+                Err(e) => {
+                    let _ = tx.send(Err(e.to_string())).await;
+                }
+            }
+        });
+    }
+
+    fn start_ms_poll(&mut self, device_code: String) {
+        let (tx, rx) = mpsc::channel(1);
+        self.ms_poll_rx = Some(rx);
+        self.login_modal.ms_polling = true;
+
+        tokio::spawn(async move {
+            let flow = MicrosoftAuthFlow::default();
+            let mut attempts = 60; // 5 minutes with 5 sec interval
+            while attempts > 0 {
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                match flow.poll_device_token(&device_code).await {
+                    Ok(Some(acc)) => {
+                        let _ = tx.send(Ok(acc)).await;
+                        break;
+                    }
+                    Ok(None) => {
+                        // Pending user confirmation
+                    }
+                    Err(e) => {
+                        let _ = tx.send(Err(e.to_string())).await;
+                        break;
+                    }
+                }
+                attempts -= 1;
             }
         });
     }
@@ -96,14 +197,137 @@ impl LauncherApp {
         };
 
         let ver_id = self.selected_version.clone().unwrap_or_else(|| "1.20.1".to_string());
-        tracing::info!("Launching Minecraft version {} for user {}", ver_id, session.username);
+        tracing::info!("Preparing Minecraft launch for version {} (User: {})...", ver_id, session.username);
         self.is_launching = true;
+
+        let paths = self.paths.clone();
+        let engine = self.download_engine.clone();
+        let options = self.config.default_launch_options.clone();
+
+        let (game_tx, game_rx) = mpsc::channel(256);
+        self.game_events_rx = Some(game_rx);
+
+        tokio::spawn(async move {
+            // 1. Ensure Adoptium Java
+            let runtimes_dir = paths.runtimes_dir();
+            let java_bin = match AdoptiumInstaller::ensure_java(&runtimes_dir, 21, &engine, None).await {
+                Ok(bin) => bin,
+                Err(e) => {
+                    tracing::error!("Java installation failed: {e}");
+                    let _ = game_tx.send(GameEvent::Crashed { message: format!("Java error: {e}") }).await;
+                    return;
+                }
+            };
+
+            tracing::info!("Java ready: {}", java_bin.display());
+
+            // 2. Launch Minecraft game process
+            let game_dir = paths.instances_dir().join(&ver_id);
+            let assets_dir = paths.assets_dir();
+            let natives_dir = paths.libraries_dir().join("natives");
+            let client_jar = paths.versions_dir().join(&ver_id).join(format!("{ver_id}.jar"));
+
+            let dummy_details = amc_minecraft::VersionDetails {
+                id: ver_id.clone(),
+                downloads: None,
+                asset_index: None,
+                libraries: Vec::new(),
+                main_class: "net.minecraft.client.main.Main".to_string(),
+                arguments: None,
+                minecraft_arguments: None,
+                java_version: None,
+                inherits_from: None,
+            };
+
+            let _ = fs_err_create(&game_dir).await;
+            let _ = fs_err_create(&natives_dir).await;
+
+            match MinecraftLauncher::launch(
+                &java_bin,
+                &game_dir,
+                &assets_dir,
+                &natives_dir,
+                &[],
+                &client_jar,
+                &dummy_details,
+                &session,
+                &options,
+            ).await {
+                Ok(mut rx) => {
+                    while let Some(event) = rx.recv().await {
+                        let _ = game_tx.send(event).await;
+                    }
+                }
+                Err(e) => {
+                    let _ = game_tx.send(GameEvent::Crashed { message: format!("Launch error: {e}") }).await;
+                }
+            }
+        });
     }
+}
+
+async fn fs_err_create(path: &std::path::Path) -> std::io::Result<()> {
+    tokio::fs::create_dir_all(path).await
 }
 
 impl App for LauncherApp {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
         apply_aleph_theme(ctx);
+
+        // Receive version manifest updates
+        if let Some(rx) = &mut self.versions_rx {
+            if let Ok(versions) = rx.try_recv() {
+                self.versions = versions;
+                self.versions_rx = None;
+            }
+        }
+
+        // Receive Modrinth search results
+        if let Some(rx) = &mut self.mod_search_rx {
+            if let Ok(results) = rx.try_recv() {
+                self.mods_page.search_results = results;
+                self.mods_page.is_searching = false;
+                self.mod_search_rx = None;
+            }
+        }
+
+        // Receive MS Device Code
+        if let Some(rx) = &mut self.ms_code_rx {
+            if let Ok(res) = rx.try_recv() {
+                match res {
+                    Ok(resp) => {
+                        let code = resp.device_code.clone();
+                        self.login_modal.ms_device_code = Some(resp);
+                        self.ms_code_rx = None;
+                        self.start_ms_poll(code);
+                    }
+                    Err(err) => {
+                        self.login_modal.error_msg = Some(err);
+                        self.ms_code_rx = None;
+                    }
+                }
+            }
+        }
+
+        // Receive MS Poll result
+        if let Some(rx) = &mut self.ms_poll_rx {
+            if let Ok(res) = rx.try_recv() {
+                match res {
+                    Ok(acc) => {
+                        let _ = self.account_mgr.add_or_update_account(acc);
+                        self.login_modal.is_open = false;
+                        self.login_modal.ms_polling = false;
+                        self.login_modal.ms_device_code = None;
+                        self.ms_poll_rx = None;
+                    }
+                    Err(err) => {
+                        self.login_modal.error_msg = Some(err);
+                        self.login_modal.ms_polling = false;
+                        self.ms_poll_rx = None;
+                    }
+                }
+            }
+        }
 
         // Check incoming download progress updates
         if let Some(rx) = &self.download_progress_rx {
@@ -189,12 +413,26 @@ impl App for LauncherApp {
                         }
                         NavTab::Mods => {
                             let mods_dir = self.paths.root_dir.join("mods");
+                            let mut query_to_search = None;
+                            let mut mod_to_install = None;
+
                             self.mods_page.show(
                                 ui,
                                 &mods_dir,
-                                |_query| {},
-                                |_result| {},
+                                |query| {
+                                    query_to_search = Some(query);
+                                },
+                                |result| {
+                                    mod_to_install = Some(result);
+                                },
                             );
+
+                            if let Some(q) = query_to_search {
+                                self.search_modrinth(q);
+                            }
+                            if let Some(item) = mod_to_install {
+                                self.install_mod(item);
+                            }
                         }
                         NavTab::Skins => {
                             let acc = self.account_mgr.active_account();
@@ -209,15 +447,20 @@ impl App for LauncherApp {
         });
 
         // Login Modal Dialog
+        let mut request_ms = false;
         self.login_modal.show(
             ctx,
             |account| {
                 let _ = self.account_mgr.add_or_update_account(account);
             },
             || {
-                // Request Microsoft device code
+                request_ms = true;
             },
         );
+
+        if request_ms {
+            self.request_ms_device_code();
+        }
 
         ctx.request_repaint_after(std::time::Duration::from_millis(100));
     }
