@@ -2,134 +2,136 @@
 
 <div align="center">
 
-**Высокопроизводительный, модульный и открытый лаунчер Minecraft нового поколения на чистом Rust.**
+**High-performance, modular, open-source Minecraft launcher built from scratch in Rust.**
 
 [![Rust 2021](https://img.shields.io/badge/Rust-2021_Edition-orange.svg?style=flat-square&logo=rust)](https://www.rust-lang.org/)
 [![License: GPL v3](https://img.shields.io/badge/License-GPL_v3-red.svg?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-blue.svg?style=flat-square)](https://github.com/KurumaOfficial/Aleph-Minecraft-Client-Launcher)
 
-[О проекте](#-о-проекте) • [Возможности](#-возможности) • [Архитектура](#-архитектура-workspace) • [Сборка](#-сборка-из-исходников) • [Дорожная карта](#-дорожная-карта)
+[English](README.md) • [Русский](README.ru.md)
+
+[About](#-about) • [Features](#-features) • [Workspace Architecture](#-workspace-architecture) • [Building from Source](#-building-from-source) • [Roadmap](#-roadmap)
 
 ---
 
 </div>
 
-## 📌 О проекте
+## 📌 About
 
-Большинство популярных лаунчеров сегодня либо упакованы в тяжелый Electron и потребляют по гигабайту оперативной памяти в фоне, либо перегружены навязчивой рекламой и закрытым кодом.
+Most modern Minecraft launchers suffer from two extremes: they are either sluggish Electron apps sitting idle at 800+ MB of RAM, or bloated with shady adware, tracking, and closed-source telemetry.
 
-**AMC Launcher** создается с нуля как бескомпромиссная альтернатива:
-- **Мгновенный старт:** запуск интерфейса за ~300 мс и ультранизкое потребление ресурсов (~30 МБ ОЗУ).
-- **Чистый Rust:** модульная архитектура Cargo Workspace на 6 независимых библиотеках.
-- **Никакой телеметрии и скрытых сервисов:** прямой обмен данными только с Mojang API, Adoptium, Modrinth и CurseForge.
-- **Строгий дизайн Aleph Studio:** темная рубиновая палитра (`#080606`, `#8B1A2A`), безрамное окно с нативным поведением и высокая частота кадров интерфейса (60–144+ FPS).
-
----
-
-## ⚡ Возможности
-
-### 🎮 Запуск и мультизагрузчики
-- **Поддержка любых версий Minecraft:** от новейших релизов (1.21+) и снапшотов до классических Alpha и Beta.
-- **Все популярные загрузчики модов:** Fabric, Quilt, Minecraft Forge, NeoForge, OptiFine и чистая Vanilla.
-- **Автоматическая установка Java:** лаунчер сам определяет необходимую версию OpenJDK (8, 17, 21) под выбранную версию игры, загружает ее через официальный Adoptium API и распаковывает в изолированную папку `runtimes/`. Вручную настраивать `JAVA_HOME` не требуется.
-- **Многопоточный загрузчик (16 потоков):** параллельная загрузка Client JAR, библиотек и ассетов с контролем целостности SHA-1. Повторный запуск уже загруженной версии происходит мгновенно (~100 мс).
-
-### 🧩 Сборки и изоляция (Instances)
-- **Изолированные директории:** у каждой созданной сборки своя папка с отдельными модами, конфигами, ресурспаками и мирами.
-- **Быстрое редактирование:** изменение версии игры, загрузчика, названия и выделения оперативной памяти прямо в карточке сборки.
-- **Учет игрового времени:** отслеживание времени проведенного в игре по каждой сборке и даты последней сессии.
-- **Быстрый доступ:** открытие папки сборки в Проводнике Windows в один клик.
-
-### 🌐 Менеджер модов
-- **Мульти-провайдерный поиск:** каталог модов с одновременным поиском через **Modrinth API v2** и **CurseForge (CurseTools API)**.
-- **Установка в 1 клик:** прямая загрузка `.jar` файлов сразу в папку `mods/` активной сборки.
-- **Управление локальными модами:** просмотр установленных модов с парсингом манифестов (`fabric.mod.json`, `mods.toml`), включение и отключение модов без их удаления (через расширение `.disabled`).
-
-### 👤 Скины и персонализация
-- **2D Skin Viewer:** предпросмотр скина со всеми слоями одежды (голова, шлем, тело, куртка, руки, рукава, ноги, штаны).
-- **Поддержка моделей:** мгновенное переключение между Classic (4px) и Slim / Alex (3px).
-- **Нативный выбор файлов:** интеграция с диалоговым окном Windows (`rfd`) для загрузки любого локального скина формата PNG.
-- **Динамический аватар:** лицо персонажа автоматически нарезается из активного скина и отображается в нижнем статус-баре.
-
-### 📟 Консоль игры и диагностика
-- **Живой перехват логов:** захват потоков stdout и stderr процесса Minecraft с буфером на 5000 строк.
-- **Синтаксическая подсветка:** фатальные сбои и Exception подсвечиваются рубиновым цветом, варнинги — оранжевым, отладочная информация — приглушенным серым.
-- **Удобные инструменты:** живой поиск по логу, переключатель автоскролла вниз, копирование в буфер обмена и экспорт лога в текстовый файл.
-
-### 🚀 Пресеты оптимизации JVM
-- **Aikar's G1GC Preset:** набор проверенных аргументов виртуальной машины Java для устранения микрофризов и скачков фреймрейта при прогрузке чанков.
-- **Generational ZGC Preset:** ультрабыстрый сборщик мусора с субмиллисекундными паузами для Java 17+.
+**AMC Launcher** is built from the ground up as an uncompromising alternative:
+- **Instant startup:** Interface launches in ~300 ms with an ultra-light footprint (~30 MB idle RAM).
+- **Pure Rust:** Architected as a modular 6-crate Cargo Workspace with strict separation of concerns.
+- **Zero telemetry:** Direct network communication only with official APIs: Mojang, Adoptium, Modrinth, and CurseForge. No tracking, no analytics, no third-party telemetry.
+- **Aleph Studio aesthetic:** Custom dark ruby design (`#080606`, `#8B1A2A`), smooth framerate (60–144+ FPS via hardware OpenGL/wgpu), and native frameless window controls.
 
 ---
 
-## 🏗 Архитектура Workspace
+## ⚡ Features
 
-Проект структурирован как многомодульный Cargo Workspace:
+### 🎮 Launch & Multi-Loader Support
+- **Full version coverage:** From the latest Minecraft releases (1.21+) and snapshots down to classic Alpha and Beta.
+- **First-class mod loaders:** Fabric, Quilt, Minecraft Forge, NeoForge, OptiFine, and clean Vanilla.
+- **Automated Java management:** The launcher detects the required OpenJDK version (8, 17, or 21) for the selected game version, downloads it directly from the official Adoptium API, and unpacks it into an isolated `runtimes/` directory. No manual `JAVA_HOME` configuration needed.
+- **High-throughput downloader (16 workers):** Parallel async downloads for client JARs, libraries, and assets with SHA-1 hash integrity validation. Relaunching an already downloaded version is near-instant (~100 ms).
+
+### 🧩 Instance Isolation
+- **Sandboxed profiles:** Each instance has its own isolated directory for mods, configs, resource packs, and save files.
+- **In-place editing:** Adjust game version, loader, profile name, and RAM allocation directly on the instance card.
+- **Playtime tracking:** Accurately tracks accumulated in-game time and timestamp of your last session.
+- **One-click access:** Open any instance folder directly in your system file manager.
+
+### 🌐 Mod Manager (Modrinth & CurseForge)
+- **Dual-provider search:** Unified mod catalog querying both **Modrinth API v2** and **CurseForge (CurseTools API)**.
+- **1-Click installation:** Direct `.jar` download directly into the active instance's `mods/` directory.
+- **Local mod management:** View installed mods with native manifest parsing (`fabric.mod.json`, `mods.toml`). Toggle mods on or off without deleting them (via `.disabled` extension).
+
+### 👤 Skins & Personalization
+- **2D Skin Viewer:** Real-time composite preview rendering all outer and inner clothing layers (head, helmet, body, jacket, arms, sleeves, legs, pants).
+- **Model switching:** Seamlessly toggle between Classic (4px) and Slim / Alex (3px) geometry.
+- **Native file dialog:** Pick any local PNG skin using the OS native dialog (`rfd`).
+- **Dynamic avatar:** Automatically crops the player's face from the active skin and renders it in the bottom status bar.
+
+### 📟 Game Console & Diagnostics
+- **Live stream capture:** Intercepts `stdout` and `stderr` streams from the running Minecraft process with a 5,000-line buffer.
+- **Syntax color-coding:** Fatal errors and exceptions highlighted in ruby red, warnings in amber, debug logs in muted gray.
+- **Built-in tools:** Real-time log search, autoscroll lock, clipboard copying, and single-click export to a `.log` file.
+
+### 🚀 JVM GC Tuning Presets
+- **Aikar's G1GC Preset:** Battle-tested Java Virtual Machine flags configured to eliminate chunk-loading micro-stutters and frame drops.
+- **Generational ZGC Preset:** Ultra-low pause garbage collector with sub-millisecond pauses for modern Java 17+.
+
+---
+
+## 🏗 Workspace Architecture
+
+The project is structured as a modular Cargo Workspace:
 
 ```
 AMC_Launcher/
 ├── crates/
-│   ├── amc-core/          # Типы сборок (Instance), версий, путей (LauncherPaths), конфиг
-│   ├── amc-auth/          # Авторизация (Offline, Microsoft Device Code Flow, WetID)
-│   ├── amc-downloader/    # Асинхронный движок загрузок, проверка SHA-1, Adoptium OpenJDK
-│   ├── amc-minecraft/     # Mojang API, построение аргументов JVM, запуск процесса, SLP-пинг
-│   ├── amc-mods/          # Modrinth API v2, CurseForge API, парсер локальных JAR-манифестов
-│   └── amc-ui/            # GUI на eframe/egui: окна, виджеты, палитра Aleph Studio
-├── assets/                # Шрифты (Segoe UI, Unbounded, JetBrains Mono) и иконки
+│   ├── amc-core/          # Instance models, version definitions, LauncherPaths, config store
+│   ├── amc-auth/          # Auth schemes (Offline, Microsoft Device Code Flow, WetID)
+│   ├── amc-downloader/    # Async download engine, SHA-1 verification, Adoptium OpenJDK
+│   ├── amc-minecraft/     # Mojang API, JVM argument builder, process runner, SLP server ping
+│   ├── amc-mods/          # Modrinth API v2, CurseForge API, local JAR manifest parser
+│   └── amc-ui/            # GUI via eframe/egui: windows, custom widgets, Aleph theme
+├── assets/                # Typography (Segoe UI, Unbounded, JetBrains Mono) and icons
 └── src/
-    └── main.rs            # Точка входа приложения, конфигурация Viewport и OpenGL
+    └── main.rs            # Application entry point, viewport setup, OpenGL configuration
 ```
 
 ---
 
-## 🛠 Сборка из исходников
+## 🛠 Building from Source
 
-### Требования
-- **Rust Toolchain:** версия `1.80` или новее (рекомендуется `stable`).
-- **Операционная система:** Windows 10/11 x64 (целевая платформа), Linux (X11 / Wayland).
+### Prerequisites
+- **Rust Toolchain:** Version `1.80` or newer (`stable` recommended).
+- **Operating System:** Windows 10/11 x64 (primary target), Linux (X11 / Wayland).
 
-### Инструкция
+### Instructions
 
-1. Клонируйте репозиторий:
+1. Clone the repository:
 ```bash
 git clone https://github.com/KurumaOfficial/Aleph-Minecraft-Client-Launcher.git
 cd Aleph-Minecraft-Client-Launcher
 ```
 
-2. Проверьте компиляцию и запустите тесты:
+2. Run test suites across all crates:
 ```bash
 cargo test --workspace
 ```
 
-3. Запустите в режиме разработки:
+3. Run in development mode:
 ```bash
 cargo run
 ```
 
-4. Соберите оптимизированный релизный бинарник:
+4. Build an optimized release binary:
 ```bash
 cargo build --release
 ```
-Готовый исполняемый файл будет находиться по пути: `target/release/amc-launcher.exe`.
+The compiled binary will be located at: `target/release/amc-launcher.exe`.
 
 ---
 
-## 🗺 Дорожная карта
+## 🗺 Roadmap
 
-- [x] Полный рекод архитектуры на модульный Cargo Workspace (6 крейтов).
-- [x] Поддержка автозагрузки OpenJDK 8, 17, 21 через Adoptium API.
-- [x] Мультизагрузчики (Fabric, Quilt, Forge, NeoForge, OptiFine, Vanilla).
-- [x] Каталог модов с интеграцией Modrinth API v2 и CurseForge.
-- [x] 2D предпросмотр скина и живая генерация аватара в статус-баре.
-- [x] Встроенная интерактивная консоль процесса игры с экспортом логов.
-- [x] Пресеты тюнинга Garbage Collector для устранения лагов в игре.
-- [x] Мониторинг статуса и пинга серверов Minecraft по TCP.
-- [ ] 3D рендер скина персонажа.
-- [ ] Экспорт и импорт модпаков в формате `.mrpack` и CurseForge `.zip`.
-- [ ] Автоматическая проверка обновлений установленных модов.
+- [x] Complete architectural rewrite as a modular Cargo Workspace (6 crates).
+- [x] Automated OpenJDK 8, 17, 21 provisioning via Adoptium API.
+- [x] Multi-loader support (Fabric, Quilt, Forge, NeoForge, OptiFine, Vanilla).
+- [x] Dual-provider mod browser (Modrinth v2 + CurseForge).
+- [x] 2D composite skin preview with dynamic status-bar avatar slicing.
+- [x] Interactive game console with log export and live filtering.
+- [x] Curated JVM garbage collection presets (Aikar's G1GC & Generational ZGC).
+- [x] TCP Server List Ping (SLP) status and latency monitor.
+- [ ] 3D skin model viewport.
+- [ ] Modpack export/import support (`.mrpack` and CurseForge `.zip`).
+- [ ] One-click update checks for installed mods.
 
 ---
 
-## 📄 Лицензия
+## 📄 License
 
-Проект распространяется под свободной лицензией **GNU General Public License v3.0 (GPL-3.0-or-later)**. Подробности смотрите в файле [LICENSE](LICENSE).
+This project is licensed under the **GNU General Public License v3.0 (GPL-3.0-or-later)**. See the [LICENSE](LICENSE) file for details.
