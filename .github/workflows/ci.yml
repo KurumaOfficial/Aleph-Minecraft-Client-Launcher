@@ -29,11 +29,11 @@ jobs:
       - name: Run Tests
         run: cargo test --workspace
 
-      - name: Build Release
-        run: cargo build --release --workspace
+      - name: Build Debug (dev builds only, see docs/ROADMAP-1.0.ru.md P0)
+        run: cargo build --workspace
 
       - name: Upload Binary Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: amc-launcher-windows-x64
-          path: target/release/amc-launcher.exe
+          name: amc-launcher-windows-x64-debug
+          path: target/debug/amc-launcher.exe
