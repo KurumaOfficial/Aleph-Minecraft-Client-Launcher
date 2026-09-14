@@ -1,0 +1,77 @@
+# Smoke: запускает debug-билд лаунчера прямо на раннере GitHub (Windows),
+# делает скриншот окна и забирает лог. Только debug, релиза нет (см. docs/DEV-ENV.ru.md).
+name: Smoke
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_LOG: debug
+
+jobs:
+  smoke-windows:
+    name: Run GUI + screenshot (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build Debug
+        run: cargo build --workspace
+
+      - name: Launch app, screenshot, collect log
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Continue"
+          $exe = Join-Path $env:GITHUB_WORKSPACE "target/debug/amc-launcher.exe"
+          if (-not (Test-Path $exe)) { Write-Error "Binary not found: $exe"; exit 1 }
+
+          $p = Start-Process -FilePath $exe -WorkingDirectory $env:GITHUB_WORKSPACE -PassThru
+          Write-Host "Started PID $($p.Id), waiting 25s for manifest load + first frames..."
+          Start-Sleep -Seconds 25
+
+          # Screenshot of the primary display (headless runner: basic 1024x768).
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+          $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bmp = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
+          $g = [System.Drawing.Graphics]::FromImage($bmp)
+          $g.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+          $bmp.Save((Join-Path $env:GITHUB_WORKSPACE "smoke.png"))
+          $g.Dispose(); $bmp.Dispose()
+          Write-Host "Screenshot saved."
+
+          # Launcher log (see crates/amc-core/src/logging.rs).
+          $logSrc = Join-Path $env:APPDATA "AlephLauncher/logs/launcher.log"
+          if (Test-Path $logSrc) {
+            Copy-Item $logSrc (Join-Path $env:GITHUB_WORKSPACE "launcher-smoke.log")
+            Write-Host "Log collected."
+          } else {
+            Write-Host "WARNING: launcher log not found at $logSrc"
+          }
+
+          if ($p.HasExited) {
+            Write-Error "APP EXITED EARLY with code $($p.ExitCode) (see screenshot + log)"
+            exit 1
+          } else {
+            Write-Host "App still running - stopping it."
+            Stop-Process -Id $p.Id -Force
+          }
+
+      - name: Upload smoke artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-windows
+          path: |
+            smoke.png
+            launcher-smoke.log
