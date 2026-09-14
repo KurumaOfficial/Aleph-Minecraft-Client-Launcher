@@ -10,7 +10,7 @@
 
 [English](README.md) • [Русский](README.ru.md)
 
-[About](#-about) • [Features](#-features) • [Workspace Architecture](#-workspace-architecture) • [Building from Source](#-building-from-source) • [Roadmap](#-roadmap)
+[About](#-about) • [Features](#-features) • [Workspace Architecture](#-workspace-architecture) • [Building from Source](#-building-from-source) • [Roadmap](#-roadmap) • [Concept & v1.0 plan](docs/CONCEPT.md)
 
 ---
 
@@ -136,6 +136,9 @@ The compiled binary will be located at: `target/release/amc-launcher.exe`.
 ---
 
 ## 🗺 Roadmap
+
+> Product concept: [docs/CONCEPT.md](docs/CONCEPT.md).
+> Full v1.0 plan (phases P0–P13, audit, DoD): [docs/ROADMAP-1.0.md](docs/ROADMAP-1.0.md).
 
 - [x] Complete architectural rewrite as a modular Cargo Workspace (6 crates).
 - [x] Automated OpenJDK 8, 17, 21 provisioning via Adoptium API.
