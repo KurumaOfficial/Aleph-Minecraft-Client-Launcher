@@ -49,6 +49,40 @@ impl Language {
         }
     }
 
+    /// Map a BCP-47 / POSIX locale tag (e.g. `"ru-RU"`, `"uk_UA.UTF-8"`)
+    /// to a supported UI language.
+    ///
+    /// Pure function (no OS calls) so it is fully unit-tested.
+    /// Unlike [`parse_code`](Self::parse_code), unknown tags fall back to
+    /// English — the lingua-franca default for fresh installs.
+    pub fn from_locale_tag(tag: &str) -> Self {
+        let primary = tag
+            .split(['.', '@'])
+            .next()
+            .unwrap_or("")
+            .split(['_', '-'])
+            .next()
+            .unwrap_or("")
+            .trim()
+            .to_lowercase();
+        match primary.as_str() {
+            "ru" => Self::Russian,
+            // Belarusian UI is not shipped; Russian is the documented fallback.
+            "be" => Self::Russian,
+            "uk" | "ua" => Self::Ukrainian,
+            "en" => Self::English,
+            _ => Self::English,
+        }
+    }
+
+    /// Detect the OS UI language (CONCEPT "Первый запуск", ROADMAP P1).
+    ///
+    /// Never panics: when the locale cannot be determined,
+    /// [`from_locale_tag`](Self::from_locale_tag) yields English.
+    pub fn detect_system() -> Self {
+        Self::from_locale_tag(&system_locale_tag())
+    }
+
     // ==========================================
     // Sidebar Navigation
     // ==========================================
@@ -823,6 +857,46 @@ impl Language {
         }
     }
 
+    pub fn settings_mode_title(&self) -> &'static str {
+        match self {
+            Self::English => "Interface Mode",
+            Self::Russian => "Режим интерфейса",
+            Self::Ukrainian => "Режим інтерфейсу",
+        }
+    }
+
+    pub fn settings_mode_simple(&self) -> &'static str {
+        match self {
+            Self::English => "Simple",
+            Self::Russian => "Упрощённый",
+            Self::Ukrainian => "Спрощений",
+        }
+    }
+
+    pub fn settings_mode_simple_desc(&self) -> &'static str {
+        match self {
+            Self::English => "One setup at a time, quick-start button",
+            Self::Russian => "Одна сборка за раз и кнопка быстрого старта",
+            Self::Ukrainian => "Одна збірка за раз і кнопка швидкого старту",
+        }
+    }
+
+    pub fn settings_mode_pro(&self) -> &'static str {
+        match self {
+            Self::English => "Professional",
+            Self::Russian => "Профессиональный",
+            Self::Ukrainian => "Професійний",
+        }
+    }
+
+    pub fn settings_mode_pro_desc(&self) -> &'static str {
+        match self {
+            Self::English => "Multiple isolated instances, like MultiMC",
+            Self::Russian => "Несколько изолированных сборок, как в MultiMC",
+            Self::Ukrainian => "Декілька ізольованих збірок, як у MultiMC",
+        }
+    }
+
     pub fn settings_resolution_title(&self) -> &'static str {
         match self {
             Self::English => "Game Window Resolution",
@@ -1531,6 +1605,46 @@ impl Language {
     }
 }
 
+/// Raw OS locale tag: `"ru-RU"` on Windows, `"uk_UA.UTF-8"` on POSIX.
+/// Empty string when detection fails — [`Language::from_locale_tag`] maps it
+/// to the English fallback.
+#[cfg(target_os = "windows")]
+fn system_locale_tag() -> String {
+    windows_locale_tag().unwrap_or_default()
+}
+
+#[cfg(target_os = "windows")]
+fn windows_locale_tag() -> Option<String> {
+    // LOCALE_NAME_MAX_LENGTH (85 wchar units, including the NUL terminator).
+    let mut buf = [0u16; 85];
+    // SAFETY: `buf` is a valid writable UTF-16 buffer of the documented
+    // capacity; the API writes at most `buf.len()` units including NUL.
+    let len = unsafe {
+        windows_sys::Win32::Globalization::GetUserDefaultLocaleName(
+            buf.as_mut_ptr(),
+            buf.len() as i32,
+        )
+    };
+    if len <= 0 {
+        return None;
+    }
+    let end = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
+    Some(String::from_utf16_lossy(&buf[..end]))
+}
+
+#[cfg(not(target_os = "windows"))]
+fn system_locale_tag() -> String {
+    for key in ["LC_ALL", "LC_MESSAGES", "LANG"] {
+        if let Ok(val) = std::env::var(key) {
+            let val = val.trim().to_string();
+            if !val.is_empty() && val != "C" && val != "POSIX" {
+                return val;
+            }
+        }
+    }
+    String::new()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1556,6 +1670,30 @@ mod tests {
         assert_eq!(Language::English.display_name(), "English");
         assert_eq!(Language::Russian.display_name(), "Русский");
         assert_eq!(Language::Ukrainian.display_name(), "Українська");
+    }
+
+    #[test]
+    fn test_locale_tag_mapping() {
+        // BCP-47 (Windows) and POSIX forms, any letter case.
+        assert_eq!(Language::from_locale_tag("ru-RU"), Language::Russian);
+        assert_eq!(Language::from_locale_tag("ru_RU.UTF-8"), Language::Russian);
+        assert_eq!(Language::from_locale_tag("RU"), Language::Russian);
+        assert_eq!(Language::from_locale_tag("be-BY"), Language::Russian);
+        assert_eq!(Language::from_locale_tag("uk-UA"), Language::Ukrainian);
+        assert_eq!(
+            Language::from_locale_tag("uk_UA.UTF-8"),
+            Language::Ukrainian
+        );
+        assert_eq!(Language::from_locale_tag("en-US"), Language::English);
+        assert_eq!(Language::from_locale_tag("en_US.UTF-8"), Language::English);
+        assert_eq!(Language::from_locale_tag("EN-us"), Language::English);
+        // Unknown / empty tags fall back to English, never panic.
+        assert_eq!(Language::from_locale_tag("de-DE"), Language::English);
+        assert_eq!(Language::from_locale_tag("ja_JP.UTF-8"), Language::English);
+        assert_eq!(Language::from_locale_tag("C"), Language::English);
+        assert_eq!(Language::from_locale_tag(""), Language::English);
+        // Detection itself must never panic, whatever the OS reports.
+        let _ = Language::detect_system();
     }
 
     #[test]
@@ -1585,6 +1723,11 @@ mod tests {
             assert!(!lang.mods_cat_resourcepacks().is_empty());
             assert!(!lang.mods_cat_shaders().is_empty());
             assert!(!lang.home_direct_play().is_empty());
+            assert!(!lang.settings_mode_title().is_empty());
+            assert!(!lang.settings_mode_simple().is_empty());
+            assert!(!lang.settings_mode_simple_desc().is_empty());
+            assert!(!lang.settings_mode_pro().is_empty());
+            assert!(!lang.settings_mode_pro_desc().is_empty());
         }
     }
 }

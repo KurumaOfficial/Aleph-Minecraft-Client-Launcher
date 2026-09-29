@@ -3,7 +3,7 @@ use crate::theme::{
     TEXT_PRIMARY,
 };
 use amc_auth::AccountManager;
-use amc_core::config::LauncherConfig;
+use amc_core::config::{AppMode, LauncherConfig};
 use amc_core::paths::LauncherPaths;
 use amc_core::Language;
 use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
@@ -98,6 +98,42 @@ impl SettingsPage {
         }
     }
 
+    /// Selectable option chip shared by the language and mode groups.
+    /// Returns true when clicked.
+    fn choice_chip(
+        ui: &mut Ui,
+        label: &str,
+        w: f32,
+        h: f32,
+        font_size: f32,
+        is_active: bool,
+    ) -> bool {
+        let (rect, resp) = ui.allocate_exact_size(vec2(w, h), Sense::click());
+        let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+        let act_t = ui.ctx().animate_bool(resp.id.with("act"), is_active);
+
+        let bg = lerp_color(lerp_color(BG_ELEVATED, BG_HOVER, hover_t), RUBY, act_t);
+        let stroke_col = lerp_color(lerp_color(BORDER_DEFAULT, RUBY, hover_t), RUBY_LIGHT, act_t);
+        let text_col = lerp_color(
+            lerp_color(TEXT_MUTED, TEXT_PRIMARY, hover_t),
+            Color32::WHITE,
+            act_t,
+        );
+
+        ui.painter().rect_filled(rect, Rounding::ZERO, bg);
+        ui.painter()
+            .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
+        ui.painter().text(
+            rect.center(),
+            egui::Align2::CENTER_CENTER,
+            label,
+            egui::FontId::proportional(font_size),
+            text_col,
+        );
+
+        resp.clicked()
+    }
+
     fn show_general(&mut self, ui: &mut Ui, config: &mut LauncherConfig, paths: &LauncherPaths) {
         let lang = config.ui.language();
 
@@ -113,36 +149,44 @@ impl SettingsPage {
 
             ui.horizontal(|ui| {
                 for l in Language::ALL {
-                    let is_active = lang == l;
-                    let (rect, resp) = ui.allocate_exact_size(vec2(130.0, 34.0), Sense::click());
-                    let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
-                    let act_t = ui.ctx().animate_bool(resp.id.with("act"), is_active);
-
-                    let bg = lerp_color(lerp_color(BG_ELEVATED, BG_HOVER, hover_t), RUBY, act_t);
-                    let stroke_col =
-                        lerp_color(lerp_color(BORDER_DEFAULT, RUBY, hover_t), RUBY_LIGHT, act_t);
-                    let text_col = lerp_color(
-                        lerp_color(TEXT_MUTED, TEXT_PRIMARY, hover_t),
-                        Color32::WHITE,
-                        act_t,
-                    );
-
-                    ui.painter().rect_filled(rect, Rounding::ZERO, bg);
-                    ui.painter()
-                        .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
-                    ui.painter().text(
-                        rect.center(),
-                        egui::Align2::CENTER_CENTER,
-                        l.display_with_flag(),
-                        egui::FontId::proportional(12.0),
-                        text_col,
-                    );
-
-                    if resp.clicked() {
+                    if Self::choice_chip(ui, l.display_with_flag(), 130.0, 34.0, 12.0, lang == l) {
                         config.ui.set_language(l);
                     }
                 }
             });
+        });
+
+        ui.add_space(14.0);
+
+        // Operation mode group (CONCEPT "Режимы работы", ROADMAP P1).
+        // Switchable here at any time; the first-run wizard will ask it once.
+        ui.group(|ui| {
+            ui.label(
+                egui::RichText::new(lang.settings_mode_title())
+                    .font(egui::FontId::proportional(16.0))
+                    .strong()
+                    .color(TEXT_HEADING),
+            );
+            ui.add_space(8.0);
+
+            for mode in AppMode::ALL {
+                let (name, desc) = match mode {
+                    AppMode::Simple => (
+                        lang.settings_mode_simple(),
+                        lang.settings_mode_simple_desc(),
+                    ),
+                    AppMode::Professional => {
+                        (lang.settings_mode_pro(), lang.settings_mode_pro_desc())
+                    }
+                };
+                ui.horizontal(|ui| {
+                    if Self::choice_chip(ui, name, 170.0, 36.0, 12.5, config.app_mode == mode) {
+                        config.app_mode = mode;
+                    }
+                    ui.label(egui::RichText::new(desc).color(TEXT_MUTED));
+                });
+                ui.add_space(6.0);
+            }
         });
 
         ui.add_space(14.0);

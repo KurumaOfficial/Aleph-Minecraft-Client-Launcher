@@ -17,3 +17,6 @@ tracing-subscriber = { workspace = true }
 dirs = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true }

@@ -28,6 +28,9 @@ amc-minecraft = { path = "crates/amc-minecraft" }
 amc-mods = { path = "crates/amc-mods" }
 amc-ui = { path = "crates/amc-ui" }
 
+# Windows system APIs (locale detection, hardware info)
+windows-sys = { version = "0.59", features = ["Win32_System_SystemInformation", "Win32_Globalization"] }
+
 # Async runtime & network
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }
@@ -93,7 +96,7 @@ tracing-subscriber = { workspace = true }
 anyhow = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.59", features = ["Win32_System_SystemInformation"] }
+windows-sys = { workspace = true }
 
 [profile.release]
 opt-level = 3

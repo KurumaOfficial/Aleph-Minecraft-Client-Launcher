@@ -33,6 +33,17 @@ impl AccountManager {
         Ok(Self { db_path, db })
     }
 
+    /// Empty in-memory database bound to `db_path` (no file is read).
+    ///
+    /// Last-resort fallback so unreadable `accounts.json` storage degrades
+    /// to "signed out" instead of crashing the whole launcher.
+    pub fn new(db_path: impl Into<PathBuf>) -> Self {
+        Self {
+            db_path: db_path.into(),
+            db: AccountDatabase::default(),
+        }
+    }
+
     pub fn save(&self) -> Result<()> {
         if let Some(parent) = self.db_path.parent() {
             fs::create_dir_all(parent).map_err(|e| LauncherError::Io {

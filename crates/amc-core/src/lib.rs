@@ -5,7 +5,7 @@ pub mod logging;
 pub mod paths;
 pub mod types;
 
-pub use config::{LauncherConfig, UiSettings};
+pub use config::{AppMode, LauncherConfig, UiSettings};
 pub use error::{LauncherError, Result};
 pub use i18n::Language;
 pub use logging::init_logging;

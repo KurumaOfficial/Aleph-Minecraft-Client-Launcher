@@ -72,11 +72,7 @@ impl LauncherApp {
 
         let paths = LauncherPaths::default_paths().expect("Failed to initialize launcher paths");
         let config = LauncherConfig::load_from_path(&paths.config_file()).unwrap_or_default();
-        let account_mgr =
-            AccountManager::load_from_path(paths.accounts_file()).unwrap_or_else(|_| {
-                AccountManager::load_from_path("accounts.json")
-                    .unwrap_or_else(|_| panic!("Failed to load accounts"))
-            });
+        let account_mgr = Self::load_accounts(&paths);
 
         let download_engine = Arc::new(DownloadEngine::new(16));
 
@@ -130,6 +126,19 @@ impl LauncherApp {
             ms_poll_rx: None,
             pending_direct_connect: None,
         }
+    }
+
+    /// Load stored accounts, degrading gracefully to an empty (signed-out)
+    /// manager when the storage is missing or unreadable — never a crash.
+    fn load_accounts(paths: &LauncherPaths) -> AccountManager {
+        if let Ok(mgr) = AccountManager::load_from_path(paths.accounts_file()) {
+            return mgr;
+        }
+        tracing::warn!("Primary accounts file unreadable, trying ./accounts.json");
+        AccountManager::load_from_path("accounts.json").unwrap_or_else(|_| {
+            tracing::error!("Accounts storage unreadable, starting signed-out");
+            AccountManager::new("accounts.json")
+        })
     }
 
     pub fn ping_featured_server(&mut self) {
