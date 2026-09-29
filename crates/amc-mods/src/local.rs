@@ -1,10 +1,10 @@
+use crate::types::LocalMod;
+use amc_core::error::{LauncherError, Result};
 use serde::Deserialize;
 use std::fs::{self, File};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use zip::ZipArchive;
-use amc_core::error::{LauncherError, Result};
-use crate::types::LocalMod;
 
 #[derive(Debug, Deserialize)]
 struct FabricModMetadata {
@@ -71,7 +71,12 @@ impl LocalModManager {
                         .trim_end_matches(".disabled")
                         .trim_end_matches(".jar")
                         .to_string();
-                    (fallback_name.clone(), fallback_name, "unknown".into(), String::new())
+                    (
+                        fallback_name.clone(),
+                        fallback_name,
+                        "unknown".into(),
+                        String::new(),
+                    )
                 }
             };
 
@@ -121,19 +126,43 @@ impl LocalModManager {
                 for line in content.lines() {
                     let line = line.trim();
                     if line.starts_with("modId=") {
-                        mod_id = line.trim_start_matches("modId=").trim_matches('"').trim().to_string();
+                        mod_id = line
+                            .trim_start_matches("modId=")
+                            .trim_matches('"')
+                            .trim()
+                            .to_string();
                     } else if line.starts_with("displayName=") {
-                        display_name = line.trim_start_matches("displayName=").trim_matches('"').trim().to_string();
+                        display_name = line
+                            .trim_start_matches("displayName=")
+                            .trim_matches('"')
+                            .trim()
+                            .to_string();
                     } else if line.starts_with("version=") {
-                        version = line.trim_start_matches("version=").trim_matches('"').trim().to_string();
+                        version = line
+                            .trim_start_matches("version=")
+                            .trim_matches('"')
+                            .trim()
+                            .to_string();
                     } else if line.starts_with("description=") {
-                        description = line.trim_start_matches("description=").trim_matches('"').trim().to_string();
+                        description = line
+                            .trim_start_matches("description=")
+                            .trim_matches('"')
+                            .trim()
+                            .to_string();
                     }
                 }
 
                 if !mod_id.is_empty() {
-                    let name = if display_name.is_empty() { mod_id.clone() } else { display_name };
-                    let ver = if version.is_empty() { "1.0.0".into() } else { version };
+                    let name = if display_name.is_empty() {
+                        mod_id.clone()
+                    } else {
+                        display_name
+                    };
+                    let ver = if version.is_empty() {
+                        "1.0.0".into()
+                    } else {
+                        version
+                    };
                     return Some((name, mod_id, ver, description));
                 }
             }

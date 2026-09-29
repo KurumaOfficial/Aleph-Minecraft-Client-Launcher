@@ -1,9 +1,10 @@
+use amc_core::error::{LauncherError, Result};
 use reqwest::Client;
 use serde::Deserialize;
-use amc_core::error::{LauncherError, Result};
 
 const NEOFORGE_MAVEN: &str = "https://maven.neoforged.net/releases";
-const NEOFORGE_META: &str = "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge";
+const NEOFORGE_META: &str =
+    "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge";
 
 #[derive(Debug, Clone, Deserialize)]
 struct NeoForgeVersions {
@@ -21,7 +22,9 @@ impl NeoForgeLoader {
             .map_err(|e| LauncherError::Network(format!("NeoForge meta error: {e}")))?;
 
         if !res.status().is_success() {
-            return Err(LauncherError::Loader("Failed to fetch NeoForge versions".into()));
+            return Err(LauncherError::Loader(
+                "Failed to fetch NeoForge versions".into(),
+            ));
         }
 
         let data: NeoForgeVersions = res
@@ -42,7 +45,9 @@ impl NeoForgeLoader {
             .into_iter()
             .filter(|v| v.starts_with(prefix))
             .last()
-            .ok_or_else(|| LauncherError::Loader(format!("No NeoForge version found for {mc_version}")))?;
+            .ok_or_else(|| {
+                LauncherError::Loader(format!("No NeoForge version found for {mc_version}"))
+            })?;
 
         Ok(found)
     }

@@ -1,8 +1,8 @@
+use crate::types::{ModCategory, ModDownloadFile, ModSearchResult, ModSource};
+use amc_core::error::{LauncherError, Result};
 use reqwest::Client;
 use serde::Deserialize;
 use std::time::Duration;
-use amc_core::error::{LauncherError, Result};
-use crate::types::{ModCategory, ModDownloadFile, ModSearchResult, ModSource};
 
 const API_BASE: &str = "https://api.curse.tools/v1/cf";
 const GAME_ID: u32 = 432;
@@ -89,7 +89,9 @@ impl CurseForgeClient {
         mc_version: Option<&str>,
         page_size: usize,
     ) -> Result<Vec<ModSearchResult>> {
-        let mut url = format!("{API_BASE}/mods/search?gameId={GAME_ID}&pageSize={page_size}&searchFilter={query}");
+        let mut url = format!(
+            "{API_BASE}/mods/search?gameId={GAME_ID}&pageSize={page_size}&searchFilter={query}"
+        );
 
         if let Some(l) = loader {
             if let Some(id) = loader_to_id(l) {
@@ -111,7 +113,10 @@ impl CurseForgeClient {
             .map_err(|e| LauncherError::Network(format!("CurseForge search error: {e}")))?;
 
         if !res.status().is_success() {
-            return Err(LauncherError::Network(format!("CurseForge HTTP {}", res.status())));
+            return Err(LauncherError::Network(format!(
+                "CurseForge HTTP {}",
+                res.status()
+            )));
         }
 
         let resp: SearchResponse = res
@@ -167,7 +172,10 @@ impl CurseForgeClient {
             .map_err(|e| LauncherError::Network(format!("CurseForge files error: {e}")))?;
 
         if !res.status().is_success() {
-            return Err(LauncherError::Network(format!("CurseForge HTTP {}", res.status())));
+            return Err(LauncherError::Network(format!(
+                "CurseForge HTTP {}",
+                res.status()
+            )));
         }
 
         let resp: FilesResponse = res
@@ -175,11 +183,10 @@ impl CurseForgeClient {
             .await
             .map_err(|e| LauncherError::Network(format!("CurseForge files parse error: {e}")))?;
 
-        let file = resp
-            .data
-            .into_iter()
-            .next()
-            .ok_or_else(|| LauncherError::Custom("No files for this Minecraft version".into()))?;
+        let file =
+            resp.data.into_iter().next().ok_or_else(|| {
+                LauncherError::Custom("No files for this Minecraft version".into())
+            })?;
 
         let mut download_url = file.download_url;
         if download_url.is_none() {

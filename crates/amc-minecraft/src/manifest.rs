@@ -1,10 +1,10 @@
+use amc_core::error::{LauncherError, Result};
+use amc_core::types::{GameVersion, ReleaseType};
 use chrono::{DateTime, Utc};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::fs;
-use amc_core::error::{LauncherError, Result};
-use amc_core::types::{GameVersion, ReleaseType};
 
 pub const MOJANG_MANIFEST_URL: &str =
     "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
@@ -75,7 +75,9 @@ impl VersionManifest {
                     if cache_path.is_file() {
                         if let Ok(text) = fs::read_to_string(cache_path).await {
                             if let Ok(manifest) = serde_json::from_str::<Self>(&text) {
-                                tracing::warn!("Using cached version manifest due to network error: {err}");
+                                tracing::warn!(
+                                    "Using cached version manifest due to network error: {err}"
+                                );
                                 return Ok(manifest);
                             }
                         }

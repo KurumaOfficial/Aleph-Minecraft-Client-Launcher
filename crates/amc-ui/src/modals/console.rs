@@ -1,6 +1,8 @@
-use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit};
-use crate::theme::{lerp_color, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT, TEXT_MUTED, TEXT_PRIMARY};
+use crate::theme::{
+    lerp_color, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT, TEXT_MUTED, TEXT_PRIMARY,
+};
 use amc_core::Language;
+use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CrashCategory {
@@ -122,7 +124,10 @@ impl ConsoleModal {
         }
 
         let mut is_open = self.is_open;
-        let diagnosis = self.manual_diagnosis.clone().or_else(|| self.analyze_crash(lang));
+        let diagnosis = self
+            .manual_diagnosis
+            .clone()
+            .or_else(|| self.analyze_crash(lang));
 
         egui::Window::new(lang.console_title())
             .open(&mut is_open)
@@ -135,7 +140,9 @@ impl ConsoleModal {
                 ui.horizontal(|ui| {
                     ui.add(
                         TextEdit::singleline(&mut self.filter)
-                            .hint_text(egui::RichText::new(lang.console_filter_hint()).color(TEXT_MUTED))
+                            .hint_text(
+                                egui::RichText::new(lang.console_filter_hint()).color(TEXT_MUTED),
+                            )
                             .desired_width(220.0),
                     );
 
@@ -146,15 +153,25 @@ impl ConsoleModal {
                     ui.add_space(12.0);
 
                     // Copy Button
-                    let (cp_rect, cp_resp) = ui.allocate_exact_size(vec2(78.0, 28.0), Sense::click());
-                    let cp_hover = ui.ctx().animate_bool_responsive(cp_resp.id, cp_resp.hovered());
+                    let (cp_rect, cp_resp) =
+                        ui.allocate_exact_size(vec2(78.0, 28.0), Sense::click());
+                    let cp_hover = ui
+                        .ctx()
+                        .animate_bool_responsive(cp_resp.id, cp_resp.hovered());
                     let cp_bg = lerp_color(BG_ELEVATED, BG_HOVER, cp_hover);
                     let cp_stroke = lerp_color(BORDER_DEFAULT, RUBY, cp_hover);
                     let cp_text = lerp_color(TEXT_PRIMARY, Color32::WHITE, cp_hover);
 
                     ui.painter().rect_filled(cp_rect, Rounding::ZERO, cp_bg);
-                    ui.painter().rect_stroke(cp_rect, Rounding::ZERO, Stroke::new(1.0, cp_stroke));
-                    ui.painter().text(cp_rect.center(), egui::Align2::CENTER_CENTER, lang.console_copy(), egui::FontId::proportional(11.0), cp_text);
+                    ui.painter()
+                        .rect_stroke(cp_rect, Rounding::ZERO, Stroke::new(1.0, cp_stroke));
+                    ui.painter().text(
+                        cp_rect.center(),
+                        egui::Align2::CENTER_CENTER,
+                        lang.console_copy(),
+                        egui::FontId::proportional(11.0),
+                        cp_text,
+                    );
 
                     if cp_resp.clicked() {
                         let full_text = self.logs.join("\n");
@@ -162,15 +179,25 @@ impl ConsoleModal {
                     }
 
                     // Clear Button
-                    let (cl_rect, cl_resp) = ui.allocate_exact_size(vec2(78.0, 28.0), Sense::click());
-                    let cl_hover = ui.ctx().animate_bool_responsive(cl_resp.id, cl_resp.hovered());
+                    let (cl_rect, cl_resp) =
+                        ui.allocate_exact_size(vec2(78.0, 28.0), Sense::click());
+                    let cl_hover = ui
+                        .ctx()
+                        .animate_bool_responsive(cl_resp.id, cl_resp.hovered());
                     let cl_bg = lerp_color(BG_ELEVATED, BG_HOVER, cl_hover);
                     let cl_stroke = lerp_color(BORDER_DEFAULT, RUBY, cl_hover);
                     let cl_text = lerp_color(TEXT_MUTED, TEXT_PRIMARY, cl_hover);
 
                     ui.painter().rect_filled(cl_rect, Rounding::ZERO, cl_bg);
-                    ui.painter().rect_stroke(cl_rect, Rounding::ZERO, Stroke::new(1.0, cl_stroke));
-                    ui.painter().text(cl_rect.center(), egui::Align2::CENTER_CENTER, lang.console_clear(), egui::FontId::proportional(11.0), cl_text);
+                    ui.painter()
+                        .rect_stroke(cl_rect, Rounding::ZERO, Stroke::new(1.0, cl_stroke));
+                    ui.painter().text(
+                        cl_rect.center(),
+                        egui::Align2::CENTER_CENTER,
+                        lang.console_clear(),
+                        egui::FontId::proportional(11.0),
+                        cl_text,
+                    );
 
                     if cl_resp.clicked() {
                         self.logs.clear();
@@ -178,15 +205,25 @@ impl ConsoleModal {
                     }
 
                     // Export Button
-                    let (ex_rect, ex_resp) = ui.allocate_exact_size(vec2(86.0, 28.0), Sense::click());
-                    let ex_hover = ui.ctx().animate_bool_responsive(ex_resp.id, ex_resp.hovered());
+                    let (ex_rect, ex_resp) =
+                        ui.allocate_exact_size(vec2(86.0, 28.0), Sense::click());
+                    let ex_hover = ui
+                        .ctx()
+                        .animate_bool_responsive(ex_resp.id, ex_resp.hovered());
                     let ex_bg = lerp_color(BG_ELEVATED, RUBY, ex_hover);
                     let ex_stroke = lerp_color(RUBY, RUBY_LIGHT, ex_hover);
                     let ex_text = lerp_color(RUBY_LIGHT, Color32::WHITE, ex_hover);
 
                     ui.painter().rect_filled(ex_rect, Rounding::ZERO, ex_bg);
-                    ui.painter().rect_stroke(ex_rect, Rounding::ZERO, Stroke::new(1.0, ex_stroke));
-                    ui.painter().text(ex_rect.center(), egui::Align2::CENTER_CENTER, lang.console_export(), egui::FontId::proportional(11.0), ex_text);
+                    ui.painter()
+                        .rect_stroke(ex_rect, Rounding::ZERO, Stroke::new(1.0, ex_stroke));
+                    ui.painter().text(
+                        ex_rect.center(),
+                        egui::Align2::CENTER_CENTER,
+                        lang.console_export(),
+                        egui::FontId::proportional(11.0),
+                        ex_text,
+                    );
 
                     if ex_resp.clicked() {
                         if let Some(dest) = rfd::FileDialog::new()
@@ -210,7 +247,10 @@ impl ConsoleModal {
                         .inner_margin(egui::Margin::same(10.0))
                         .show(ui, |ui| {
                             ui.horizontal(|ui| {
-                                ui.label(egui::RichText::new("⚠️").font(egui::FontId::proportional(22.0)));
+                                ui.label(
+                                    egui::RichText::new("⚠️")
+                                        .font(egui::FontId::proportional(22.0)),
+                                );
                                 ui.vertical(|ui| {
                                     ui.horizontal(|ui| {
                                         ui.label(

@@ -1,7 +1,7 @@
-use std::fmt::Write as _;
-use md5::{Digest, Md5};
-use amc_core::error::{LauncherError, Result};
 use crate::types::Account;
+use amc_core::error::{LauncherError, Result};
+use md5::{Digest, Md5};
+use std::fmt::Write as _;
 
 pub fn validate_nickname(name: &str) -> Result<()> {
     let len = name.chars().count();

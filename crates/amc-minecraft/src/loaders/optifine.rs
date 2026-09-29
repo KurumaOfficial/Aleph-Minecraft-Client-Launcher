@@ -1,6 +1,6 @@
+use amc_core::error::{LauncherError, Result};
 use reqwest::Client;
 use serde::Deserialize;
-use amc_core::error::{LauncherError, Result};
 
 const BMCLAPI_OPTIFINE: &str = "https://bmclapi2.bangbang93.com/optifine";
 
@@ -17,7 +17,10 @@ pub struct OptiFineVersion {
 pub struct OptiFineLoader;
 
 impl OptiFineLoader {
-    pub async fn get_versions_for_mc(client: &Client, mc_version: &str) -> Result<Vec<OptiFineVersion>> {
+    pub async fn get_versions_for_mc(
+        client: &Client,
+        mc_version: &str,
+    ) -> Result<Vec<OptiFineVersion>> {
         let url = format!("{BMCLAPI_OPTIFINE}/{mc_version}");
         let res = client
             .get(&url)

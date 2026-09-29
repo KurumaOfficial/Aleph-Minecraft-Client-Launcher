@@ -1,9 +1,9 @@
+use crate::rules::{allows, current_os, Rule};
+use amc_core::error::{LauncherError, Result};
+use amc_downloader::DownloadItem;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
-use amc_core::error::{LauncherError, Result};
-use amc_downloader::DownloadItem;
-use crate::rules::{allows, current_os, Rule};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileDownload {
@@ -85,7 +85,16 @@ impl Library {
                     .natives
                     .as_ref()
                     .and_then(|n| n.get(os_name))
-                    .map(|s| s.replace("${arch}", if cfg!(target_arch = "x86_64") { "64" } else { "32" }))
+                    .map(|s| {
+                        s.replace(
+                            "${arch}",
+                            if cfg!(target_arch = "x86_64") {
+                                "64"
+                            } else {
+                                "32"
+                            },
+                        )
+                    })
                     .unwrap_or_else(|| format!("natives-{}", os_name));
 
                 if let Some(classifier_art) = classifiers.get(&native_key) {
@@ -191,7 +200,10 @@ impl VersionDetails {
         // Fallback heuristics based on version string
         if self.id.starts_with("1.20") || self.id.starts_with("1.21") {
             21
-        } else if self.id.starts_with("1.17") || self.id.starts_with("1.18") || self.id.starts_with("1.19") {
+        } else if self.id.starts_with("1.17")
+            || self.id.starts_with("1.18")
+            || self.id.starts_with("1.19")
+        {
             17
         } else {
             8
@@ -319,9 +331,9 @@ impl VersionDetails {
         })?;
 
         for i in 0..archive.len() {
-            let mut entry = archive.by_index(i).map_err(|e| {
-                LauncherError::Custom(format!("Ошибка чтения zip entry: {e}"))
-            })?;
+            let mut entry = archive
+                .by_index(i)
+                .map_err(|e| LauncherError::Custom(format!("Ошибка чтения zip entry: {e}")))?;
 
             let Some(name) = entry.enclosed_name().map(|p| p.to_path_buf()) else {
                 continue;

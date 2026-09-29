@@ -1,8 +1,8 @@
+use crate::types::{ModCategory, ModDownloadFile, ModSearchResult, ModSource};
+use amc_core::error::{LauncherError, Result};
 use reqwest::Client;
 use serde::Deserialize;
 use std::time::Duration;
-use amc_core::error::{LauncherError, Result};
-use crate::types::{ModCategory, ModDownloadFile, ModSearchResult, ModSource};
 
 const API_BASE: &str = "https://api.modrinth.com/v2";
 
@@ -92,7 +92,10 @@ impl ModrinthClient {
             .get(&format!("{API_BASE}/search"))
             .query(&[
                 ("query", query),
-                ("facets", &serde_json::to_string(&facets).unwrap_or_default()),
+                (
+                    "facets",
+                    &serde_json::to_string(&facets).unwrap_or_default(),
+                ),
                 ("limit", &limit.to_string()),
                 ("index", &"relevance".to_string()),
             ])
@@ -101,7 +104,10 @@ impl ModrinthClient {
             .map_err(|e| LauncherError::Network(format!("Modrinth search failed: {e}")))?;
 
         if !res.status().is_success() {
-            return Err(LauncherError::Network(format!("Modrinth HTTP {}", res.status())));
+            return Err(LauncherError::Network(format!(
+                "Modrinth HTTP {}",
+                res.status()
+            )));
         }
 
         let resp: SearchResponse = res
@@ -151,12 +157,10 @@ impl ModrinthClient {
             url.push_str(&params.join("&"));
         }
 
-        let res = self
-            .client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| LauncherError::Network(format!("Modrinth versions query failed: {e}")))?;
+        let res =
+            self.client.get(&url).send().await.map_err(|e| {
+                LauncherError::Network(format!("Modrinth versions query failed: {e}"))
+            })?;
 
         if !res.status().is_success() {
             return Err(LauncherError::Network(format!(

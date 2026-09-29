@@ -1,5 +1,7 @@
+use crate::theme::{
+    lerp_color, BORDER_SUBTLE, RUBY_DIM, RUBY_LIGHT, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
+};
 use egui::{vec2, Color32, Pos2, Rect, Response, Rounding, Sense, Stroke, Ui, ViewportCommand};
-use crate::theme::{lerp_color, BORDER_SUBTLE, RUBY_DIM, RUBY_LIGHT, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TitleBarResponse {
@@ -36,7 +38,8 @@ impl TitleBar {
         }
         if drag_resp.double_clicked() {
             let is_maximized = ui.input(|i| i.viewport().maximized.unwrap_or(false));
-            ui.ctx().send_viewport_cmd(ViewportCommand::Maximized(!is_maximized));
+            ui.ctx()
+                .send_viewport_cmd(ViewportCommand::Maximized(!is_maximized));
         }
 
         // Draw title inside drag area
@@ -52,7 +55,10 @@ impl TitleBar {
         let controls_start_x = bar_rect.right() - controls_width;
 
         // Console Button
-        let con_rect = Rect::from_min_size(Pos2::new(controls_start_x, bar_rect.top()), vec2(button_w, height));
+        let con_rect = Rect::from_min_size(
+            Pos2::new(controls_start_x, bar_rect.top()),
+            vec2(button_w, height),
+        );
         let con_resp = Self::draw_control_button(ui, con_rect, "📟", false);
         if con_resp.clicked() {
             response.console_clicked = true;
@@ -60,7 +66,10 @@ impl TitleBar {
         con_resp.on_hover_text(lang.titlebar_console_tooltip());
 
         // Minimize Button
-        let min_rect = Rect::from_min_size(Pos2::new(controls_start_x + button_w, bar_rect.top()), vec2(button_w, height));
+        let min_rect = Rect::from_min_size(
+            Pos2::new(controls_start_x + button_w, bar_rect.top()),
+            vec2(button_w, height),
+        );
         if Self::draw_control_button(ui, min_rect, "—", false).clicked() {
             ui.ctx().send_viewport_cmd(ViewportCommand::Minimized(true));
         }
@@ -68,13 +77,20 @@ impl TitleBar {
         // Maximize Button
         let is_maximized = ui.input(|i| i.viewport().maximized.unwrap_or(false));
         let max_symbol = if is_maximized { "❐" } else { "□" };
-        let max_rect = Rect::from_min_size(Pos2::new(controls_start_x + button_w * 2.0, bar_rect.top()), vec2(button_w, height));
+        let max_rect = Rect::from_min_size(
+            Pos2::new(controls_start_x + button_w * 2.0, bar_rect.top()),
+            vec2(button_w, height),
+        );
         if Self::draw_control_button(ui, max_rect, max_symbol, false).clicked() {
-            ui.ctx().send_viewport_cmd(ViewportCommand::Maximized(!is_maximized));
+            ui.ctx()
+                .send_viewport_cmd(ViewportCommand::Maximized(!is_maximized));
         }
 
         // Close Button
-        let close_rect = Rect::from_min_size(Pos2::new(controls_start_x + button_w * 3.0, bar_rect.top()), vec2(button_w, height));
+        let close_rect = Rect::from_min_size(
+            Pos2::new(controls_start_x + button_w * 3.0, bar_rect.top()),
+            vec2(button_w, height),
+        );
         if Self::draw_control_button(ui, close_rect, "✕", true).clicked() {
             ui.ctx().send_viewport_cmd(ViewportCommand::Close);
         }
@@ -87,7 +103,9 @@ impl TitleBar {
     fn draw_control_button(ui: &mut Ui, rect: Rect, symbol: &str, is_close: bool) -> Response {
         let resp = ui.allocate_rect(rect, Sense::click());
         let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
-        let press_t = ui.ctx().animate_bool_responsive(resp.id.with("pr"), resp.is_pointer_button_down_on());
+        let press_t = ui
+            .ctx()
+            .animate_bool_responsive(resp.id.with("pr"), resp.is_pointer_button_down_on());
 
         let target_bg = if is_close {
             RUBY_LIGHT

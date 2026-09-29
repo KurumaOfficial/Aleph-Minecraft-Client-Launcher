@@ -1,6 +1,6 @@
+use crate::error::{LauncherError, Result};
 use std::fs;
 use std::path::PathBuf;
-use crate::error::{LauncherError, Result};
 
 #[derive(Debug, Clone)]
 pub struct LauncherPaths {
@@ -29,7 +29,9 @@ impl LauncherPaths {
     }
 
     pub fn custom(root: impl Into<PathBuf>) -> Result<Self> {
-        let paths = Self { root_dir: root.into() };
+        let paths = Self {
+            root_dir: root.into(),
+        };
         paths.ensure_directories()?;
         Ok(paths)
     }

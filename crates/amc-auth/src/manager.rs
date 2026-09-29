@@ -1,9 +1,9 @@
+use crate::types::{Account, AuthSession};
+use amc_core::error::{LauncherError, Result};
+use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use amc_core::error::{LauncherError, Result};
-use crate::types::{Account, AuthSession};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AccountDatabase {
@@ -72,7 +72,11 @@ impl AccountManager {
 
     pub fn add_or_update_account(&mut self, account: Account) -> Result<()> {
         let id = account.id;
-        if let Some(pos) = self.db.accounts.iter().position(|a| a.username == account.username && a.account_type == account.account_type) {
+        if let Some(pos) =
+            self.db.accounts.iter().position(|a| {
+                a.username == account.username && a.account_type == account.account_type
+            })
+        {
             self.db.accounts[pos] = account;
             self.db.active_account_id = Some(self.db.accounts[pos].id);
         } else {

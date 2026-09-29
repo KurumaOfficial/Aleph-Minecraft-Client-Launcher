@@ -645,9 +645,15 @@ impl Language {
 
     pub fn mods_no_installed(&self) -> &'static str {
         match self {
-            Self::English => "No mods in the 'mods/' folder. Use the search tab to find and install mods!",
-            Self::Russian => "В папке 'mods/' нет установленных модов. Переключитесь на поиск, чтобы скачать!",
-            Self::Ukrainian => "У папці 'mods/' немає встановлених модів. Перемкніться на пошук, щоб завантажити!",
+            Self::English => {
+                "No mods in the 'mods/' folder. Use the search tab to find and install mods!"
+            }
+            Self::Russian => {
+                "В папке 'mods/' нет установленных модов. Переключитесь на поиск, чтобы скачать!"
+            }
+            Self::Ukrainian => {
+                "У папці 'mods/' немає встановлених модів. Перемкніться на пошук, щоб завантажити!"
+            }
         }
     }
 
@@ -997,9 +1003,15 @@ impl Language {
 
     pub fn settings_tooltip_preset_zgc(&self) -> &'static str {
         match self {
-            Self::English => "Ultra-fast ZGC collector with sub-millisecond pauses (for Java 17 and 21)",
-            Self::Russian => "Сверхбыстрый сборщик мусора ZGC с субмиллисекундными паузами (для Java 17 и 21)",
-            Self::Ukrainian => "Надшвидкий збирач сміття ZGC з субмілісекундними паузами (для Java 17 та 21)",
+            Self::English => {
+                "Ultra-fast ZGC collector with sub-millisecond pauses (for Java 17 and 21)"
+            }
+            Self::Russian => {
+                "Сверхбыстрый сборщик мусора ZGC с субмиллисекундными паузами (для Java 17 и 21)"
+            }
+            Self::Ukrainian => {
+                "Надшвидкий збирач сміття ZGC з субмілісекундними паузами (для Java 17 та 21)"
+            }
         }
     }
 
@@ -1353,9 +1365,15 @@ impl Language {
 
     pub fn diag_oom_solution(&self) -> &'static str {
         match self {
-            Self::English => "Increase maximum RAM allocation in Instance Settings (4096–6144 MB recommended).",
-            Self::Russian => "Увеличьте выделение ОЗУ в параметрах сборки (рекомендуется 4096–6144 МБ).",
-            Self::Ukrainian => "Збільшіть виділення ОЗП у параметрах збірки (рекомендовано 4096–6144 МБ).",
+            Self::English => {
+                "Increase maximum RAM allocation in Instance Settings (4096–6144 MB recommended)."
+            }
+            Self::Russian => {
+                "Увеличьте выделение ОЗУ в параметрах сборки (рекомендуется 4096–6144 МБ)."
+            }
+            Self::Ukrainian => {
+                "Збільшіть виділення ОЗП у параметрах збірки (рекомендовано 4096–6144 МБ)."
+            }
         }
     }
 
@@ -1369,8 +1387,12 @@ impl Language {
 
     pub fn diag_java_desc(&self) -> &'static str {
         match self {
-            Self::English => "The game or one of its mods requires a different Java runtime version.",
-            Self::Russian => "Игра или один из модов скомпилированы под другую версию Java Runtime.",
+            Self::English => {
+                "The game or one of its mods requires a different Java runtime version."
+            }
+            Self::Russian => {
+                "Игра или один из модов скомпилированы под другую версию Java Runtime."
+            }
             Self::Ukrainian => "Гра або один із модів скомпільовані під іншу версію Java Runtime.",
         }
     }
@@ -1394,15 +1416,21 @@ impl Language {
     pub fn diag_fabric_dep_desc(&self) -> &'static str {
         match self {
             Self::English => "One or more mods require additional libraries or Fabric API.",
-            Self::Russian => "Один или несколько модов требуют дополнительные библиотеки или Fabric API.",
-            Self::Ukrainian => "Один або кілька модів вимагають додаткові бібліотеки або Fabric API.",
+            Self::Russian => {
+                "Один или несколько модов требуют дополнительные библиотеки или Fabric API."
+            }
+            Self::Ukrainian => {
+                "Один або кілька модів вимагають додаткові бібліотеки або Fabric API."
+            }
         }
     }
 
     pub fn diag_fabric_dep_solution(&self) -> &'static str {
         match self {
             Self::English => "Install missing dependencies (such as Fabric API) from the Mods tab.",
-            Self::Russian => "Установите недостающие моды (например, Fabric API) во вкладке «Моды».",
+            Self::Russian => {
+                "Установите недостающие моды (например, Fabric API) во вкладке «Моды»."
+            }
             Self::Ukrainian => "Встановіть відсутні моди (наприклад, Fabric API) у вкладці «Моди».",
         }
     }
@@ -1441,9 +1469,13 @@ impl Language {
 
     pub fn diag_gpu_desc(&self) -> &'static str {
         match self {
-            Self::English => "The graphics driver failed to create a valid OpenGL context (GLFW error 65542).",
+            Self::English => {
+                "The graphics driver failed to create a valid OpenGL context (GLFW error 65542)."
+            }
             Self::Russian => "Видеодрайвер не смог создать контекст OpenGL (ошибка GLFW 65542).",
-            Self::Ukrainian => "Відеодрайвер не зміг створити контекст OpenGL (помилка GLFW 65542).",
+            Self::Ukrainian => {
+                "Відеодрайвер не зміг створити контекст OpenGL (помилка GLFW 65542)."
+            }
         }
     }
 
@@ -1556,4 +1588,3 @@ mod tests {
         }
     }
 }
-

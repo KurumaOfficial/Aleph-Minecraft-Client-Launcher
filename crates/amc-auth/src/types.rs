@@ -118,14 +118,20 @@ impl AuthSession {
             AccountType::Microsoft => Self {
                 username: account.username.clone(),
                 uuid: account.uuid.clone(),
-                access_token: account.access_token.clone().unwrap_or_else(|| "0".to_string()),
+                access_token: account
+                    .access_token
+                    .clone()
+                    .unwrap_or_else(|| "0".to_string()),
                 user_type: "msa".to_string(),
                 xuid: None,
             },
             AccountType::WetId => Self {
                 username: account.username.clone(),
                 uuid: account.uuid.clone(),
-                access_token: account.access_token.clone().unwrap_or_else(|| "0".to_string()),
+                access_token: account
+                    .access_token
+                    .clone()
+                    .unwrap_or_else(|| "0".to_string()),
                 user_type: "wetid".to_string(),
                 xuid: None,
             },

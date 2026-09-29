@@ -1,12 +1,12 @@
-use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
-use amc_mods::types::{LocalMod, ModCategory, ModSearchResult, ModSource};
-use amc_core::Language;
-use std::collections::HashSet;
-use std::path::Path;
 use crate::theme::{
     lerp_color, BG_CARD, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT, SUCCESS,
     TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
+use amc_core::Language;
+use amc_mods::types::{LocalMod, ModCategory, ModSearchResult, ModSource};
+use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
+use std::collections::HashSet;
+use std::path::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ModsSubTab {
@@ -84,15 +84,36 @@ impl ModsPage {
 
             // Local Tab Button
             let (loc_rect, loc_resp) = ui.allocate_exact_size(vec2(130.0, 32.0), Sense::click());
-            let loc_hover = ui.ctx().animate_bool_responsive(loc_resp.id, loc_resp.hovered());
+            let loc_hover = ui
+                .ctx()
+                .animate_bool_responsive(loc_resp.id, loc_resp.hovered());
             let loc_act = ui.ctx().animate_bool(loc_resp.id.with("act"), local_active);
-            let loc_bg = lerp_color(lerp_color(Color32::TRANSPARENT, BG_HOVER, loc_hover), RUBY, loc_act);
-            let loc_stroke = lerp_color(lerp_color(BORDER_DEFAULT, RUBY, loc_hover), RUBY_LIGHT, loc_act);
-            let loc_text = lerp_color(lerp_color(TEXT_MUTED, TEXT_PRIMARY, loc_hover), Color32::WHITE, loc_act);
+            let loc_bg = lerp_color(
+                lerp_color(Color32::TRANSPARENT, BG_HOVER, loc_hover),
+                RUBY,
+                loc_act,
+            );
+            let loc_stroke = lerp_color(
+                lerp_color(BORDER_DEFAULT, RUBY, loc_hover),
+                RUBY_LIGHT,
+                loc_act,
+            );
+            let loc_text = lerp_color(
+                lerp_color(TEXT_MUTED, TEXT_PRIMARY, loc_hover),
+                Color32::WHITE,
+                loc_act,
+            );
 
             ui.painter().rect_filled(loc_rect, Rounding::ZERO, loc_bg);
-            ui.painter().rect_stroke(loc_rect, Rounding::ZERO, Stroke::new(1.0, loc_stroke));
-            ui.painter().text(loc_rect.center(), egui::Align2::CENTER_CENTER, lang.mods_tab_installed(), egui::FontId::proportional(12.0), loc_text);
+            ui.painter()
+                .rect_stroke(loc_rect, Rounding::ZERO, Stroke::new(1.0, loc_stroke));
+            ui.painter().text(
+                loc_rect.center(),
+                egui::Align2::CENTER_CENTER,
+                lang.mods_tab_installed(),
+                egui::FontId::proportional(12.0),
+                loc_text,
+            );
 
             if loc_resp.clicked() {
                 self.sub_tab = ModsSubTab::Local;
@@ -106,15 +127,38 @@ impl ModsPage {
             };
 
             let (sea_rect, sea_resp) = ui.allocate_exact_size(vec2(160.0, 32.0), Sense::click());
-            let sea_hover = ui.ctx().animate_bool_responsive(sea_resp.id, sea_resp.hovered());
-            let sea_act = ui.ctx().animate_bool(sea_resp.id.with("act"), search_active);
-            let sea_bg = lerp_color(lerp_color(Color32::TRANSPARENT, BG_HOVER, sea_hover), RUBY, sea_act);
-            let sea_stroke = lerp_color(lerp_color(BORDER_DEFAULT, RUBY, sea_hover), RUBY_LIGHT, sea_act);
-            let sea_text = lerp_color(lerp_color(TEXT_MUTED, TEXT_PRIMARY, sea_hover), Color32::WHITE, sea_act);
+            let sea_hover = ui
+                .ctx()
+                .animate_bool_responsive(sea_resp.id, sea_resp.hovered());
+            let sea_act = ui
+                .ctx()
+                .animate_bool(sea_resp.id.with("act"), search_active);
+            let sea_bg = lerp_color(
+                lerp_color(Color32::TRANSPARENT, BG_HOVER, sea_hover),
+                RUBY,
+                sea_act,
+            );
+            let sea_stroke = lerp_color(
+                lerp_color(BORDER_DEFAULT, RUBY, sea_hover),
+                RUBY_LIGHT,
+                sea_act,
+            );
+            let sea_text = lerp_color(
+                lerp_color(TEXT_MUTED, TEXT_PRIMARY, sea_hover),
+                Color32::WHITE,
+                sea_act,
+            );
 
             ui.painter().rect_filled(sea_rect, Rounding::ZERO, sea_bg);
-            ui.painter().rect_stroke(sea_rect, Rounding::ZERO, Stroke::new(1.0, sea_stroke));
-            ui.painter().text(sea_rect.center(), egui::Align2::CENTER_CENTER, &search_label, egui::FontId::proportional(12.0), sea_text);
+            ui.painter()
+                .rect_stroke(sea_rect, Rounding::ZERO, Stroke::new(1.0, sea_stroke));
+            ui.painter().text(
+                sea_rect.center(),
+                egui::Align2::CENTER_CENTER,
+                &search_label,
+                egui::FontId::proportional(12.0),
+                sea_text,
+            );
 
             if sea_resp.clicked() {
                 self.sub_tab = ModsSubTab::Search;
@@ -158,16 +202,15 @@ impl ModsPage {
                 let mut to_delete = None;
 
                 for (idx, m) in self.local_mods.iter().enumerate() {
-                    let (rect, resp) = ui.allocate_exact_size(
-                        vec2(ui.available_width(), 62.0),
-                        Sense::click(),
-                    );
+                    let (rect, resp) =
+                        ui.allocate_exact_size(vec2(ui.available_width(), 62.0), Sense::click());
                     let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
                     let bg = lerp_color(BG_CARD, BG_HOVER, hover_t);
                     let stroke_col = lerp_color(BORDER_DEFAULT, RUBY, hover_t);
 
                     ui.painter().rect_filled(rect, Rounding::ZERO, bg);
-                    ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
+                    ui.painter()
+                        .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
 
                     let mut child = ui.new_child(
                         egui::UiBuilder::new()
@@ -194,9 +237,13 @@ impl ModsPage {
                             .truncate(),
                         );
                         ui.label(
-                            egui::RichText::new(format!("v{} • {:.1} KB", m.version, m.file_size as f64 / 1024.0))
-                                .font(egui::FontId::proportional(11.0))
-                                .color(TEXT_MUTED),
+                            egui::RichText::new(format!(
+                                "v{} • {:.1} KB",
+                                m.version,
+                                m.file_size as f64 / 1024.0
+                            ))
+                            .font(egui::FontId::proportional(11.0))
+                            .color(TEXT_MUTED),
                         );
                     });
 
@@ -208,7 +255,11 @@ impl ModsPage {
                     }
 
                     // Toggle Button
-                    let toggle_text = if m.enabled { lang.mods_status_enabled() } else { lang.mods_status_disabled() };
+                    let toggle_text = if m.enabled {
+                        lang.mods_status_enabled()
+                    } else {
+                        lang.mods_status_disabled()
+                    };
                     let toggle_color = if m.enabled { SUCCESS } else { TEXT_MUTED };
                     let toggle_btn = egui::Button::new(
                         egui::RichText::new(toggle_text)
@@ -226,13 +277,18 @@ impl ModsPage {
                     child.add_space(8.0);
 
                     // Delete button
-                    if child.button(egui::RichText::new("🗑").color(TEXT_MUTED)).clicked() {
+                    if child
+                        .button(egui::RichText::new("🗑").color(TEXT_MUTED))
+                        .clicked()
+                    {
                         to_delete = Some(idx);
                     }
                 }
 
                 if let Some(idx) = to_toggle {
-                    if let Ok(new_path) = amc_mods::LocalModManager::toggle_mod(&self.local_mods[idx].path) {
+                    if let Ok(new_path) =
+                        amc_mods::LocalModManager::toggle_mod(&self.local_mods[idx].path)
+                    {
                         self.local_mods[idx].path = new_path;
                         self.local_mods[idx].enabled = !self.local_mods[idx].enabled;
                     }
@@ -261,7 +317,11 @@ impl ModsPage {
                 egui::RichText::new("Modrinth")
                     .font(egui::FontId::proportional(11.0))
                     .strong()
-                    .color(if mr_active { Color32::WHITE } else { TEXT_MUTED }),
+                    .color(if mr_active {
+                        Color32::WHITE
+                    } else {
+                        TEXT_MUTED
+                    }),
             )
             .fill(if mr_active { RUBY } else { BG_HOVER })
             .min_size(vec2(80.0, 30.0));
@@ -274,7 +334,11 @@ impl ModsPage {
                 egui::RichText::new("CurseForge")
                     .font(egui::FontId::proportional(11.0))
                     .strong()
-                    .color(if cf_active { Color32::WHITE } else { TEXT_MUTED }),
+                    .color(if cf_active {
+                        Color32::WHITE
+                    } else {
+                        TEXT_MUTED
+                    }),
             )
             .fill(if cf_active { RUBY } else { BG_HOVER })
             .min_size(vec2(90.0, 30.0));
@@ -304,11 +368,19 @@ impl ModsPage {
             ui.add_space(8.0);
 
             if ui
-                .button(egui::RichText::new(lang.mods_btn_search()).strong().color(Color32::WHITE))
+                .button(
+                    egui::RichText::new(lang.mods_btn_search())
+                        .strong()
+                        .color(Color32::WHITE),
+                )
                 .clicked()
                 || enter_pressed
             {
-                on_search(self.search_query.clone(), self.search_provider, self.search_category);
+                on_search(
+                    self.search_query.clone(),
+                    self.search_provider,
+                    self.search_category,
+                );
             }
         });
 
@@ -371,16 +443,15 @@ impl ModsPage {
                 let mut to_install = None;
 
                 for item in &self.search_results {
-                    let (rect, resp) = ui.allocate_exact_size(
-                        vec2(ui.available_width(), 70.0),
-                        Sense::click(),
-                    );
+                    let (rect, resp) =
+                        ui.allocate_exact_size(vec2(ui.available_width(), 70.0), Sense::click());
                     let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
                     let bg = lerp_color(BG_CARD, BG_HOVER, hover_t);
                     let stroke_col = lerp_color(BORDER_DEFAULT, RUBY, hover_t);
 
                     ui.painter().rect_filled(rect, Rounding::ZERO, bg);
-                    ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
+                    ui.painter()
+                        .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
 
                     let mut child = ui.new_child(
                         egui::UiBuilder::new()
@@ -395,7 +466,9 @@ impl ModsPage {
                         ModSource::CurseForge => "🔥",
                         ModSource::Local => "🧩",
                     };
-                    child.label(egui::RichText::new(icon_glyph).font(egui::FontId::proportional(22.0)));
+                    child.label(
+                        egui::RichText::new(icon_glyph).font(egui::FontId::proportional(22.0)),
+                    );
                     child.add_space(12.0);
 
                     // Title & Description with truncation
@@ -471,13 +544,20 @@ impl ModsPage {
                         .min_size(vec2(100.0, 30.0));
                         child.add(badge);
                     } else {
-                        let (ib_rect, ib_resp) = child.allocate_exact_size(vec2(90.0, 30.0), Sense::click());
-                        let ib_hover = child.ctx().animate_bool_responsive(ib_resp.id, ib_resp.hovered());
+                        let (ib_rect, ib_resp) =
+                            child.allocate_exact_size(vec2(90.0, 30.0), Sense::click());
+                        let ib_hover = child
+                            .ctx()
+                            .animate_bool_responsive(ib_resp.id, ib_resp.hovered());
                         let ib_bg = lerp_color(RUBY, RUBY_LIGHT, ib_hover);
                         let ib_stroke = lerp_color(RUBY_LIGHT, Color32::WHITE, ib_hover);
 
                         child.painter().rect_filled(ib_rect, Rounding::ZERO, ib_bg);
-                        child.painter().rect_stroke(ib_rect, Rounding::ZERO, Stroke::new(1.0, ib_stroke));
+                        child.painter().rect_stroke(
+                            ib_rect,
+                            Rounding::ZERO,
+                            Stroke::new(1.0, ib_stroke),
+                        );
                         child.painter().text(
                             ib_rect.center(),
                             egui::Align2::CENTER_CENTER,

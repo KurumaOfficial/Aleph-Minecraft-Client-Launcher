@@ -1,6 +1,6 @@
+use amc_core::error::{LauncherError, Result};
 use reqwest::Client;
 use serde::Deserialize;
-use amc_core::error::{LauncherError, Result};
 
 const MAVEN_FORGE: &str = "https://maven.minecraftforge.net";
 const FORGE_API_MIRROR: &str = "https://bmclapi2.bangbang93.com/forge/minecraft";

@@ -1,3 +1,6 @@
+use crate::progress::{DownloadProgress, ProgressTracker};
+use crate::verifier::{file_sha1, sha1_hex};
+use amc_core::error::{LauncherError, Result};
 use futures_util::StreamExt;
 use reqwest::Client;
 use std::path::PathBuf;
@@ -6,9 +9,6 @@ use std::time::Duration;
 use tokio::fs::{self, File};
 use tokio::io::AsyncWriteExt;
 use tokio::sync::{watch, Semaphore};
-use amc_core::error::{LauncherError, Result};
-use crate::progress::{DownloadProgress, ProgressTracker};
-use crate::verifier::{file_sha1, sha1_hex};
 
 #[derive(Debug, Clone)]
 pub struct DownloadItem {
@@ -100,10 +100,12 @@ impl DownloadEngine {
         }
 
         if let Some(parent) = item.destination.parent() {
-            fs::create_dir_all(parent).await.map_err(|e| LauncherError::Io {
-                path: parent.to_path_buf(),
-                source: e,
-            })?;
+            fs::create_dir_all(parent)
+                .await
+                .map_err(|e| LauncherError::Io {
+                    path: parent.to_path_buf(),
+                    source: e,
+                })?;
         }
 
         let mut retries = 3;
@@ -125,7 +127,10 @@ impl DownloadEngine {
             }
         }
 
-        Err(LauncherError::Network(format!("Failed to download {}", item.url)))
+        Err(LauncherError::Network(format!(
+            "Failed to download {}",
+            item.url
+        )))
     }
 
     async fn execute_download(
@@ -134,12 +139,10 @@ impl DownloadEngine {
         tracker: Option<&ProgressTracker>,
         filename: &str,
     ) -> Result<()> {
-        let response = self
-            .client
-            .get(&item.url)
-            .send()
-            .await
-            .map_err(|e| LauncherError::Network(format!("Request to {} failed: {e}", item.url)))?;
+        let response =
+            self.client.get(&item.url).send().await.map_err(|e| {
+                LauncherError::Network(format!("Request to {} failed: {e}", item.url))
+            })?;
 
         if !response.status().is_success() {
             return Err(LauncherError::Network(format!(
@@ -150,21 +153,26 @@ impl DownloadEngine {
         }
 
         let tmp_path = item.destination.with_extension("amctmp");
-        let mut file = File::create(&tmp_path).await.map_err(|e| LauncherError::Io {
-            path: tmp_path.clone(),
-            source: e,
-        })?;
+        let mut file = File::create(&tmp_path)
+            .await
+            .map_err(|e| LauncherError::Io {
+                path: tmp_path.clone(),
+                source: e,
+            })?;
 
         let mut stream = response.bytes_stream();
         let mut downloaded_bytes = Vec::new();
         let compute_sha1 = item.sha1.is_some();
 
         while let Some(chunk_res) = stream.next().await {
-            let chunk = chunk_res.map_err(|e| LauncherError::Network(format!("Chunk error: {e}")))?;
-            file.write_all(&chunk).await.map_err(|e| LauncherError::Io {
-                path: tmp_path.clone(),
-                source: e,
-            })?;
+            let chunk =
+                chunk_res.map_err(|e| LauncherError::Network(format!("Chunk error: {e}")))?;
+            file.write_all(&chunk)
+                .await
+                .map_err(|e| LauncherError::Io {
+                    path: tmp_path.clone(),
+                    source: e,
+                })?;
 
             if compute_sha1 {
                 downloaded_bytes.extend_from_slice(&chunk);

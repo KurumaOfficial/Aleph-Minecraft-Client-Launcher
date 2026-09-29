@@ -1,9 +1,9 @@
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use amc_auth::AuthSession;
-use amc_core::types::LaunchOptions;
 use crate::rules::allows;
 use crate::version::{ArgumentValue, ArgumentValueNested, VersionDetails};
+use amc_auth::AuthSession;
+use amc_core::types::LaunchOptions;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 
 pub struct ArgumentBuilder;
 
@@ -47,12 +47,14 @@ impl ArgumentBuilder {
                         if allows(rules.as_deref(), features) {
                             match value {
                                 ArgumentValueNested::Single(s) => {
-                                    let replaced = Self::replace_jvm_templates(s, natives_dir, classpath);
+                                    let replaced =
+                                        Self::replace_jvm_templates(s, natives_dir, classpath);
                                     args.push(replaced);
                                 }
                                 ArgumentValueNested::Multiple(list) => {
                                     for s in list {
-                                        let replaced = Self::replace_jvm_templates(s, natives_dir, classpath);
+                                        let replaced =
+                                            Self::replace_jvm_templates(s, natives_dir, classpath);
                                         args.push(replaced);
                                     }
                                 }
@@ -189,7 +191,11 @@ impl ArgumentBuilder {
     }
 
     pub fn build_classpath(libraries: &[PathBuf], client_jar: &Path) -> String {
-        let separator = if cfg!(target_os = "windows") { ";" } else { ":" };
+        let separator = if cfg!(target_os = "windows") {
+            ";"
+        } else {
+            ":"
+        };
         let mut parts = Vec::with_capacity(libraries.len() + 1);
 
         for lib in libraries {

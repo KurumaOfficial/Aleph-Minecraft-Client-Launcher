@@ -1,11 +1,11 @@
+use crate::version::AssetIndexRef;
+use amc_core::error::{LauncherError, Result};
+use amc_downloader::DownloadItem;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 use tokio::fs;
-use amc_core::error::{LauncherError, Result};
-use amc_downloader::DownloadItem;
-use crate::version::AssetIndexRef;
 
 pub const RESOURCES_BASE_URL: &str = "https://resources.download.minecraft.net";
 
@@ -26,7 +26,9 @@ impl AssetIndex {
         asset_ref: &AssetIndexRef,
         assets_dir: &Path,
     ) -> Result<Self> {
-        let index_file = assets_dir.join("indexes").join(format!("{}.json", asset_ref.id));
+        let index_file = assets_dir
+            .join("indexes")
+            .join(format!("{}.json", asset_ref.id));
 
         if index_file.is_file() {
             if let Ok(content) = fs::read_to_string(&index_file).await {
@@ -37,10 +39,12 @@ impl AssetIndex {
         }
 
         if let Some(parent) = index_file.parent() {
-            fs::create_dir_all(parent).await.map_err(|e| LauncherError::Io {
-                path: parent.to_path_buf(),
-                source: e,
-            })?;
+            fs::create_dir_all(parent)
+                .await
+                .map_err(|e| LauncherError::Io {
+                    path: parent.to_path_buf(),
+                    source: e,
+                })?;
         }
 
         let res = client

@@ -1,11 +1,11 @@
-use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
-use amc_core::types::{GameVersion, ReleaseType};
-use amc_minecraft::ServerStatus;
 use crate::theme::{
     lerp_color, BG_CARD, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_DIM, RUBY_LIGHT,
     TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
 use crate::widgets::draw_custom_badge;
+use amc_core::types::{GameVersion, ReleaseType};
+use amc_minecraft::ServerStatus;
+use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FilterTab {
@@ -94,13 +94,16 @@ impl HomePage {
             };
 
             let (sort_rect, sort_resp) = ui.allocate_exact_size(vec2(140.0, 32.0), Sense::click());
-            let sort_hover = ui.ctx().animate_bool_responsive(sort_resp.id, sort_resp.hovered());
+            let sort_hover = ui
+                .ctx()
+                .animate_bool_responsive(sort_resp.id, sort_resp.hovered());
             let sort_bg = lerp_color(BG_ELEVATED, BG_HOVER, sort_hover);
             let sort_stroke = lerp_color(BORDER_DEFAULT, RUBY, sort_hover);
             let sort_text = lerp_color(TEXT_PRIMARY, Color32::WHITE, sort_hover);
 
             ui.painter().rect_filled(sort_rect, Rounding::ZERO, sort_bg);
-            ui.painter().rect_stroke(sort_rect, Rounding::ZERO, Stroke::new(1.0, sort_stroke));
+            ui.painter()
+                .rect_stroke(sort_rect, Rounding::ZERO, Stroke::new(1.0, sort_stroke));
             ui.painter().text(
                 sort_rect.center(),
                 egui::Align2::CENTER_CENTER,
@@ -148,7 +151,8 @@ impl HomePage {
                 let matches_search = if self.search_query.trim().is_empty() {
                     true
                 } else {
-                    v.id.to_lowercase().contains(&self.search_query.to_lowercase())
+                    v.id.to_lowercase()
+                        .contains(&self.search_query.to_lowercase())
                 };
 
                 matches_filter && matches_search
@@ -201,10 +205,8 @@ impl HomePage {
                     let v = filtered[idx];
                     let is_selected = selected_version.as_deref() == Some(&v.id);
 
-                    let (rect, resp) = ui.allocate_exact_size(
-                        vec2(ui.available_width(), 50.0),
-                        Sense::click(),
-                    );
+                    let (rect, resp) =
+                        ui.allocate_exact_size(vec2(ui.available_width(), 50.0), Sense::click());
 
                     let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
                     let sel_t = ui.ctx().animate_bool(resp.id.with("sel"), is_selected);
@@ -212,20 +214,25 @@ impl HomePage {
                     let base_bg = lerp_color(BG_CARD, BG_HOVER, hover_t);
                     let bg = lerp_color(base_bg, RUBY_DIM, sel_t);
 
-                    let stroke_col = lerp_color(
-                        lerp_color(BORDER_DEFAULT, RUBY, hover_t),
-                        RUBY_LIGHT,
-                        sel_t,
-                    );
+                    let stroke_col =
+                        lerp_color(lerp_color(BORDER_DEFAULT, RUBY, hover_t), RUBY_LIGHT, sel_t);
                     let border_width = if is_selected { 1.5 } else { 1.0 };
 
                     ui.painter().rect_filled(rect, Rounding::ZERO, bg);
-                    ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(border_width, stroke_col));
+                    ui.painter().rect_stroke(
+                        rect,
+                        Rounding::ZERO,
+                        Stroke::new(border_width, stroke_col),
+                    );
 
                     // Active left indicator bar (Square motif)
                     if sel_t > 0.01 {
-                        let bar_rect = egui::Rect::from_min_max(rect.left_top(), egui::pos2(rect.left() + 3.0 * sel_t, rect.bottom()));
-                        ui.painter().rect_filled(bar_rect, Rounding::ZERO, RUBY_LIGHT);
+                        let bar_rect = egui::Rect::from_min_max(
+                            rect.left_top(),
+                            egui::pos2(rect.left() + 3.0 * sel_t, rect.bottom()),
+                        );
+                        ui.painter()
+                            .rect_filled(bar_rect, Rounding::ZERO, RUBY_LIGHT);
                     }
 
                     let mut child = ui.new_child(
@@ -244,7 +251,9 @@ impl HomePage {
                         ReleaseType::Alpha => "🔨",
                         ReleaseType::Old => "📜",
                     };
-                    child.label(egui::RichText::new(icon_glyph).font(egui::FontId::proportional(18.0)));
+                    child.label(
+                        egui::RichText::new(icon_glyph).font(egui::FontId::proportional(18.0)),
+                    );
                     child.add_space(10.0);
 
                     // Version ID
@@ -297,11 +306,7 @@ impl HomePage {
         let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
         let active_t = ui.ctx().animate_bool(resp.id.with("act"), is_active);
 
-        let bg = lerp_color(
-            lerp_color(BG_ELEVATED, BG_HOVER, hover_t),
-            RUBY,
-            active_t,
-        );
+        let bg = lerp_color(lerp_color(BG_ELEVATED, BG_HOVER, hover_t), RUBY, active_t);
         let stroke_col = lerp_color(
             lerp_color(BORDER_DEFAULT, RUBY, hover_t),
             RUBY_LIGHT,
@@ -314,7 +319,8 @@ impl HomePage {
         );
 
         ui.painter().rect_filled(rect, Rounding::ZERO, bg);
-        ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
+        ui.painter()
+            .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
         ui.painter().text(
             rect.center(),
             egui::Align2::CENTER_CENTER,

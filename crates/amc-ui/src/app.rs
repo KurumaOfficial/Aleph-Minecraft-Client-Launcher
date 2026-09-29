@@ -1,14 +1,18 @@
-use eframe::App;
-use egui::{CentralPanel, Context, SidePanel, TopBottomPanel, ViewportCommand};
-use std::sync::Arc;
-use tokio::sync::{mpsc, watch};
 use amc_auth::{Account, AccountManager, DeviceCodeResponse, MicrosoftAuthFlow};
 use amc_core::config::LauncherConfig;
 use amc_core::paths::LauncherPaths;
 use amc_core::types::{GameVersion, Instance, LoaderType};
 use amc_downloader::{AdoptiumInstaller, DownloadEngine, DownloadProgress};
-use amc_minecraft::{FabricLoader, GameEvent, MinecraftLauncher, QuiltLoader, VersionDetails, VersionManifest};
-use amc_mods::{CurseForgeClient, LocalModManager, ModCategory, ModSearchResult, ModSource, ModrinthClient};
+use amc_minecraft::{
+    FabricLoader, GameEvent, MinecraftLauncher, QuiltLoader, VersionDetails, VersionManifest,
+};
+use amc_mods::{
+    CurseForgeClient, LocalModManager, ModCategory, ModSearchResult, ModSource, ModrinthClient,
+};
+use eframe::App;
+use egui::{CentralPanel, Context, SidePanel, TopBottomPanel, ViewportCommand};
+use std::sync::Arc;
+use tokio::sync::{mpsc, watch};
 
 use crate::modals::{ConsoleModal, DownloadOverlay, LoginModal};
 use crate::pages::{HomePage, InstanceAction, InstancesPage, ModsPage, SettingsPage, SkinsPage};
@@ -68,9 +72,11 @@ impl LauncherApp {
 
         let paths = LauncherPaths::default_paths().expect("Failed to initialize launcher paths");
         let config = LauncherConfig::load_from_path(&paths.config_file()).unwrap_or_default();
-        let account_mgr = AccountManager::load_from_path(paths.accounts_file()).unwrap_or_else(|_| {
-            AccountManager::load_from_path("accounts.json").unwrap_or_else(|_| panic!("Failed to load accounts"))
-        });
+        let account_mgr =
+            AccountManager::load_from_path(paths.accounts_file()).unwrap_or_else(|_| {
+                AccountManager::load_from_path("accounts.json")
+                    .unwrap_or_else(|_| panic!("Failed to load accounts"))
+            });
 
         let download_engine = Arc::new(DownloadEngine::new(16));
 
@@ -228,7 +234,9 @@ impl LauncherApp {
                     let item = amc_downloader::DownloadItem::new(&file_info.url, dest);
                     if let Err(e) = engine.download_one(&item, None).await {
                         tracing::error!("Failed to download {}: {e}", file_info.filename);
-                        let _ = tx.send(Err(format!("Ошибка загрузки {}: {e}", file_info.filename))).await;
+                        let _ = tx
+                            .send(Err(format!("Ошибка загрузки {}: {e}", file_info.filename)))
+                            .await;
                     } else {
                         tracing::info!("Item {} installed successfully!", file_info.filename);
                         let _ = tx.send(Ok((mod_item.id, mod_item.title))).await;
@@ -299,17 +307,39 @@ impl LauncherApp {
         self.launched_instance_id = self.selected_instance;
 
         let paths = self.paths.clone();
-        let (game_dir, ver_id, ram_override, loader) = if let Some(inst_id) = self.selected_instance {
+        let (game_dir, ver_id, ram_override, loader) = if let Some(inst_id) = self.selected_instance
+        {
             if let Some(inst) = self.instances.iter().find(|i| i.id == inst_id) {
                 let _ = inst.ensure_directories(&paths.instances_dir());
-                (inst.get_game_dir(&paths.instances_dir()), inst.game_version.clone(), inst.ram_mb, inst.loader)
+                (
+                    inst.get_game_dir(&paths.instances_dir()),
+                    inst.game_version.clone(),
+                    inst.ram_mb,
+                    inst.loader,
+                )
             } else {
-                let ver = self.selected_version.clone().unwrap_or_else(|| "1.20.1".to_string());
-                (paths.instances_dir().join(&ver), ver, None, LoaderType::Vanilla)
+                let ver = self
+                    .selected_version
+                    .clone()
+                    .unwrap_or_else(|| "1.20.1".to_string());
+                (
+                    paths.instances_dir().join(&ver),
+                    ver,
+                    None,
+                    LoaderType::Vanilla,
+                )
             }
         } else {
-            let ver = self.selected_version.clone().unwrap_or_else(|| "1.20.1".to_string());
-            (paths.instances_dir().join(&ver), ver, None, LoaderType::Vanilla)
+            let ver = self
+                .selected_version
+                .clone()
+                .unwrap_or_else(|| "1.20.1".to_string());
+            (
+                paths.instances_dir().join(&ver),
+                ver,
+                None,
+                LoaderType::Vanilla,
+            )
         };
 
         tracing::info!(
@@ -345,26 +375,54 @@ impl LauncherApp {
             let client = reqwest::Client::new();
 
             // 1. Resolve Version Details
-            let _ = status_tx.send(lang.status_fetching_manifest().to_string()).await;
+            let _ = status_tx
+                .send(lang.status_fetching_manifest().to_string())
+                .await;
             let details = match loader {
                 LoaderType::Fabric => {
                     let _ = status_tx.send("Fabric Loader...".to_string()).await;
                     match FabricLoader::get_latest_loader_version(&client, &ver_id).await {
                         Ok(loader_ver) => {
-                            let _ = status_tx.send(format!("Загрузка профиля Fabric {loader_ver}...")).await;
-                            match FabricLoader::fetch_profile_json(&client, &ver_id, &loader_ver).await {
+                            let _ = status_tx
+                                .send(format!("Загрузка профиля Fabric {loader_ver}..."))
+                                .await;
+                            match FabricLoader::fetch_profile_json(&client, &ver_id, &loader_ver)
+                                .await
+                            {
                                 Ok(mut fab_details) => {
-                                    if let Ok(vanilla) = VersionDetails::fetch_or_load(&client, &ver_id, None, &paths.versions_dir()).await {
+                                    if let Ok(vanilla) = VersionDetails::fetch_or_load(
+                                        &client,
+                                        &ver_id,
+                                        None,
+                                        &paths.versions_dir(),
+                                    )
+                                    .await
+                                    {
                                         fab_details.merge_parent(vanilla);
                                     }
                                     fab_details
                                 }
                                 Err(e) => {
-                                    tracing::warn!("Fabric profile fetch error: {e}, falling back to Vanilla");
-                                    match VersionDetails::fetch_or_load(&client, &ver_id, None, &paths.versions_dir()).await {
+                                    tracing::warn!(
+                                        "Fabric profile fetch error: {e}, falling back to Vanilla"
+                                    );
+                                    match VersionDetails::fetch_or_load(
+                                        &client,
+                                        &ver_id,
+                                        None,
+                                        &paths.versions_dir(),
+                                    )
+                                    .await
+                                    {
                                         Ok(d) => d,
                                         Err(err) => {
-                                            let _ = game_tx.send(GameEvent::Crashed { message: format!("Ошибка загрузки версии {ver_id}: {err}") }).await;
+                                            let _ = game_tx
+                                                .send(GameEvent::Crashed {
+                                                    message: format!(
+                                                        "Ошибка загрузки версии {ver_id}: {err}"
+                                                    ),
+                                                })
+                                                .await;
                                             return;
                                         }
                                     }
@@ -372,11 +430,26 @@ impl LauncherApp {
                             }
                         }
                         Err(e) => {
-                            tracing::warn!("Fabric loader lookup error: {e}, falling back to Vanilla");
-                            match VersionDetails::fetch_or_load(&client, &ver_id, None, &paths.versions_dir()).await {
+                            tracing::warn!(
+                                "Fabric loader lookup error: {e}, falling back to Vanilla"
+                            );
+                            match VersionDetails::fetch_or_load(
+                                &client,
+                                &ver_id,
+                                None,
+                                &paths.versions_dir(),
+                            )
+                            .await
+                            {
                                 Ok(d) => d,
                                 Err(err) => {
-                                    let _ = game_tx.send(GameEvent::Crashed { message: format!("Ошибка загрузки версии {ver_id}: {err}") }).await;
+                                    let _ = game_tx
+                                        .send(GameEvent::Crashed {
+                                            message: format!(
+                                                "Ошибка загрузки версии {ver_id}: {err}"
+                                            ),
+                                        })
+                                        .await;
                                     return;
                                 }
                             }
@@ -387,20 +460,46 @@ impl LauncherApp {
                     let _ = status_tx.send("Поиск Quilt Loader...".to_string()).await;
                     match QuiltLoader::get_latest_loader_version(&client, &ver_id).await {
                         Ok(loader_ver) => {
-                            let _ = status_tx.send(format!("Загрузка профиля Quilt {loader_ver}...")).await;
-                            match QuiltLoader::fetch_profile_json(&client, &ver_id, &loader_ver).await {
+                            let _ = status_tx
+                                .send(format!("Загрузка профиля Quilt {loader_ver}..."))
+                                .await;
+                            match QuiltLoader::fetch_profile_json(&client, &ver_id, &loader_ver)
+                                .await
+                            {
                                 Ok(mut quilt_details) => {
-                                    if let Ok(vanilla) = VersionDetails::fetch_or_load(&client, &ver_id, None, &paths.versions_dir()).await {
+                                    if let Ok(vanilla) = VersionDetails::fetch_or_load(
+                                        &client,
+                                        &ver_id,
+                                        None,
+                                        &paths.versions_dir(),
+                                    )
+                                    .await
+                                    {
                                         quilt_details.merge_parent(vanilla);
                                     }
                                     quilt_details
                                 }
                                 Err(e) => {
-                                    tracing::warn!("Quilt profile fetch error: {e}, falling back to Vanilla");
-                                    match VersionDetails::fetch_or_load(&client, &ver_id, None, &paths.versions_dir()).await {
+                                    tracing::warn!(
+                                        "Quilt profile fetch error: {e}, falling back to Vanilla"
+                                    );
+                                    match VersionDetails::fetch_or_load(
+                                        &client,
+                                        &ver_id,
+                                        None,
+                                        &paths.versions_dir(),
+                                    )
+                                    .await
+                                    {
                                         Ok(d) => d,
                                         Err(err) => {
-                                            let _ = game_tx.send(GameEvent::Crashed { message: format!("Ошибка загрузки версии {ver_id}: {err}") }).await;
+                                            let _ = game_tx
+                                                .send(GameEvent::Crashed {
+                                                    message: format!(
+                                                        "Ошибка загрузки версии {ver_id}: {err}"
+                                                    ),
+                                                })
+                                                .await;
                                             return;
                                         }
                                     }
@@ -408,11 +507,26 @@ impl LauncherApp {
                             }
                         }
                         Err(e) => {
-                            tracing::warn!("Quilt loader lookup error: {e}, falling back to Vanilla");
-                            match VersionDetails::fetch_or_load(&client, &ver_id, None, &paths.versions_dir()).await {
+                            tracing::warn!(
+                                "Quilt loader lookup error: {e}, falling back to Vanilla"
+                            );
+                            match VersionDetails::fetch_or_load(
+                                &client,
+                                &ver_id,
+                                None,
+                                &paths.versions_dir(),
+                            )
+                            .await
+                            {
                                 Ok(d) => d,
                                 Err(err) => {
-                                    let _ = game_tx.send(GameEvent::Crashed { message: format!("Ошибка загрузки версии {ver_id}: {err}") }).await;
+                                    let _ = game_tx
+                                        .send(GameEvent::Crashed {
+                                            message: format!(
+                                                "Ошибка загрузки версии {ver_id}: {err}"
+                                            ),
+                                        })
+                                        .await;
                                     return;
                                 }
                             }
@@ -420,10 +534,21 @@ impl LauncherApp {
                     }
                 }
                 _ => {
-                    match VersionDetails::fetch_or_load(&client, &ver_id, None, &paths.versions_dir()).await {
+                    match VersionDetails::fetch_or_load(
+                        &client,
+                        &ver_id,
+                        None,
+                        &paths.versions_dir(),
+                    )
+                    .await
+                    {
                         Ok(d) => d,
                         Err(err) => {
-                            let _ = game_tx.send(GameEvent::Crashed { message: format!("Ошибка загрузки версии {ver_id}: {err}") }).await;
+                            let _ = game_tx
+                                .send(GameEvent::Crashed {
+                                    message: format!("Ошибка загрузки версии {ver_id}: {err}"),
+                                })
+                                .await;
                             return;
                         }
                     }
@@ -432,35 +557,55 @@ impl LauncherApp {
 
             // 2. Resolve Java Runtime
             let req_java = details.required_java_major();
-            let _ = status_tx.send(lang.status_checking_java().to_string()).await;
+            let _ = status_tx
+                .send(lang.status_checking_java().to_string())
+                .await;
             let java_bin = if let Some(custom_java) = &options.java_path {
                 if custom_java.is_file() {
                     custom_java.clone()
                 } else {
-                    AdoptiumInstaller::ensure_java(&paths.runtimes_dir(), req_java, &engine, None).await.unwrap_or_else(|_| custom_java.clone())
+                    AdoptiumInstaller::ensure_java(&paths.runtimes_dir(), req_java, &engine, None)
+                        .await
+                        .unwrap_or_else(|_| custom_java.clone())
                 }
             } else {
-                match AdoptiumInstaller::ensure_java(&paths.runtimes_dir(), req_java, &engine, None).await {
+                match AdoptiumInstaller::ensure_java(&paths.runtimes_dir(), req_java, &engine, None)
+                    .await
+                {
                     Ok(bin) => bin,
                     Err(e) => {
                         tracing::error!("Java installation failed: {e}");
-                        let _ = game_tx.send(GameEvent::Crashed { message: format!("Ошибка установки Java {req_java}: {e}") }).await;
+                        let _ = game_tx
+                            .send(GameEvent::Crashed {
+                                message: format!("Ошибка установки Java {req_java}: {e}"),
+                            })
+                            .await;
                         return;
                     }
                 }
             };
 
             // 3. Collect download items
-            let _ = status_tx.send(lang.status_checking_assets().to_string()).await;
+            let _ = status_tx
+                .send(lang.status_checking_assets().to_string())
+                .await;
             let mut download_items: Vec<amc_downloader::DownloadItem> = Vec::new();
-            let client_jar = paths.versions_dir().join(&ver_id).join(format!("{ver_id}.jar"));
+            let client_jar = paths
+                .versions_dir()
+                .join(&ver_id)
+                .join(format!("{ver_id}.jar"));
 
             if let Some(downloads) = &details.downloads {
                 if let Some(client_file) = &downloads.client {
                     if !client_jar.is_file() {
-                        let mut item = amc_downloader::DownloadItem::new(&client_file.url, &client_jar);
-                        if let Some(sha1) = &client_file.sha1 { item = item.with_sha1(sha1); }
-                        if let Some(size) = client_file.size { item = item.with_size(size); }
+                        let mut item =
+                            amc_downloader::DownloadItem::new(&client_file.url, &client_jar);
+                        if let Some(sha1) = &client_file.sha1 {
+                            item = item.with_sha1(sha1);
+                        }
+                        if let Some(size) = client_file.size {
+                            item = item.with_size(size);
+                        }
                         download_items.push(item);
                     }
                 }
@@ -487,8 +632,16 @@ impl LauncherApp {
             }
 
             if let Some(asset_ref) = &details.asset_index {
-                let _ = status_tx.send(lang.status_checking_assets().to_string()).await;
-                if let Ok(idx) = amc_minecraft::AssetIndex::fetch_or_load(&client, asset_ref, &paths.assets_dir()).await {
+                let _ = status_tx
+                    .send(lang.status_checking_assets().to_string())
+                    .await;
+                if let Ok(idx) = amc_minecraft::AssetIndex::fetch_or_load(
+                    &client,
+                    asset_ref,
+                    &paths.assets_dir(),
+                )
+                .await
+                {
                     let all_assets = idx.to_download_items(&paths.assets_dir());
                     for a in all_assets {
                         if !a.destination.is_file() {
@@ -505,10 +658,17 @@ impl LauncherApp {
                 let (tracker, progress_rx) = engine.create_tracker(&download_items);
                 let _ = prog_tx.send(Some(progress_rx)).await;
 
-                if let Err(e) = engine.download_all_with_progress(download_items, Some(tracker)).await {
+                if let Err(e) = engine
+                    .download_all_with_progress(download_items, Some(tracker))
+                    .await
+                {
                     tracing::error!("Component download failed: {e}");
                     let _ = prog_tx.send(None).await;
-                    let _ = game_tx.send(GameEvent::Crashed { message: format!("Ошибка скачивания компонентов: {e}") }).await;
+                    let _ = game_tx
+                        .send(GameEvent::Crashed {
+                            message: format!("Ошибка скачивания компонентов: {e}"),
+                        })
+                        .await;
                     return;
                 }
                 let _ = prog_tx.send(None).await;
@@ -517,7 +677,9 @@ impl LauncherApp {
             // 5. Unpack natives
             let natives_dir = paths.libraries_dir().join("natives").join(&ver_id);
             let _ = tokio::fs::create_dir_all(&natives_dir).await;
-            let _ = status_tx.send(lang.status_extracting_natives().to_string()).await;
+            let _ = status_tx
+                .send(lang.status_extracting_natives().to_string())
+                .await;
             for nat_jar in &natives_jars {
                 let _ = VersionDetails::extract_natives(nat_jar, &natives_dir);
             }
@@ -536,14 +698,20 @@ impl LauncherApp {
                 &details,
                 &session,
                 &options,
-            ).await {
+            )
+            .await
+            {
                 Ok(mut rx) => {
                     while let Some(event) = rx.recv().await {
                         let _ = game_tx.send(event).await;
                     }
                 }
                 Err(e) => {
-                    let _ = game_tx.send(GameEvent::Crashed { message: format!("Ошибка запуска: {e}") }).await;
+                    let _ = game_tx
+                        .send(GameEvent::Crashed {
+                            message: format!("Ошибка запуска: {e}"),
+                        })
+                        .await;
                 }
             }
         });
@@ -577,8 +745,10 @@ impl App for LauncherApp {
                         self.mods_page.installing_ids.remove(&id);
                         self.mods_page.installed_titles.insert(title.to_lowercase());
                         let mods_dir = self.paths.root_dir.join("mods");
-                        self.mods_page.local_mods = LocalModManager::scan_mods(&mods_dir).unwrap_or_default();
-                        self.mods_page.status_message = Some((format!("Мод \"{title}\" успешно установлен!"), true));
+                        self.mods_page.local_mods =
+                            LocalModManager::scan_mods(&mods_dir).unwrap_or_default();
+                        self.mods_page.status_message =
+                            Some((format!("Мод \"{title}\" успешно установлен!"), true));
                     }
                     Err(err) => {
                         self.mods_page.status_message = Some((err, false));
@@ -685,10 +855,15 @@ impl App for LauncherApp {
                         if let Some(start) = self.session_start_time.take() {
                             let elapsed_mins = (start.elapsed().as_secs() / 60).max(1);
                             if let Some(inst_id) = self.launched_instance_id {
-                                if let Some(inst) = self.instances.iter_mut().find(|i| i.id == inst_id) {
+                                if let Some(inst) =
+                                    self.instances.iter_mut().find(|i| i.id == inst_id)
+                                {
                                     inst.total_played_minutes += elapsed_mins;
                                     inst.last_played = Some(chrono::Utc::now());
-                                    let _ = Instance::save_all(&self.paths.instances_file(), &self.instances);
+                                    let _ = Instance::save_all(
+                                        &self.paths.instances_file(),
+                                        &self.instances,
+                                    );
                                 }
                             }
                         }
@@ -702,10 +877,15 @@ impl App for LauncherApp {
                         if let Some(start) = self.session_start_time.take() {
                             let elapsed_mins = (start.elapsed().as_secs() / 60).max(1);
                             if let Some(inst_id) = self.launched_instance_id {
-                                if let Some(inst) = self.instances.iter_mut().find(|i| i.id == inst_id) {
+                                if let Some(inst) =
+                                    self.instances.iter_mut().find(|i| i.id == inst_id)
+                                {
                                     inst.total_played_minutes += elapsed_mins;
                                     inst.last_played = Some(chrono::Utc::now());
-                                    let _ = Instance::save_all(&self.paths.instances_file(), &self.instances);
+                                    let _ = Instance::save_all(
+                                        &self.paths.instances_file(),
+                                        &self.instances,
+                                    );
                                 }
                             }
                         }
@@ -722,7 +902,8 @@ impl App for LauncherApp {
                 self.skins_page.skin_image.as_ref(),
                 self.skins_page.is_slim_model,
             );
-            self.avatar_texture = Some(ctx.load_texture("player_avatar", avatar_img, egui::TextureOptions::NEAREST));
+            self.avatar_texture =
+                Some(ctx.load_texture("player_avatar", avatar_img, egui::TextureOptions::NEAREST));
             self.skins_page.avatar_dirty = false;
         }
 
@@ -745,7 +926,13 @@ impl App for LauncherApp {
                 let active_acc = self.account_mgr.active_account();
                 let is_launching = self.is_launching;
 
-                let bbar_resp = BottomBar::show(ui, active_acc, is_launching, self.avatar_texture.as_ref(), lang);
+                let bbar_resp = BottomBar::show(
+                    ui,
+                    active_acc,
+                    is_launching,
+                    self.avatar_texture.as_ref(),
+                    lang,
+                );
                 if bbar_resp.login_clicked {
                     self.login_modal.is_open = true;
                 }
@@ -773,7 +960,9 @@ impl App for LauncherApp {
         CentralPanel::default()
             .frame(egui::Frame::none().fill(BG))
             .show(ctx, |ui| {
-                let inner_rect = ui.available_rect_before_wrap().shrink2(egui::vec2(24.0, 12.0));
+                let inner_rect = ui
+                    .available_rect_before_wrap()
+                    .shrink2(egui::vec2(24.0, 12.0));
                 let mut content_ui = ui.new_child(
                     egui::UiBuilder::new()
                         .max_rect(inner_rect)
@@ -782,7 +971,12 @@ impl App for LauncherApp {
 
                 match self.current_tab {
                     NavTab::Home => {
-                        self.home_page.show(&mut content_ui, &self.versions, &mut self.selected_version, lang);
+                        self.home_page.show(
+                            &mut content_ui,
+                            &self.versions,
+                            &mut self.selected_version,
+                            lang,
+                        );
                         if let Some((server, port)) = self.home_page.direct_connect_request.take() {
                             self.handle_direct_connect(server, port);
                         }
@@ -800,29 +994,50 @@ impl App for LauncherApp {
                             InstanceAction::Created(inst) => {
                                 let _ = inst.ensure_directories(&self.paths.instances_dir());
                                 self.instances.push(inst);
-                                let _ = Instance::save_all(&self.paths.instances_file(), &self.instances);
+                                let _ = Instance::save_all(
+                                    &self.paths.instances_file(),
+                                    &self.instances,
+                                );
                             }
                             InstanceAction::Updated(inst) => {
-                                if let Some(existing) = self.instances.iter_mut().find(|i| i.id == inst.id) {
+                                if let Some(existing) =
+                                    self.instances.iter_mut().find(|i| i.id == inst.id)
+                                {
                                     *existing = inst.clone();
                                 }
                                 if self.selected_instance == Some(inst.id) {
                                     self.selected_version = Some(inst.game_version.clone());
                                 }
-                                let _ = Instance::save_all(&self.paths.instances_file(), &self.instances);
+                                let _ = Instance::save_all(
+                                    &self.paths.instances_file(),
+                                    &self.instances,
+                                );
                             }
                             InstanceAction::Cloned(id) => {
-                                if let Some(inst) = self.instances.iter().find(|i| i.id == id).cloned() {
+                                if let Some(inst) =
+                                    self.instances.iter().find(|i| i.id == id).cloned()
+                                {
                                     let copy_name = match lang {
-                                        amc_core::Language::English => format!("{} (Copy)", inst.name),
-                                        amc_core::Language::Russian => format!("{} (Копия)", inst.name),
-                                        amc_core::Language::Ukrainian => format!("{} (Копія)", inst.name),
+                                        amc_core::Language::English => {
+                                            format!("{} (Copy)", inst.name)
+                                        }
+                                        amc_core::Language::Russian => {
+                                            format!("{} (Копия)", inst.name)
+                                        }
+                                        amc_core::Language::Ukrainian => {
+                                            format!("{} (Копія)", inst.name)
+                                        }
                                     };
-                                    if let Ok(cloned) = inst.clone_instance(&copy_name, &self.paths.instances_dir()) {
+                                    if let Ok(cloned) =
+                                        inst.clone_instance(&copy_name, &self.paths.instances_dir())
+                                    {
                                         let new_id = cloned.id;
                                         self.instances.push(cloned);
                                         self.selected_instance = Some(new_id);
-                                        let _ = Instance::save_all(&self.paths.instances_file(), &self.instances);
+                                        let _ = Instance::save_all(
+                                            &self.paths.instances_file(),
+                                            &self.instances,
+                                        );
                                     }
                                 }
                             }
@@ -831,7 +1046,10 @@ impl App for LauncherApp {
                                 if self.selected_instance == Some(id) {
                                     self.selected_instance = self.instances.first().map(|i| i.id);
                                 }
-                                let _ = Instance::save_all(&self.paths.instances_file(), &self.instances);
+                                let _ = Instance::save_all(
+                                    &self.paths.instances_file(),
+                                    &self.instances,
+                                );
                             }
                             InstanceAction::Selected(id) => {
                                 if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
@@ -886,7 +1104,12 @@ impl App for LauncherApp {
                         self.skins_page.show(&mut content_ui, acc, lang);
                     }
                     NavTab::Settings => {
-                        self.settings_page.show(&mut content_ui, &mut self.config, &mut self.account_mgr, &self.paths);
+                        self.settings_page.show(
+                            &mut content_ui,
+                            &mut self.config,
+                            &mut self.account_mgr,
+                            &self.paths,
+                        );
                         // Auto-save configuration changes
                         let _ = self.config.save_to_path(&self.paths.config_file());
                     }

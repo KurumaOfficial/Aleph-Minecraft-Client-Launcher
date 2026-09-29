@@ -1,11 +1,11 @@
-use egui::{vec2, Color32, Rounding, Sense, Stroke, TextureOptions, Ui};
-use amc_auth::Account;
-use image::RgbaImage;
-use std::path::PathBuf;
 use crate::theme::{
     lerp_color, BG_CARD, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, BORDER_STRONG, RUBY, RUBY_LIGHT,
     TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
+use amc_auth::Account;
+use egui::{vec2, Color32, Rounding, Sense, Stroke, TextureOptions, Ui};
+use image::RgbaImage;
+use std::path::PathBuf;
 
 pub struct SkinsPage {
     pub is_slim_model: bool,
@@ -53,7 +53,11 @@ impl SkinsPage {
                     composite_front_skin(&default_skin, self.is_slim_model)
                 }
             };
-            self.texture_handle = Some(ui.ctx().load_texture("skin_preview", img, TextureOptions::NEAREST));
+            self.texture_handle = Some(ui.ctx().load_texture(
+                "skin_preview",
+                img,
+                TextureOptions::NEAREST,
+            ));
             self.dirty = false;
         }
 
@@ -63,7 +67,8 @@ impl SkinsPage {
         let (rect, _) = ui.allocate_exact_size(vec2(preview_width, preview_height), Sense::hover());
 
         ui.painter().rect_filled(rect, Rounding::ZERO, BG_ELEVATED);
-        ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, BORDER_DEFAULT));
+        ui.painter()
+            .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, BORDER_DEFAULT));
 
         let mut child = ui.new_child(
             egui::UiBuilder::new()
@@ -80,15 +85,34 @@ impl SkinsPage {
             let slim_active = self.is_slim_model;
 
             let (cb_rect, cb_resp) = ui.allocate_exact_size(vec2(110.0, 28.0), Sense::click());
-            let cb_hover = ui.ctx().animate_bool_responsive(cb_resp.id, cb_resp.hovered());
-            let cb_act = ui.ctx().animate_bool(cb_resp.id.with("act"), classic_active);
+            let cb_hover = ui
+                .ctx()
+                .animate_bool_responsive(cb_resp.id, cb_resp.hovered());
+            let cb_act = ui
+                .ctx()
+                .animate_bool(cb_resp.id.with("act"), classic_active);
             let cb_bg = lerp_color(lerp_color(BG_ELEVATED, BG_HOVER, cb_hover), RUBY, cb_act);
-            let cb_stroke = lerp_color(lerp_color(BORDER_DEFAULT, RUBY, cb_hover), RUBY_LIGHT, cb_act);
-            let cb_text = lerp_color(lerp_color(TEXT_MUTED, TEXT_PRIMARY, cb_hover), Color32::WHITE, cb_act);
+            let cb_stroke = lerp_color(
+                lerp_color(BORDER_DEFAULT, RUBY, cb_hover),
+                RUBY_LIGHT,
+                cb_act,
+            );
+            let cb_text = lerp_color(
+                lerp_color(TEXT_MUTED, TEXT_PRIMARY, cb_hover),
+                Color32::WHITE,
+                cb_act,
+            );
 
             ui.painter().rect_filled(cb_rect, Rounding::ZERO, cb_bg);
-            ui.painter().rect_stroke(cb_rect, Rounding::ZERO, Stroke::new(1.0, cb_stroke));
-            ui.painter().text(cb_rect.center(), egui::Align2::CENTER_CENTER, lang.skins_classic(), egui::FontId::proportional(11.0), cb_text);
+            ui.painter()
+                .rect_stroke(cb_rect, Rounding::ZERO, Stroke::new(1.0, cb_stroke));
+            ui.painter().text(
+                cb_rect.center(),
+                egui::Align2::CENTER_CENTER,
+                lang.skins_classic(),
+                egui::FontId::proportional(11.0),
+                cb_text,
+            );
 
             if cb_resp.clicked() && self.is_slim_model {
                 self.is_slim_model = false;
@@ -97,15 +121,32 @@ impl SkinsPage {
             }
 
             let (sb_rect, sb_resp) = ui.allocate_exact_size(vec2(110.0, 28.0), Sense::click());
-            let sb_hover = ui.ctx().animate_bool_responsive(sb_resp.id, sb_resp.hovered());
+            let sb_hover = ui
+                .ctx()
+                .animate_bool_responsive(sb_resp.id, sb_resp.hovered());
             let sb_act = ui.ctx().animate_bool(sb_resp.id.with("act"), slim_active);
             let sb_bg = lerp_color(lerp_color(BG_ELEVATED, BG_HOVER, sb_hover), RUBY, sb_act);
-            let sb_stroke = lerp_color(lerp_color(BORDER_DEFAULT, RUBY, sb_hover), RUBY_LIGHT, sb_act);
-            let sb_text = lerp_color(lerp_color(TEXT_MUTED, TEXT_PRIMARY, sb_hover), Color32::WHITE, sb_act);
+            let sb_stroke = lerp_color(
+                lerp_color(BORDER_DEFAULT, RUBY, sb_hover),
+                RUBY_LIGHT,
+                sb_act,
+            );
+            let sb_text = lerp_color(
+                lerp_color(TEXT_MUTED, TEXT_PRIMARY, sb_hover),
+                Color32::WHITE,
+                sb_act,
+            );
 
             ui.painter().rect_filled(sb_rect, Rounding::ZERO, sb_bg);
-            ui.painter().rect_stroke(sb_rect, Rounding::ZERO, Stroke::new(1.0, sb_stroke));
-            ui.painter().text(sb_rect.center(), egui::Align2::CENTER_CENTER, lang.skins_slim(), egui::FontId::proportional(11.0), sb_text);
+            ui.painter()
+                .rect_stroke(sb_rect, Rounding::ZERO, Stroke::new(1.0, sb_stroke));
+            ui.painter().text(
+                sb_rect.center(),
+                egui::Align2::CENTER_CENTER,
+                lang.skins_slim(),
+                egui::FontId::proportional(11.0),
+                sb_text,
+            );
 
             if sb_resp.clicked() && !self.is_slim_model {
                 self.is_slim_model = true;
@@ -119,8 +160,12 @@ impl SkinsPage {
         // 2D Character Display
         if let Some(tex) = &self.texture_handle {
             let (img_rect, _) = child.allocate_exact_size(vec2(130.0, 260.0), Sense::hover());
-            child.painter().rect_filled(img_rect, Rounding::ZERO, BG_HOVER);
-            child.painter().rect_stroke(img_rect, Rounding::ZERO, Stroke::new(1.0, BORDER_STRONG));
+            child
+                .painter()
+                .rect_filled(img_rect, Rounding::ZERO, BG_HOVER);
+            child
+                .painter()
+                .rect_stroke(img_rect, Rounding::ZERO, Stroke::new(1.0, BORDER_STRONG));
             child.painter().image(
                 tex.id(),
                 img_rect,
@@ -145,13 +190,22 @@ impl SkinsPage {
             ui.spacing_mut().item_spacing = vec2(10.0, 0.0);
 
             let (up_rect, up_resp) = ui.allocate_exact_size(vec2(160.0, 34.0), Sense::click());
-            let up_hover = ui.ctx().animate_bool_responsive(up_resp.id, up_resp.hovered());
+            let up_hover = ui
+                .ctx()
+                .animate_bool_responsive(up_resp.id, up_resp.hovered());
             let up_bg = lerp_color(RUBY, RUBY_LIGHT, up_hover);
             let up_stroke = lerp_color(RUBY_LIGHT, Color32::WHITE, up_hover);
 
             ui.painter().rect_filled(up_rect, Rounding::ZERO, up_bg);
-            ui.painter().rect_stroke(up_rect, Rounding::ZERO, Stroke::new(1.0, up_stroke));
-            ui.painter().text(up_rect.center(), egui::Align2::CENTER_CENTER, lang.skins_btn_load(), egui::FontId::proportional(11.0), Color32::WHITE);
+            ui.painter()
+                .rect_stroke(up_rect, Rounding::ZERO, Stroke::new(1.0, up_stroke));
+            ui.painter().text(
+                up_rect.center(),
+                egui::Align2::CENTER_CENTER,
+                lang.skins_btn_load(),
+                egui::FontId::proportional(11.0),
+                Color32::WHITE,
+            );
 
             if up_resp.clicked() {
                 if let Some(path) = rfd::FileDialog::new()
@@ -171,16 +225,29 @@ impl SkinsPage {
                 }
             }
 
-            let reset_label = if self.is_slim_model { lang.skins_btn_reset_alex() } else { lang.skins_btn_reset_steve() };
+            let reset_label = if self.is_slim_model {
+                lang.skins_btn_reset_alex()
+            } else {
+                lang.skins_btn_reset_steve()
+            };
             let (rs_rect, rs_resp) = ui.allocate_exact_size(vec2(130.0, 34.0), Sense::click());
-            let rs_hover = ui.ctx().animate_bool_responsive(rs_resp.id, rs_resp.hovered());
+            let rs_hover = ui
+                .ctx()
+                .animate_bool_responsive(rs_resp.id, rs_resp.hovered());
             let rs_bg = lerp_color(BG_HOVER, BG_CARD, rs_hover);
             let rs_stroke = lerp_color(BORDER_DEFAULT, RUBY, rs_hover);
             let rs_text = lerp_color(TEXT_PRIMARY, Color32::WHITE, rs_hover);
 
             ui.painter().rect_filled(rs_rect, Rounding::ZERO, rs_bg);
-            ui.painter().rect_stroke(rs_rect, Rounding::ZERO, Stroke::new(1.0, rs_stroke));
-            ui.painter().text(rs_rect.center(), egui::Align2::CENTER_CENTER, &reset_label, egui::FontId::proportional(11.0), rs_text);
+            ui.painter()
+                .rect_stroke(rs_rect, Rounding::ZERO, Stroke::new(1.0, rs_stroke));
+            ui.painter().text(
+                rs_rect.center(),
+                egui::Align2::CENTER_CENTER,
+                &reset_label,
+                egui::FontId::proportional(11.0),
+                rs_text,
+            );
 
             if rs_resp.clicked() {
                 self.skin_image = None;
@@ -205,9 +272,13 @@ impl SkinsPage {
                 amc_core::Language::Ukrainian => "Акаунт",
             };
             ui.label(
-                egui::RichText::new(format!("{acc_label}: {} ({})", acc.username, acc.account_type.as_str()))
-                    .font(egui::FontId::proportional(13.0))
-                    .color(TEXT_MUTED),
+                egui::RichText::new(format!(
+                    "{acc_label}: {} ({})",
+                    acc.username,
+                    acc.account_type.as_str()
+                ))
+                .font(egui::FontId::proportional(13.0))
+                .color(TEXT_MUTED),
             );
         }
     }
@@ -260,7 +331,14 @@ fn composite_front_skin(skin: &RgbaImage, is_slim: bool) -> egui::ColorImage {
     let arm_w = if is_slim { 3 } else { 4 };
     let mut out = RgbaImage::new(16, 32);
 
-    let blit = |dest: &mut RgbaImage, src: &RgbaImage, sx: u32, sy: u32, sw: u32, sh: u32, dx: u32, dy: u32| {
+    let blit = |dest: &mut RgbaImage,
+                src: &RgbaImage,
+                sx: u32,
+                sy: u32,
+                sw: u32,
+                sh: u32,
+                dx: u32,
+                dy: u32| {
         for y in 0..sh {
             for x in 0..sw {
                 let px = sx + x;
@@ -391,13 +469,21 @@ fn generate_default_skin(is_slim: bool) -> RgbaImage {
     // Legs
     for y in 20..32 {
         for x in 4..8 {
-            let col = if y < 30 { pants_color } else { [60, 60, 60, 255] };
+            let col = if y < 30 {
+                pants_color
+            } else {
+                [60, 60, 60, 255]
+            };
             skin.put_pixel(x, y, image::Rgba(col));
         }
     }
     for y in 52..64 {
         for x in 20..24 {
-            let col = if y < 62 { pants_color } else { [60, 60, 60, 255] };
+            let col = if y < 62 {
+                pants_color
+            } else {
+                [60, 60, 60, 255]
+            };
             skin.put_pixel(x, y, image::Rgba(col));
         }
     }

@@ -1,8 +1,8 @@
+use crate::types::Account;
+use amc_core::error::{LauncherError, Result};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use amc_core::error::{LauncherError, Result};
-use crate::types::Account;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WetIdLoginRequest {
@@ -61,7 +61,9 @@ impl WetIdClient {
             .json(&req)
             .send()
             .await
-            .map_err(|e| LauncherError::Network(format!("WetID authentication request failed: {e}")))?;
+            .map_err(|e| {
+                LauncherError::Network(format!("WetID authentication request failed: {e}"))
+            })?;
 
         if !res.status().is_success() {
             let msg = res.text().await.unwrap_or_default();

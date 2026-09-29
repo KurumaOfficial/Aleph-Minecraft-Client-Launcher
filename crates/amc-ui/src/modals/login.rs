@@ -1,9 +1,9 @@
-use egui::{vec2, Color32, Rounding, Sense, Stroke, TextEdit, Ui};
-use amc_auth::{login_offline, Account, DeviceCodeResponse};
-use amc_core::Language;
 use crate::theme::{
     lerp_color, BG_ACTIVE, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT, TEXT_MUTED, TEXT_PRIMARY,
 };
+use amc_auth::{login_offline, Account, DeviceCodeResponse};
+use amc_core::Language;
+use egui::{vec2, Color32, Rounding, Sense, Stroke, TextEdit, Ui};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LoginMode {
@@ -277,10 +277,15 @@ impl LoginModal {
 
         let bg = lerp_color(lerp_color(BG_HOVER, BG_ACTIVE, hover_t), RUBY, act_t);
         let stroke_col = lerp_color(lerp_color(BORDER_DEFAULT, RUBY, hover_t), RUBY_LIGHT, act_t);
-        let text_col = lerp_color(lerp_color(TEXT_MUTED, TEXT_PRIMARY, hover_t), Color32::WHITE, act_t);
+        let text_col = lerp_color(
+            lerp_color(TEXT_MUTED, TEXT_PRIMARY, hover_t),
+            Color32::WHITE,
+            act_t,
+        );
 
         ui.painter().rect_filled(rect, Rounding::ZERO, bg);
-        ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
+        ui.painter()
+            .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
         ui.painter().text(
             rect.center(),
             egui::Align2::CENTER_CENTER,

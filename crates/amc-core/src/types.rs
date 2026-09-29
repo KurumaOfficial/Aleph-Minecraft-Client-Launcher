@@ -90,7 +90,11 @@ pub struct Instance {
 use crate::error::{LauncherError, Result};
 
 impl Instance {
-    pub fn new(name: impl Into<String>, game_version: impl Into<String>, loader: LoaderType) -> Self {
+    pub fn new(
+        name: impl Into<String>,
+        game_version: impl Into<String>,
+        loader: LoaderType,
+    ) -> Self {
         Self {
             id: Uuid::new_v4(),
             name: name.into(),
@@ -134,7 +138,13 @@ impl Instance {
             let sanitized: String = self
                 .name
                 .chars()
-                .map(|c| if c.is_alphanumeric() || c == '_' || c == '-' || c == ' ' { c } else { '_' })
+                .map(|c| {
+                    if c.is_alphanumeric() || c == '_' || c == '-' || c == ' ' {
+                        c
+                    } else {
+                        '_'
+                    }
+                })
                 .collect();
             let folder_name = if sanitized.trim().is_empty() {
                 self.id.to_string()
@@ -145,7 +155,11 @@ impl Instance {
         }
     }
 
-    pub fn clone_instance(&self, new_name: &str, base_instances_dir: &std::path::Path) -> Result<Self> {
+    pub fn clone_instance(
+        &self,
+        new_name: &str,
+        base_instances_dir: &std::path::Path,
+    ) -> Result<Self> {
         let mut cloned = self.clone();
         cloned.id = Uuid::new_v4();
         cloned.name = new_name.to_string();
@@ -175,7 +189,14 @@ impl Instance {
 
     pub fn ensure_directories(&self, base_instances_dir: &std::path::Path) -> Result<PathBuf> {
         let game_dir = self.get_game_dir(base_instances_dir);
-        let subdirs = ["mods", "saves", "resourcepacks", "shaderpacks", "config", "screenshots"];
+        let subdirs = [
+            "mods",
+            "saves",
+            "resourcepacks",
+            "shaderpacks",
+            "config",
+            "screenshots",
+        ];
         for sub in subdirs {
             let p = game_dir.join(sub);
             let _ = std::fs::create_dir_all(&p);
@@ -246,7 +267,9 @@ mod tests {
         let original = Instance::new("Test Pack", "1.20.1", LoaderType::Fabric);
         let _ = original.ensure_directories(&temp_dir);
 
-        let cloned = original.clone_instance("Test Pack (Copy)", &temp_dir).unwrap();
+        let cloned = original
+            .clone_instance("Test Pack (Copy)", &temp_dir)
+            .unwrap();
         assert_ne!(original.id, cloned.id);
         assert_eq!(cloned.name, "Test Pack (Copy)");
         assert_eq!(cloned.game_version, "1.20.1");
@@ -265,7 +288,10 @@ mod tests {
         let json = serde_json::to_string(&opts).unwrap();
         assert!(json.contains("hypixel.net"));
         let deserialized: LaunchOptions = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized.quick_play_server.as_deref(), Some("hypixel.net"));
+        assert_eq!(
+            deserialized.quick_play_server.as_deref(),
+            Some("hypixel.net")
+        );
         assert_eq!(deserialized.quick_play_port, Some(25565));
     }
 }

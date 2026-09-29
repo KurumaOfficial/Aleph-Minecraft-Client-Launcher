@@ -1,8 +1,8 @@
-use egui::{vec2, Color32, Pos2, Rect, Rounding, Sense, Stroke, Ui};
 use crate::theme::{
-    lerp_color, BG_ELEVATED, BORDER_DEFAULT, BORDER_SUBTLE, RUBY, RUBY_DIM, RUBY_LIGHT,
-    TEXT_DIM, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
+    lerp_color, BG_ELEVATED, BORDER_DEFAULT, BORDER_SUBTLE, RUBY, RUBY_DIM, RUBY_LIGHT, TEXT_DIM,
+    TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
+use egui::{vec2, Color32, Pos2, Rect, Rounding, Sense, Stroke, Ui};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum NavTab {
@@ -37,7 +37,12 @@ impl Sidebar {
             if Self::nav_item(ui, lang.nav_home(), "⌂", *current_tab == NavTab::Home) {
                 *current_tab = NavTab::Home;
             }
-            if Self::nav_item(ui, lang.nav_instances(), "⊞", *current_tab == NavTab::Modpacks) {
+            if Self::nav_item(
+                ui,
+                lang.nav_instances(),
+                "⊞",
+                *current_tab == NavTab::Modpacks,
+            ) {
                 *current_tab = NavTab::Modpacks;
             }
             if Self::nav_item(ui, lang.nav_mods(), "◈", *current_tab == NavTab::Mods) {
@@ -57,12 +62,20 @@ impl Sidebar {
             // Bottom border separator
             let sep_y = ui.cursor().top();
             ui.painter().line_segment(
-                [Pos2::new(rect.left(), sep_y), Pos2::new(rect.right(), sep_y)],
+                [
+                    Pos2::new(rect.left(), sep_y),
+                    Pos2::new(rect.right(), sep_y),
+                ],
                 Stroke::new(1.0, BORDER_SUBTLE),
             );
             ui.add_space(8.0);
 
-            if Self::nav_item(ui, lang.nav_settings(), "⚙", *current_tab == NavTab::Settings) {
+            if Self::nav_item(
+                ui,
+                lang.nav_settings(),
+                "⚙",
+                *current_tab == NavTab::Settings,
+            ) {
                 *current_tab = NavTab::Settings;
             }
 
@@ -100,7 +113,8 @@ impl Sidebar {
         let sq_stroke = lerp_color(RUBY, RUBY_LIGHT, hover_t);
 
         ui.painter().rect_filled(sq_rect, Rounding::ZERO, sq_bg);
-        ui.painter().rect_stroke(sq_rect, Rounding::ZERO, Stroke::new(1.5, sq_stroke));
+        ui.painter()
+            .rect_stroke(sq_rect, Rounding::ZERO, Stroke::new(1.5, sq_stroke));
 
         // Central 'ℵ' glyph
         ui.painter().text(
@@ -147,8 +161,12 @@ impl Sidebar {
         let bar_w = 3.0 * active_t + 1.5 * hover_t * (1.0 - active_t);
         if bar_w > 0.1 {
             let bar_color = lerp_color(RUBY_DIM, RUBY_LIGHT, active_t.max(hover_t));
-            let bar_rect = Rect::from_min_max(rect.left_top(), Pos2::new(rect.left() + bar_w, rect.bottom()));
-            ui.painter().rect_filled(bar_rect, Rounding::ZERO, bar_color);
+            let bar_rect = Rect::from_min_max(
+                rect.left_top(),
+                Pos2::new(rect.left() + bar_w, rect.bottom()),
+            );
+            ui.painter()
+                .rect_filled(bar_rect, Rounding::ZERO, bar_color);
         }
 
         // Smooth color transition for text & icon
@@ -186,7 +204,8 @@ impl Sidebar {
                 RUBY_LIGHT.b(),
                 (active_t * 220.0) as u8,
             );
-            ui.painter().rect_filled(sq_dot_rect, Rounding::ZERO, dot_col);
+            ui.painter()
+                .rect_filled(sq_dot_rect, Rounding::ZERO, dot_col);
         }
 
         resp.clicked()

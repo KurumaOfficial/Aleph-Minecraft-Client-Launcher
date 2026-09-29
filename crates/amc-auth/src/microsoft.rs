@@ -1,9 +1,9 @@
+use crate::types::Account;
+use amc_core::error::{LauncherError, Result};
 use chrono::{Duration, Utc};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::time::Duration as StdDuration;
-use amc_core::error::{LauncherError, Result};
-use crate::types::Account;
 
 pub const DEFAULT_CLIENT_ID: &str = "00000000402b5328"; // Standard Minecraft public client ID for Azure
 
@@ -136,10 +136,9 @@ impl MicrosoftAuthFlow {
             return Err(LauncherError::Auth(format!("Device code error: {body}")));
         }
 
-        let resp = res
-            .json::<DeviceCodeResponse>()
-            .await
-            .map_err(|e| LauncherError::Network(format!("Failed to parse device code response: {e}")))?;
+        let resp = res.json::<DeviceCodeResponse>().await.map_err(|e| {
+            LauncherError::Network(format!("Failed to parse device code response: {e}"))
+        })?;
 
         Ok(resp)
     }
@@ -160,10 +159,9 @@ impl MicrosoftAuthFlow {
             .await
             .map_err(|e| LauncherError::Network(format!("Token poll failed: {e}")))?;
 
-        let token_resp: MsTokenResponse = res
-            .json()
-            .await
-            .map_err(|e| LauncherError::Network(format!("Failed to parse MS token response: {e}")))?;
+        let token_resp: MsTokenResponse = res.json().await.map_err(|e| {
+            LauncherError::Network(format!("Failed to parse MS token response: {e}"))
+        })?;
 
         if let Some(err) = token_resp.error {
             if err == "authorization_pending" {
@@ -249,10 +247,9 @@ impl MicrosoftAuthFlow {
             .await
             .map_err(|e| LauncherError::Network(format!("Minecraft services login failed: {e}")))?;
 
-        let mc_auth: MinecraftAuthResponse = mc_res
-            .json()
-            .await
-            .map_err(|e| LauncherError::Auth(format!("Failed to parse Minecraft login response: {e}")))?;
+        let mc_auth: MinecraftAuthResponse = mc_res.json().await.map_err(|e| {
+            LauncherError::Auth(format!("Failed to parse Minecraft login response: {e}"))
+        })?;
 
         // 4. Fetch Minecraft Profile
         let profile_res = self
@@ -261,7 +258,9 @@ impl MicrosoftAuthFlow {
             .bearer_auth(&mc_auth.access_token)
             .send()
             .await
-            .map_err(|e| LauncherError::Network(format!("Minecraft profile request failed: {e}")))?;
+            .map_err(|e| {
+                LauncherError::Network(format!("Minecraft profile request failed: {e}"))
+            })?;
 
         let profile: MinecraftProfileResponse = profile_res
             .json()

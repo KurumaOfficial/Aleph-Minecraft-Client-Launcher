@@ -1,9 +1,9 @@
+use amc_core::error::{LauncherError, Result};
 use sha1::{Digest, Sha1};
 use std::fmt::Write as _;
 use std::path::Path;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
-use amc_core::error::{LauncherError, Result};
 
 pub fn sha1_hex(bytes: &[u8]) -> String {
     let mut hasher = Sha1::new();
@@ -26,10 +26,13 @@ pub async fn file_sha1(path: &Path) -> Result<String> {
     let mut buffer = [0u8; 64 * 1024];
 
     loop {
-        let n = file.read(&mut buffer).await.map_err(|e| LauncherError::Io {
-            path: path.to_path_buf(),
-            source: e,
-        })?;
+        let n = file
+            .read(&mut buffer)
+            .await
+            .map_err(|e| LauncherError::Io {
+                path: path.to_path_buf(),
+                source: e,
+            })?;
         if n == 0 {
             break;
         }

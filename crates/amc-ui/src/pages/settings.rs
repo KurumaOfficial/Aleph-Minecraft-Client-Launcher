@@ -1,12 +1,12 @@
-use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
+use crate::theme::{
+    lerp_color, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT, TEXT_HEADING, TEXT_MUTED,
+    TEXT_PRIMARY,
+};
 use amc_auth::AccountManager;
 use amc_core::config::LauncherConfig;
 use amc_core::paths::LauncherPaths;
 use amc_core::Language;
-use crate::theme::{
-    lerp_color, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT,
-    TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
-};
+use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SettingsSubTab {
@@ -76,10 +76,15 @@ impl SettingsPage {
 
         let bg = lerp_color(lerp_color(BG_ELEVATED, BG_HOVER, hover_t), RUBY, act_t);
         let stroke_col = lerp_color(lerp_color(BORDER_DEFAULT, RUBY, hover_t), RUBY_LIGHT, act_t);
-        let text_col = lerp_color(lerp_color(TEXT_MUTED, TEXT_PRIMARY, hover_t), Color32::WHITE, act_t);
+        let text_col = lerp_color(
+            lerp_color(TEXT_MUTED, TEXT_PRIMARY, hover_t),
+            Color32::WHITE,
+            act_t,
+        );
 
         ui.painter().rect_filled(rect, Rounding::ZERO, bg);
-        ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
+        ui.painter()
+            .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
         ui.painter().text(
             rect.center(),
             egui::Align2::CENTER_CENTER,
@@ -114,11 +119,17 @@ impl SettingsPage {
                     let act_t = ui.ctx().animate_bool(resp.id.with("act"), is_active);
 
                     let bg = lerp_color(lerp_color(BG_ELEVATED, BG_HOVER, hover_t), RUBY, act_t);
-                    let stroke_col = lerp_color(lerp_color(BORDER_DEFAULT, RUBY, hover_t), RUBY_LIGHT, act_t);
-                    let text_col = lerp_color(lerp_color(TEXT_MUTED, TEXT_PRIMARY, hover_t), Color32::WHITE, act_t);
+                    let stroke_col =
+                        lerp_color(lerp_color(BORDER_DEFAULT, RUBY, hover_t), RUBY_LIGHT, act_t);
+                    let text_col = lerp_color(
+                        lerp_color(TEXT_MUTED, TEXT_PRIMARY, hover_t),
+                        Color32::WHITE,
+                        act_t,
+                    );
 
                     ui.painter().rect_filled(rect, Rounding::ZERO, bg);
-                    ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
+                    ui.painter()
+                        .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
                     ui.painter().text(
                         rect.center(),
                         egui::Align2::CENTER_CENTER,
@@ -178,10 +189,15 @@ impl SettingsPage {
 
             ui.horizontal(|ui| {
                 ui.label(egui::RichText::new(lang.settings_width()).color(TEXT_MUTED));
-                ui.add(egui::DragValue::new(&mut config.default_launch_options.window_width).speed(10));
+                ui.add(
+                    egui::DragValue::new(&mut config.default_launch_options.window_width).speed(10),
+                );
                 ui.add_space(20.0);
                 ui.label(egui::RichText::new(lang.settings_height()).color(TEXT_MUTED));
-                ui.add(egui::DragValue::new(&mut config.default_launch_options.window_height).speed(10));
+                ui.add(
+                    egui::DragValue::new(&mut config.default_launch_options.window_height)
+                        .speed(10),
+                );
             });
 
             ui.add_space(6.0);
@@ -229,22 +245,23 @@ impl SettingsPage {
             ui.add_space(8.0);
 
             ui.label(
-                egui::RichText::new(lang.settings_min_ram(config.default_launch_options.memory_min_mb))
-                    .color(TEXT_PRIMARY),
+                egui::RichText::new(
+                    lang.settings_min_ram(config.default_launch_options.memory_min_mb),
+                )
+                .color(TEXT_PRIMARY),
             );
             ui.add(
-                egui::Slider::new(
-                    &mut config.default_launch_options.memory_min_mb,
-                    512..=8192,
-                )
-                .step_by(256.0),
+                egui::Slider::new(&mut config.default_launch_options.memory_min_mb, 512..=8192)
+                    .step_by(256.0),
             );
 
             ui.add_space(10.0);
 
             ui.label(
-                egui::RichText::new(lang.settings_max_ram(config.default_launch_options.memory_max_mb))
-                    .color(TEXT_PRIMARY),
+                egui::RichText::new(
+                    lang.settings_max_ram(config.default_launch_options.memory_max_mb),
+                )
+                .color(TEXT_PRIMARY),
             );
             ui.add(
                 egui::Slider::new(
@@ -321,10 +338,22 @@ impl SettingsPage {
             ui.add_space(8.0);
 
             let mut to_remove = None;
-            for (idx, arg) in config.default_launch_options.custom_jvm_args.iter().enumerate() {
+            for (idx, arg) in config
+                .default_launch_options
+                .custom_jvm_args
+                .iter()
+                .enumerate()
+            {
                 ui.horizontal(|ui| {
-                    ui.label(egui::RichText::new(arg).font(egui::FontId::monospace(12.0)).color(TEXT_PRIMARY));
-                    if ui.button(egui::RichText::new("✕").color(TEXT_MUTED)).clicked() {
+                    ui.label(
+                        egui::RichText::new(arg)
+                            .font(egui::FontId::monospace(12.0))
+                            .color(TEXT_PRIMARY),
+                    );
+                    if ui
+                        .button(egui::RichText::new("✕").color(TEXT_MUTED))
+                        .clicked()
+                    {
                         to_remove = Some(idx);
                     }
                 });
@@ -341,16 +370,26 @@ impl SettingsPage {
                         .hint_text("-XX:+...")
                         .desired_width(300.0),
                 );
-                if ui.button(lang.settings_btn_add_arg()).clicked() && !self.custom_jvm_arg_input.trim().is_empty() {
-                    config.default_launch_options.custom_jvm_args.push(self.custom_jvm_arg_input.trim().to_string());
+                if ui.button(lang.settings_btn_add_arg()).clicked()
+                    && !self.custom_jvm_arg_input.trim().is_empty()
+                {
+                    config
+                        .default_launch_options
+                        .custom_jvm_args
+                        .push(self.custom_jvm_arg_input.trim().to_string());
                     self.custom_jvm_arg_input.clear();
                 }
             });
 
             ui.add_space(8.0);
-            ui.label(egui::RichText::new(lang.settings_gc_presets_title()).font(egui::FontId::proportional(12.0)).color(TEXT_MUTED));
+            ui.label(
+                egui::RichText::new(lang.settings_gc_presets_title())
+                    .font(egui::FontId::proportional(12.0))
+                    .color(TEXT_MUTED),
+            );
             ui.horizontal(|ui| {
-                if ui.button(lang.settings_btn_preset_g1gc())
+                if ui
+                    .button(lang.settings_btn_preset_g1gc())
                     .on_hover_text(lang.settings_tooltip_preset_g1gc())
                     .clicked()
                 {
@@ -368,7 +407,8 @@ impl SettingsPage {
                     ];
                 }
 
-                if ui.button(lang.settings_btn_preset_zgc())
+                if ui
+                    .button(lang.settings_btn_preset_zgc())
                     .on_hover_text(lang.settings_tooltip_preset_zgc())
                     .clicked()
                 {
@@ -379,7 +419,8 @@ impl SettingsPage {
                     ];
                 }
 
-                if ui.button(lang.settings_btn_reset_args())
+                if ui
+                    .button(lang.settings_btn_reset_args())
                     .on_hover_text(lang.settings_tooltip_reset_args())
                     .clicked()
                 {
@@ -426,16 +467,28 @@ impl SettingsPage {
                         egui::RichText::new(&acc.username)
                             .font(egui::FontId::proportional(14.0))
                             .strong()
-                            .color(if is_active { Color32::WHITE } else { TEXT_PRIMARY }),
+                            .color(if is_active {
+                                Color32::WHITE
+                            } else {
+                                TEXT_PRIMARY
+                            }),
                     );
 
                     if is_active {
-                        ui.label(egui::RichText::new(lang.settings_account_active()).color(Color32::from_rgb(0x50, 0xB0, 0x50)));
+                        ui.label(
+                            egui::RichText::new(lang.settings_account_active())
+                                .color(Color32::from_rgb(0x50, 0xB0, 0x50)),
+                        );
                     } else if ui.button(lang.settings_btn_set_active()).clicked() {
                         set_active_id = Some(acc.id);
                     }
 
-                    if ui.button(egui::RichText::new(lang.settings_btn_delete_acc()).color(TEXT_MUTED)).clicked() {
+                    if ui
+                        .button(
+                            egui::RichText::new(lang.settings_btn_delete_acc()).color(TEXT_MUTED),
+                        )
+                        .clicked()
+                    {
                         remove_id = Some(acc.id);
                     }
                 });

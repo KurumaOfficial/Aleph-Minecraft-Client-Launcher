@@ -1,7 +1,7 @@
+use crate::version::VersionDetails;
+use amc_core::error::{LauncherError, Result};
 use reqwest::Client;
 use serde::Deserialize;
-use amc_core::error::{LauncherError, Result};
-use crate::version::VersionDetails;
 
 const FABRIC_META: &str = "https://meta.fabricmc.net/v2";
 
@@ -56,7 +56,8 @@ impl FabricLoader {
         mc_version: &str,
         loader_version: &str,
     ) -> Result<VersionDetails> {
-        let url = format!("{FABRIC_META}/versions/loader/{mc_version}/{loader_version}/profile/json");
+        let url =
+            format!("{FABRIC_META}/versions/loader/{mc_version}/{loader_version}/profile/json");
         let res = client
             .get(&url)
             .send()

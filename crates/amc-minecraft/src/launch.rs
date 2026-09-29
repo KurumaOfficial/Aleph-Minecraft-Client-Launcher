@@ -1,14 +1,14 @@
+use crate::args::ArgumentBuilder;
+use crate::version::VersionDetails;
+use amc_auth::AuthSession;
+use amc_core::error::{LauncherError, Result};
+use amc_core::types::LaunchOptions;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 use tokio::sync::mpsc;
-use amc_auth::AuthSession;
-use amc_core::error::{LauncherError, Result};
-use amc_core::types::LaunchOptions;
-use crate::args::ArgumentBuilder;
-use crate::version::VersionDetails;
 
 #[derive(Debug, Clone)]
 pub enum GameEvent {
@@ -42,21 +42,11 @@ impl MinecraftLauncher {
         let features: HashMap<String, bool> = HashMap::new();
         let classpath = ArgumentBuilder::build_classpath(libraries, client_jar);
 
-        let jvm_args = ArgumentBuilder::build_jvm_args(
-            options,
-            natives_dir,
-            &classpath,
-            details,
-            &features,
-        );
+        let jvm_args =
+            ArgumentBuilder::build_jvm_args(options, natives_dir, &classpath, details, &features);
 
         let game_args = ArgumentBuilder::build_game_args(
-            options,
-            game_dir,
-            assets_dir,
-            details,
-            session,
-            &features,
+            options, game_dir, assets_dir, details, session, &features,
         );
 
         let mut cmd = Command::new(java_bin);
@@ -73,7 +63,10 @@ impl MinecraftLauncher {
             // Creation flags on Windows: 0x08000000 = CREATE_NO_WINDOW if desired, or default
         }
 
-        tracing::info!("Spawning Minecraft with {} arguments...", jvm_args.len() + game_args.len() + 1);
+        tracing::info!(
+            "Spawning Minecraft with {} arguments...",
+            jvm_args.len() + game_args.len() + 1
+        );
 
         let mut child = cmd
             .spawn()
@@ -104,7 +97,9 @@ impl MinecraftLauncher {
             tokio::spawn(async move {
                 let mut reader = BufReader::new(err).lines();
                 while let Ok(Some(line)) = reader.next_line().await {
-                    let _ = tx_err.send(GameEvent::LogLine(format!("[ERROR] {line}"))).await;
+                    let _ = tx_err
+                        .send(GameEvent::LogLine(format!("[ERROR] {line}")))
+                        .await;
                 }
             });
         }

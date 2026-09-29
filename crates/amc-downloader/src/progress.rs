@@ -75,7 +75,10 @@ pub struct ProgressTracker {
 }
 
 impl ProgressTracker {
-    pub fn new(total_files: usize, total_bytes: u64) -> (Arc<Self>, watch::Receiver<DownloadProgress>) {
+    pub fn new(
+        total_files: usize,
+        total_bytes: u64,
+    ) -> (Arc<Self>, watch::Receiver<DownloadProgress>) {
         let initial = DownloadProgress {
             total_bytes,
             downloaded_bytes: 0,

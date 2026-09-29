@@ -1,12 +1,12 @@
-use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
+use crate::theme::{
+    lerp_color, BG_CARD, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_DIM, RUBY_LIGHT, TEXT_HEADING,
+    TEXT_MUTED, TEXT_PRIMARY,
+};
 use amc_core::types::{Instance, LoaderType};
 use amc_core::Language;
+use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
 use std::path::Path;
 use uuid::Uuid;
-use crate::theme::{
-    lerp_color, BG_CARD, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_DIM, RUBY_LIGHT,
-    TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
-};
 
 #[derive(Debug, Clone)]
 pub enum InstanceAction {
@@ -91,12 +91,15 @@ impl InstancesPage {
             ui.add_space(10.0);
 
             let (cr_rect, cr_resp) = ui.allocate_exact_size(vec2(160.0, 36.0), Sense::click());
-            let cr_hover = ui.ctx().animate_bool_responsive(cr_resp.id, cr_resp.hovered());
+            let cr_hover = ui
+                .ctx()
+                .animate_bool_responsive(cr_resp.id, cr_resp.hovered());
             let cr_bg = lerp_color(RUBY, RUBY_LIGHT, cr_hover);
             let cr_stroke = lerp_color(RUBY_LIGHT, Color32::WHITE, cr_hover);
 
             ui.painter().rect_filled(cr_rect, Rounding::ZERO, cr_bg);
-            ui.painter().rect_stroke(cr_rect, Rounding::ZERO, Stroke::new(1.0, cr_stroke));
+            ui.painter()
+                .rect_stroke(cr_rect, Rounding::ZERO, Stroke::new(1.0, cr_stroke));
             ui.painter().text(
                 cr_rect.center(),
                 egui::Align2::CENTER_CENTER,
@@ -170,10 +173,8 @@ impl InstancesPage {
                     let inst = &instances[idx];
                     let is_selected = selected_instance.as_ref() == Some(&inst.id);
 
-                    let (rect, resp) = ui.allocate_exact_size(
-                        vec2(ui.available_width(), 64.0),
-                        Sense::click(),
-                    );
+                    let (rect, resp) =
+                        ui.allocate_exact_size(vec2(ui.available_width(), 64.0), Sense::click());
 
                     let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
                     let sel_t = ui.ctx().animate_bool(resp.id.with("sel"), is_selected);
@@ -181,15 +182,16 @@ impl InstancesPage {
                     let base_bg = lerp_color(BG_CARD, BG_HOVER, hover_t);
                     let bg = lerp_color(base_bg, RUBY_DIM, sel_t);
 
-                    let stroke_col = lerp_color(
-                        lerp_color(BORDER_DEFAULT, RUBY, hover_t),
-                        RUBY_LIGHT,
-                        sel_t,
-                    );
+                    let stroke_col =
+                        lerp_color(lerp_color(BORDER_DEFAULT, RUBY, hover_t), RUBY_LIGHT, sel_t);
                     let border_width = if is_selected { 1.5 } else { 1.0 };
 
                     ui.painter().rect_filled(rect, Rounding::ZERO, bg);
-                    ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(border_width, stroke_col));
+                    ui.painter().rect_stroke(
+                        rect,
+                        Rounding::ZERO,
+                        Stroke::new(border_width, stroke_col),
+                    );
 
                     // Left loader accent stripe (Square motif from aleph.icu)
                     let loader_color = match inst.loader {
@@ -201,8 +203,12 @@ impl InstancesPage {
                         LoaderType::OptiFine => Color32::from_rgb(0x00, 0x83, 0x8F),
                     };
                     let bar_w = 3.0;
-                    let bar_rect = egui::Rect::from_min_max(rect.left_top(), egui::pos2(rect.left() + bar_w, rect.bottom()));
-                    ui.painter().rect_filled(bar_rect, Rounding::ZERO, loader_color);
+                    let bar_rect = egui::Rect::from_min_max(
+                        rect.left_top(),
+                        egui::pos2(rect.left() + bar_w, rect.bottom()),
+                    );
+                    ui.painter()
+                        .rect_filled(bar_rect, Rounding::ZERO, loader_color);
 
                     let mut child = ui.new_child(
                         egui::UiBuilder::new()
@@ -220,7 +226,9 @@ impl InstancesPage {
                         LoaderType::NeoForge => "⚡",
                         LoaderType::OptiFine => "✨",
                     };
-                    child.label(egui::RichText::new(icon_glyph).font(egui::FontId::proportional(22.0)));
+                    child.label(
+                        egui::RichText::new(icon_glyph).font(egui::FontId::proportional(22.0)),
+                    );
                     child.add_space(12.0);
 
                     // Name + version
@@ -264,9 +272,12 @@ impl InstancesPage {
                                 )
                             };
                             ui.label(
-                                egui::RichText::new(format!("• ⏱ {}", lang.inst_playtime_label(&play_time_str)))
-                                    .font(egui::FontId::proportional(11.0))
-                                    .color(TEXT_MUTED),
+                                egui::RichText::new(format!(
+                                    "• ⏱ {}",
+                                    lang.inst_playtime_label(&play_time_str)
+                                ))
+                                .font(egui::FontId::proportional(11.0))
+                                .color(TEXT_MUTED),
                             );
                         });
                     });
@@ -319,13 +330,20 @@ impl InstancesPage {
                     child.add_space(6.0);
 
                     // Quick launch
-                    let (pb_rect, pb_resp) = child.allocate_exact_size(vec2(76.0, 28.0), Sense::click());
-                    let pb_hover = child.ctx().animate_bool_responsive(pb_resp.id, pb_resp.hovered());
+                    let (pb_rect, pb_resp) =
+                        child.allocate_exact_size(vec2(76.0, 28.0), Sense::click());
+                    let pb_hover = child
+                        .ctx()
+                        .animate_bool_responsive(pb_resp.id, pb_resp.hovered());
                     let pb_bg = lerp_color(RUBY, RUBY_LIGHT, pb_hover);
                     let pb_stroke = lerp_color(RUBY_LIGHT, Color32::WHITE, pb_hover);
 
                     child.painter().rect_filled(pb_rect, Rounding::ZERO, pb_bg);
-                    child.painter().rect_stroke(pb_rect, Rounding::ZERO, Stroke::new(1.0, pb_stroke));
+                    child.painter().rect_stroke(
+                        pb_rect,
+                        Rounding::ZERO,
+                        Stroke::new(1.0, pb_stroke),
+                    );
                     child.painter().text(
                         pb_rect.center(),
                         egui::Align2::CENTER_CENTER,
@@ -370,29 +388,68 @@ impl InstancesPage {
 
                     ui.add_space(10.0);
                     ui.label(egui::RichText::new(lang.inst_modal_version()).color(TEXT_PRIMARY));
-                    ui.add(TextEdit::singleline(&mut self.new_instance_version).desired_width(400.0));
+                    ui.add(
+                        TextEdit::singleline(&mut self.new_instance_version).desired_width(400.0),
+                    );
 
                     ui.add_space(10.0);
                     ui.label(egui::RichText::new(lang.inst_modal_loader()).color(TEXT_PRIMARY));
                     egui::ComboBox::from_id_salt("loader_select")
                         .selected_text(self.new_instance_loader.as_str())
                         .show_ui(ui, |ui| {
-                            ui.selectable_value(&mut self.new_instance_loader, LoaderType::Vanilla, "Vanilla");
-                            ui.selectable_value(&mut self.new_instance_loader, LoaderType::Fabric, "Fabric");
-                            ui.selectable_value(&mut self.new_instance_loader, LoaderType::Quilt, "Quilt");
-                            ui.selectable_value(&mut self.new_instance_loader, LoaderType::Forge, "Forge");
-                            ui.selectable_value(&mut self.new_instance_loader, LoaderType::NeoForge, "NeoForge");
-                            ui.selectable_value(&mut self.new_instance_loader, LoaderType::OptiFine, "OptiFine");
+                            ui.selectable_value(
+                                &mut self.new_instance_loader,
+                                LoaderType::Vanilla,
+                                "Vanilla",
+                            );
+                            ui.selectable_value(
+                                &mut self.new_instance_loader,
+                                LoaderType::Fabric,
+                                "Fabric",
+                            );
+                            ui.selectable_value(
+                                &mut self.new_instance_loader,
+                                LoaderType::Quilt,
+                                "Quilt",
+                            );
+                            ui.selectable_value(
+                                &mut self.new_instance_loader,
+                                LoaderType::Forge,
+                                "Forge",
+                            );
+                            ui.selectable_value(
+                                &mut self.new_instance_loader,
+                                LoaderType::NeoForge,
+                                "NeoForge",
+                            );
+                            ui.selectable_value(
+                                &mut self.new_instance_loader,
+                                LoaderType::OptiFine,
+                                "OptiFine",
+                            );
                         });
 
                     ui.add_space(10.0);
-                    ui.label(egui::RichText::new(format!("{}: {} MB", lang.inst_modal_ram(), self.new_instance_ram)).color(TEXT_PRIMARY));
-                    ui.add(egui::Slider::new(&mut self.new_instance_ram, 1024..=16384).step_by(512.0));
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "{}: {} MB",
+                            lang.inst_modal_ram(),
+                            self.new_instance_ram
+                        ))
+                        .color(TEXT_PRIMARY),
+                    );
+                    ui.add(
+                        egui::Slider::new(&mut self.new_instance_ram, 1024..=16384).step_by(512.0),
+                    );
 
                     ui.add_space(18.0);
                     ui.horizontal(|ui| {
                         if ui
-                            .button(egui::RichText::new(lang.inst_modal_btn_create()).strong().color(Color32::WHITE))
+                            .button(
+                                egui::RichText::new(lang.inst_modal_btn_create())
+                                    .strong()
+                                    .color(Color32::WHITE),
+                            )
                             .clicked()
                         {
                             let mut inst = Instance::new(
@@ -430,29 +487,68 @@ impl InstancesPage {
 
                     ui.add_space(10.0);
                     ui.label(egui::RichText::new(lang.inst_modal_version()).color(TEXT_PRIMARY));
-                    ui.add(TextEdit::singleline(&mut self.edit_instance_version).desired_width(400.0));
+                    ui.add(
+                        TextEdit::singleline(&mut self.edit_instance_version).desired_width(400.0),
+                    );
 
                     ui.add_space(10.0);
                     ui.label(egui::RichText::new(lang.inst_modal_loader()).color(TEXT_PRIMARY));
                     egui::ComboBox::from_id_salt("edit_loader_select")
                         .selected_text(self.edit_instance_loader.as_str())
                         .show_ui(ui, |ui| {
-                            ui.selectable_value(&mut self.edit_instance_loader, LoaderType::Vanilla, "Vanilla");
-                            ui.selectable_value(&mut self.edit_instance_loader, LoaderType::Fabric, "Fabric");
-                            ui.selectable_value(&mut self.edit_instance_loader, LoaderType::Quilt, "Quilt");
-                            ui.selectable_value(&mut self.edit_instance_loader, LoaderType::Forge, "Forge");
-                            ui.selectable_value(&mut self.edit_instance_loader, LoaderType::NeoForge, "NeoForge");
-                            ui.selectable_value(&mut self.edit_instance_loader, LoaderType::OptiFine, "OptiFine");
+                            ui.selectable_value(
+                                &mut self.edit_instance_loader,
+                                LoaderType::Vanilla,
+                                "Vanilla",
+                            );
+                            ui.selectable_value(
+                                &mut self.edit_instance_loader,
+                                LoaderType::Fabric,
+                                "Fabric",
+                            );
+                            ui.selectable_value(
+                                &mut self.edit_instance_loader,
+                                LoaderType::Quilt,
+                                "Quilt",
+                            );
+                            ui.selectable_value(
+                                &mut self.edit_instance_loader,
+                                LoaderType::Forge,
+                                "Forge",
+                            );
+                            ui.selectable_value(
+                                &mut self.edit_instance_loader,
+                                LoaderType::NeoForge,
+                                "NeoForge",
+                            );
+                            ui.selectable_value(
+                                &mut self.edit_instance_loader,
+                                LoaderType::OptiFine,
+                                "OptiFine",
+                            );
                         });
 
                     ui.add_space(10.0);
-                    ui.label(egui::RichText::new(format!("{}: {} MB", lang.inst_modal_ram(), self.edit_instance_ram)).color(TEXT_PRIMARY));
-                    ui.add(egui::Slider::new(&mut self.edit_instance_ram, 1024..=32768).step_by(512.0));
+                    ui.label(
+                        egui::RichText::new(format!(
+                            "{}: {} MB",
+                            lang.inst_modal_ram(),
+                            self.edit_instance_ram
+                        ))
+                        .color(TEXT_PRIMARY),
+                    );
+                    ui.add(
+                        egui::Slider::new(&mut self.edit_instance_ram, 1024..=32768).step_by(512.0),
+                    );
 
                     ui.add_space(18.0);
                     ui.horizontal(|ui| {
                         if ui
-                            .button(egui::RichText::new(lang.inst_modal_btn_save()).strong().color(Color32::WHITE))
+                            .button(
+                                egui::RichText::new(lang.inst_modal_btn_save())
+                                    .strong()
+                                    .color(Color32::WHITE),
+                            )
                             .clicked()
                         {
                             save_edit = true;

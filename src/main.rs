@@ -1,10 +1,10 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use amc_core::init_logging;
+use amc_core::paths::LauncherPaths;
+use amc_ui::{setup_fonts, LauncherApp};
 use eframe::egui::vec2;
 use eframe::NativeOptions;
-use amc_core::paths::LauncherPaths;
-use amc_core::init_logging;
-use amc_ui::{setup_fonts, LauncherApp};
 
 fn app_icon() -> Option<egui::IconData> {
     let image = image::load_from_memory(include_bytes!("../assets/icon.png"))

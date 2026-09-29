@@ -14,7 +14,12 @@ pub fn init_logging(log_dir: Option<&Path>) {
     if let Some(dir) = log_dir {
         let _ = std::fs::create_dir_all(dir);
         let log_file_path = dir.join("launcher.log");
-        if let Ok(file) = OpenOptions::new().create(true).write(true).append(true).open(&log_file_path) {
+        if let Ok(file) = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .append(true)
+            .open(&log_file_path)
+        {
             let file_writer = Mutex::new(file);
             let file_layer = tracing_subscriber::fmt::layer()
                 .with_ansi(false)

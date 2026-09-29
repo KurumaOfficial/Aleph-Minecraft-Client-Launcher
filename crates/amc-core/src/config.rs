@@ -1,8 +1,8 @@
-use std::fs;
-use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
 use crate::error::{LauncherError, Result};
 use crate::types::LaunchOptions;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UiSettings {
@@ -40,7 +40,6 @@ impl Default for UiSettings {
         }
     }
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LauncherConfig {

@@ -11,4 +11,3 @@ pub use i18n::Language;
 pub use logging::init_logging;
 pub use paths::LauncherPaths;
 pub use types::{GameVersion, Instance, LaunchOptions, LoaderType, ReleaseType};
-

@@ -1,9 +1,9 @@
+use amc_core::error::{LauncherError, Result};
 use serde::Deserialize;
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::time::timeout;
-use amc_core::error::{LauncherError, Result};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ServerVersionInfo {
@@ -97,7 +97,8 @@ impl ServerPinger {
 
             let json_len = read_varint(&mut stream)
                 .await
-                .map_err(|e| LauncherError::Network(format!("Read string len: {e}")))? as usize;
+                .map_err(|e| LauncherError::Network(format!("Read string len: {e}")))?
+                as usize;
 
             if json_len > 32768 {
                 return Err(LauncherError::Network("Server response too large".into()));
@@ -110,7 +111,8 @@ impl ServerPinger {
                 .map_err(|e| LauncherError::Network(format!("Read body: {e}")))?;
 
             let json_str = String::from_utf8_lossy(&json_bytes);
-            let raw: ServerStatusRaw = serde_json::from_str(&json_str).map_err(LauncherError::Json)?;
+            let raw: ServerStatusRaw =
+                serde_json::from_str(&json_str).map_err(LauncherError::Json)?;
 
             Ok(raw)
         })
@@ -209,7 +211,10 @@ fn strip_minecraft_color_codes(text: &str) -> String {
         if c == '§' || c == '&' {
             if let Some(&next) = chars.peek() {
                 if next.is_ascii_hexdigit()
-                    || matches!(next, 'k' | 'l' | 'm' | 'n' | 'o' | 'r' | 'K' | 'L' | 'M' | 'N' | 'O' | 'R')
+                    || matches!(
+                        next,
+                        'k' | 'l' | 'm' | 'n' | 'o' | 'r' | 'K' | 'L' | 'M' | 'N' | 'O' | 'R'
+                    )
                 {
                     chars.next();
                     continue;

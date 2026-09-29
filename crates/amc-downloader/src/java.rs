@@ -1,12 +1,12 @@
+use crate::engine::{DownloadEngine, DownloadItem};
+use crate::progress::ProgressTracker;
+use amc_core::error::{LauncherError, Result};
 use flate2::read::GzDecoder;
 use std::fs::{self, File};
 use std::io::copy;
 use std::path::{Path, PathBuf};
 use tar::Archive as TarArchive;
 use zip::ZipArchive;
-use amc_core::error::{LauncherError, Result};
-use crate::engine::{DownloadEngine, DownloadItem};
-use crate::progress::ProgressTracker;
 
 pub struct AdoptiumInstaller;
 
@@ -137,9 +137,15 @@ impl AdoptiumInstaller {
                     let tar = GzDecoder::new(file);
                     let mut archive = TarArchive::new(tar);
 
-                    for entry_res in archive.entries().map_err(|e| LauncherError::Java(format!("Tar error: {e}")))? {
-                        let mut entry = entry_res.map_err(|e| LauncherError::Java(format!("Tar entry error: {e}")))?;
-                        let path = entry.path().map_err(|e| LauncherError::Java(format!("Tar path error: {e}")))?;
+                    for entry_res in archive
+                        .entries()
+                        .map_err(|e| LauncherError::Java(format!("Tar error: {e}")))?
+                    {
+                        let mut entry = entry_res
+                            .map_err(|e| LauncherError::Java(format!("Tar entry error: {e}")))?;
+                        let path = entry
+                            .path()
+                            .map_err(|e| LauncherError::Java(format!("Tar path error: {e}")))?;
 
                         let mut components = path.components();
                         components.next();
@@ -167,8 +173,7 @@ impl AdoptiumInstaller {
             }
         })
         .await
-        .map_err(|e| LauncherError::Custom(format!("Extraction thread panicked: {e}")))?
-        ?;
+        .map_err(|e| LauncherError::Custom(format!("Extraction thread panicked: {e}")))??;
 
         #[cfg(unix)]
         {

@@ -28,7 +28,9 @@ pub enum LauncherError {
     #[error("Loader error: {0}")]
     Loader(String),
 
-    #[error("Download integrity check failed for {file}: expected sha1 {expected}, calculated {actual}")]
+    #[error(
+        "Download integrity check failed for {file}: expected sha1 {expected}, calculated {actual}"
+    )]
     ChecksumMismatch {
         file: String,
         expected: String,

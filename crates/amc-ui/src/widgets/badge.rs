@@ -1,11 +1,14 @@
-use egui::{vec2, Color32, Rounding, Ui};
-use amc_core::types::ReleaseType;
 use crate::theme::{BADGE_ALPHA, BADGE_BETA, BADGE_OLD, BADGE_SNAPSHOT, RUBY};
+use amc_core::types::ReleaseType;
+use egui::{vec2, Color32, Rounding, Ui};
 
 pub fn draw_custom_badge(ui: &mut Ui, text: &str, bg_color: Color32) {
     let font = egui::FontId::proportional(10.0);
     let padding = vec2(8.0, 3.0);
-    let text_size = ui.painter().layout_no_wrap(text.to_string(), font.clone(), Color32::WHITE).size();
+    let text_size = ui
+        .painter()
+        .layout_no_wrap(text.to_string(), font.clone(), Color32::WHITE)
+        .size();
     let badge_size = text_size + padding * 2.0;
 
     let (rect, _) = ui.allocate_exact_size(badge_size, egui::Sense::hover());
