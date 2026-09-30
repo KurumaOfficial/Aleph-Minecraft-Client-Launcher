@@ -162,6 +162,42 @@ with zero telemetry (network only: Mojang, Adoptium, Modrinth, CurseForge).
 | Profile (nickname/skin/cape) | ⬜ Todo | P7 |
 | After launch: minimize/keep; parallel launches incl. same instance ×N | 🟡 Partial | `close_after_launch` bool ✅; 3 states + parallel — P2 |
 
+### Folded back from the working copy (returned to the concept on 2026-09-30)
+
+| Concept item | Status | Location / note |
+|---|---|---|
+| Newcomer tutorial tour; .minecraft reuse instead of re-download | ⬜ Todo | P1 |
+| Quick start = last played version; single setup in Simple; classic versions | ⬜ Todo | P1/P2 |
+| AMC-only templates; clone with worlds/mods choice; folders/tags/sort/pin/search; notes; pre/post scripts; Java/RAM groups | ⬜ Todo | P2 |
+| Instance card (glanceable content); disk usage | 🟡 Partial | Content partial; disk usage — P2 |
+| Ratings in mod search | ⬜ Todo | P4 (fields already in the APIs) |
+| World import by dragging its folder | ⬜ Todo | P4 |
+| OptiFine as a regular mod (temporarily a loader in code, P2) | 🟡 Partial | Move to mod-style install — P4 |
+| Unsafe-loader warning | ⬜ Todo | P2/P4 |
+| Wishlist; batch actions; auto-dependencies; incompatibility warning; "often installed together" | ⬜ Todo | P4 |
+| CLI mode (automation, servers) | ⬜ Todo | New phase P14 |
+| Local-mod instance badge; "no antivirus scan" policy | ⬜/✅ | Badge — P2; policy fixed |
+| Instance shortcuts with direct launch; GPU choice; per-instance resolution; instance icon in taskbar | ⬜ Todo | P11/P14 (shortcuts need CLI) |
+| Config editor (Pro) | ⬜ Todo | P2 |
+| Free-space check before downloading | ⬜ Todo | P2 (with disk usage) |
+| Java manager screen (add/remove) | ⬜ Todo | P5 |
+| Server-required mods (window + auto-install) | ⬜ Todo | P8 |
+| OS autostart | ⬜ Todo | P11 |
+| .NET/VC++ check in the installer | ⬜ Todo | P11 |
+| Resource pack previews + resolution filter | ⬜ Todo | P10 |
+| Launcher updates: at startup only, changelog, signature, portable settings, Linux formats, trusted mode | ⬜ Todo | P11 |
+| Process priority + FPS overlay | ⬜ Todo | P2/P11 |
+| Pack rollback + autobackup + changelog; version pinning | ⬜ Todo | P4 |
+| Settings export/import via file | ⬜ Todo | P10 |
+| Crash reports opt-out (concept requires opt-out, not opt-in) | ⬜ Todo | P12 |
+| Verify/repair files + health score | ⬜ Todo | P2 |
+| Deletion trash; uninstall data question; instance backup to disk | ⬜ Todo | P2/P9/P11 |
+| Scheduled world backups + folder choice | ⬜ Todo | P9 |
+| WetID 2FA; per-launch identity picker + "remember"; default account per instance | ⬜ Todo | P6 |
+| Post-exit session summary | ⬜ Todo | P10 |
+| Hotkeys + gamepad; per-type notifications | ⬜ Todo | P10 |
+| Local server button (tunneling — ❓ open) | ⬜ Todo | P13 |
+
 ## 4. Work phases
 
 ### P0 — Foundation: docs, board, CI (this commit)
@@ -248,13 +284,18 @@ with zero telemetry (network only: Mojang, Adoptium, Modrinth, CurseForge).
 - Acceptance: both formats install; self-update works; offline launch verified.
 
 ### P12 — Diagnostics and data
-- [ ] Anonymous crash reports (automatic, but with explicit opt-in in wizard/settings — given the zero-telemetry stance).
+- [ ] Anonymous crash reports: automatic per the concept, but with explicit opt-out in wizard/settings (zero telemetry holds: network only under consent, see 1.2).
 - [ ] Conflicts stay log-only, no auto-fix (already so — do not break).
 - Acceptance: reports go out only with consent; crash diagnostics cover OOM/Java/deps.
 
 ### P13 — Steam co-op
 - [ ] Steam invites + co-op as a built-in feature (not a separate mod), all account types, no launcher chat.
 - Acceptance: two players with different account types play via invite with no manual port forwarding.
+
+### P14 — CLI and direct launches (from the working copy)
+- [ ] Headless mode (`--launch <instance>`, `--help`, exit codes) on the same pipeline as the GUI.
+- [ ] Instance shortcuts (Desktop/Start) via CLI — launch with no launcher window.
+- Acceptance: a shortcut launches an instance with no GUI; `cli --help` runs in CI.
 
 ## 5. Open questions (`❓ Open` — await concept updates)
 
@@ -267,6 +308,10 @@ with zero telemetry (network only: Mojang, Adoptium, Modrinth, CurseForge).
 7. 3D skin preview in 1.0 — required or is 2D enough?
 8. Win7 — support literally or amend the concept to Win10+?
 9. Family WetIDs on one device — really no exceptions?
+10. Custom URL protocol (amc://) for installing from sites — needed or not?
+11. Donation platform(s) — not chosen.
+12. Donor profile badge — yes or no?
+13. What WetID registration requires — undefined.
 
 ## 6. Definition of Done for v1.0 (release checklist)
 
@@ -279,7 +324,7 @@ with zero telemetry (network only: Mojang, Adoptium, Modrinth, CurseForge).
 - [ ] Skins + profile (P7), server favorites with inject (P8), world backups (P9).
 - [ ] Stats, screenshots, resource/shader packs (P10).
 - [ ] Installer + portable + self-update + offline launch + perf budget (P11).
-- [ ] Opt-in crash reports (P12), Steam co-op (P13).
+- [ ] Opt-out crash reports (P12), Steam co-op (P13), CLI + shortcuts (P14).
 - [ ] `cargo test --workspace` + `clippy` + `fmt` green; manual checklist over section 3 matrix.
 - [ ] `docs/` updated; open questions either resolved or explicitly moved to 2.0.
 
