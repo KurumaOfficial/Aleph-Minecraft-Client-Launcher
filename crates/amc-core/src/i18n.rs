@@ -897,6 +897,151 @@ impl Language {
         }
     }
 
+    // ==========================================
+    // First-run wizard (ROADMAP P1)
+    // ==========================================
+    pub fn wizard_title(&self) -> &'static str {
+        match self {
+            Self::English => "Setup Wizard",
+            Self::Russian => "Мастер настройки",
+            Self::Ukrainian => "Майстер налаштування",
+        }
+    }
+
+    pub fn wizard_step_language(&self) -> &'static str {
+        match self {
+            Self::English => "Step 1 — Language",
+            Self::Russian => "Шаг 1 — Язык",
+            Self::Ukrainian => "Крок 1 — Мова",
+        }
+    }
+
+    pub fn wizard_step_mode(&self) -> &'static str {
+        match self {
+            Self::English => "Step 2 — Interface",
+            Self::Russian => "Шаг 2 — Интерфейс",
+            Self::Ukrainian => "Крок 2 — Інтерфейс",
+        }
+    }
+
+    pub fn wizard_step_account(&self) -> &'static str {
+        match self {
+            Self::English => "Step 3 — Account",
+            Self::Russian => "Шаг 3 — Аккаунт",
+            Self::Ukrainian => "Крок 3 — Акаунт",
+        }
+    }
+
+    pub fn wizard_next(&self) -> &'static str {
+        match self {
+            Self::English => "Next →",
+            Self::Russian => "Далее →",
+            Self::Ukrainian => "Далі →",
+        }
+    }
+
+    pub fn wizard_back(&self) -> &'static str {
+        match self {
+            Self::English => "← Back",
+            Self::Russian => "← Назад",
+            Self::Ukrainian => "← Назад",
+        }
+    }
+
+    pub fn wizard_ms_title(&self) -> &'static str {
+        match self {
+            Self::English => "Microsoft account",
+            Self::Russian => "Аккаунт Microsoft",
+            Self::Ukrainian => "Акаунт Microsoft",
+        }
+    }
+
+    pub fn wizard_ms_desc(&self) -> &'static str {
+        match self {
+            Self::English => "Licensed servers. Opens the login window.",
+            Self::Russian => "Лицензионные серверы. Откроет окно входа.",
+            Self::Ukrainian => "Ліцензійні сервери. Відкриє вікно входу.",
+        }
+    }
+
+    pub fn wizard_offline_title(&self) -> &'static str {
+        match self {
+            Self::English => "Play without an account",
+            Self::Russian => "Играть без аккаунта",
+            Self::Ukrainian => "Грати без акаунта",
+        }
+    }
+
+    pub fn wizard_offline_hint(&self) -> &'static str {
+        match self {
+            Self::English => "Nickname, 3–16 chars: A–Z, 0–9, _",
+            Self::Russian => "Ник, 3–16 символов: A–Z, 0–9, _",
+            Self::Ukrainian => "Нік, 3–16 символів: A–Z, 0–9, _",
+        }
+    }
+
+    pub fn wizard_offline_invalid(&self) -> &'static str {
+        match self {
+            Self::English => "Check the nickname format above",
+            Self::Russian => "Проверь формат ника выше",
+            Self::Ukrainian => "Перевір формат ніку вище",
+        }
+    }
+
+    pub fn wizard_wetid_title(&self) -> &'static str {
+        match self {
+            Self::English => "WetID",
+            Self::Russian => "WetID",
+            Self::Ukrainian => "WetID",
+        }
+    }
+
+    pub fn wizard_wetid_soon(&self) -> &'static str {
+        match self {
+            Self::English => "Browser sign-in arrives in P6",
+            Self::Russian => "Вход через браузер появится в P6",
+            Self::Ukrainian => "Вхід через браузер з'явиться в P6",
+        }
+    }
+
+    pub fn wizard_hw_title(&self) -> &'static str {
+        match self {
+            Self::English => "Weak hardware detected",
+            Self::Russian => "Обнаружено слабое железо",
+            Self::Ukrainian => "Виявлено слабке залізо",
+        }
+    }
+
+    pub fn wizard_hw_body(&self) -> &'static str {
+        match self {
+            Self::English => "The launcher will run, but expect lower FPS. Lightweight mod suggestions (Sodium/Lithium) arrive with the mod manager.",
+            Self::Russian => "Лаунчер будет работать, но FPS может быть ниже. Подсказки лёгких модов (Sodium/Lithium) появятся вместе с менеджером модов.",
+            Self::Ukrainian => "Лаунчер працюватиме, але FPS може бути нижчим. Підказки легких модів (Sodium/Lithium) з'являться разом із менеджером модів.",
+        }
+    }
+
+    pub fn wizard_hw_specs(&self, ram: &str, threads: u32, disk: &str) -> String {
+        match self {
+            Self::English => {
+                format!("RAM: {ram} (min 4 GB) • CPU threads: {threads} (min 4) • Disk: {disk} (min 2 GB)")
+            }
+            Self::Russian => {
+                format!("RAM: {ram} (мин. 4 ГБ) • Потоков CPU: {threads} (мин. 4) • Диск: {disk} (мин. 2 ГБ)")
+            }
+            Self::Ukrainian => {
+                format!("RAM: {ram} (мін. 4 ГБ) • Потоків CPU: {threads} (мін. 4) • Диск: {disk} (мін. 2 ГБ)")
+            }
+        }
+    }
+
+    pub fn wizard_hw_ok(&self) -> &'static str {
+        match self {
+            Self::English => "Understood",
+            Self::Russian => "Понятно",
+            Self::Ukrainian => "Зрозуміло",
+        }
+    }
+
     pub fn settings_resolution_title(&self) -> &'static str {
         match self {
             Self::English => "Game Window Resolution",
@@ -1728,6 +1873,23 @@ mod tests {
             assert!(!lang.settings_mode_simple_desc().is_empty());
             assert!(!lang.settings_mode_pro().is_empty());
             assert!(!lang.settings_mode_pro_desc().is_empty());
+            assert!(!lang.wizard_title().is_empty());
+            assert!(!lang.wizard_step_language().is_empty());
+            assert!(!lang.wizard_step_mode().is_empty());
+            assert!(!lang.wizard_step_account().is_empty());
+            assert!(!lang.wizard_next().is_empty());
+            assert!(!lang.wizard_back().is_empty());
+            assert!(!lang.wizard_ms_title().is_empty());
+            assert!(!lang.wizard_ms_desc().is_empty());
+            assert!(!lang.wizard_offline_title().is_empty());
+            assert!(!lang.wizard_offline_hint().is_empty());
+            assert!(!lang.wizard_offline_invalid().is_empty());
+            assert!(!lang.wizard_wetid_title().is_empty());
+            assert!(!lang.wizard_wetid_soon().is_empty());
+            assert!(!lang.wizard_hw_title().is_empty());
+            assert!(!lang.wizard_hw_body().is_empty());
+            assert!(!lang.wizard_hw_specs("8 GB", 8, "100 GB").is_empty());
+            assert!(!lang.wizard_hw_ok().is_empty());
         }
     }
 }

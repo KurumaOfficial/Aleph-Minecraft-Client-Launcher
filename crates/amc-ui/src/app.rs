@@ -2,6 +2,7 @@ use amc_auth::{Account, AccountManager, DeviceCodeResponse, MicrosoftAuthFlow};
 use amc_core::config::LauncherConfig;
 use amc_core::paths::LauncherPaths;
 use amc_core::types::{GameVersion, Instance, LoaderType};
+use amc_core::HardwareReport;
 use amc_downloader::{AdoptiumInstaller, DownloadEngine, DownloadProgress};
 use amc_minecraft::{
     FabricLoader, GameEvent, MinecraftLauncher, QuiltLoader, VersionDetails, VersionManifest,
@@ -14,7 +15,9 @@ use egui::{CentralPanel, Context, SidePanel, TopBottomPanel, ViewportCommand};
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
 
-use crate::modals::{ConsoleModal, DownloadOverlay, LoginModal};
+use crate::modals::{
+    ConsoleModal, DownloadOverlay, LoginModal, LoginMode, WizardAction, WizardFlow,
+};
 use crate::pages::{HomePage, InstanceAction, InstancesPage, ModsPage, SettingsPage, SkinsPage};
 use crate::theme::{apply_aleph_theme, BG};
 use crate::widgets::{BottomBar, NavTab, Sidebar, TitleBar};
@@ -44,6 +47,10 @@ pub struct LauncherApp {
     // Modals
     login_modal: LoginModal,
     console_modal: ConsoleModal,
+
+    // First-run wizard (ROADMAP P1) and the one-time hardware notice.
+    wizard: Option<WizardFlow>,
+    hw_notice: Option<HardwareReport>,
 
     // Dynamic textures
     avatar_texture: Option<egui::TextureHandle>,
@@ -92,12 +99,29 @@ impl LauncherApp {
 
         let lang = config.ui.language();
 
+        // Professional mode opens on instances (computed before `config` moves
+        // into the app struct below).
+        let initial_tab = if config.app_mode == amc_core::config::AppMode::Professional {
+            NavTab::Modpacks
+        } else {
+            NavTab::Home
+        };
+
+        // A fresh profile (no config file yet) starts with the setup wizard.
+        let wizard = if config.first_run {
+            Some(WizardFlow::new(config.ui.language(), config.app_mode))
+        } else {
+            None
+        };
+
         Self {
             paths,
             config,
             account_mgr,
             download_engine,
-            current_tab: NavTab::Home,
+            // Professional mode opens on instances, Simple on versions (ROADMAP P1:
+            // different home screens start here; full split follows in P2).
+            current_tab: initial_tab,
             selected_version,
             selected_instance,
             versions: Vec::new(),
@@ -111,6 +135,8 @@ impl LauncherApp {
             settings_page: SettingsPage::default(),
             login_modal: LoginModal::default(),
             console_modal: ConsoleModal::default(),
+            wizard,
+            hw_notice: None,
             avatar_texture: None,
             session_start_time: None,
             launched_instance_id: None,
@@ -139,6 +165,26 @@ impl LauncherApp {
             tracing::error!("Accounts storage unreadable, starting signed-out");
             AccountManager::new("accounts.json")
         })
+    }
+
+    /// Persist the wizard choices, clear the first-run flag, and schedule the
+    /// weak-hardware notice when the machine is below target. Never blocks.
+    fn complete_wizard(&mut self) {
+        if let Some(flow) = self.wizard.take() {
+            self.config.ui.set_language(flow.language);
+            self.config.app_mode = flow.mode;
+            self.current_tab = if flow.mode == amc_core::config::AppMode::Professional {
+                NavTab::Modpacks
+            } else {
+                NavTab::Home
+            };
+        }
+        self.config.first_run = false;
+        let _ = self.config.save_to_path(&self.paths.config_file());
+        let report = HardwareReport::gather(&self.paths.root_dir);
+        if report.is_weak() || report.is_low_disk() {
+            self.hw_notice = Some(report);
+        }
     }
 
     pub fn ping_featured_server(&mut self) {
@@ -914,6 +960,38 @@ impl App for LauncherApp {
             self.avatar_texture =
                 Some(ctx.load_texture("player_avatar", avatar_img, egui::TextureOptions::NEAREST));
             self.skins_page.avatar_dirty = false;
+        }
+
+        // First-run wizard (ROADMAP P1) takes over the whole window until done.
+        if self.wizard.is_some() {
+            let action = self
+                .wizard
+                .as_mut()
+                .map(|flow| flow.show(ctx))
+                .unwrap_or(WizardAction::None);
+            match action {
+                WizardAction::None => {}
+                WizardAction::Finished => self.complete_wizard(),
+                WizardAction::CreateOffline(account) => {
+                    let _ = self.account_mgr.add_or_update_account(account);
+                    self.complete_wizard();
+                }
+                WizardAction::OpenMicrosoftLogin => {
+                    self.login_modal.is_open = true;
+                    self.login_modal.mode = LoginMode::Microsoft;
+                    self.complete_wizard();
+                }
+            }
+            if self.wizard.is_some() {
+                return;
+            }
+        }
+
+        // One-time weak-hardware notice right after the wizard.
+        if let Some(report) = self.hw_notice.take() {
+            if !crate::modals::wizard::show_hardware_notice(ctx, lang, &report) {
+                self.hw_notice = Some(report);
+            }
         }
 
         // 1. Top custom titlebar
