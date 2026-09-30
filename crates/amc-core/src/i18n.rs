@@ -1555,6 +1555,56 @@ impl Language {
         }
     }
 
+    /// Human-readable byte count (CONCEPT "Место на диске").
+    pub fn disk_size(&self, bytes: u64) -> String {
+        const MB: f64 = 1024.0 * 1024.0;
+        const GB: f64 = 1024.0 * MB;
+        let (value, unit) = if bytes < 1024 * 1024 {
+            (
+                format!("{}", bytes / 1024),
+                match self {
+                    Self::English => "KB",
+                    Self::Russian | Self::Ukrainian => "КБ",
+                },
+            )
+        } else if bytes < 1024 * 1024 * 1024 {
+            (
+                Self::one_decimal(bytes as f64 / MB, self),
+                match self {
+                    Self::English => "MB",
+                    Self::Russian | Self::Ukrainian => "МБ",
+                },
+            )
+        } else {
+            (
+                Self::one_decimal(bytes as f64 / GB, self),
+                match self {
+                    Self::English => "GB",
+                    Self::Russian | Self::Ukrainian => "ГБ",
+                },
+            )
+        };
+        format!("{value} {unit}")
+    }
+
+    fn one_decimal(value: f64, lang: &Self) -> String {
+        let text = format!("{value:.1}");
+        match lang {
+            Self::English => text,
+            Self::Russian | Self::Ukrainian => text.replace('.', ","),
+        }
+    }
+
+    pub fn err_low_disk(&self, need: &str, free: &str) -> String {
+        match self {
+            Self::English => format!("Not enough disk space: need {need}, free {free}"),
+            Self::Russian => format!("Не хватает места на диске: нужно {need}, свободно {free}"),
+            Self::Ukrainian => {
+                format!("Не вистачає місця на диску: потрібно {need}, вільно {free}")
+            }
+        }
+    }
+
     pub fn status_process_exited(&self, code: Option<i32>) -> String {
         match self {
             Self::English => format!("Minecraft process exited with code {:?}", code),
@@ -1834,6 +1884,23 @@ mod tests {
     }
 
     #[test]
+    fn test_disk_size_formatting() {
+        assert_eq!(Language::English.disk_size(0), "0 KB");
+        assert_eq!(Language::English.disk_size(512 * 1024), "512 KB");
+        assert_eq!(Language::English.disk_size(1536 * 1024), "1.5 MB");
+        assert_eq!(
+            Language::English.disk_size(2 * 1024 * 1024 * 1024),
+            "2.0 GB"
+        );
+        assert_eq!(Language::Russian.disk_size(1536 * 1024), "1,5 МБ");
+        assert_eq!(
+            Language::Russian.disk_size(2 * 1024 * 1024 * 1024),
+            "2,0 ГБ"
+        );
+        assert_eq!(Language::Ukrainian.disk_size(100 * 1024), "100 КБ");
+    }
+
+    #[test]
     fn test_locale_tag_mapping() {
         // BCP-47 (Windows) and POSIX forms, any letter case.
         assert_eq!(Language::from_locale_tag("ru-RU"), Language::Russian);
@@ -1908,6 +1975,8 @@ mod tests {
             assert!(!lang.wizard_hw_ok().is_empty());
             assert!(!lang.status_resolving_loader("Forge", "1.20.1").is_empty());
             assert!(!lang.err_loader_failed("Forge", "x").is_empty());
+            assert!(!lang.disk_size(500).is_empty());
+            assert!(!lang.err_low_disk("1 GB", "1 MB").is_empty());
         }
     }
 }

@@ -8,7 +8,7 @@ pub mod types;
 
 pub use config::{AppMode, LauncherConfig, UiSettings};
 pub use error::{LauncherError, Result};
-pub use hardware::HardwareReport;
+pub use hardware::{free_disk_mb, HardwareReport};
 pub use i18n::Language;
 pub use logging::init_logging;
 pub use paths::LauncherPaths;

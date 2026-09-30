@@ -826,6 +826,24 @@ impl LauncherApp {
             if !download_items.is_empty() {
                 let count = download_items.len();
                 let _ = status_tx.send(lang.status_downloading_files(count)).await;
+                // CONCEPT "Место на диске": warn before downloading more than fits.
+                let needed: u64 = download_items.iter().filter_map(|item| item.size).sum();
+                if needed > 0 {
+                    if let Some(free_mb) = amc_core::free_disk_mb(&game_dir) {
+                        let free_bytes = free_mb.saturating_mul(1024 * 1024);
+                        if needed > free_bytes {
+                            let _ = game_tx
+                                .send(GameEvent::Crashed {
+                                    message: lang.err_low_disk(
+                                        &lang.disk_size(needed),
+                                        &lang.disk_size(free_bytes),
+                                    ),
+                                })
+                                .await;
+                            return;
+                        }
+                    }
+                }
                 let (tracker, progress_rx) = engine.create_tracker(&download_items);
                 let _ = prog_tx.send(Some(progress_rx)).await;
 

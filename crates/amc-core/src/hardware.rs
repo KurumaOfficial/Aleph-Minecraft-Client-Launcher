@@ -84,7 +84,7 @@ fn total_ram_mb() -> Option<u64> {
 }
 
 #[cfg(target_os = "windows")]
-fn free_disk_mb(path: &Path) -> Option<u64> {
+pub fn free_disk_mb(path: &Path) -> Option<u64> {
     use windows_sys::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
 
     let root = path
@@ -111,7 +111,7 @@ fn free_disk_mb(path: &Path) -> Option<u64> {
 }
 
 #[cfg(target_os = "linux")]
-fn free_disk_mb(path: &Path) -> Option<u64> {
+pub fn free_disk_mb(path: &Path) -> Option<u64> {
     // `df -k -P <path>` → second line, 4th column = available KiB.
     let out = std::process::Command::new("df")
         .args(["-k", "-P"])
@@ -133,7 +133,7 @@ fn free_disk_mb(path: &Path) -> Option<u64> {
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-fn free_disk_mb(_path: &Path) -> Option<u64> {
+pub fn free_disk_mb(_path: &Path) -> Option<u64> {
     None
 }
 

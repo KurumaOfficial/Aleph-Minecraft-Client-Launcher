@@ -155,6 +155,36 @@ impl Instance {
         }
     }
 
+    /// Total bytes under the instance game directory (CONCEPT "Место на диске").
+    /// Missing directories count as 0, unreadable entries are skipped and
+    /// symlinks are never followed — measurement never fails.
+    pub fn disk_usage(&self, base_instances_dir: &std::path::Path) -> u64 {
+        Self::disk_usage_dir(&self.get_game_dir(base_instances_dir))
+    }
+
+    /// Size of an arbitrary directory tree. See [`disk_usage`](Self::disk_usage).
+    pub fn disk_usage_dir(dir: &std::path::Path) -> u64 {
+        let mut total = 0u64;
+        let mut stack = vec![dir.to_path_buf()];
+        while let Some(current) = stack.pop() {
+            let entries = match std::fs::read_dir(&current) {
+                Ok(entries) => entries,
+                Err(_) => continue,
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_symlink() {
+                    continue;
+                } else if path.is_dir() {
+                    stack.push(path);
+                } else if let Ok(meta) = entry.metadata() {
+                    total = total.saturating_add(meta.len());
+                }
+            }
+        }
+        total
+    }
+
     pub fn clone_instance(
         &self,
         new_name: &str,
@@ -276,6 +306,21 @@ mod tests {
         assert_eq!(cloned.loader, LoaderType::Fabric);
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_disk_usage_counts_nested_files() {
+        let root = std::env::temp_dir().join(format!("amc_disktest_{}", Uuid::new_v4()));
+        let inst = Instance::new("Disk", "1.20.1", LoaderType::Vanilla);
+        let game_dir = inst.get_game_dir(&root);
+        std::fs::create_dir_all(game_dir.join("mods")).unwrap();
+        std::fs::write(game_dir.join("x.jar"), vec![0u8; 100]).unwrap();
+        std::fs::write(game_dir.join("mods").join("y.jar"), vec![0u8; 300]).unwrap();
+        assert_eq!(inst.disk_usage(&root), 400);
+        assert_eq!(Instance::disk_usage_dir(&game_dir.join("mods")), 300);
+        // Missing trees measure zero instead of failing.
+        assert_eq!(inst.disk_usage(&root.join("nonexistent-base")), 0);
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]

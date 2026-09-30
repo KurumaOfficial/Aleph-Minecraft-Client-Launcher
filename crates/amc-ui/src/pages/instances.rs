@@ -5,7 +5,8 @@ use crate::theme::{
 use amc_core::types::{Instance, LoaderType};
 use amc_core::Language;
 use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
-use std::path::Path;
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
@@ -34,6 +35,11 @@ pub struct InstancesPage {
     pub edit_instance_version: String,
     pub edit_instance_loader: LoaderType,
     pub edit_instance_ram: u32,
+
+    // Background disk-usage scan (CONCEPT "Место на диске").
+    disk_sizes: HashMap<Uuid, u64>,
+    disk_scanned_for: Vec<Uuid>,
+    disk_rx: Option<std::sync::mpsc::Receiver<Vec<(Uuid, u64)>>>,
 }
 
 impl Default for InstancesPage {
@@ -52,11 +58,51 @@ impl Default for InstancesPage {
             edit_instance_version: String::new(),
             edit_instance_loader: LoaderType::Vanilla,
             edit_instance_ram: 4096,
+
+            disk_sizes: HashMap::new(),
+            disk_scanned_for: Vec::new(),
+            disk_rx: None,
         }
     }
 }
 
 impl InstancesPage {
+    /// Poll a finished background scan, or (re)start one when the instance
+    /// set changed. Measuring runs on a worker thread — the UI never blocks.
+    fn poll_disk_sizes(&mut self, instances: &[Instance], instances_dir: &Path) {
+        if let Some(rx) = &self.disk_rx {
+            match rx.try_recv() {
+                Ok(sizes) => {
+                    self.disk_sizes = sizes.into_iter().collect();
+                    self.disk_rx = None;
+                }
+                Err(std::sync::mpsc::TryRecvError::Empty) => {}
+                Err(std::sync::mpsc::TryRecvError::Disconnected) => {
+                    self.disk_rx = None;
+                }
+            }
+            return;
+        }
+        let ids: Vec<Uuid> = instances.iter().map(|i| i.id).collect();
+        if ids == self.disk_scanned_for {
+            return;
+        }
+        self.disk_scanned_for = ids;
+        let pairs: Vec<(Uuid, PathBuf)> = instances
+            .iter()
+            .map(|i| (i.id, i.get_game_dir(instances_dir)))
+            .collect();
+        let (tx, rx) = std::sync::mpsc::channel();
+        self.disk_rx = Some(rx);
+        std::thread::spawn(move || {
+            let sizes: Vec<(Uuid, u64)> = pairs
+                .into_iter()
+                .map(|(id, dir)| (id, Instance::disk_usage_dir(&dir)))
+                .collect();
+            let _ = tx.send(sizes);
+        });
+    }
+
     pub fn show(
         &mut self,
         ui: &mut Ui,
@@ -66,6 +112,7 @@ impl InstancesPage {
         lang: Language,
     ) -> InstanceAction {
         let mut action = InstanceAction::None;
+        self.poll_disk_sizes(instances, instances_dir);
         ui.add_space(20.0);
 
         // Header
@@ -278,6 +325,15 @@ impl InstancesPage {
                                 ))
                                 .font(egui::FontId::proportional(11.0))
                                 .color(TEXT_MUTED),
+                            );
+                            let size_text = match self.disk_sizes.get(&inst.id) {
+                                Some(bytes) => lang.disk_size(*bytes),
+                                None => "…".to_string(),
+                            };
+                            ui.label(
+                                egui::RichText::new(format!("• 💾 {size_text}"))
+                                    .font(egui::FontId::proportional(11.0))
+                                    .color(TEXT_MUTED),
                             );
                         });
                     });
