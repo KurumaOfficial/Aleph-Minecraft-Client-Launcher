@@ -177,6 +177,9 @@ impl ArgumentBuilder {
             args.push(port.to_string());
         }
 
+        // User game arguments go last so they can override anything above.
+        args.extend(options.custom_game_args.iter().cloned());
+
         args
     }
 
@@ -206,5 +209,59 @@ impl ArgumentBuilder {
         parts.push(client_jar.to_string_lossy().to_string());
 
         parts.join(separator)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use amc_auth::{Account, AuthSession};
+
+    fn test_details() -> VersionDetails {
+        VersionDetails {
+            id: "1.20.1".to_string(),
+            downloads: None,
+            asset_index: None,
+            libraries: Vec::new(),
+            main_class: "net.minecraft.client.main.Main".to_string(),
+            arguments: None,
+            minecraft_arguments: Some(
+                "--username ${auth_player_name} --version ${version_name}".to_string(),
+            ),
+            java_version: None,
+            inherits_from: None,
+        }
+    }
+
+    fn test_session() -> AuthSession {
+        let account = Account::new_offline(
+            "Steve".to_string(),
+            "00000000-0000-0000-0000-000000000000".to_string(),
+        );
+        AuthSession::from_account(&account)
+    }
+
+    #[test]
+    fn test_custom_game_args_appended_last() {
+        let mut options = LaunchOptions::default();
+        options.custom_game_args = vec!["--foo".to_string(), "bar".to_string()];
+        let args = ArgumentBuilder::build_game_args(
+            &options,
+            std::path::Path::new("/game"),
+            std::path::Path::new("/assets"),
+            &test_details(),
+            &test_session(),
+            &std::collections::HashMap::new(),
+        );
+        assert!(args.contains(&"--username".to_string()));
+        assert!(args.contains(&"Steve".to_string()));
+        let tail = &args[args.len() - 2..];
+        assert_eq!(tail, ["--foo", "bar"]);
+    }
+
+    #[test]
+    fn test_no_custom_game_args_by_default() {
+        let options = LaunchOptions::default();
+        assert!(options.custom_game_args.is_empty());
     }
 }

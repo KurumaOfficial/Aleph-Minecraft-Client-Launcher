@@ -255,6 +255,10 @@ pub struct LaunchOptions {
     pub memory_max_mb: u32,
     pub java_path: Option<PathBuf>,
     pub custom_jvm_args: Vec<String>,
+    /// Extra game (not JVM) arguments, appended last so they can override
+    /// anything above. `#[serde(default)]` keeps pre-P2 configs loadable.
+    #[serde(default)]
+    pub custom_game_args: Vec<String>,
     pub window_width: u32,
     pub window_height: u32,
     pub fullscreen: bool,
@@ -276,12 +280,55 @@ impl Default for LaunchOptions {
                 "-XX:MaxGCPauseMillis=50".into(),
                 "-XX:G1HeapRegionSize=32m".into(),
             ],
+            custom_game_args: Vec::new(),
             window_width: 1280,
             window_height: 720,
             fullscreen: false,
             quick_play_server: None,
             quick_play_port: None,
         }
+    }
+}
+
+/// Quick-start preset for the create-instance dialog (CONCEPT, P2).
+/// AMC-team templates only in v1.0 — no user/community templates.
+/// A template prefills loader, RAM and (when untouched) the name;
+/// the game version stays user-chosen.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InstanceTemplate {
+    pub id: &'static str,
+    pub loader: LoaderType,
+    pub ram_mb: u32,
+}
+
+impl InstanceTemplate {
+    pub const EMPTY: Self = Self {
+        id: "empty",
+        loader: LoaderType::Vanilla,
+        ram_mb: 2048,
+    };
+    pub const VANILLA_PLUS: Self = Self {
+        id: "vanilla_plus",
+        loader: LoaderType::Vanilla,
+        ram_mb: 4096,
+    };
+    pub const OPTIMIZED: Self = Self {
+        id: "optimized",
+        loader: LoaderType::Fabric,
+        ram_mb: 6144,
+    };
+    pub const ALL: [Self; 3] = [Self::EMPTY, Self::VANILLA_PLUS, Self::OPTIMIZED];
+
+    /// Template whose settings exactly match a loader/RAM pair, if any.
+    pub fn matching(loader: LoaderType, ram_mb: u32) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|t| t.loader == loader && t.ram_mb == ram_mb)
+    }
+
+    /// Suggested instance name in the UI language.
+    pub fn default_name(&self, lang: crate::i18n::Language) -> String {
+        lang.tmpl_name(self.id).to_string()
     }
 }
 
@@ -321,6 +368,31 @@ mod tests {
         // Missing trees measure zero instead of failing.
         assert_eq!(inst.disk_usage(&root.join("nonexistent-base")), 0);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn test_instance_templates() {
+        use crate::i18n::Language;
+        assert_eq!(InstanceTemplate::ALL.len(), 3);
+        let ids: Vec<&str> = InstanceTemplate::ALL.iter().map(|t| t.id).collect();
+        assert_eq!(ids, vec!["empty", "vanilla_plus", "optimized"]);
+        for tmpl in InstanceTemplate::ALL {
+            assert!((1024..=16384).contains(&tmpl.ram_mb));
+            assert!(!Language::English.tmpl_name(tmpl.id).is_empty());
+            assert!(!Language::Russian.tmpl_desc(tmpl.id).is_empty());
+        }
+        assert_eq!(
+            InstanceTemplate::matching(LoaderType::Fabric, 6144).map(|t| t.id),
+            Some("optimized")
+        );
+        assert_eq!(
+            InstanceTemplate::matching(LoaderType::Forge, 4096).map(|t| t.id),
+            None
+        );
+        assert_eq!(
+            InstanceTemplate::OPTIMIZED.default_name(Language::Russian),
+            "Оптимизированная"
+        );
     }
 
     #[test]

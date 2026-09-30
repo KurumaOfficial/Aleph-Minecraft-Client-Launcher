@@ -1677,6 +1677,67 @@ impl Language {
         }
     }
 
+    // ==========================================
+    // Instance templates (ROADMAP P2)
+    // ==========================================
+    pub fn tmpl_title(&self) -> &'static str {
+        match self {
+            Self::English => "Template",
+            Self::Russian => "Шаблон",
+            Self::Ukrainian => "Шаблон",
+        }
+    }
+
+    pub fn tmpl_name(&self, id: &str) -> &'static str {
+        match (self, id) {
+            (Self::English, "vanilla_plus") => "Vanilla+",
+            (Self::Russian, "vanilla_plus") => "Vanilla+",
+            (Self::Ukrainian, "vanilla_plus") => "Vanilla+",
+            (Self::English, "optimized") => "Optimized",
+            (Self::Russian, "optimized") => "Оптимизированная",
+            (Self::Ukrainian, "optimized") => "Оптимізована",
+            (Self::English, _) => "Empty",
+            (Self::Russian, _) => "Пустая",
+            (Self::Ukrainian, _) => "Порожня",
+        }
+    }
+
+    pub fn tmpl_desc(&self, id: &str) -> &'static str {
+        match (self, id) {
+            (Self::English, "vanilla_plus") => "Latest vanilla with comfortable memory",
+            (Self::Russian, "vanilla_plus") => "Свежая ванилла с запасом памяти",
+            (Self::Ukrainian, "vanilla_plus") => "Свіжа ванілла із запасом пам'яті",
+            (Self::English, "optimized") => {
+                "Fabric for performance mods — add Sodium/Lithium after creation"
+            }
+            (Self::Russian, "optimized") => {
+                "Fabric под моды производительности — Sodium/Lithium поставьте после создания"
+            }
+            (Self::Ukrainian, "optimized") => {
+                "Fabric під моди продуктивності — Sodium/Lithium поставте після створення"
+            }
+            (Self::English, _) => "Clean vanilla, default settings",
+            (Self::Russian, _) => "Чистая ванилла, настройки по умолчанию",
+            (Self::Ukrainian, _) => "Чиста ванілла, налаштування за замовчуванням",
+        }
+    }
+
+    pub fn tmpl_custom_note(&self) -> &'static str {
+        match self {
+            Self::English => "Custom setup — tune freely",
+            Self::Russian => "Своя конфигурация — настраивайте свободно",
+            Self::Ukrainian => "Власна конфігурація — налаштовуйте вільно",
+        }
+    }
+
+    pub fn settings_game_args_title(&self) -> &'static str {
+        match self {
+            Self::English => "Game arguments",
+            Self::Russian => "Аргументы игры",
+            Self::Ukrainian => "Аргументи гри",
+        }
+    }
+
     pub fn status_process_exited(&self, code: Option<i32>) -> String {
         match self {
             Self::English => format!("Minecraft process exited with code {:?}", code),
@@ -2058,6 +2119,11 @@ mod tests {
             assert!(!lang.overlay_btn_resume().is_empty());
             assert!(!lang.settings_speed_title().is_empty());
             assert!(!lang.settings_speed_unlimited().is_empty());
+            assert!(!lang.tmpl_title().is_empty());
+            assert!(!lang.tmpl_name("empty").is_empty());
+            assert!(!lang.tmpl_desc("optimized").is_empty());
+            assert!(!lang.tmpl_custom_note().is_empty());
+            assert!(!lang.settings_game_args_title().is_empty());
         }
     }
 }

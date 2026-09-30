@@ -2,7 +2,8 @@ use crate::theme::{
     lerp_color, BG_CARD, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_DIM, RUBY_LIGHT, TEXT_HEADING,
     TEXT_MUTED, TEXT_PRIMARY,
 };
-use amc_core::types::{Instance, LoaderType};
+use crate::widgets::choice_chip;
+use amc_core::types::{Instance, InstanceTemplate, LoaderType};
 use amc_core::Language;
 use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
 use std::collections::HashMap;
@@ -101,6 +102,16 @@ impl InstancesPage {
                 .collect();
             let _ = tx.send(sizes);
         });
+    }
+
+    /// Fill the create dialog from a quick-start template (ROADMAP P2).
+    /// Loader and RAM always apply; the name applies only while untouched.
+    fn apply_template(&mut self, template: InstanceTemplate, lang: Language) {
+        self.new_instance_loader = template.loader;
+        self.new_instance_ram = template.ram_mb;
+        if self.new_instance_name.trim().is_empty() || self.new_instance_name == "My Instance" {
+            self.new_instance_name = template.default_name(lang);
+        }
     }
 
     pub fn show(
@@ -439,6 +450,30 @@ impl InstancesPage {
                 .min_width(420.0)
                 .show(ui.ctx(), |ui| {
                     ui.add_space(8.0);
+                    ui.label(
+                        egui::RichText::new(lang.tmpl_title())
+                            .strong()
+                            .color(TEXT_HEADING),
+                    );
+                    ui.horizontal(|ui| {
+                        for tmpl in InstanceTemplate::ALL {
+                            let active = InstanceTemplate::matching(
+                                self.new_instance_loader,
+                                self.new_instance_ram,
+                            )
+                            .map(|t| t.id)
+                                == Some(tmpl.id);
+                            if choice_chip(ui, lang.tmpl_name(tmpl.id), 130.0, 32.0, 12.0, active) {
+                                self.apply_template(tmpl, lang);
+                            }
+                        }
+                    });
+                    let tmpl_desc =
+                        InstanceTemplate::matching(self.new_instance_loader, self.new_instance_ram)
+                            .map(|t| lang.tmpl_desc(t.id))
+                            .unwrap_or_else(|| lang.tmpl_custom_note());
+                    ui.label(egui::RichText::new(tmpl_desc).color(TEXT_MUTED));
+                    ui.add_space(8.0);
                     ui.label(egui::RichText::new(lang.inst_modal_name()).color(TEXT_PRIMARY));
                     ui.add(TextEdit::singleline(&mut self.new_instance_name).desired_width(400.0));
 
@@ -635,5 +670,32 @@ impl InstancesPage {
         }
 
         action
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_apply_template_fills_form() {
+        let lang = Language::English;
+        let mut page = InstancesPage::default();
+        page.new_instance_name = String::new();
+        page.apply_template(InstanceTemplate::OPTIMIZED, lang);
+        assert_eq!(page.new_instance_loader, LoaderType::Fabric);
+        assert_eq!(page.new_instance_ram, 6144);
+        assert_eq!(page.new_instance_name, "Optimized");
+    }
+
+    #[test]
+    fn test_apply_template_keeps_custom_name() {
+        let lang = Language::English;
+        let mut page = InstancesPage::default();
+        page.new_instance_name = "My Pack".to_string();
+        page.apply_template(InstanceTemplate::EMPTY, lang);
+        assert_eq!(page.new_instance_loader, LoaderType::Vanilla);
+        assert_eq!(page.new_instance_ram, 2048);
+        assert_eq!(page.new_instance_name, "My Pack");
     }
 }

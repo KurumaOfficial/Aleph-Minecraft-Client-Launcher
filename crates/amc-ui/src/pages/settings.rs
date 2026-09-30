@@ -20,6 +20,7 @@ pub enum SettingsSubTab {
 pub struct SettingsPage {
     pub sub_tab: SettingsSubTab,
     pub custom_jvm_arg_input: String,
+    pub custom_game_arg_input: String,
 }
 
 impl Default for SettingsPage {
@@ -27,6 +28,7 @@ impl Default for SettingsPage {
         Self {
             sub_tab: SettingsSubTab::General,
             custom_jvm_arg_input: String::new(),
+            custom_game_arg_input: String::new(),
         }
     }
 }
@@ -453,6 +455,62 @@ impl SettingsPage {
                     .clicked()
                 {
                     config.default_launch_options.custom_jvm_args.clear();
+                }
+            });
+        });
+
+        ui.add_space(14.0);
+
+        ui.group(|ui| {
+            ui.label(
+                egui::RichText::new(lang.settings_game_args_title())
+                    .font(egui::FontId::proportional(16.0))
+                    .strong()
+                    .color(TEXT_HEADING),
+            );
+            ui.add_space(8.0);
+
+            let mut game_arg_to_remove = None;
+            for (idx, arg) in config
+                .default_launch_options
+                .custom_game_args
+                .iter()
+                .enumerate()
+            {
+                ui.horizontal(|ui| {
+                    ui.label(
+                        egui::RichText::new(arg)
+                            .font(egui::FontId::monospace(12.0))
+                            .color(TEXT_PRIMARY),
+                    );
+                    if ui
+                        .button(egui::RichText::new("✕").color(TEXT_MUTED))
+                        .clicked()
+                    {
+                        game_arg_to_remove = Some(idx);
+                    }
+                });
+            }
+
+            if let Some(idx) = game_arg_to_remove {
+                config.default_launch_options.custom_game_args.remove(idx);
+            }
+
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                ui.add(
+                    TextEdit::singleline(&mut self.custom_game_arg_input)
+                        .hint_text("--fullscreen")
+                        .desired_width(300.0),
+                );
+                if ui.button(lang.settings_btn_add_arg()).clicked()
+                    && !self.custom_game_arg_input.trim().is_empty()
+                {
+                    config
+                        .default_launch_options
+                        .custom_game_args
+                        .push(self.custom_game_arg_input.trim().to_string());
+                    self.custom_game_arg_input.clear();
                 }
             });
         });

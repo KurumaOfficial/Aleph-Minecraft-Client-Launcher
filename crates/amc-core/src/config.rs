@@ -198,6 +198,7 @@ mod tests {
         let config: LauncherConfig = serde_json::from_str(legacy).unwrap();
         assert_eq!(config.app_mode, AppMode::Simple);
         assert!(!config.first_run);
+        assert!(config.default_launch_options.custom_game_args.is_empty());
         assert_eq!(config.ui.language(), crate::i18n::Language::English);
     }
 
