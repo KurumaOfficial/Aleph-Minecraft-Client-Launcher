@@ -188,6 +188,26 @@ impl SettingsPage {
 
         ui.group(|ui| {
             ui.label(
+                egui::RichText::new(lang.settings_speed_title())
+                    .font(egui::FontId::proportional(16.0))
+                    .strong()
+                    .color(TEXT_HEADING),
+            );
+            ui.add_space(8.0);
+            ui.label(egui::RichText::new(lang.settings_speed_unlimited()).color(TEXT_MUTED));
+            let mut kbps = config.download_speed_limit_kbps.unwrap_or(0).min(10240) as u32;
+            ui.add(
+                egui::Slider::new(&mut kbps, 0..=10240)
+                    .step_by(128.0)
+                    .text("KB/s"),
+            );
+            config.download_speed_limit_kbps = if kbps == 0 { None } else { Some(kbps as u64) };
+        });
+
+        ui.add_space(14.0);
+
+        ui.group(|ui| {
+            ui.label(
                 egui::RichText::new(lang.settings_resolution_title())
                     .font(egui::FontId::proportional(16.0))
                     .strong()

@@ -73,6 +73,8 @@ pub struct LauncherApp {
     game_events_rx: Option<mpsc::Receiver<GameEvent>>,
     /// Cancel token for the current launch download (overlay Cancel button).
     download_cancel: Option<DownloadCancel>,
+    /// Set while a download is paused (overlay stays open with Resume).
+    download_paused: bool,
     ms_code_rx: Option<mpsc::Receiver<Result<DeviceCodeResponse, String>>>,
     ms_poll_rx: Option<mpsc::Receiver<Result<Account, String>>>,
 }
@@ -153,6 +155,7 @@ impl LauncherApp {
             download_progress_rx: None,
             game_events_rx: None,
             download_cancel: None,
+            download_paused: false,
             ms_code_rx: None,
             ms_poll_rx: None,
             pending_direct_connect: None,
@@ -418,6 +421,7 @@ impl LauncherApp {
         self.launch_status_text = lang.status_preparing_version(&ver_id);
 
         let engine = self.download_engine.clone();
+        engine.set_speed_limit_kbps(self.config.download_speed_limit_kbps);
         let mut options = self.config.default_launch_options.clone();
         if let Some(ram) = ram_override {
             options.memory_max_mb = ram;
@@ -1071,14 +1075,39 @@ impl App for LauncherApp {
             }
         }
 
-        // Check incoming download progress updates
-        if let Some(rx) = &self.download_progress_rx {
-            let progress = rx.borrow().clone();
-            DownloadOverlay::show(ctx, &progress, &self.launch_status_text, || {
+        // Download progress overlay (pause/resume/cancel).
+        if self.download_progress_rx.is_some() {
+            let lang = self.config.ui.language();
+            let paused = self.download_paused;
+            let mut pause_requested = false;
+            let mut resume_requested = false;
+            if let Some(rx) = &self.download_progress_rx {
+                let progress = rx.borrow().clone();
+                let title = self.launch_status_text.clone();
+                DownloadOverlay::show(
+                    ctx,
+                    lang,
+                    &progress,
+                    &title,
+                    paused,
+                    || pause_requested = true,
+                    || resume_requested = true,
+                    || {
+                        if let Some(cancel) = &self.download_cancel {
+                            cancel.cancel();
+                        }
+                    },
+                );
+            }
+            if pause_requested {
                 if let Some(cancel) = &self.download_cancel {
-                    cancel.cancel();
+                    cancel.pause();
                 }
-            });
+            }
+            if resume_requested {
+                self.download_paused = false;
+                self.handle_launch();
+            }
             ctx.request_repaint_after(std::time::Duration::from_millis(16));
         }
 
@@ -1121,6 +1150,13 @@ impl App for LauncherApp {
                                 }
                             }
                         }
+                    }
+                    GameEvent::DownloadPaused => {
+                        let lang = self.config.ui.language();
+                        let msg = lang.status_download_paused();
+                        tracing::info!("{msg}");
+                        self.console_modal.push_line(format!("[ALEPH] {msg}"));
+                        self.download_paused = true;
                     }
                     GameEvent::Cancelled => {
                         let lang = self.config.ui.language();

@@ -5,20 +5,23 @@ use futures_util::StreamExt;
 use reqwest::Client;
 use sha1::{Digest, Sha1};
 use std::fmt::Write as _;
-use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
-use tokio::fs::{self, File};
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use tokio::sync::{watch, Semaphore};
 
-/// Cooperative cancellation token for downloads. Cheap to clone (shared
-/// flag): the UI cancels the current operation, workers observe the flag
-/// between chunks and before retries.
+/// Cooperative control token for downloads. Cheap to clone (shared flags):
+/// the UI cancels or pauses the current operation, workers observe the flags
+/// between chunks and before retries. Pause preserves the partial `.amctmp`
+/// file for Range-resume; cancel deletes it.
 #[derive(Debug, Clone, Default)]
 pub struct DownloadCancel {
-    flag: Arc<AtomicBool>,
+    cancel: Arc<AtomicBool>,
+    pause: Arc<AtomicBool>,
 }
 
 impl DownloadCancel {
@@ -27,11 +30,23 @@ impl DownloadCancel {
     }
 
     pub fn cancel(&self) {
-        self.flag.store(true, Ordering::Relaxed);
+        self.cancel.store(true, Ordering::Relaxed);
     }
 
     pub fn is_cancelled(&self) -> bool {
-        self.flag.load(Ordering::Relaxed)
+        self.cancel.load(Ordering::Relaxed)
+    }
+
+    pub fn pause(&self) {
+        self.pause.store(true, Ordering::Relaxed);
+    }
+
+    pub fn resume(&self) {
+        self.pause.store(false, Ordering::Relaxed);
+    }
+
+    pub fn is_paused(&self) -> bool {
+        self.pause.load(Ordering::Relaxed)
     }
 }
 
@@ -69,6 +84,99 @@ fn fatal(err: LauncherError) -> AttemptError {
     AttemptError::Fatal(err)
 }
 
+/// `Range` header value resuming after `have` bytes.
+fn range_value(have: u64) -> String {
+    format!("bytes={have}-")
+}
+
+/// Stream-hash an existing partial `.amctmp` file so a resumed download
+/// continues with a correct running hash. A missing or unreadable file
+/// restarts from scratch — never fails the download.
+pub(crate) async fn hash_file_prefix(path: &Path) -> (Sha1, u64) {
+    use tokio::io::AsyncReadExt;
+    let mut file = match tokio::fs::File::open(path).await {
+        Ok(file) => file,
+        Err(_) => return (Sha1::new(), 0),
+    };
+    let mut hasher = Sha1::new();
+    let mut total = 0u64;
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        match file.read(&mut buffer).await {
+            Ok(0) => break,
+            Ok(n) => {
+                hasher.update(&buffer[..n]);
+                total += n as u64;
+            }
+            Err(_) => return (Sha1::new(), 0),
+        }
+    }
+    (hasher, total)
+}
+
+/// Global download speed limiter (token bucket). Shared across all workers
+/// so the cap holds for the whole operation, not per connection.
+#[derive(Debug)]
+struct ThrottleState {
+    tokens: f64,
+    last: Instant,
+}
+
+#[derive(Debug)]
+pub struct SpeedLimiter {
+    limit_bps: AtomicU64,
+    state: Mutex<ThrottleState>,
+}
+
+impl SpeedLimiter {
+    fn new() -> Self {
+        Self {
+            limit_bps: AtomicU64::new(0),
+            state: Mutex::new(ThrottleState {
+                tokens: 0.0,
+                last: Instant::now(),
+            }),
+        }
+    }
+
+    /// Cap in bytes per second. `None` (or 0) disables limiting.
+    pub fn set_limit_bps(&self, limit: Option<u64>) {
+        self.limit_bps.store(limit.unwrap_or(0), Ordering::Relaxed);
+    }
+
+    async fn take(&self, n: u64) {
+        let limit = self.limit_bps.load(Ordering::Relaxed);
+        if limit == 0 || n == 0 {
+            return;
+        }
+        let delay_secs = {
+            let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+            consume(&mut state, Instant::now(), n, limit)
+        };
+        if delay_secs > 0.0 {
+            tokio::time::sleep(Duration::from_secs_f64(delay_secs)).await;
+        }
+    }
+}
+
+/// Pure bucket step: returns seconds to wait before consuming `n` bytes.
+/// Fully unit-tested; the async wrapper only sleeps.
+fn consume(state: &mut ThrottleState, now: Instant, n: u64, limit_bps: u64) -> f64 {
+    let elapsed = now.saturating_duration_since(state.last).as_secs_f64();
+    state.last = now;
+    // One second of burst, at least 256 KiB so small files never stall.
+    let capacity = (limit_bps as f64).max(262_144.0);
+    state.tokens = (state.tokens + elapsed * limit_bps as f64).min(capacity);
+    if state.tokens >= n as f64 {
+        state.tokens -= n as f64;
+        0.0
+    } else {
+        let wait = (n as f64 - state.tokens) / limit_bps as f64;
+        state.tokens = 0.0;
+        wait
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct DownloadItem {
     pub url: String,
@@ -101,6 +209,7 @@ impl DownloadItem {
 pub struct DownloadEngine {
     client: Client,
     max_concurrency: usize,
+    throttle: Arc<SpeedLimiter>,
 }
 
 impl Default for DownloadEngine {
@@ -120,7 +229,16 @@ impl DownloadEngine {
         Self {
             client,
             max_concurrency: max_concurrency.max(1),
+            throttle: Arc::new(SpeedLimiter::new()),
         }
+    }
+
+    /// Global speed cap in KiB/s (`None` = unlimited). Shared across all
+    /// workers and all downloads through this engine. Applied by the app
+    /// from settings on every launch.
+    pub fn set_speed_limit_kbps(&self, kbps: Option<u64>) {
+        self.throttle
+            .set_limit_bps(kbps.map(|k| k.saturating_mul(1024)));
     }
 
     pub async fn download_one(
@@ -131,6 +249,9 @@ impl DownloadEngine {
     ) -> Result<()> {
         if cancel.is_cancelled() {
             return Err(LauncherError::Cancelled);
+        }
+        if cancel.is_paused() {
+            return Err(LauncherError::Paused);
         }
 
         let filename = item
@@ -194,6 +315,9 @@ impl DownloadEngine {
                     if cancel.is_cancelled() {
                         return Err(LauncherError::Cancelled);
                     }
+                    if cancel.is_paused() {
+                        return Err(LauncherError::Paused);
+                    }
                     match retry_delay(attempt) {
                         Some(delay) => {
                             attempt += 1;
@@ -213,7 +337,15 @@ impl DownloadEngine {
         filename: &str,
         cancel: &DownloadCancel,
     ) -> std::result::Result<(), AttemptError> {
-        let response = self.client.get(&item.url).send().await.map_err(|e| {
+        let tmp_path = item.destination.with_extension("amctmp");
+
+        // Resume: hash the existing partial file, then ask for the rest.
+        let (mut hasher, have) = hash_file_prefix(&tmp_path).await;
+        let mut request = self.client.get(&item.url);
+        if have > 0 {
+            request = request.header("Range", range_value(have));
+        }
+        let response = request.send().await.map_err(|e| {
             retryable(LauncherError::Network(format!(
                 "Request to {} failed: {e}",
                 item.url
@@ -229,16 +361,26 @@ impl DownloadEngine {
             return Err(fatal(err));
         }
 
-        let tmp_path = item.destination.with_extension("amctmp");
-        let mut file = File::create(&tmp_path).await.map_err(|e| {
-            retryable(LauncherError::Io {
-                path: tmp_path.clone(),
-                source: e,
-            })
-        })?;
+        // 206 = resume accepted (append, keep the seeded hash); anything else
+        // (200, 416, …) restarts the file from scratch.
+        let append = have > 0 && response.status() == reqwest::StatusCode::PARTIAL_CONTENT;
+        if !append {
+            hasher = Sha1::new();
+        }
+        let mut file = tokio::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .append(append)
+            .truncate(!append)
+            .open(&tmp_path)
+            .await
+            .map_err(|e| {
+                retryable(LauncherError::Io {
+                    path: tmp_path.clone(),
+                    source: e,
+                })
+            })?;
 
-        // Streamed SHA-1: files of any size hash with O(1) memory.
-        let mut hasher = Sha1::new();
         let mut stream = response.bytes_stream();
 
         while let Some(chunk_res) = stream.next().await {
@@ -247,8 +389,13 @@ impl DownloadEngine {
                 let _ = fs::remove_file(&tmp_path).await;
                 return Err(fatal(LauncherError::Cancelled));
             }
+            if cancel.is_paused() {
+                drop(file);
+                return Err(fatal(LauncherError::Paused));
+            }
             let chunk = chunk_res
                 .map_err(|e| retryable(LauncherError::Network(format!("Chunk error: {e}"))))?;
+            self.throttle.take(chunk.len() as u64).await;
             file.write_all(&chunk).await.map_err(|e| {
                 retryable(LauncherError::Io {
                     path: tmp_path.clone(),
@@ -336,6 +483,7 @@ impl DownloadEngine {
             let engine = DownloadEngine {
                 client,
                 max_concurrency: self.max_concurrency,
+                throttle: self.throttle.clone(),
             };
 
             handles.push(tokio::spawn(async move {
@@ -418,5 +566,56 @@ mod tests {
         );
         let err = engine.download_one(&item, None, cancel).await.unwrap_err();
         assert!(matches!(err, LauncherError::Cancelled));
+    }
+
+    #[tokio::test]
+    async fn test_prepaused_download_returns_paused() {
+        let engine = DownloadEngine::new(1);
+        let cancel = DownloadCancel::new();
+        cancel.pause();
+        assert!(cancel.is_paused());
+        cancel.resume();
+        assert!(!cancel.is_paused());
+        cancel.pause();
+        let item = DownloadItem::new(
+            "http://127.0.0.1:1/amc-pause-probe.jar",
+            std::env::temp_dir().join("amc-pause-probe.jar"),
+        );
+        let err = engine.download_one(&item, None, cancel).await.unwrap_err();
+        assert!(matches!(err, LauncherError::Paused));
+    }
+
+    #[test]
+    fn test_range_value() {
+        assert_eq!(range_value(0), "bytes=0-");
+        assert_eq!(range_value(123456), "bytes=123456-");
+    }
+
+    #[test]
+    fn test_throttle_consume_math() {
+        let now = Instant::now();
+        // Full bucket: instant.
+        let mut state = ThrottleState {
+            tokens: 10_000.0,
+            last: now,
+        };
+        assert_eq!(consume(&mut state, now, 1000, 1000), 0.0);
+        assert_eq!(state.tokens, 9000.0);
+        // Empty bucket: wait the deficit.
+        let mut state = ThrottleState {
+            tokens: 0.0,
+            last: now,
+        };
+        let wait = consume(&mut state, now, 2000, 1000);
+        assert!((wait - 2.0).abs() < 1e-9);
+        assert_eq!(state.tokens, 0.0);
+        // Refill over idle time, capped at one second of burst.
+        let later = now + Duration::from_secs(10);
+        let mut state = ThrottleState {
+            tokens: 0.0,
+            last: now,
+        };
+        assert_eq!(consume(&mut state, later, 500, 1000), 0.0);
+        assert_eq!(state.tokens, 9500.0);
     }
 }

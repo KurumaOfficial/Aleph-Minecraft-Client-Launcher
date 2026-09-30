@@ -79,6 +79,9 @@ pub struct LauncherConfig {
     /// mistaken for a fresh install.
     #[serde(default)]
     pub first_run: bool,
+    /// Global download speed limit in KiB/s (P3). `None` (default) = unlimited.
+    #[serde(default)]
+    pub download_speed_limit_kbps: Option<u64>,
 }
 
 impl LauncherConfig {

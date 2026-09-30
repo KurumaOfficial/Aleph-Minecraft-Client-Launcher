@@ -69,6 +69,36 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_hash_file_prefix_matches_full_hash() {
+        use sha1::Digest;
+        let dir = std::env::temp_dir().join(format!(
+            "amc_prefix_test_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("prefix.bin");
+        std::fs::write(&file, b"hello world, this is a resume probe").unwrap();
+
+        let (hasher, len) = crate::engine::hash_file_prefix(&file).await;
+        assert_eq!(len, 35);
+        let mut hex = String::with_capacity(40);
+        for byte in hasher.finalize().iter() {
+            hex.push_str(&format!("{byte:02x}"));
+        }
+        assert_eq!(hex, file_sha1(&file).await.unwrap());
+
+        // Missing file restarts from scratch.
+        let (_, zero) = crate::engine::hash_file_prefix(&dir.join("missing.bin")).await;
+        assert_eq!(zero, 0);
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
     async fn test_file_sha1_roundtrip() {
         let dir = std::env::temp_dir().join(format!(
             "amc_verify_test_{}_{}",

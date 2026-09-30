@@ -52,6 +52,9 @@ pub enum LauncherError {
     #[error("Download cancelled by user")]
     Cancelled,
 
+    #[error("Download paused by user")]
+    Paused,
+
     #[error("{0}")]
     Custom(String),
 }

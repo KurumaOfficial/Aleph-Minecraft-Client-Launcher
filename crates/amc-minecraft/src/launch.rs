@@ -25,6 +25,9 @@ pub enum GameEvent {
     /// User-cancelled operation (e.g. download cancel). Not a crash: no
     /// diagnostics, no playtime accounting — just back to idle.
     Cancelled,
+    /// User-paused download (P3). The overlay stays open with Resume;
+    /// resuming re-runs the launch, picking up partial files via Range.
+    DownloadPaused,
 }
 
 pub struct MinecraftLauncher;

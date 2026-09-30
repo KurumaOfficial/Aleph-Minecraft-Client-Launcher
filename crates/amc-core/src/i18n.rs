@@ -1613,6 +1613,70 @@ impl Language {
         }
     }
 
+    pub fn status_download_paused(&self) -> &'static str {
+        match self {
+            Self::English => "Download paused — press Resume to continue",
+            Self::Russian => "Загрузка приостановлена — нажмите «Продолжить»",
+            Self::Ukrainian => "Завантаження призупинено — натисніть «Продовжити»",
+        }
+    }
+
+    pub fn overlay_title(&self) -> &'static str {
+        match self {
+            Self::English => "Downloading components",
+            Self::Russian => "Загрузка компонентов",
+            Self::Ukrainian => "Завантаження компонентів",
+        }
+    }
+
+    pub fn overlay_file(&self, name: &str) -> String {
+        match self {
+            Self::English => format!("File: {name}"),
+            Self::Russian => format!("Файл: {name}"),
+            Self::Ukrainian => format!("Файл: {name}"),
+        }
+    }
+
+    pub fn overlay_btn_cancel(&self) -> &'static str {
+        match self {
+            Self::English => "Cancel",
+            Self::Russian => "Отмена",
+            Self::Ukrainian => "Скасувати",
+        }
+    }
+
+    pub fn overlay_btn_pause(&self) -> &'static str {
+        match self {
+            Self::English => "Pause",
+            Self::Russian => "Пауза",
+            Self::Ukrainian => "Пауза",
+        }
+    }
+
+    pub fn overlay_btn_resume(&self) -> &'static str {
+        match self {
+            Self::English => "Resume",
+            Self::Russian => "Продолжить",
+            Self::Ukrainian => "Продовжити",
+        }
+    }
+
+    pub fn settings_speed_title(&self) -> &'static str {
+        match self {
+            Self::English => "Download speed limit",
+            Self::Russian => "Лимит скорости загрузки",
+            Self::Ukrainian => "Ліміт швидкості завантаження",
+        }
+    }
+
+    pub fn settings_speed_unlimited(&self) -> &'static str {
+        match self {
+            Self::English => "0 = unlimited, applies to game and installer downloads",
+            Self::Russian => "0 — без лимита, действует на загрузки игры и установщиков",
+            Self::Ukrainian => "0 — без ліміту, діє на завантаження гри та інсталяторів",
+        }
+    }
+
     pub fn status_process_exited(&self, code: Option<i32>) -> String {
         match self {
             Self::English => format!("Minecraft process exited with code {:?}", code),
@@ -1986,6 +2050,14 @@ mod tests {
             assert!(!lang.disk_size(500).is_empty());
             assert!(!lang.err_low_disk("1 GB", "1 MB").is_empty());
             assert!(!lang.status_download_cancelled().is_empty());
+            assert!(!lang.status_download_paused().is_empty());
+            assert!(!lang.overlay_title().is_empty());
+            assert!(!lang.overlay_file("x.jar").is_empty());
+            assert!(!lang.overlay_btn_cancel().is_empty());
+            assert!(!lang.overlay_btn_pause().is_empty());
+            assert!(!lang.overlay_btn_resume().is_empty());
+            assert!(!lang.settings_speed_title().is_empty());
+            assert!(!lang.settings_speed_unlimited().is_empty());
         }
     }
 }
