@@ -1605,6 +1605,14 @@ impl Language {
         }
     }
 
+    pub fn status_download_cancelled(&self) -> &'static str {
+        match self {
+            Self::English => "Download cancelled",
+            Self::Russian => "Загрузка отменена",
+            Self::Ukrainian => "Завантаження скасовано",
+        }
+    }
+
     pub fn status_process_exited(&self, code: Option<i32>) -> String {
         match self {
             Self::English => format!("Minecraft process exited with code {:?}", code),
@@ -1977,6 +1985,7 @@ mod tests {
             assert!(!lang.err_loader_failed("Forge", "x").is_empty());
             assert!(!lang.disk_size(500).is_empty());
             assert!(!lang.err_low_disk("1 GB", "1 MB").is_empty());
+            assert!(!lang.status_download_cancelled().is_empty());
         }
     }
 }

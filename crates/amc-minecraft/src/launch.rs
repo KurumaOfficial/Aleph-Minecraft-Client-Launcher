@@ -12,10 +12,19 @@ use tokio::sync::mpsc;
 
 #[derive(Debug, Clone)]
 pub enum GameEvent {
-    Started { pid: u32 },
+    Started {
+        pid: u32,
+    },
     LogLine(String),
-    Exited { code: Option<i32> },
-    Crashed { message: String },
+    Exited {
+        code: Option<i32>,
+    },
+    Crashed {
+        message: String,
+    },
+    /// User-cancelled operation (e.g. download cancel). Not a crash: no
+    /// diagnostics, no playtime accounting — just back to idle.
+    Cancelled,
 }
 
 pub struct MinecraftLauncher;

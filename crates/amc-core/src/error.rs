@@ -49,6 +49,9 @@ pub enum LauncherError {
     #[error("Process launch error: {0}")]
     Launch(String),
 
+    #[error("Download cancelled by user")]
+    Cancelled,
+
     #[error("{0}")]
     Custom(String),
 }

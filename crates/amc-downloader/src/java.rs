@@ -1,4 +1,4 @@
-use crate::engine::{DownloadEngine, DownloadItem};
+use crate::engine::{DownloadCancel, DownloadEngine, DownloadItem};
 use crate::progress::ProgressTracker;
 use amc_core::error::{LauncherError, Result};
 use flate2::read::GzDecoder;
@@ -68,7 +68,10 @@ impl AdoptiumInstaller {
         tracing::info!("Downloading Java {} from Adoptium: {}", major, url);
 
         let item = DownloadItem::new(&url, &archive_path);
-        engine.download_one(&item, tracker).await?;
+        // Runtime download is not UI-cancellable yet (P3): uncancellable token.
+        engine
+            .download_one(&item, tracker, DownloadCancel::default())
+            .await?;
 
         tracing::info!("Extracting Java {} archive...", major);
         tokio::task::spawn_blocking({

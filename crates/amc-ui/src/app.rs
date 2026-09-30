@@ -1,9 +1,10 @@
 use amc_auth::{Account, AccountManager, DeviceCodeResponse, MicrosoftAuthFlow};
 use amc_core::config::LauncherConfig;
+use amc_core::error::LauncherError;
 use amc_core::paths::LauncherPaths;
 use amc_core::types::{GameVersion, Instance, LaunchOptions, LoaderType};
 use amc_core::HardwareReport;
-use amc_downloader::{AdoptiumInstaller, DownloadEngine, DownloadProgress};
+use amc_downloader::{AdoptiumInstaller, DownloadCancel, DownloadEngine, DownloadProgress};
 use amc_minecraft::{
     FabricLoader, ForgeLoader, GameEvent, MinecraftLauncher, NeoForgeLoader, OptiFineLoader,
     QuiltLoader, VersionDetails, VersionManifest,
@@ -70,6 +71,8 @@ pub struct LauncherApp {
     launch_status_rx: Option<mpsc::Receiver<String>>,
     download_progress_rx: Option<watch::Receiver<DownloadProgress>>,
     game_events_rx: Option<mpsc::Receiver<GameEvent>>,
+    /// Cancel token for the current launch download (overlay Cancel button).
+    download_cancel: Option<DownloadCancel>,
     ms_code_rx: Option<mpsc::Receiver<Result<DeviceCodeResponse, String>>>,
     ms_poll_rx: Option<mpsc::Receiver<Result<Account, String>>>,
 }
@@ -149,6 +152,7 @@ impl LauncherApp {
             launch_status_rx: None,
             download_progress_rx: None,
             game_events_rx: None,
+            download_cancel: None,
             ms_code_rx: None,
             ms_poll_rx: None,
             pending_direct_connect: None,
@@ -288,7 +292,11 @@ impl LauncherApp {
                 Ok(file_info) => {
                     let dest = target_dir.join(&file_info.filename);
                     let item = amc_downloader::DownloadItem::new(&file_info.url, dest);
-                    if let Err(e) = engine.download_one(&item, None).await {
+                    // Single-mod installs are not UI-cancellable yet (P3).
+                    if let Err(e) = engine
+                        .download_one(&item, None, DownloadCancel::default())
+                        .await
+                    {
                         tracing::error!("Failed to download {}: {e}", file_info.filename);
                         let _ = tx
                             .send(Err(format!("Ошибка загрузки {}: {e}", file_info.filename)))
@@ -419,6 +427,7 @@ impl LauncherApp {
             options.quick_play_port = Some(port);
         }
 
+        let download_cancel = DownloadCancel::new();
         let (game_tx, game_rx) = mpsc::channel(256);
         let (status_tx, status_rx) = mpsc::channel(32);
         let (prog_tx, prog_rx) = mpsc::channel(8);
@@ -426,6 +435,7 @@ impl LauncherApp {
         self.game_events_rx = Some(game_rx);
         self.launch_status_rx = Some(status_rx);
         self.progress_init_rx = Some(prog_rx);
+        self.download_cancel = Some(download_cancel.clone());
 
         tokio::spawn(async move {
             let client = reqwest::Client::new();
@@ -848,16 +858,23 @@ impl LauncherApp {
                 let _ = prog_tx.send(Some(progress_rx)).await;
 
                 if let Err(e) = engine
-                    .download_all_with_progress(download_items, Some(tracker))
+                    .download_all_with_progress(download_items, Some(tracker), download_cancel)
                     .await
                 {
-                    tracing::error!("Component download failed: {e}");
                     let _ = prog_tx.send(None).await;
-                    let _ = game_tx
-                        .send(GameEvent::Crashed {
-                            message: format!("Ошибка скачивания компонентов: {e}"),
-                        })
-                        .await;
+                    match e {
+                        LauncherError::Cancelled => {
+                            let _ = game_tx.send(GameEvent::Cancelled).await;
+                        }
+                        _ => {
+                            tracing::error!("Component download failed: {e}");
+                            let _ = game_tx
+                                .send(GameEvent::Crashed {
+                                    message: format!("Ошибка скачивания компонентов: {e}"),
+                                })
+                                .await;
+                        }
+                    }
                     return;
                 }
                 let _ = prog_tx.send(None).await;
@@ -1058,7 +1075,9 @@ impl App for LauncherApp {
         if let Some(rx) = &self.download_progress_rx {
             let progress = rx.borrow().clone();
             DownloadOverlay::show(ctx, &progress, &self.launch_status_text, || {
-                // Cancel
+                if let Some(cancel) = &self.download_cancel {
+                    cancel.cancel();
+                }
             });
             ctx.request_repaint_after(std::time::Duration::from_millis(16));
         }
@@ -1102,6 +1121,13 @@ impl App for LauncherApp {
                                 }
                             }
                         }
+                    }
+                    GameEvent::Cancelled => {
+                        let lang = self.config.ui.language();
+                        let msg = lang.status_download_cancelled();
+                        tracing::info!("{msg}");
+                        self.console_modal.push_line(format!("[ALEPH] {msg}"));
+                        self.is_launching = false;
                     }
                     GameEvent::Crashed { message } => {
                         let lang = self.config.ui.language();

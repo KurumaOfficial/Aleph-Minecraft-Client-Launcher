@@ -2,7 +2,7 @@ use super::installer::{run_client_installer, INSTALLER_TIMEOUT};
 use crate::version::VersionDetails;
 use amc_core::error::{LauncherError, Result};
 use amc_core::paths::LauncherPaths;
-use amc_downloader::{DownloadEngine, DownloadItem};
+use amc_downloader::{DownloadCancel, DownloadEngine, DownloadItem};
 use reqwest::Client;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -104,8 +104,9 @@ impl ForgeLoader {
                 Self::installer_url(mc_version, &forge_version),
                 &installer_path,
             );
+            // Installer phase is not UI-cancellable yet (P3): uncancellable token.
             engine
-                .download_all_with_progress(vec![item], None)
+                .download_all_with_progress(vec![item], None, DownloadCancel::default())
                 .await
                 .map_err(|e| {
                     LauncherError::Loader(format!("Forge installer download failed: {e}"))

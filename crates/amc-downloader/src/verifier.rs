@@ -56,3 +56,44 @@ pub async fn verify_file_sha1(path: &Path, expected_sha1: &str) -> Result<bool> 
         Err(_) => Ok(false),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sha1_hex_vector() {
+        // Well-known SHA-1 test vector.
+        assert_eq!(sha1_hex(b"abc"),             "a9993e364706816aba3e25717850c26c9cd0d89d");
+        assert_eq!(sha1_hex(b""), "da39a3ee5e6b4b0d3255bfef95601890afd80709");
+    }
+
+    #[tokio::test]
+    async fn test_file_sha1_roundtrip() {
+        let dir = std::env::temp_dir().join(format!(
+            "amc_verify_test_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let file = dir.join("hello.bin");
+        std::fs::write(&file, b"hello world").unwrap();
+
+        let hex = file_sha1(&file).await.unwrap();
+        assert_eq!(hex, sha1_hex(b"hello world"));
+        assert!(verify_file_sha1(&file, &hex).await.unwrap());
+        assert!(
+            !verify_file_sha1(&file, "0000000000000000000000000000000000000000")
+                .await
+                .unwrap()
+        );
+        assert!(!verify_file_sha1(&dir.join("missing.bin"), &hex)
+            .await
+            .unwrap());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}
