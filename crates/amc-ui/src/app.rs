@@ -1,11 +1,12 @@
 use amc_auth::{Account, AccountManager, DeviceCodeResponse, MicrosoftAuthFlow};
 use amc_core::config::LauncherConfig;
 use amc_core::paths::LauncherPaths;
-use amc_core::types::{GameVersion, Instance, LoaderType};
+use amc_core::types::{GameVersion, Instance, LaunchOptions, LoaderType};
 use amc_core::HardwareReport;
 use amc_downloader::{AdoptiumInstaller, DownloadEngine, DownloadProgress};
 use amc_minecraft::{
-    FabricLoader, GameEvent, MinecraftLauncher, QuiltLoader, VersionDetails, VersionManifest,
+    FabricLoader, ForgeLoader, GameEvent, MinecraftLauncher, NeoForgeLoader, OptiFineLoader,
+    QuiltLoader, VersionDetails, VersionManifest,
 };
 use amc_mods::{
     CurseForgeClient, LocalModManager, ModCategory, ModSearchResult, ModSource, ModrinthClient,
@@ -588,6 +589,121 @@ impl LauncherApp {
                         }
                     }
                 }
+                LoaderType::Forge => {
+                    let _ = status_tx
+                        .send(lang.status_resolving_loader("Forge", &ver_id))
+                        .await;
+                    let vanilla =
+                        match fetch_vanilla_details(&client, &ver_id, &paths, &game_tx).await {
+                            Some(v) => v,
+                            None => return,
+                        };
+                    let java_bin =
+                        match resolve_java_for_install(&vanilla, &options, &engine, &paths).await {
+                            Ok(bin) => bin,
+                            Err(err) => {
+                                let _ = game_tx
+                                    .send(GameEvent::Crashed {
+                                        message: lang.err_loader_failed("Forge", &err),
+                                    })
+                                    .await;
+                                return;
+                            }
+                        };
+                    match ForgeLoader::resolve(
+                        &client,
+                        &engine,
+                        &ver_id,
+                        &java_bin,
+                        &paths,
+                        status_tx.clone(),
+                    )
+                    .await
+                    {
+                        Ok(mut forge_details) => {
+                            forge_details.merge_parent(vanilla);
+                            forge_details
+                        }
+                        Err(e) => {
+                            let _ = game_tx
+                                .send(GameEvent::Crashed {
+                                    message: lang.err_loader_failed("Forge", &e.to_string()),
+                                })
+                                .await;
+                            return;
+                        }
+                    }
+                }
+                LoaderType::NeoForge => {
+                    let _ = status_tx
+                        .send(lang.status_resolving_loader("NeoForge", &ver_id))
+                        .await;
+                    let vanilla =
+                        match fetch_vanilla_details(&client, &ver_id, &paths, &game_tx).await {
+                            Some(v) => v,
+                            None => return,
+                        };
+                    let java_bin =
+                        match resolve_java_for_install(&vanilla, &options, &engine, &paths).await {
+                            Ok(bin) => bin,
+                            Err(err) => {
+                                let _ = game_tx
+                                    .send(GameEvent::Crashed {
+                                        message: lang.err_loader_failed("NeoForge", &err),
+                                    })
+                                    .await;
+                                return;
+                            }
+                        };
+                    match NeoForgeLoader::resolve(
+                        &client,
+                        &engine,
+                        &ver_id,
+                        &java_bin,
+                        &paths,
+                        status_tx.clone(),
+                    )
+                    .await
+                    {
+                        Ok(mut neoforge_details) => {
+                            neoforge_details.merge_parent(vanilla);
+                            neoforge_details
+                        }
+                        Err(e) => {
+                            let _ = game_tx
+                                .send(GameEvent::Crashed {
+                                    message: lang.err_loader_failed("NeoForge", &e.to_string()),
+                                })
+                                .await;
+                            return;
+                        }
+                    }
+                }
+                LoaderType::OptiFine => {
+                    let _ = status_tx
+                        .send(lang.status_resolving_loader("OptiFine", &ver_id))
+                        .await;
+                    let vanilla =
+                        match fetch_vanilla_details(&client, &ver_id, &paths, &game_tx).await {
+                            Some(v) => v,
+                            None => return,
+                        };
+                    match OptiFineLoader::resolve(&client, &ver_id).await {
+                        Ok(mut of_details) => {
+                            of_details.merge_parent(vanilla);
+                            OptiFineLoader::normalize_legacy_tweak(&mut of_details);
+                            of_details
+                        }
+                        Err(e) => {
+                            let _ = game_tx
+                                .send(GameEvent::Crashed {
+                                    message: lang.err_loader_failed("OptiFine", &e.to_string()),
+                                })
+                                .await;
+                            return;
+                        }
+                    }
+                }
                 _ => {
                     match VersionDetails::fetch_or_load(
                         &client,
@@ -770,6 +886,52 @@ impl LauncherApp {
                 }
             }
         });
+    }
+}
+
+/// Fetch the vanilla parent for a loader branch, reporting a crash event.
+/// New loader arms share it instead of duplicating the boilerplate.
+async fn fetch_vanilla_details(
+    client: &reqwest::Client,
+    ver_id: &str,
+    paths: &LauncherPaths,
+    game_tx: &mpsc::Sender<GameEvent>,
+) -> Option<VersionDetails> {
+    match VersionDetails::fetch_or_load(client, ver_id, None, &paths.versions_dir()).await {
+        Ok(d) => Some(d),
+        Err(err) => {
+            let _ = game_tx
+                .send(GameEvent::Crashed {
+                    message: format!("Ошибка загрузки версии {ver_id}: {err}"),
+                })
+                .await;
+            None
+        }
+    }
+}
+
+/// Resolve a runnable `java` binary for installer-based loaders, mirroring
+/// the main launch flow: explicit user path first, Adoptium otherwise.
+async fn resolve_java_for_install(
+    vanilla: &VersionDetails,
+    options: &LaunchOptions,
+    engine: &DownloadEngine,
+    paths: &LauncherPaths,
+) -> Result<std::path::PathBuf, String> {
+    if let Some(custom_java) = &options.java_path {
+        if custom_java.is_file() {
+            return Ok(custom_java.clone());
+        }
+        let major = vanilla.required_java_major();
+        match AdoptiumInstaller::ensure_java(&paths.runtimes_dir(), major, engine, None).await {
+            Ok(bin) => Ok(bin),
+            Err(_) => Ok(custom_java.clone()),
+        }
+    } else {
+        let major = vanilla.required_java_major();
+        AdoptiumInstaller::ensure_java(&paths.runtimes_dir(), major, engine, None)
+            .await
+            .map_err(|e| format!("Java {major}: {e}"))
     }
 }
 

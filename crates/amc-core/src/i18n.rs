@@ -1539,6 +1539,22 @@ impl Language {
         }
     }
 
+    pub fn status_resolving_loader(&self, loader: &str, mc: &str) -> String {
+        match self {
+            Self::English => format!("Resolving {loader} for {mc}..."),
+            Self::Russian => format!("Подбираем {loader} для {mc}..."),
+            Self::Ukrainian => format!("Підбираємо {loader} для {mc}..."),
+        }
+    }
+
+    pub fn err_loader_failed(&self, loader: &str, err: &str) -> String {
+        match self {
+            Self::English => format!("Failed to prepare {loader}: {err}"),
+            Self::Russian => format!("Не удалось подготовить {loader}: {err}"),
+            Self::Ukrainian => format!("Не вдалося підготувати {loader}: {err}"),
+        }
+    }
+
     pub fn status_process_exited(&self, code: Option<i32>) -> String {
         match self {
             Self::English => format!("Minecraft process exited with code {:?}", code),
@@ -1890,6 +1906,8 @@ mod tests {
             assert!(!lang.wizard_hw_body().is_empty());
             assert!(!lang.wizard_hw_specs("8 GB", 8, "100 GB").is_empty());
             assert!(!lang.wizard_hw_ok().is_empty());
+            assert!(!lang.status_resolving_loader("Forge", "1.20.1").is_empty());
+            assert!(!lang.err_loader_failed("Forge", "x").is_empty());
         }
     }
 }
