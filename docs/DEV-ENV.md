@@ -79,3 +79,21 @@ Smart App Control is turned off by the user, and cannot be turned back on withou
 
 Without administrator rights there are no other options (WSL, WDAC allowlist, policy change) —
 verified: no admin rights (`BUILTIN\Administrators` is deny-only), WSL is not installed.
+
+## One-command fetch of the latest cloud build
+
+`scripts/fetch-build.ps1` downloads the newest **successful** CI artifact and
+refreshes the `Aleph Launcher` Desktop shortcut. No `gh` install is needed —
+the GitHub token is reused from the local git credential helper:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/fetch-build.ps1
+```
+
+Artifacts land in `<workspace>/dist/` (a sibling of the repo checkout, never
+committed); a `.last-successful-run` stamp skips redundant downloads.
+Run the script after every green CI build — that is the "test it here" half
+of the loop (the "test it there" half is the Smoke workflow).
+
+Optional: `gh run watch` for live run status (needs an interactive
+`gh auth login`; a portable `gh` copy may live in `<workspace>/tools/gh`).

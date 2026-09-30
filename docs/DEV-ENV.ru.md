@@ -78,3 +78,21 @@ Smart App Control выключается пользователем и обра�
 
 Без прав администратора (WSL, allowlist WDAC, смена политики) варианты отсутствуют —
 проверено: прав нет (`BUILTIN\Administrators` — deny-only), WSL не установлен.
+
+## Забор свежего облачного билда одной командой
+
+`scripts/fetch-build.ps1` скачивает новейший **успешный** артефакт CI и
+обновляет ярлык `Aleph Launcher` на рабочем столе. Устанавливать `gh`
+не нужно — токен GitHub переиспользуется из локального git credential helper:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/fetch-build.ps1
+```
+
+Билды складываются в `<workspace>/dist/` (рядом с checkout репозитория,
+никогда не коммитится); штамп `.last-successful-run` пропускает повторные
+скачивания. Запускать скрипт после каждой зелёной сборки CI — это половина
+цикла «тестируем тут» (половина «тестируем там» — workflow Smoke).
+
+Опционально: `gh run watch` для живого статуса ранов (нужен интерактивный
+`gh auth login`; портативная копия `gh` может лежать в `<workspace>/tools/gh`).
