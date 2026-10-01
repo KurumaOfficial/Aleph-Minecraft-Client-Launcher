@@ -75,6 +75,8 @@ pub struct LauncherApp {
     download_cancel: Option<DownloadCancel>,
     /// Set while a download is paused (overlay stays open with Resume).
     download_paused: bool,
+    /// Clean-exit session summary modal (CONCEPT "После запуска игры").
+    session_summary: Option<(String, u64)>,
     ms_code_rx: Option<mpsc::Receiver<Result<DeviceCodeResponse, String>>>,
     ms_poll_rx: Option<mpsc::Receiver<Result<Account, String>>>,
 }
@@ -156,6 +158,7 @@ impl LauncherApp {
             game_events_rx: None,
             download_cancel: None,
             download_paused: false,
+            session_summary: None,
             ms_code_rx: None,
             ms_poll_rx: None,
             pending_direct_connect: None,
@@ -1148,6 +1151,16 @@ impl App for LauncherApp {
                                         &self.instances,
                                     );
                                 }
+                                // Clean exit (not a crash): remember the session
+                                // for the summary modal (CONCEPT "После запуска игры").
+                                if code == Some(0) {
+                                    if let Some(inst) =
+                                        self.instances.iter().find(|i| i.id == inst_id)
+                                    {
+                                        self.session_summary =
+                                            Some((inst.name.clone(), elapsed_mins));
+                                    }
+                                }
                             }
                         }
                     }
@@ -1233,6 +1246,43 @@ impl App for LauncherApp {
         if let Some(report) = self.hw_notice.take() {
             if !crate::modals::wizard::show_hardware_notice(ctx, lang, &report) {
                 self.hw_notice = Some(report);
+            }
+        }
+
+        // Post-exit session summary (clean exits only, never crashes).
+        if let Some((name, mins)) = self.session_summary.clone() {
+            let mut close_summary = false;
+            egui::Window::new(lang.sess_title())
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                .min_width(360.0)
+                .show(ctx, |ui| {
+                    ui.add_space(8.0);
+                    ui.label(egui::RichText::new(&name).strong());
+                    let play_time_str = if mins == 0 {
+                        lang.inst_never_played().to_string()
+                    } else if mins < 60 {
+                        format!("{} {}", mins, lang.inst_mins_suffix())
+                    } else {
+                        format!(
+                            "{} {} {} {}",
+                            mins / 60,
+                            lang.inst_hours_suffix(),
+                            mins % 60,
+                            lang.inst_mins_suffix()
+                        )
+                    };
+                    ui.label(egui::RichText::new(
+                        lang.inst_playtime_label(&play_time_str),
+                    ));
+                    ui.add_space(12.0);
+                    if ui.button(lang.wizard_hw_ok()).clicked() {
+                        close_summary = true;
+                    }
+                });
+            if close_summary {
+                self.session_summary = None;
             }
         }
 

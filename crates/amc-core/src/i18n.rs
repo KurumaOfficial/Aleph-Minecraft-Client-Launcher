@@ -1738,6 +1738,14 @@ impl Language {
         }
     }
 
+    pub fn sess_title(&self) -> &'static str {
+        match self {
+            Self::English => "Session summary",
+            Self::Russian => "Сводка сессии",
+            Self::Ukrainian => "Підсумок сесії",
+        }
+    }
+
     pub fn status_process_exited(&self, code: Option<i32>) -> String {
         match self {
             Self::English => format!("Minecraft process exited with code {:?}", code),
@@ -2124,6 +2132,7 @@ mod tests {
             assert!(!lang.tmpl_desc("optimized").is_empty());
             assert!(!lang.tmpl_custom_note().is_empty());
             assert!(!lang.settings_game_args_title().is_empty());
+            assert!(!lang.sess_title().is_empty());
         }
     }
 }
