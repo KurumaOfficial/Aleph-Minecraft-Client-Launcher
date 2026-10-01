@@ -167,6 +167,20 @@ impl LauncherApp {
         }
     }
 
+    /// Store an account, surfacing storage errors (e.g. a second WetID,
+    /// which the concept forbids) in the login modal instead of dropping
+    /// them silently. Returns success.
+    fn store_account(&mut self, account: Account) -> bool {
+        match self.account_mgr.add_or_update_account(account) {
+            Ok(()) => true,
+            Err(e) => {
+                self.login_modal.error_msg = Some(e.to_string());
+                self.login_modal.is_open = true;
+                false
+            }
+        }
+    }
+
     /// Load stored accounts, degrading gracefully to an empty (signed-out)
     /// manager when the storage is missing or unreadable — never a crash.
     fn load_accounts(paths: &LauncherPaths) -> AccountManager {
@@ -371,7 +385,20 @@ impl LauncherApp {
     }
 
     fn handle_launch(&mut self) {
-        let Some(session) = self.account_mgr.get_session() else {
+        // Instance default account wins over the active one; unknown ids
+        // fall back to active (CONCEPT: no per-launch picker yet).
+        let session = self
+            .selected_instance
+            .and_then(|id| {
+                self.instances
+                    .iter()
+                    .find(|i| i.id == id)
+                    .and_then(|inst| inst.default_account)
+                    .and_then(|acc_id| self.account_mgr.accounts().iter().find(|a| a.id == acc_id))
+                    .map(amc_auth::AuthSession::from_account)
+            })
+            .or_else(|| self.account_mgr.get_session());
+        let Some(session) = session else {
             self.login_modal.is_open = true;
             return;
         };
@@ -1056,11 +1083,14 @@ impl App for LauncherApp {
             if let Ok(res) = rx.try_recv() {
                 match res {
                     Ok(acc) => {
-                        let _ = self.account_mgr.add_or_update_account(acc);
-                        self.login_modal.is_open = false;
-                        self.login_modal.ms_polling = false;
-                        self.login_modal.ms_device_code = None;
-                        self.ms_poll_rx = None;
+                        if self.store_account(acc) {
+                            self.login_modal.is_open = false;
+                            self.login_modal.ms_polling = false;
+                            self.login_modal.ms_device_code = None;
+                            self.ms_poll_rx = None;
+                        } else {
+                            self.login_modal.ms_polling = false;
+                        }
                     }
                     Err(err) => {
                         self.login_modal.error_msg = Some(err);
@@ -1122,8 +1152,14 @@ impl App for LauncherApp {
                         self.console_modal.push_line(format!("[ALEPH] {msg}"));
                         self.session_start_time = Some(std::time::Instant::now());
                         self.is_launching = false;
-                        if self.config.ui.close_after_launch {
-                            ctx.send_viewport_cmd(ViewportCommand::Close);
+                        match self.config.ui.after_launch {
+                            amc_core::config::AfterLaunch::Close => {
+                                ctx.send_viewport_cmd(ViewportCommand::Close);
+                            }
+                            amc_core::config::AfterLaunch::Minimize => {
+                                ctx.send_viewport_cmd(ViewportCommand::Minimized(true));
+                            }
+                            amc_core::config::AfterLaunch::Keep => {}
                         }
                     }
                     GameEvent::LogLine(line) => {
@@ -1226,8 +1262,9 @@ impl App for LauncherApp {
                 WizardAction::None => {}
                 WizardAction::Finished => self.complete_wizard(),
                 WizardAction::CreateOffline(account) => {
-                    let _ = self.account_mgr.add_or_update_account(account);
-                    self.complete_wizard();
+                    if self.store_account(account) {
+                        self.complete_wizard();
+                    }
                 }
                 WizardAction::OpenMicrosoftLogin => {
                     self.login_modal.is_open = true;
@@ -1417,6 +1454,7 @@ impl App for LauncherApp {
                             &mut self.instances,
                             &mut self.selected_instance,
                             &self.paths.instances_dir(),
+                            self.account_mgr.accounts(),
                             lang,
                         );
 
@@ -1548,16 +1586,20 @@ impl App for LauncherApp {
 
         // Modals
         let mut request_ms = false;
+        let mut pending_account = None;
         self.login_modal.show(
             ctx,
             lang,
             |account| {
-                let _ = self.account_mgr.add_or_update_account(account);
+                pending_account = Some(account);
             },
             || {
                 request_ms = true;
             },
         );
+        if let Some(account) = pending_account {
+            self.store_account(account);
+        }
 
         if request_ms {
             self.request_ms_device_code();

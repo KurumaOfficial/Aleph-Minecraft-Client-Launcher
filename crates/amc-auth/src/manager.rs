@@ -1,4 +1,4 @@
-use crate::types::{Account, AuthSession};
+use crate::types::{Account, AccountType, AuthSession};
 use amc_core::error::{LauncherError, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
@@ -82,6 +82,18 @@ impl AccountManager {
     }
 
     pub fn add_or_update_account(&mut self, account: Account) -> Result<()> {
+        // Strictly one WetID per profile (CONCEPT "Аккаунты").
+        if account.account_type == AccountType::WetId
+            && self
+                .db
+                .accounts
+                .iter()
+                .any(|a| a.account_type == AccountType::WetId && a.id != account.id)
+        {
+            return Err(LauncherError::Auth(
+                "Only one WetID account per launcher profile".to_string(),
+            ));
+        }
         let id = account.id;
         if let Some(pos) =
             self.db.accounts.iter().position(|a| {
@@ -107,5 +119,44 @@ impl AccountManager {
 
     pub fn get_session(&self) -> Option<AuthSession> {
         self.active_account().map(AuthSession::from_account)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::Account;
+
+    fn wetid(name: &str) -> Account {
+        Account::new_wetid(
+            name.to_string(),
+            Uuid::new_v4().to_string(),
+            "token".to_string(),
+            None,
+        )
+    }
+
+    #[test]
+    fn test_second_wetid_is_rejected() {
+        let path = std::env::temp_dir().join(format!("amc_acct_test_{}", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        let mut mgr = AccountManager::load_from_path(&path).unwrap();
+        assert!(mgr.add_or_update_account(wetid("first")).is_ok());
+        let err = mgr.add_or_update_account(wetid("second")).unwrap_err();
+        assert!(matches!(err, LauncherError::Auth(_)));
+        // Updating the SAME WetID account is fine.
+        let mut same = wetid("first");
+        same.id = mgr.db.accounts[0].id;
+        assert!(mgr.add_or_update_account(same).is_ok());
+        assert_eq!(mgr.db.accounts.len(), 1);
+        // Other types are unaffected.
+        assert!(mgr
+            .add_or_update_account(Account::new_offline(
+                "Steve".to_string(),
+                "00000000-0000-0000-0000-000000000000".to_string()
+            ))
+            .is_ok());
+        assert_eq!(mgr.db.accounts.len(), 2);
+        let _ = std::fs::remove_file(&path);
     }
 }

@@ -172,10 +172,40 @@ impl SettingsPage {
             );
             ui.add_space(8.0);
 
-            ui.checkbox(
-                &mut config.ui.close_after_launch,
-                egui::RichText::new(lang.settings_close_after_launch()).color(TEXT_PRIMARY),
+            ui.label(
+                egui::RichText::new(lang.settings_after_launch_title())
+                    .font(egui::FontId::proportional(13.0))
+                    .strong()
+                    .color(TEXT_HEADING),
             );
+            ui.add_space(4.0);
+            ui.horizontal(|ui| {
+                for (mode, label) in [
+                    (
+                        amc_core::config::AfterLaunch::Close,
+                        lang.settings_after_close(),
+                    ),
+                    (
+                        amc_core::config::AfterLaunch::Minimize,
+                        lang.settings_after_minimize(),
+                    ),
+                    (
+                        amc_core::config::AfterLaunch::Keep,
+                        lang.settings_after_keep(),
+                    ),
+                ] {
+                    if crate::widgets::choice_chip(
+                        ui,
+                        label,
+                        130.0,
+                        32.0,
+                        12.0,
+                        config.ui.after_launch == mode,
+                    ) {
+                        config.ui.after_launch = mode;
+                    }
+                }
+            });
 
             ui.add_space(6.0);
 
@@ -190,6 +220,20 @@ impl SettingsPage {
                 &mut config.ui.show_old,
                 egui::RichText::new(lang.settings_show_old()).color(TEXT_PRIMARY),
             );
+
+            ui.add_space(6.0);
+
+            let mut autostart_want = config.ui.autostart;
+            ui.checkbox(
+                &mut autostart_want,
+                egui::RichText::new(lang.settings_autostart()).color(TEXT_PRIMARY),
+            );
+            if autostart_want != config.ui.autostart {
+                match amc_core::autostart::set_enabled(autostart_want) {
+                    Ok(()) => config.ui.autostart = autostart_want,
+                    Err(e) => tracing::error!("Autostart change failed: {e}"),
+                }
+            }
         });
 
         ui.add_space(14.0);

@@ -156,6 +156,24 @@ fn select_forge_version(promos: &HashMap<String, String>, mc_version: &str) -> O
         .cloned()
 }
 
+/// Whether a Forge line is old enough to deserve an unsafe-loader warning
+/// (CONCEPT "Загрузчики модов"). The 1.12-and-older Forge line ended in 2018
+/// and ships a pre-2.17 log4j — warn, never block. Pure, unit-tested.
+pub fn is_legacy_unsafe_line(mc_version: &str) -> bool {
+    mc_version.starts_with("1.7.")
+        || mc_version.starts_with("1.8.")
+        || mc_version.starts_with("1.9.")
+        || mc_version.starts_with("1.10.")
+        || mc_version.starts_with("1.11.")
+        || mc_version.starts_with("1.12.")
+        || mc_version == "1.7"
+        || mc_version == "1.8"
+        || mc_version == "1.9"
+        || mc_version == "1.10"
+        || mc_version == "1.11"
+        || mc_version == "1.12"
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -183,6 +201,16 @@ mod tests {
             Some("43.2.0")
         );
         assert_eq!(select_forge_version(&fixture(), "1.16.5"), None);
+    }
+
+    #[test]
+    fn test_legacy_unsafe_line() {
+        for mc in ["1.7.10", "1.8.9", "1.12.2", "1.12", "1.7"] {
+            assert!(is_legacy_unsafe_line(mc), "{mc} should warn");
+        }
+        for mc in ["1.13", "1.16.5", "1.19.2", "1.20.1", "1.21", ""] {
+            assert!(!is_legacy_unsafe_line(mc), "{mc} should not warn");
+        }
     }
 
     #[test]

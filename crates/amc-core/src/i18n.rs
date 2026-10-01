@@ -833,11 +833,43 @@ impl Language {
         }
     }
 
-    pub fn settings_close_after_launch(&self) -> &'static str {
+    pub fn settings_after_launch_title(&self) -> &'static str {
         match self {
-            Self::English => "Close launcher after Minecraft starts",
-            Self::Russian => "Закрывать лаунчер после запуска Minecraft",
-            Self::Ukrainian => "Закривати лаунчер після запуску Minecraft",
+            Self::English => "After game start",
+            Self::Russian => "После запуска игры",
+            Self::Ukrainian => "Після запуску гри",
+        }
+    }
+
+    pub fn settings_after_close(&self) -> &'static str {
+        match self {
+            Self::English => "Close",
+            Self::Russian => "Закрывать",
+            Self::Ukrainian => "Закривати",
+        }
+    }
+
+    pub fn settings_after_minimize(&self) -> &'static str {
+        match self {
+            Self::English => "Minimize",
+            Self::Russian => "Сворачивать",
+            Self::Ukrainian => "Згортати",
+        }
+    }
+
+    pub fn settings_after_keep(&self) -> &'static str {
+        match self {
+            Self::English => "Keep open",
+            Self::Russian => "Оставлять открытым",
+            Self::Ukrainian => "Залишати відкритим",
+        }
+    }
+
+    pub fn settings_autostart(&self) -> &'static str {
+        match self {
+            Self::English => "Start with OS",
+            Self::Russian => "Запускать вместе с ОС",
+            Self::Ukrainian => "Запускати разом з ОС",
         }
     }
 
@@ -1896,6 +1928,36 @@ impl Language {
         }
     }
 
+    pub fn inst_account_label(&self) -> &'static str {
+        match self {
+            Self::English => "Instance account",
+            Self::Russian => "Аккаунт сборки",
+            Self::Ukrainian => "Акаунт збірки",
+        }
+    }
+
+    pub fn inst_account_default(&self) -> &'static str {
+        match self {
+            Self::English => "Active account",
+            Self::Russian => "Активный аккаунт",
+            Self::Ukrainian => "Активний акаунт",
+        }
+    }
+
+    pub fn inst_warn_legacy_forge(&self) -> &'static str {
+        match self {
+            Self::English => {
+                "Old Forge line: known vulnerabilities possible, update at your own risk"
+            }
+            Self::Russian => {
+                "Старая линейка Forge: возможны известные уязвимости, используйте на свой риск"
+            }
+            Self::Ukrainian => {
+                "Стара лінійка Forge: можливі відомі вразливості, використовуйте на свій ризик"
+            }
+        }
+    }
+
     pub fn home_hero_hint(&self) -> &'static str {
         match self {
             Self::English => "Pick a version and hit Play. Files download themselves.",
@@ -2365,6 +2427,14 @@ mod tests {
             assert!(!lang.inst_tags_label().is_empty());
             assert!(!lang.inst_tags_hint().is_empty());
             assert!(!lang.inst_pin_label().is_empty());
+            assert!(!lang.inst_account_label().is_empty());
+            assert!(!lang.inst_account_default().is_empty());
+            assert!(!lang.inst_warn_legacy_forge().is_empty());
+            assert!(!lang.settings_after_launch_title().is_empty());
+            assert!(!lang.settings_after_close().is_empty());
+            assert!(!lang.settings_after_minimize().is_empty());
+            assert!(!lang.settings_after_keep().is_empty());
+            assert!(!lang.settings_autostart().is_empty());
         }
     }
 }

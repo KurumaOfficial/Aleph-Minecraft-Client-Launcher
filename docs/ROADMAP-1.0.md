@@ -114,8 +114,8 @@ with zero telemetry (network only: Mojang, Adoptium, Modrinth, CurseForge).
 
 | Concept item | Status | Location / note |
 |---|---|---|
-| Wizard 1: language choice, OS auto-detect | 🟡 Partial | `i18n.rs` + Settings exist; wizard + OS auto-detect — P1 |
-| Wizard 2: Simple / Pro choice | ⬜ Todo | P1: different home screens + free switching |
+| Wizard 1: language choice, OS auto-detect | ✅ Done | Wizard + `detect_system()` ✅ |
+| Wizard 2: Simple / Pro choice | ✅ Done | Wizard + free switching from settings ✅ |
 | Wizard 3: sign-in (MS/WetID/no account), WetID via browser | 🟡 Partial | `login.rs`, `microsoft.rs`, `wetid.rs`; browser WetID — P6 |
 | Hardware test + lightweight mode (non-blocking, independent of Simple/Pro) | ⬜ Todo | P1 |
 | Simple: versions incl. snapshot/pre, quick start | 🟡 Partial | Home + filters exist; "quick start" as one button — P2 |
@@ -131,7 +131,7 @@ with zero telemetry (network only: Mojang, Adoptium, Modrinth, CurseForge).
 | Storage location choice (another drive) | 🟡 Partial | `LauncherPaths::custom` + `custom_game_dir` exist; selection UI — P2 |
 | Self-contained instances, no dedup | ✅ Done | Confirmed by architecture |
 | In-launcher console/logs | ✅ Done | `console.rs` + `launch.rs` |
-| Disk usage per instance/folder | ⬜ Todo | P2 |
+| Disk usage per instance/folder | ✅ Done | Card + pre-download free-space check ✅ |
 | Hybrid Java: auto + manual + system/other-launcher discovery | 🟡 Partial | Auto+manual ✅; system discovery — P5 |
 | Server browser | 🚫 Out | Not built; favorites + inject — P8 |
 | Windows + Linux | 🟡 Partial | Primary Win, Linux X11/Wayland via `eframe`; Win7/GT710 — verify in P11 |
@@ -154,7 +154,7 @@ with zero telemetry (network only: Mojang, Adoptium, Modrinth, CurseForge).
 | News feed | ❓ Open | Undecided; plan default: not in 1.0 without a "yes" |
 | Screenshot gallery | ⬜ Todo | P10 (`screenshots/` already created) |
 | Multi-MS ✅, single WetID | 🟡 Partial | Second-WetID ban — P6 |
-| Anonymous auto crash reports + conflicts only in logs | ⬜/✅ | Non-interference ✅; auto reports — P12 (opt-in) |
+| Anonymous auto crash reports + conflicts only in logs | ⬜/✅ | Non-interference ✅; auto reports — P12 (opt-out) |
 | World backup (manual + scheduled) | ⬜ Todo | P9 |
 | Guard/anticheat | 🚫 Out | 2.0 |
 | Skins: free selection/upload, NameMC validation + auto command, launcher fallback | 🟡 Partial | Upload+2D ✅; rest — P7 |
@@ -169,7 +169,7 @@ with zero telemetry (network only: Mojang, Adoptium, Modrinth, CurseForge).
 | Newcomer tutorial tour; .minecraft reuse instead of re-download | ⬜ Todo | P1 |
 | Quick start = last played version; single setup in Simple; classic versions | ⬜ Todo | P1/P2 |
 | AMC-only templates; clone with worlds/mods choice; folders/tags/sort/pin/search; notes; pre/post scripts; Java/RAM groups | ⬜ Todo | P2 |
-| Instance card (glanceable content); disk usage | 🟡 Partial | Content partial; disk usage — P2 |
+| Instance card (glanceable content); disk usage | ✅ Done | Card grid + usage ✅ |
 | Ratings in mod search | ⬜ Todo | P4 (fields already in the APIs) |
 | World import by dragging its folder | ⬜ Todo | P4 |
 | OptiFine as a regular mod (temporarily a loader in code, P2) | 🟡 Partial | Move to mod-style install — P4 |
@@ -179,8 +179,8 @@ with zero telemetry (network only: Mojang, Adoptium, Modrinth, CurseForge).
 | Local-mod instance badge; "no antivirus scan" policy | ⬜/✅ | Badge — P2; policy fixed |
 | Instance shortcuts with direct launch; GPU choice; per-instance resolution; instance icon in taskbar | ⬜ Todo | P11/P14 (shortcuts need CLI) |
 | Config editor (Pro) | ⬜ Todo | P2 |
-| Free-space check before downloading | ⬜ Todo | P2 (with disk usage) |
-| Java manager screen (add/remove) | ⬜ Todo | P5 |
+| Free-space check before downloading | ✅ Done | Warning with numbers ✅ |
+| Java manager screen (add/remove) | ✅ Done | System discovery + runtime list ✅ |
 | Server-required mods (window + auto-install) | ⬜ Todo | P8 |
 | OS autostart | ⬜ Todo | P11 |
 | .NET/VC++ check in the installer | ⬜ Todo | P11 |
@@ -194,7 +194,7 @@ with zero telemetry (network only: Mojang, Adoptium, Modrinth, CurseForge).
 | Deletion trash; uninstall data question; instance backup to disk | ⬜ Todo | P2/P9/P11 |
 | Scheduled world backups + folder choice | ⬜ Todo | P9 |
 | WetID 2FA; per-launch identity picker + "remember"; default account per instance | ⬜ Todo | P6 |
-| Post-exit session summary | ⬜ Todo | P10 |
+| Post-exit session summary | ✅ Done | Modal on clean exit ✅ |
 | Hotkeys + gamepad; per-type notifications | ⬜ Todo | P10 |
 | Local server button (tunneling — ❓ open) | ⬜ Todo | P13 |
 

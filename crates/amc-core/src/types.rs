@@ -95,6 +95,10 @@ pub struct Instance {
     /// Pinned instances sort above the rest.
     #[serde(default)]
     pub pinned: bool,
+    /// Default account for this instance (CONCEPT: no per-launch picker).
+    /// Missing or unknown ids fall back to the active account.
+    #[serde(default)]
+    pub default_account: Option<Uuid>,
 }
 
 /// Preset instance icons (key, glyph). AMC-team set; custom art goes
@@ -148,6 +152,7 @@ impl Instance {
             icon: None,
             tags: Vec::new(),
             pinned: false,
+            default_account: None,
         }
     }
 
@@ -415,6 +420,7 @@ mod tests {
         assert_eq!(inst.icon, None);
         assert!(inst.tags.is_empty());
         assert!(!inst.pinned);
+        assert_eq!(inst.default_account, None);
     }
 
     #[test]

@@ -8,12 +8,47 @@ use std::path::{Path, PathBuf};
 pub struct UiSettings {
     pub theme: String,
     pub ui_scale: f32,
-    pub close_after_launch: bool,
+    /// What to do with the launcher window once the game starts.
+    /// Old `true`/`false` configs migrate to Close/Keep.
+    #[serde(default, deserialize_with = "de_after_launch")]
+    pub after_launch: AfterLaunch,
     pub show_snapshots: bool,
     pub show_betas: bool,
     pub show_alphas: bool,
     pub show_old: bool,
     pub language: String,
+    /// Start with the OS (CONCEPT "Автозапуск"). Applied on toggle; may drift
+    /// if the OS entry is removed externally.
+    #[serde(default)]
+    pub autostart: bool,
+}
+
+/// Launcher window behavior after game start (CONCEPT "После запуска игры").
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum AfterLaunch {
+    Close,
+    Minimize,
+    #[default]
+    Keep,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum BoolOrAfterLaunch {
+    Bool(bool),
+    After(AfterLaunch),
+}
+
+fn de_after_launch<'de, D>(deserializer: D) -> std::result::Result<AfterLaunch, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    match BoolOrAfterLaunch::deserialize(deserializer)? {
+        BoolOrAfterLaunch::Bool(true) => Ok(AfterLaunch::Close),
+        BoolOrAfterLaunch::Bool(false) => Ok(AfterLaunch::Keep),
+        BoolOrAfterLaunch::After(mode) => Ok(mode),
+    }
 }
 
 impl UiSettings {
@@ -31,12 +66,13 @@ impl Default for UiSettings {
         Self {
             theme: "aleph-dark".to_string(),
             ui_scale: 1.0,
-            close_after_launch: false,
+            after_launch: AfterLaunch::Keep,
             show_snapshots: false,
             show_betas: false,
             show_alphas: false,
             show_old: false,
             language: "ru".to_string(),
+            autostart: false,
         }
     }
 }
@@ -150,6 +186,29 @@ mod tests {
         ));
         let _ = std::fs::remove_dir_all(&dir);
         dir
+    }
+
+    #[test]
+    fn test_after_launch_bool_migration() {
+        // Old configs stored a bare bool.
+        let closed: UiSettings =
+            serde_json::from_str(r#"{"theme":"x","ui_scale":1.0,"after_launch":true,"show_snapshots":false,"show_betas":false,"show_alphas":false,"show_old":false,"language":"en"}"#)
+                .unwrap();
+        assert_eq!(closed.after_launch, AfterLaunch::Close);
+        let kept: UiSettings =
+            serde_json::from_str(r#"{"theme":"x","ui_scale":1.0,"after_launch":false,"show_snapshots":false,"show_betas":false,"show_alphas":false,"show_old":false,"language":"en"}"#)
+                .unwrap();
+        assert_eq!(kept.after_launch, AfterLaunch::Keep);
+        // New string form round-trips.
+        let minimized: UiSettings =
+            serde_json::from_str(r#"{"theme":"x","ui_scale":1.0,"after_launch":"minimize","show_snapshots":false,"show_betas":false,"show_alphas":false,"show_old":false,"language":"en"}"#)
+                .unwrap();
+        assert_eq!(minimized.after_launch, AfterLaunch::Minimize);
+        // Missing field defaults to Keep, never fails old files.
+        let legacy: UiSettings =
+            serde_json::from_str(r#"{"theme":"x","ui_scale":1.0,"show_snapshots":false,"show_betas":false,"show_alphas":false,"show_old":false,"language":"en"}"#)
+                .unwrap();
+        assert_eq!(legacy.after_launch, AfterLaunch::Keep);
     }
 
     #[test]

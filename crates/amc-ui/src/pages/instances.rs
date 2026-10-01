@@ -1,9 +1,10 @@
 use crate::theme::{
     lerp_color, BG_CARD, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_DIM, RUBY_LIGHT, TEXT_HEADING,
-    TEXT_MUTED, TEXT_PRIMARY,
+    TEXT_MUTED, TEXT_PRIMARY, WARNING,
 };
 use crate::widgets::choice_chip;
 use crate::widgets::full::tag;
+use amc_auth::Account;
 use amc_core::types::{Instance, InstanceIcon, InstanceTemplate, LoaderType};
 use amc_core::Language;
 use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
@@ -40,6 +41,7 @@ pub struct InstancesPage {
     pub edit_instance_icon: Option<String>,
     pub edit_instance_tags: String,
     pub edit_instance_pinned: bool,
+    pub edit_instance_account: Option<Uuid>,
 
     // Background disk-usage scan (CONCEPT "Место на диске").
     disk_sizes: HashMap<Uuid, u64>,
@@ -72,6 +74,7 @@ impl Default for InstancesPage {
             edit_instance_icon: None,
             edit_instance_tags: String::new(),
             edit_instance_pinned: false,
+            edit_instance_account: None,
 
             disk_sizes: HashMap::new(),
             disk_scanned_for: Vec::new(),
@@ -256,6 +259,7 @@ impl InstancesPage {
         instances: &mut Vec<Instance>,
         selected_instance: &mut Option<Uuid>,
         instances_dir: &Path,
+        accounts: &[Account],
         lang: Language,
     ) -> InstanceAction {
         let mut action = InstanceAction::None;
@@ -614,6 +618,7 @@ impl InstancesPage {
                     page.edit_instance_icon = inst.icon.clone();
                     page.edit_instance_tags = inst.tags.join(", ");
                     page.edit_instance_pinned = inst.pinned;
+                    page.edit_instance_account = inst.default_account;
                     page.show_edit_modal = true;
                 }
                 if ui
@@ -743,6 +748,17 @@ impl InstancesPage {
                                 "OptiFine",
                             );
                         });
+                    if self.new_instance_loader == LoaderType::Forge
+                        && amc_minecraft::loaders::forge::is_legacy_unsafe_line(
+                            &self.new_instance_version,
+                        )
+                    {
+                        ui.label(
+                            egui::RichText::new(lang.inst_warn_legacy_forge())
+                                .font(egui::FontId::proportional(12.0))
+                                .color(WARNING),
+                        );
+                    }
 
                     ui.add_space(10.0);
                     ui.label(
@@ -842,6 +858,17 @@ impl InstancesPage {
                                 "OptiFine",
                             );
                         });
+                    if self.edit_instance_loader == LoaderType::Forge
+                        && amc_minecraft::loaders::forge::is_legacy_unsafe_line(
+                            &self.edit_instance_version,
+                        )
+                    {
+                        ui.label(
+                            egui::RichText::new(lang.inst_warn_legacy_forge())
+                                .font(egui::FontId::proportional(12.0))
+                                .color(WARNING),
+                        );
+                    }
 
                     ui.add_space(10.0);
                     ui.label(
@@ -938,6 +965,38 @@ impl InstancesPage {
                     ui.add_space(6.0);
                     ui.checkbox(&mut self.edit_instance_pinned, lang.inst_pin_label());
 
+                    ui.add_space(10.0);
+                    ui.label(egui::RichText::new(lang.inst_account_label()).color(TEXT_PRIMARY));
+                    egui::ComboBox::from_id_salt("edit_account_select")
+                        .selected_text(
+                            self.edit_instance_account
+                                .and_then(|id| accounts.iter().find(|a| a.id == id))
+                                .map(|a| a.username.clone())
+                                .unwrap_or_else(|| lang.inst_account_default().to_string()),
+                        )
+                        .show_ui(ui, |ui| {
+                            if ui
+                                .selectable_label(
+                                    self.edit_instance_account.is_none(),
+                                    lang.inst_account_default(),
+                                )
+                                .clicked()
+                            {
+                                self.edit_instance_account = None;
+                            }
+                            for acc in accounts {
+                                if ui
+                                    .selectable_label(
+                                        self.edit_instance_account == Some(acc.id),
+                                        &acc.username,
+                                    )
+                                    .clicked()
+                                {
+                                    self.edit_instance_account = Some(acc.id);
+                                }
+                            }
+                        });
+
                     ui.add_space(18.0);
                     ui.horizontal(|ui| {
                         if ui
@@ -967,6 +1026,7 @@ impl InstancesPage {
                         inst.icon = self.edit_instance_icon.clone();
                         inst.tags = parse_tags(&self.edit_instance_tags);
                         inst.pinned = self.edit_instance_pinned;
+                        inst.default_account = self.edit_instance_account;
                         action = InstanceAction::Updated(inst.clone());
                     }
                     self.icon_textures.remove(&target_id);

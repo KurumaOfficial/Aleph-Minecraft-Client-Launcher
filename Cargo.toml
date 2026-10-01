@@ -29,7 +29,7 @@ amc-mods = { path = "crates/amc-mods" }
 amc-ui = { path = "crates/amc-ui" }
 
 # Windows system APIs (locale detection, hardware info)
-windows-sys = { version = "0.59", features = ["Win32_System_SystemInformation", "Win32_Globalization", "Win32_Storage_FileSystem"] }
+windows-sys = { version = "0.59", features = ["Win32_System_SystemInformation", "Win32_Globalization", "Win32_Storage_FileSystem", "Win32_System_Registry"] }
 
 # Async runtime & network
 tokio = { version = "1", features = ["full"] }
