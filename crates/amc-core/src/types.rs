@@ -85,6 +85,45 @@ pub struct Instance {
     pub created_at: DateTime<Utc>,
     pub last_played: Option<DateTime<Utc>>,
     pub total_played_minutes: u64,
+    /// Preset icon key (`InstanceIcon::ALL`), `None` = loader glyph.
+    /// A custom `icon.png` in the game dir wins over any preset.
+    #[serde(default)]
+    pub icon: Option<String>,
+    /// Free-form tags for grouping/filtering (CONCEPT, P2).
+    #[serde(default)]
+    pub tags: Vec<String>,
+    /// Pinned instances sort above the rest.
+    #[serde(default)]
+    pub pinned: bool,
+}
+
+/// Preset instance icons (key, glyph). AMC-team set; custom art goes
+/// through `icon.png`, no user icon packs in v1.0.
+pub struct InstanceIcon;
+
+impl InstanceIcon {
+    pub const ALL: [(&'static str, &'static str); 12] = [
+        ("pickaxe", "⛏"),
+        ("sword", "🗡"),
+        ("shield", "🛡"),
+        ("bow", "🏹"),
+        ("potion", "🧪"),
+        ("dragon", "🐉"),
+        ("castle", "🏰"),
+        ("wheat", "🌾"),
+        ("gear", "⚙"),
+        ("alien", "👾"),
+        ("art", "🎨"),
+        ("fire", "🔥"),
+    ];
+    pub const CUSTOM_ICON_FILE: &'static str = "icon.png";
+
+    pub fn glyph(key: &str) -> Option<&'static str> {
+        Self::ALL
+            .iter()
+            .find(|(k, _)| *k == key)
+            .map(|(_, glyph)| *glyph)
+    }
 }
 
 use crate::error::{LauncherError, Result};
@@ -106,6 +145,9 @@ impl Instance {
             created_at: Utc::now(),
             last_played: None,
             total_played_minutes: 0,
+            icon: None,
+            tags: Vec::new(),
+            pinned: false,
         }
     }
 
@@ -353,6 +395,38 @@ mod tests {
         assert_eq!(cloned.loader, LoaderType::Fabric);
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_legacy_instance_without_p2_fields_uses_defaults() {
+        let legacy = r#"{
+            "id": "123e4567-e89b-12d3-a456-426614174000",
+            "name": "Old Pack",
+            "game_version": "1.19.2",
+            "loader": "forge",
+            "loader_version": null,
+            "custom_dir": null,
+            "ram_mb": 4096,
+            "created_at": "2024-01-01T00:00:00Z",
+            "last_played": null,
+            "total_played_minutes": 0
+        }"#;
+        let inst: Instance = serde_json::from_str(legacy).unwrap();
+        assert_eq!(inst.icon, None);
+        assert!(inst.tags.is_empty());
+        assert!(!inst.pinned);
+    }
+
+    #[test]
+    fn test_instance_icon_keys_unique_and_known() {
+        let mut keys = std::collections::HashSet::new();
+        for (key, glyph) in InstanceIcon::ALL {
+            assert!(keys.insert(key), "duplicate icon key: {key}");
+            assert!(!glyph.is_empty());
+            assert_eq!(InstanceIcon::glyph(key), Some(glyph));
+        }
+        assert_eq!(InstanceIcon::glyph("nope"), None);
+        assert_eq!(InstanceIcon::CUSTOM_ICON_FILE, "icon.png");
     }
 
     #[test]

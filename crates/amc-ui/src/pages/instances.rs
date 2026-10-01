@@ -3,7 +3,8 @@ use crate::theme::{
     TEXT_MUTED, TEXT_PRIMARY,
 };
 use crate::widgets::choice_chip;
-use amc_core::types::{Instance, InstanceTemplate, LoaderType};
+use crate::widgets::full::tag;
+use amc_core::types::{Instance, InstanceIcon, InstanceTemplate, LoaderType};
 use amc_core::Language;
 use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
 use std::collections::HashMap;
@@ -36,11 +37,20 @@ pub struct InstancesPage {
     pub edit_instance_version: String,
     pub edit_instance_loader: LoaderType,
     pub edit_instance_ram: u32,
+    pub edit_instance_icon: Option<String>,
+    pub edit_instance_tags: String,
+    pub edit_instance_pinned: bool,
 
     // Background disk-usage scan (CONCEPT "Место на диске").
     disk_sizes: HashMap<Uuid, u64>,
     disk_scanned_for: Vec<Uuid>,
     disk_rx: Option<std::sync::mpsc::Receiver<Vec<(Uuid, u64)>>>,
+
+    // Organization (CONCEPT, P2): tag filter, sort, icon texture cache.
+    pub active_tag: Option<String>,
+    pub sort_mode: InstanceSort,
+    icon_textures: HashMap<Uuid, egui::TextureHandle>,
+    icon_failed: std::collections::HashSet<Uuid>,
 }
 
 impl Default for InstancesPage {
@@ -59,10 +69,17 @@ impl Default for InstancesPage {
             edit_instance_version: String::new(),
             edit_instance_loader: LoaderType::Vanilla,
             edit_instance_ram: 4096,
+            edit_instance_icon: None,
+            edit_instance_tags: String::new(),
+            edit_instance_pinned: false,
 
             disk_sizes: HashMap::new(),
             disk_scanned_for: Vec::new(),
             disk_rx: None,
+            active_tag: None,
+            sort_mode: InstanceSort::default(),
+            icon_textures: HashMap::new(),
+            icon_failed: std::collections::HashSet::new(),
         }
     }
 }
@@ -76,7 +93,117 @@ fn truncate_name(name: &str, max_chars: usize) -> String {
     }
 }
 
+/// Instance list ordering (CONCEPT: folders/tags/sort, P2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum InstanceSort {
+    /// Recently played first, never-played last.
+    #[default]
+    Recent,
+    Name,
+    Created,
+    Playtime,
+}
+
+impl InstanceSort {
+    pub const ALL: [Self; 4] = [Self::Recent, Self::Name, Self::Created, Self::Playtime];
+
+    pub fn label(&self, lang: Language) -> &'static str {
+        match self {
+            Self::Recent => lang.inst_sort_recent(),
+            Self::Name => lang.inst_sort_name(),
+            Self::Created => lang.inst_sort_created(),
+            Self::Playtime => lang.inst_sort_played(),
+        }
+    }
+}
+
+/// Search + tag predicate for the instance list (pure, unit-tested).
+fn matches_filter(inst: &Instance, query: &str, active_tag: Option<&str>) -> bool {
+    if let Some(tag) = active_tag {
+        if !inst.tags.iter().any(|t| t == tag) {
+            return false;
+        }
+    }
+    if query.is_empty() {
+        return true;
+    }
+    inst.name.to_lowercase().contains(query)
+        || inst.game_version.to_lowercase().contains(query)
+        || inst.loader.as_str().to_lowercase().contains(query)
+}
+
+/// Pinned instances float above the rest, then the sort mode applies.
+/// `None` last-played counts as ancient. Pure, unit-tested.
+fn compare_instances(a: &Instance, b: &Instance, mode: InstanceSort) -> std::cmp::Ordering {
+    match (a.pinned, b.pinned) {
+        (true, false) => return std::cmp::Ordering::Less,
+        (false, true) => return std::cmp::Ordering::Greater,
+        _ => {}
+    }
+    match mode {
+        InstanceSort::Name => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+        InstanceSort::Recent => b.last_played.cmp(&a.last_played),
+        InstanceSort::Created => b.created_at.cmp(&a.created_at),
+        InstanceSort::Playtime => b.total_played_minutes.cmp(&a.total_played_minutes),
+    }
+}
+
+/// Split a tags field (`"a, b,,c"`) into clean values, order kept.
+fn parse_tags(raw: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for part in raw.split(',') {
+        let tag = part.trim().to_string();
+        if !tag.is_empty() && !out.contains(&tag) {
+            out.push(tag);
+        }
+    }
+    out
+}
+
 impl InstancesPage {
+    /// Cached custom `icon.png` texture for a card. Missing or broken files
+    /// are remembered as failed so later frames don't re-hit the disk; the
+    /// negative cache is cleared whenever the edit modal saves.
+    fn instance_icon_texture(
+        &mut self,
+        ctx: &egui::Context,
+        inst_id: Uuid,
+        game_dir: &Path,
+    ) -> Option<egui::TextureHandle> {
+        if let Some(tex) = self.icon_textures.get(&inst_id) {
+            return Some(tex.clone());
+        }
+        if self.icon_failed.contains(&inst_id) {
+            return None;
+        }
+        let bytes = std::fs::read(game_dir.join(InstanceIcon::CUSTOM_ICON_FILE)).ok()?;
+        if bytes.is_empty() {
+            self.icon_failed.insert(inst_id);
+            return None;
+        }
+        let img = image::load_from_memory(&bytes).ok()?;
+        let rgba = img.to_rgba8();
+        let (w, h) = (rgba.width() as usize, rgba.height() as usize);
+        if w == 0 || h == 0 || w > 512 || h > 512 {
+            self.icon_failed.insert(inst_id);
+            return None;
+        }
+        let pixels: Vec<Color32> = rgba
+            .pixels()
+            .map(|p| Color32::from_rgba_premultiplied(p[0], p[1], p[2], p[3]))
+            .collect();
+        let tex = ctx.load_texture(
+            format!("inst-icon-{inst_id}"),
+            egui::ColorImage {
+                size: [w, h],
+                pixels,
+            },
+            egui::TextureOptions::LINEAR,
+        );
+        self.icon_textures.insert(inst_id, tex.clone());
+        Some(tex)
+    }
+
     /// Poll a finished background scan, or (re)start one when the instance
     /// set changed. Measuring runs on a worker thread — the UI never blocks.
     fn poll_disk_sizes(&mut self, instances: &[Instance], instances_dir: &Path) {
@@ -182,22 +309,63 @@ impl InstancesPage {
 
         ui.add_space(14.0);
 
-        // Filter instances
+        // Tag filter chips + sort selector.
+        let mut all_tags: Vec<String> = Vec::new();
+        for inst in instances.iter() {
+            for t in &inst.tags {
+                if !all_tags.contains(t) {
+                    all_tags.push(t.clone());
+                }
+            }
+        }
+        all_tags.sort();
+        if let Some(active) = self.active_tag.clone() {
+            if !all_tags.contains(&active) {
+                self.active_tag = None;
+            }
+        }
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
+            if tag(ui, lang.inst_tag_all(), self.active_tag.is_none()).clicked() {
+                self.active_tag = None;
+            }
+            for t in &all_tags {
+                let is_active = self.active_tag.as_deref() == Some(t.as_str());
+                if tag(ui, t, is_active).clicked() {
+                    self.active_tag = if is_active { None } else { Some(t.clone()) };
+                }
+            }
+        });
+
+        ui.add_space(8.0);
+
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
+            ui.label(
+                egui::RichText::new(lang.inst_sort_title())
+                    .font(egui::FontId::proportional(12.0))
+                    .color(TEXT_MUTED),
+            );
+            for mode in InstanceSort::ALL {
+                if tag(ui, mode.label(lang), self.sort_mode == mode).clicked() {
+                    self.sort_mode = mode;
+                }
+            }
+        });
+
+        ui.add_space(8.0);
+
+        // Filter + sort instances (pinned float on top).
         let query = self.search_query.trim().to_lowercase();
-        let filtered_indices: Vec<usize> = instances
+        let mut filtered_indices: Vec<usize> = instances
             .iter()
             .enumerate()
-            .filter(|(_, inst)| {
-                if query.is_empty() {
-                    true
-                } else {
-                    inst.name.to_lowercase().contains(&query)
-                        || inst.game_version.to_lowercase().contains(&query)
-                        || inst.loader.as_str().to_lowercase().contains(&query)
-                }
-            })
+            .filter(|(_, inst)| matches_filter(inst, &query, self.active_tag.as_deref()))
             .map(|(idx, _)| idx)
             .collect();
+        let sort_mode = self.sort_mode;
+        filtered_indices
+            .sort_by(|&a, &b| compare_instances(&instances[a], &instances[b], sort_mode));
 
         // Instances list
         ScrollArea::vertical()
@@ -312,28 +480,57 @@ impl InstancesPage {
 
             // Header: loader icon + name + version.
             card.horizontal(|ui| {
-                let icon_glyph = match inst.loader {
-                    LoaderType::Vanilla => "🟩",
-                    LoaderType::Fabric => "🧵",
-                    LoaderType::Quilt => "🪡",
-                    LoaderType::Forge => "🔨",
-                    LoaderType::NeoForge => "⚡",
-                    LoaderType::OptiFine => "✨",
-                };
                 let (icon_rect, _) = ui.allocate_exact_size(vec2(48.0, 48.0), Sense::hover());
-                ui.painter()
-                    .rect_filled(icon_rect, Rounding::ZERO, RUBY_DIM);
-                ui.painter().text(
-                    icon_rect.center(),
-                    egui::Align2::CENTER_CENTER,
-                    icon_glyph,
-                    egui::FontId::proportional(22.0),
-                    Color32::WHITE,
-                );
+                match page.instance_icon_texture(
+                    ui.ctx(),
+                    inst_id,
+                    &inst.get_game_dir(instances_dir),
+                ) {
+                    Some(tex) => {
+                        ui.painter().image(
+                            tex.id(),
+                            icon_rect,
+                            egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                            Color32::WHITE,
+                        );
+                        ui.painter().rect_stroke(
+                            icon_rect,
+                            Rounding::ZERO,
+                            Stroke::new(1.0_f32, BORDER_DEFAULT),
+                        );
+                    }
+                    None => {
+                        let icon_glyph = match inst.icon.as_deref().and_then(InstanceIcon::glyph) {
+                            Some(glyph) => glyph,
+                            None => match inst.loader {
+                                LoaderType::Vanilla => "🟩",
+                                LoaderType::Fabric => "🧵",
+                                LoaderType::Quilt => "🪡",
+                                LoaderType::Forge => "🔨",
+                                LoaderType::NeoForge => "⚡",
+                                LoaderType::OptiFine => "✨",
+                            },
+                        };
+                        ui.painter()
+                            .rect_filled(icon_rect, Rounding::ZERO, RUBY_DIM);
+                        ui.painter().text(
+                            icon_rect.center(),
+                            egui::Align2::CENTER_CENTER,
+                            icon_glyph,
+                            egui::FontId::proportional(22.0),
+                            Color32::WHITE,
+                        );
+                    }
+                }
                 ui.add_space(8.0);
                 ui.vertical(|inner| {
+                    let title = if inst.pinned {
+                        format!("{} 📌", truncate_name(&inst.name, 22))
+                    } else {
+                        truncate_name(&inst.name, 22)
+                    };
                     inner.label(
-                        egui::RichText::new(truncate_name(&inst.name, 22))
+                        egui::RichText::new(title)
                             .font(egui::FontId::proportional(15.0))
                             .strong()
                             .color(TEXT_HEADING),
@@ -383,6 +580,13 @@ impl InstancesPage {
                 .font(egui::FontId::proportional(11.0))
                 .color(TEXT_MUTED),
             );
+            if !inst.tags.is_empty() {
+                card.label(
+                    egui::RichText::new(format!("🏷 {}", truncate_name(&inst.tags.join(", "), 40)))
+                        .font(egui::FontId::proportional(11.0))
+                        .color(TEXT_MUTED),
+                );
+            }
 
             card.add_space(6.0);
 
@@ -407,6 +611,9 @@ impl InstancesPage {
                     page.edit_instance_version = inst.game_version.clone();
                     page.edit_instance_loader = inst.loader;
                     page.edit_instance_ram = inst.ram_mb.unwrap_or(4096);
+                    page.edit_instance_icon = inst.icon.clone();
+                    page.edit_instance_tags = inst.tags.join(", ");
+                    page.edit_instance_pinned = inst.pinned;
                     page.show_edit_modal = true;
                 }
                 if ui
@@ -649,6 +856,88 @@ impl InstancesPage {
                         egui::Slider::new(&mut self.edit_instance_ram, 1024..=32768).step_by(512.0),
                     );
 
+                    ui.add_space(10.0);
+                    ui.label(egui::RichText::new(lang.inst_icon_title()).color(TEXT_PRIMARY));
+                    ui.horizontal_wrapped(|ui| {
+                        ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
+                        for (key, glyph) in InstanceIcon::ALL {
+                            let active = self.edit_instance_icon.as_deref() == Some(key);
+                            let (rect, resp) =
+                                ui.allocate_exact_size(vec2(40.0, 40.0), Sense::click());
+                            let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+                            let bg = lerp_color(BG_CARD, BG_HOVER, hover_t);
+                            let stroke_col = if active {
+                                RUBY_LIGHT
+                            } else {
+                                lerp_color(BORDER_DEFAULT, RUBY, hover_t)
+                            };
+                            ui.painter().rect_filled(rect, Rounding::ZERO, bg);
+                            ui.painter().rect_stroke(
+                                rect,
+                                Rounding::ZERO,
+                                Stroke::new(1.0_f32, stroke_col),
+                            );
+                            ui.painter().text(
+                                rect.center(),
+                                egui::Align2::CENTER_CENTER,
+                                glyph,
+                                egui::FontId::proportional(20.0),
+                                TEXT_PRIMARY,
+                            );
+                            if resp.clicked() {
+                                self.edit_instance_icon = Some(key.to_string());
+                            }
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        if ui.button(lang.inst_icon_custom()).clicked() {
+                            if let Some(path) = rfd::FileDialog::new()
+                                .add_filter("PNG image", &["png"])
+                                .pick_file()
+                            {
+                                if let Some(target_id) = self.edit_instance_id {
+                                    if let Some(inst) = instances.iter().find(|i| i.id == target_id)
+                                    {
+                                        let dest = inst
+                                            .get_game_dir(instances_dir)
+                                            .join(InstanceIcon::CUSTOM_ICON_FILE);
+                                        if let Some(parent) = dest.parent() {
+                                            let _ = std::fs::create_dir_all(parent);
+                                        }
+                                        let _ = std::fs::copy(&path, &dest);
+                                        self.icon_failed.remove(&target_id);
+                                        self.icon_textures.remove(&target_id);
+                                    }
+                                }
+                            }
+                        }
+                        if ui.button(lang.inst_icon_none()).clicked() {
+                            self.edit_instance_icon = None;
+                        }
+                        if ui.button(lang.inst_icon_remove()).clicked() {
+                            if let Some(target_id) = self.edit_instance_id {
+                                if let Some(inst) = instances.iter().find(|i| i.id == target_id) {
+                                    let _ = std::fs::remove_file(
+                                        inst.get_game_dir(instances_dir)
+                                            .join(InstanceIcon::CUSTOM_ICON_FILE),
+                                    );
+                                    self.icon_failed.remove(&target_id);
+                                    self.icon_textures.remove(&target_id);
+                                }
+                            }
+                        }
+                    });
+
+                    ui.add_space(10.0);
+                    ui.label(egui::RichText::new(lang.inst_tags_label()).color(TEXT_PRIMARY));
+                    ui.add(
+                        TextEdit::singleline(&mut self.edit_instance_tags)
+                            .hint_text(lang.inst_tags_hint())
+                            .desired_width(400.0),
+                    );
+                    ui.add_space(6.0);
+                    ui.checkbox(&mut self.edit_instance_pinned, lang.inst_pin_label());
+
                     ui.add_space(18.0);
                     ui.horizontal(|ui| {
                         if ui
@@ -675,9 +964,14 @@ impl InstancesPage {
                         inst.game_version = self.edit_instance_version.clone();
                         inst.loader = self.edit_instance_loader;
                         inst.ram_mb = Some(self.edit_instance_ram);
+                        inst.icon = self.edit_instance_icon.clone();
+                        inst.tags = parse_tags(&self.edit_instance_tags);
+                        inst.pinned = self.edit_instance_pinned;
                         action = InstanceAction::Updated(inst.clone());
                     }
+                    self.icon_textures.remove(&target_id);
                 }
+                self.icon_failed.clear();
                 self.show_edit_modal = false;
             }
 
@@ -724,5 +1018,59 @@ mod tests {
         assert_eq!(page.new_instance_loader, LoaderType::Vanilla);
         assert_eq!(page.new_instance_ram, 2048);
         assert_eq!(page.new_instance_name, "My Pack");
+    }
+
+    fn tagged(name: &str, tags: &[&str], pinned: bool, mins: u64) -> Instance {
+        let mut inst = Instance::new(name, "1.20.1", LoaderType::Vanilla);
+        inst.tags = tags.iter().map(|t| t.to_string()).collect();
+        inst.pinned = pinned;
+        inst.total_played_minutes = mins;
+        inst
+    }
+
+    #[test]
+    fn test_matches_filter_query_and_tag() {
+        let inst = tagged("Survival Friends", &["smp", "vanilla"], false, 0);
+        assert!(matches_filter(&inst, "", None));
+        assert!(matches_filter(&inst, "surv", None));
+        assert!(!matches_filter(&inst, "creative", None));
+        assert!(matches_filter(&inst, "", Some("smp")));
+        assert!(!matches_filter(&inst, "", Some("modded")));
+        assert!(!matches_filter(&inst, "surv", Some("modded")));
+    }
+
+    #[test]
+    fn test_compare_instances_pinned_first_then_mode() {
+        let pinned = tagged("Pinned", &[], true, 0);
+        let played = tagged("Played", &[], false, 120);
+        let fresh = tagged("Fresh", &[], false, 0);
+        // Pinned floats above everything in every mode.
+        assert_eq!(
+            compare_instances(&pinned, &played, InstanceSort::Playtime),
+            std::cmp::Ordering::Less
+        );
+        assert_eq!(
+            compare_instances(&played, &pinned, InstanceSort::Name),
+            std::cmp::Ordering::Greater
+        );
+        // Playtime mode: most played first.
+        assert_eq!(
+            compare_instances(&played, &fresh, InstanceSort::Playtime),
+            std::cmp::Ordering::Less
+        );
+        // Name mode: alphabetical, case-insensitive.
+        assert_eq!(
+            compare_instances(&fresh, &played, InstanceSort::Name),
+            std::cmp::Ordering::Less
+        );
+    }
+
+    #[test]
+    fn test_parse_tags() {
+        assert_eq!(
+            parse_tags("smp, vanilla ,, smp,"),
+            vec!["smp".to_string(), "vanilla".to_string()]
+        );
+        assert!(parse_tags("  , ").is_empty());
     }
 }

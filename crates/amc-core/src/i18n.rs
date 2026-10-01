@@ -1746,6 +1746,113 @@ impl Language {
         }
     }
 
+    // ==========================================
+    // Instance organization: icons, tags, pin, sort (ROADMAP P2)
+    // ==========================================
+    pub fn inst_sort_title(&self) -> &'static str {
+        match self {
+            Self::English => "Sort",
+            Self::Russian => "Сортировка",
+            Self::Ukrainian => "Сортування",
+        }
+    }
+
+    pub fn inst_sort_name(&self) -> &'static str {
+        match self {
+            Self::English => "Name",
+            Self::Russian => "Имя",
+            Self::Ukrainian => "Ім'я",
+        }
+    }
+
+    pub fn inst_sort_recent(&self) -> &'static str {
+        match self {
+            Self::English => "Recent",
+            Self::Russian => "Недавние",
+            Self::Ukrainian => "Недавні",
+        }
+    }
+
+    pub fn inst_sort_created(&self) -> &'static str {
+        match self {
+            Self::English => "Newest",
+            Self::Russian => "Новые",
+            Self::Ukrainian => "Нові",
+        }
+    }
+
+    pub fn inst_sort_played(&self) -> &'static str {
+        match self {
+            Self::English => "Most played",
+            Self::Russian => "Наигранное",
+            Self::Ukrainian => "Награне",
+        }
+    }
+
+    pub fn inst_tag_all(&self) -> &'static str {
+        match self {
+            Self::English => "All",
+            Self::Russian => "Все",
+            Self::Ukrainian => "Всі",
+        }
+    }
+
+    pub fn inst_icon_title(&self) -> &'static str {
+        match self {
+            Self::English => "Icon",
+            Self::Russian => "Иконка",
+            Self::Ukrainian => "Іконка",
+        }
+    }
+
+    pub fn inst_icon_custom(&self) -> &'static str {
+        match self {
+            Self::English => "Custom PNG…",
+            Self::Russian => "Свой PNG…",
+            Self::Ukrainian => "Свій PNG…",
+        }
+    }
+
+    pub fn inst_icon_none(&self) -> &'static str {
+        match self {
+            Self::English => "No icon",
+            Self::Russian => "Без иконки",
+            Self::Ukrainian => "Без іконки",
+        }
+    }
+
+    pub fn inst_icon_remove(&self) -> &'static str {
+        match self {
+            Self::English => "Remove custom",
+            Self::Russian => "Убрать свою",
+            Self::Ukrainian => "Прибрати свою",
+        }
+    }
+
+    pub fn inst_tags_label(&self) -> &'static str {
+        match self {
+            Self::English => "Tags",
+            Self::Russian => "Теги",
+            Self::Ukrainian => "Теги",
+        }
+    }
+
+    pub fn inst_tags_hint(&self) -> &'static str {
+        match self {
+            Self::English => "tag1, tag2",
+            Self::Russian => "тег1, тег2",
+            Self::Ukrainian => "тег1, тег2",
+        }
+    }
+
+    pub fn inst_pin_label(&self) -> &'static str {
+        match self {
+            Self::English => "Pin to top",
+            Self::Russian => "Закрепить сверху",
+            Self::Ukrainian => "Закріпити зверху",
+        }
+    }
+
     pub fn home_hero_hint(&self) -> &'static str {
         match self {
             Self::English => "Pick a version and hit Play. Files download themselves.",
@@ -2197,6 +2304,19 @@ mod tests {
             assert!(!lang.tmpl_custom_note().is_empty());
             assert!(!lang.settings_game_args_title().is_empty());
             assert!(!lang.sess_title().is_empty());
+            assert!(!lang.inst_sort_title().is_empty());
+            assert!(!lang.inst_sort_name().is_empty());
+            assert!(!lang.inst_sort_recent().is_empty());
+            assert!(!lang.inst_sort_created().is_empty());
+            assert!(!lang.inst_sort_played().is_empty());
+            assert!(!lang.inst_tag_all().is_empty());
+            assert!(!lang.inst_icon_title().is_empty());
+            assert!(!lang.inst_icon_custom().is_empty());
+            assert!(!lang.inst_icon_none().is_empty());
+            assert!(!lang.inst_icon_remove().is_empty());
+            assert!(!lang.inst_tags_label().is_empty());
+            assert!(!lang.inst_tags_hint().is_empty());
+            assert!(!lang.inst_pin_label().is_empty());
         }
     }
 }
