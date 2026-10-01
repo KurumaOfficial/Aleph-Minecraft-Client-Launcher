@@ -5,6 +5,14 @@ use egui::{vec2, ProgressBar, Rounding};
 
 pub struct DownloadOverlay;
 
+/// Overlay button pressed by the user.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OverlayAction {
+    Pause,
+    Resume,
+    Cancel,
+}
+
 impl DownloadOverlay {
     pub fn show(
         ctx: &egui::Context,
@@ -12,13 +20,9 @@ impl DownloadOverlay {
         progress: &DownloadProgress,
         title: &str,
         paused: bool,
-        on_pause: impl FnOnce(),
-        on_resume: impl FnOnce(),
-        on_cancel: impl FnOnce(),
+        on_action: impl FnOnce(OverlayAction),
     ) {
-        let mut pause_clicked = false;
-        let mut resume_clicked = false;
-        let mut cancel_clicked = false;
+        let mut action = None;
 
         egui::Window::new(lang.overlay_title())
             .collapsible(false)
@@ -95,34 +99,26 @@ impl DownloadOverlay {
                 ui.add_space(14.0);
 
                 ui.horizontal(|ui| {
-                    if ui
-                        .button(if paused {
-                            lang.overlay_btn_resume()
+                    let resume_label = if paused {
+                        lang.overlay_btn_resume()
+                    } else {
+                        lang.overlay_btn_pause()
+                    };
+                    if ui.button(resume_label).clicked() {
+                        action = Some(if paused {
+                            OverlayAction::Resume
                         } else {
-                            lang.overlay_btn_pause()
-                        })
-                        .clicked()
-                    {
-                        if paused {
-                            resume_clicked = true;
-                        } else {
-                            pause_clicked = true;
-                        }
+                            OverlayAction::Pause
+                        });
                     }
                     if ui.button(lang.overlay_btn_cancel()).clicked() {
-                        cancel_clicked = true;
+                        action = Some(OverlayAction::Cancel);
                     }
                 });
             });
 
-        if pause_clicked {
-            on_pause();
-        }
-        if resume_clicked {
-            on_resume();
-        }
-        if cancel_clicked {
-            on_cancel();
+        if let Some(a) = action {
+            on_action(a);
         }
     }
 }

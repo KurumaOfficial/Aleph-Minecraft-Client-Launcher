@@ -4,7 +4,7 @@ pub mod mods;
 pub mod settings;
 pub mod skins;
 
-pub use home::HomePage;
+pub use home::{HomeContext, HomePage};
 pub use instances::{InstanceAction, InstancesPage};
 pub use mods::ModsPage;
 pub use settings::SettingsPage;

@@ -1746,6 +1746,70 @@ impl Language {
         }
     }
 
+    pub fn home_hero_hint(&self) -> &'static str {
+        match self {
+            Self::English => "Pick a version and hit Play. Files download themselves.",
+            Self::Russian => "Выбери версию и нажми «Играть». Файлы скачаются сами.",
+            Self::Ukrainian => "Обери версію і натисни «Грати». Файли завантажаться самі.",
+        }
+    }
+
+    pub fn home_hero_pick(&self) -> &'static str {
+        match self {
+            Self::English => "Choose version",
+            Self::Russian => "Выбрать версию",
+            Self::Ukrainian => "Обрати версію",
+        }
+    }
+
+    pub fn home_stat_versions(&self) -> &'static str {
+        match self {
+            Self::English => "VERSIONS",
+            Self::Russian => "ВЕРСИЙ",
+            Self::Ukrainian => "ВЕРСІЙ",
+        }
+    }
+
+    pub fn home_stat_instances(&self) -> &'static str {
+        match self {
+            Self::English => "INSTANCES",
+            Self::Russian => "СБОРОК",
+            Self::Ukrainian => "ЗБІРОК",
+        }
+    }
+
+    pub fn home_stat_ram(&self) -> &'static str {
+        match self {
+            Self::English => "MEMORY",
+            Self::Russian => "ПАМЯТЬ",
+            Self::Ukrainian => "ПАМ'ЯТЬ",
+        }
+    }
+
+    pub fn home_drawer_close(&self) -> &'static str {
+        match self {
+            Self::English => "Close",
+            Self::Russian => "Закрыть",
+            Self::Ukrainian => "Закрити",
+        }
+    }
+
+    pub fn home_drawer_installed(&self) -> &'static str {
+        match self {
+            Self::English => "INSTALLED",
+            Self::Russian => "УСТАНОВЛЕНА",
+            Self::Ukrainian => "ВСТАНОВЛЕНО",
+        }
+    }
+
+    pub fn home_drawer_not_installed(&self) -> &'static str {
+        match self {
+            Self::English => "NOT DOWNLOADED",
+            Self::Russian => "НЕ СКАЧАНА",
+            Self::Ukrainian => "НЕ ЗАВАНТАЖЕНА",
+        }
+    }
+
     pub fn status_process_exited(&self, code: Option<i32>) -> String {
         match self {
             Self::English => format!("Minecraft process exited with code {:?}", code),

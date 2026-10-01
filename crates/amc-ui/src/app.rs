@@ -18,9 +18,11 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
 
 use crate::modals::{
-    ConsoleModal, DownloadOverlay, LoginModal, LoginMode, WizardAction, WizardFlow,
+    ConsoleModal, DownloadOverlay, LoginModal, LoginMode, OverlayAction, WizardAction, WizardFlow,
 };
-use crate::pages::{HomePage, InstanceAction, InstancesPage, ModsPage, SettingsPage, SkinsPage};
+use crate::pages::{
+    HomeContext, HomePage, InstanceAction, InstancesPage, ModsPage, SettingsPage, SkinsPage,
+};
 use crate::theme::{apply_aleph_theme, BG};
 use crate::widgets::{topbar, BottomBar, NavTab, Sidebar, TitleBar};
 
@@ -1082,34 +1084,30 @@ impl App for LauncherApp {
         if self.download_progress_rx.is_some() {
             let lang = self.config.ui.language();
             let paused = self.download_paused;
-            let mut pause_requested = false;
-            let mut resume_requested = false;
+            let mut overlay_action = None;
             if let Some(rx) = &self.download_progress_rx {
                 let progress = rx.borrow().clone();
                 let title = self.launch_status_text.clone();
-                DownloadOverlay::show(
-                    ctx,
-                    lang,
-                    &progress,
-                    &title,
-                    paused,
-                    || pause_requested = true,
-                    || resume_requested = true,
-                    || {
-                        if let Some(cancel) = &self.download_cancel {
-                            cancel.cancel();
-                        }
-                    },
-                );
+                DownloadOverlay::show(ctx, lang, &progress, &title, paused, |a| {
+                    overlay_action = Some(a)
+                });
             }
-            if pause_requested {
-                if let Some(cancel) = &self.download_cancel {
-                    cancel.pause();
+            match overlay_action {
+                Some(OverlayAction::Pause) => {
+                    if let Some(cancel) = &self.download_cancel {
+                        cancel.pause();
+                    }
                 }
-            }
-            if resume_requested {
-                self.download_paused = false;
-                self.handle_launch();
+                Some(OverlayAction::Resume) => {
+                    self.download_paused = false;
+                    self.handle_launch();
+                }
+                Some(OverlayAction::Cancel) => {
+                    if let Some(cancel) = &self.download_cancel {
+                        cancel.cancel();
+                    }
+                }
+                None => {}
             }
             ctx.request_repaint_after(std::time::Duration::from_millis(16));
         }
@@ -1389,14 +1387,28 @@ impl App for LauncherApp {
 
                 match self.current_tab {
                     NavTab::Home => {
+                        let home_ctx = HomeContext {
+                            versions_dir: &self.paths.versions_dir(),
+                            instances_count: self.instances.len(),
+                            memory_mb: self.config.default_launch_options.memory_max_mb,
+                        };
                         self.home_page.show(
                             &mut content_ui,
                             &self.versions,
                             &mut self.selected_version,
+                            &home_ctx,
                             lang,
                         );
                         if let Some((server, port)) = self.home_page.direct_connect_request.take() {
                             self.handle_direct_connect(server, port);
+                        }
+                        if self.home_page.hero_play_request {
+                            self.home_page.hero_play_request = false;
+                            self.handle_launch();
+                        }
+                        if let Some(id) = self.home_page.drawer_play_request.take() {
+                            self.selected_version = Some(id);
+                            self.handle_launch();
                         }
                     }
                     NavTab::Modpacks => {

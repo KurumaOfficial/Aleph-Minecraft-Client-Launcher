@@ -265,6 +265,48 @@ pub fn tag(ui: &mut Ui, label: &str, active: bool) -> Response {
     response
 }
 
+/// Cover-fit image paint (aspect-preserving crop).
+pub fn image_cover(
+    painter: &egui::Painter,
+    rect: Rect,
+    texture: &egui::TextureHandle,
+    tint: Color32,
+) {
+    let source = texture.size_vec2();
+    if source.x <= 0.0 || source.y <= 0.0 {
+        return;
+    }
+    let dest_aspect = rect.width() / rect.height().max(1.0);
+    let source_aspect = source.x / source.y;
+    let uv = if source_aspect > dest_aspect {
+        let span = dest_aspect / source_aspect;
+        let pad = (1.0 - span) * 0.5;
+        Rect::from_min_max(pos2(pad, 0.0), pos2(1.0 - pad, 1.0))
+    } else {
+        let span = source_aspect / dest_aspect;
+        let pad = (1.0 - span) * 0.5;
+        Rect::from_min_max(pos2(0.0, pad), pos2(1.0, 1.0 - pad))
+    };
+    painter.image(texture.id(), rect, uv, tint);
+}
+
+/// Thin double ruby square decoration for hero art.
+pub fn red_square_deco(painter: &egui::Painter, rect: Rect) {
+    painter.rect_stroke(
+        rect,
+        Rounding::ZERO,
+        Stroke::new(1.0_f32, theme::with_alpha(theme::ACCENT, 56)),
+    );
+    let inner = rect.shrink(40.0);
+    if inner.width() > 20.0 && inner.height() > 20.0 {
+        painter.rect_stroke(
+            inner,
+            Rounding::ZERO,
+            Stroke::new(1.0_f32, theme::with_alpha(theme::ACCENT, 20)),
+        );
+    }
+}
+
 pub fn card<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) -> R {
     let width = ui.available_width();
     egui::Frame::none()
