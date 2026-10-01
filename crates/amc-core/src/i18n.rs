@@ -1738,6 +1738,49 @@ impl Language {
         }
     }
 
+    // ==========================================
+    // Java manager: system discovery (ROADMAP P5)
+    // ==========================================
+    pub fn settings_java_found_title(&self) -> &'static str {
+        match self {
+            Self::English => "Found on this PC",
+            Self::Russian => "Найдено на этом ПК",
+            Self::Ukrainian => "Знайдено на цьому ПК",
+        }
+    }
+
+    pub fn settings_java_scanning(&self) -> &'static str {
+        match self {
+            Self::English => "Scanning for Java…",
+            Self::Russian => "Ищем Java…",
+            Self::Ukrainian => "Шукаємо Java…",
+        }
+    }
+
+    pub fn settings_java_none_found(&self) -> &'static str {
+        match self {
+            Self::English => "Nothing found — the launcher will download Java itself",
+            Self::Russian => "Ничего не найдено — лаунчер скачает Java сам",
+            Self::Ukrainian => "Нічого не знайдено — лаунчер завантажить Java сам",
+        }
+    }
+
+    pub fn settings_btn_use_java(&self) -> &'static str {
+        match self {
+            Self::English => "Use",
+            Self::Russian => "Использовать",
+            Self::Ukrainian => "Використати",
+        }
+    }
+
+    pub fn settings_runtimes_title(&self) -> &'static str {
+        match self {
+            Self::English => "Launcher runtimes",
+            Self::Russian => "Среды лаунчера",
+            Self::Ukrainian => "Середовища лаунчера",
+        }
+    }
+
     pub fn sess_title(&self) -> &'static str {
         match self {
             Self::English => "Session summary",
@@ -2303,6 +2346,11 @@ mod tests {
             assert!(!lang.tmpl_desc("optimized").is_empty());
             assert!(!lang.tmpl_custom_note().is_empty());
             assert!(!lang.settings_game_args_title().is_empty());
+            assert!(!lang.settings_java_found_title().is_empty());
+            assert!(!lang.settings_java_scanning().is_empty());
+            assert!(!lang.settings_java_none_found().is_empty());
+            assert!(!lang.settings_btn_use_java().is_empty());
+            assert!(!lang.settings_runtimes_title().is_empty());
             assert!(!lang.sess_title().is_empty());
             assert!(!lang.inst_sort_title().is_empty());
             assert!(!lang.inst_sort_name().is_empty());

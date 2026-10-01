@@ -21,6 +21,9 @@ pub struct SettingsPage {
     pub sub_tab: SettingsSubTab,
     pub custom_jvm_arg_input: String,
     pub custom_game_arg_input: String,
+    java_scan: Option<Vec<amc_downloader::SystemJava>>,
+    java_scan_rx: Option<std::sync::mpsc::Receiver<Vec<amc_downloader::SystemJava>>>,
+    managed_runtimes: Option<Vec<String>>,
 }
 
 impl Default for SettingsPage {
@@ -29,6 +32,9 @@ impl Default for SettingsPage {
             sub_tab: SettingsSubTab::General,
             custom_jvm_arg_input: String::new(),
             custom_game_arg_input: String::new(),
+            java_scan: None,
+            java_scan_rx: None,
+            managed_runtimes: None,
         }
     }
 }
@@ -66,7 +72,7 @@ impl SettingsPage {
             .auto_shrink([false, false])
             .show(ui, |ui| match self.sub_tab {
                 SettingsSubTab::General => self.show_general(ui, config, paths),
-                SettingsSubTab::Java => self.show_java(ui, config),
+                SettingsSubTab::Java => self.show_java(ui, config, paths),
                 SettingsSubTab::Accounts => self.show_accounts(ui, account_mgr, lang),
             });
     }
@@ -262,7 +268,7 @@ impl SettingsPage {
         });
     }
 
-    fn show_java(&mut self, ui: &mut Ui, config: &mut LauncherConfig) {
+    fn show_java(&mut self, ui: &mut Ui, config: &mut LauncherConfig, paths: &LauncherPaths) {
         let lang = config.ui.language();
 
         ui.group(|ui| {
@@ -354,6 +360,151 @@ impl SettingsPage {
                     }
                 }
             });
+        });
+
+        ui.add_space(14.0);
+
+        // Java manager: discovered system runtimes + launcher runtimes.
+        ui.group(|ui| {
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new(lang.settings_java_found_title())
+                        .font(egui::FontId::proportional(16.0))
+                        .strong()
+                        .color(TEXT_HEADING),
+                );
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("↻").clicked() {
+                        self.java_scan = None;
+                        self.java_scan_rx = None;
+                        self.managed_runtimes = None;
+                    }
+                });
+            });
+            ui.add_space(8.0);
+
+            // System scan runs on a worker thread (probes can take seconds).
+            if self.java_scan.is_none() && self.java_scan_rx.is_none() {
+                let (tx, rx) = std::sync::mpsc::channel();
+                self.java_scan_rx = Some(rx);
+                std::thread::spawn(move || {
+                    let found = amc_downloader::discover_system_java();
+                    let _ = tx.send(found);
+                });
+            }
+            if let Some(rx) = &self.java_scan_rx {
+                if let Ok(found) = rx.try_recv() {
+                    self.java_scan = Some(found);
+                    self.java_scan_rx = None;
+                }
+            }
+
+            match &self.java_scan {
+                None => {
+                    ui.horizontal(|ui| {
+                        ui.spinner();
+                        ui.label(
+                            egui::RichText::new(lang.settings_java_scanning()).color(TEXT_MUTED),
+                        );
+                    });
+                }
+                Some(found) if found.is_empty() => {
+                    ui.label(
+                        egui::RichText::new(lang.settings_java_none_found()).color(TEXT_MUTED),
+                    );
+                }
+                Some(found) => {
+                    for java in found {
+                        ui.horizontal(|ui| {
+                            let major = match java.major {
+                                Some(m) => format!("Java {m}"),
+                                None => "?".to_string(),
+                            };
+                            ui.label(
+                                egui::RichText::new(major)
+                                    .font(egui::FontId::proportional(12.0))
+                                    .strong()
+                                    .color(TEXT_HEADING),
+                            );
+                            let short = java
+                                .path
+                                .parent()
+                                .and_then(|p| p.file_name())
+                                .map(|n| n.to_string_lossy().to_string())
+                                .unwrap_or_else(|| java.path.to_string_lossy().to_string());
+                            ui.label(
+                                egui::RichText::new(short)
+                                    .font(egui::FontId::proportional(11.0))
+                                    .color(TEXT_MUTED),
+                            )
+                            .on_hover_text(java.path.to_string_lossy());
+                            ui.label(
+                                egui::RichText::new(&java.source)
+                                    .font(egui::FontId::proportional(11.0))
+                                    .color(RUBY_LIGHT),
+                            );
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    if ui.button(lang.settings_btn_use_java()).clicked() {
+                                        config.default_launch_options.java_path =
+                                            Some(java.path.clone());
+                                    }
+                                },
+                            );
+                        });
+                    }
+                }
+            }
+
+            ui.add_space(10.0);
+            ui.label(
+                egui::RichText::new(lang.settings_runtimes_title())
+                    .font(egui::FontId::proportional(16.0))
+                    .strong()
+                    .color(TEXT_HEADING),
+            );
+            ui.add_space(6.0);
+
+            if self.managed_runtimes.is_none() {
+                let mut names = Vec::new();
+                if let Ok(entries) = std::fs::read_dir(paths.runtimes_dir()) {
+                    for entry in entries.flatten() {
+                        if entry.path().is_dir() {
+                            names.push(entry.file_name().to_string_lossy().to_string());
+                        }
+                    }
+                }
+                names.sort();
+                self.managed_runtimes = Some(names);
+            }
+            let mut delete_runtime = None;
+            if let Some(names) = &self.managed_runtimes {
+                if names.is_empty() {
+                    ui.label(
+                        egui::RichText::new(lang.settings_java_none_found()).color(TEXT_MUTED),
+                    );
+                }
+                for name in names {
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            egui::RichText::new(name)
+                                .font(egui::FontId::monospace(12.0))
+                                .color(TEXT_PRIMARY),
+                        );
+                        if ui
+                            .button(egui::RichText::new("✕").color(TEXT_MUTED))
+                            .clicked()
+                        {
+                            delete_runtime = Some(name.clone());
+                        }
+                    });
+                }
+            }
+            if let Some(name) = delete_runtime {
+                let _ = std::fs::remove_dir_all(paths.runtimes_dir().join(&name));
+                self.managed_runtimes = None;
+            }
         });
 
         ui.add_space(14.0);
