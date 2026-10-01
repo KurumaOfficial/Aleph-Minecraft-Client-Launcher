@@ -3,6 +3,7 @@ pub mod bottom_bar;
 pub mod choice_chip;
 pub mod sidebar;
 pub mod titlebar;
+pub mod topbar;
 
 pub use badge::{draw_badge, draw_custom_badge};
 pub use bottom_bar::BottomBar;

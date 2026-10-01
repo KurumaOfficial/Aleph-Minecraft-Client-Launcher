@@ -22,7 +22,7 @@ use crate::modals::{
 };
 use crate::pages::{HomePage, InstanceAction, InstancesPage, ModsPage, SettingsPage, SkinsPage};
 use crate::theme::{apply_aleph_theme, BG};
-use crate::widgets::{BottomBar, NavTab, Sidebar, TitleBar};
+use crate::widgets::{topbar, BottomBar, NavTab, Sidebar, TitleBar};
 
 pub struct LauncherApp {
     paths: LauncherPaths,
@@ -1273,17 +1273,56 @@ impl App for LauncherApp {
                 }
             });
 
-        // 3. Left sidebar dock panel
-        SidePanel::left("sidebar_panel")
-            .exact_width(170.0)
-            .resizable(false)
-            .frame(egui::Frame::none())
-            .show(ctx, |ui| {
-                let exit_clicked = Sidebar::show(ui, &mut self.current_tab, lang);
-                if exit_clicked {
-                    ui.ctx().send_viewport_cmd(ViewportCommand::Close);
-                }
-            });
+        // 3. Navigation: Full-style top bar in Professional, sidebar in Simple.
+        // The slide id is driven in both branches so the animation replays
+        // on every mode switch.
+        let pro_slide_id = egui::Id::new("pro_topbar_slide");
+        let is_pro = self.config.app_mode == amc_core::config::AppMode::Professional;
+        if is_pro {
+            let slide_t = ctx.animate_bool_responsive(pro_slide_id, true);
+            let slide_px = (1.0 - slide_t) * topbar::TOPBAR_HEIGHT;
+            let acc_name: Option<String> = self
+                .account_mgr
+                .active_account()
+                .map(|a| a.username.clone());
+            let avatar = self.avatar_texture.clone();
+            let launching = self.is_launching;
+            TopBottomPanel::top("pro_topbar")
+                .exact_height(topbar::TOPBAR_HEIGHT)
+                .frame(egui::Frame::none())
+                .show(ctx, |ui| {
+                    let resp = topbar::show_topbar(
+                        ui,
+                        lang,
+                        self.current_tab,
+                        acc_name.as_deref(),
+                        avatar.as_ref(),
+                        launching,
+                        slide_px,
+                    );
+                    if let Some(tab) = resp.tab_clicked {
+                        self.current_tab = tab;
+                    }
+                    if resp.account_clicked {
+                        self.login_modal.is_open = true;
+                    }
+                    if resp.play_clicked {
+                        self.handle_launch();
+                    }
+                });
+        } else {
+            ctx.animate_bool_responsive(pro_slide_id, false);
+            SidePanel::left("sidebar_panel")
+                .exact_width(170.0)
+                .resizable(false)
+                .frame(egui::Frame::none())
+                .show(ctx, |ui| {
+                    let exit_clicked = Sidebar::show(ui, &mut self.current_tab, lang);
+                    if exit_clicked {
+                        ui.ctx().send_viewport_cmd(ViewportCommand::Close);
+                    }
+                });
+        }
 
         // 4. Central content panel
         CentralPanel::default()
