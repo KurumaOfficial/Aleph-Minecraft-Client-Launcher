@@ -99,6 +99,19 @@ pub struct Instance {
     /// Missing or unknown ids fall back to the active account.
     #[serde(default)]
     pub default_account: Option<Uuid>,
+    /// Personal notes (seed, who we play with…).
+    #[serde(default)]
+    pub notes: String,
+    /// Custom command before launch (CONCEPT pre-launch scripts).
+    #[serde(default)]
+    pub pre_launch_cmd: String,
+    /// Custom command after the game exits (CONCEPT post-exit scripts).
+    #[serde(default)]
+    pub post_exit_cmd: String,
+    /// Mod jars installed by the launcher itself (provenance for the
+    /// local-mod badge; anything else counts as local).
+    #[serde(default)]
+    pub installed_by_launcher: Vec<String>,
 }
 
 /// Preset instance icons (key, glyph). AMC-team set; custom art goes
@@ -153,6 +166,10 @@ impl Instance {
             tags: Vec::new(),
             pinned: false,
             default_account: None,
+            notes: String::new(),
+            pre_launch_cmd: String::new(),
+            post_exit_cmd: String::new(),
+            installed_by_launcher: Vec::new(),
         }
     }
 
@@ -421,6 +438,10 @@ mod tests {
         assert!(inst.tags.is_empty());
         assert!(!inst.pinned);
         assert_eq!(inst.default_account, None);
+        assert!(inst.notes.is_empty());
+        assert!(inst.pre_launch_cmd.is_empty());
+        assert!(inst.post_exit_cmd.is_empty());
+        assert!(inst.installed_by_launcher.is_empty());
     }
 
     #[test]

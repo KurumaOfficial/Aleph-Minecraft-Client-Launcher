@@ -873,6 +873,648 @@ impl Language {
         }
     }
 
+    // ---- Tutorial tour (CONCEPT, P1) ----
+    pub fn tour_home_title(&self) -> &'static str {
+        match self {
+            Self::English => "Welcome to Aleph!",
+            Self::Russian => "Добро пожаловать в Aleph!",
+            Self::Ukrainian => "Ласкаво просимо до Aleph!",
+        }
+    }
+
+    pub fn tour_home_body(&self) -> &'static str {
+        match self {
+            Self::English => "Pick a version below and hit Play. Your first launch downloads everything automatically.",
+            Self::Russian => "Выбери версию ниже и нажми «Играть». При первом запуске всё скачается само.",
+            Self::Ukrainian => "Обери версію нижче й натисни «Грати». За першого запуску все завантажиться само.",
+        }
+    }
+
+    pub fn tour_instances_title(&self) -> &'static str {
+        match self {
+            Self::English => "Your instances live here",
+            Self::Russian => "Сборки живут здесь",
+            Self::Ukrainian => "Збірки живуть тут",
+        }
+    }
+
+    pub fn tour_instances_body(&self) -> &'static str {
+        match self {
+            Self::English => "Create isolated packs with their own mods, worlds and settings.",
+            Self::Russian => {
+                "Создавай изолированные сборки со своими модами, мирами и настройками."
+            }
+            Self::Ukrainian => {
+                "Створюй ізольовані збірки зі своїми модами, світами й налаштуваннями."
+            }
+        }
+    }
+
+    pub fn tour_dismiss(&self) -> &'static str {
+        match self {
+            Self::English => "Got it",
+            Self::Russian => "Понятно",
+            Self::Ukrainian => "Зрозуміло",
+        }
+    }
+
+    // ---- .minecraft reuse (CONCEPT, P1) ----
+    pub fn mcreuse_title(&self) -> &'static str {
+        match self {
+            Self::English => "Found another Minecraft",
+            Self::Russian => "Найден другой Minecraft",
+            Self::Ukrainian => "Знайдено інший Minecraft",
+        }
+    }
+
+    pub fn mcreuse_body(&self, path: &str) -> String {
+        match self {
+            Self::English => {
+                format!("Copy already downloaded files from {path} instead of re-downloading?")
+            }
+            Self::Russian => {
+                format!("Скопировать уже скачанные файлы из {path} вместо повторной загрузки?")
+            }
+            Self::Ukrainian => format!(
+                "Скопіювати вже завантажені файли з {path} замість повторного завантаження?"
+            ),
+        }
+    }
+
+    pub fn mcreuse_use(&self) -> &'static str {
+        match self {
+            Self::English => "Copy files",
+            Self::Russian => "Скопировать файлы",
+            Self::Ukrainian => "Скопіювати файли",
+        }
+    }
+
+    pub fn mcreuse_skip(&self) -> &'static str {
+        match self {
+            Self::English => "Skip",
+            Self::Russian => "Пропустить",
+            Self::Ukrainian => "Пропустити",
+        }
+    }
+
+    // ---- Instance notes & scripts (CONCEPT, P2) ----
+    pub fn inst_notes_label(&self) -> &'static str {
+        match self {
+            Self::English => "Notes",
+            Self::Russian => "Заметки",
+            Self::Ukrainian => "Нотатки",
+        }
+    }
+
+    pub fn inst_notes_hint(&self) -> &'static str {
+        match self {
+            Self::English => "seed, who we play with…",
+            Self::Russian => "сид, с кем играем…",
+            Self::Ukrainian => "сід, з ким граємо…",
+        }
+    }
+
+    pub fn inst_pre_label(&self) -> &'static str {
+        match self {
+            Self::English => "Command before launch",
+            Self::Russian => "Команда до запуска",
+            Self::Ukrainian => "Команда до запуску",
+        }
+    }
+
+    pub fn inst_post_label(&self) -> &'static str {
+        match self {
+            Self::English => "Command after exit",
+            Self::Russian => "Команда после выхода",
+            Self::Ukrainian => "Команда після виходу",
+        }
+    }
+
+    // ---- Storage root (CONCEPT "Хранение на диске", P2) ----
+    pub fn settings_root_title(&self) -> &'static str {
+        match self {
+            Self::English => "Storage folder",
+            Self::Russian => "Папка хранения",
+            Self::Ukrainian => "Папка зберігання",
+        }
+    }
+
+    pub fn settings_root_pick(&self) -> &'static str {
+        match self {
+            Self::English => "Move…",
+            Self::Russian => "Переместить…",
+            Self::Ukrainian => "Перемістити…",
+        }
+    }
+
+    pub fn settings_root_restart(&self) -> &'static str {
+        match self {
+            Self::English => "Applies on next launcher start",
+            Self::Russian => "Применится при следующем запуске лаунчера",
+            Self::Ukrainian => "Застосується за наступного запуску лаунчера",
+        }
+    }
+
+    // ---- Config editor (CONCEPT, P2) ----
+    pub fn editor_title(&self) -> &'static str {
+        match self {
+            Self::English => "Config files",
+            Self::Russian => "Конфиги модов",
+            Self::Ukrainian => "Конфіги модів",
+        }
+    }
+
+    pub fn editor_empty(&self) -> &'static str {
+        match self {
+            Self::English => "No editable configs in this instance yet",
+            Self::Russian => "В этой сборке пока нет редактируемых конфигов",
+            Self::Ukrainian => "У цій збірці поки немає редагованих конфігів",
+        }
+    }
+
+    pub fn editor_saved(&self) -> &'static str {
+        match self {
+            Self::English => "Saved",
+            Self::Russian => "Сохранено",
+            Self::Ukrainian => "Збережено",
+        }
+    }
+
+    // ---- Health verify/repair + trash (CONCEPT, P2) ----
+    pub fn health_title(&self) -> &'static str {
+        match self {
+            Self::English => "Health check",
+            Self::Russian => "Проверка целостности",
+            Self::Ukrainian => "Перевірка цілісності",
+        }
+    }
+
+    pub fn health_ok(&self) -> &'static str {
+        match self {
+            Self::English => "All files in place",
+            Self::Russian => "Все файлы на месте",
+            Self::Ukrainian => "Усі файли на місці",
+        }
+    }
+
+    pub fn health_missing(&self, n: usize) -> String {
+        match self {
+            Self::English => format!("{n} files missing or broken"),
+            Self::Russian => format!("Отсутствует или повреждено файлов: {n}"),
+            Self::Ukrainian => format!("Відсутні або пошкоджені файли: {n}"),
+        }
+    }
+
+    pub fn health_repair(&self) -> &'static str {
+        match self {
+            Self::English => "Repair",
+            Self::Russian => "Восстановить",
+            Self::Ukrainian => "Відновити",
+        }
+    }
+
+    pub fn trash_title(&self) -> &'static str {
+        match self {
+            Self::English => "Trash",
+            Self::Russian => "Корзина",
+            Self::Ukrainian => "Кошик",
+        }
+    }
+
+    pub fn trash_restore(&self) -> &'static str {
+        match self {
+            Self::English => "Restore",
+            Self::Russian => "Восстановить",
+            Self::Ukrainian => "Відновити",
+        }
+    }
+
+    pub fn trash_delete_forever(&self) -> &'static str {
+        match self {
+            Self::English => "Delete forever",
+            Self::Russian => "Удалить навсегда",
+            Self::Ukrainian => "Видалити назавжди",
+        }
+    }
+
+    pub fn trash_empty(&self) -> &'static str {
+        match self {
+            Self::English => "Trash is empty",
+            Self::Russian => "Корзина пуста",
+            Self::Ukrainian => "Кошик порожній",
+        }
+    }
+
+    pub fn badge_local_mods(&self) -> &'static str {
+        match self {
+            Self::English => "LOCAL MODS",
+            Self::Russian => "ЛОКАЛЬНЫЕ МОДЫ",
+            Self::Ukrainian => "ЛОКАЛЬНІ МОДИ",
+        }
+    }
+
+    // ---- Server favorites without a browser (CONCEPT, P8) ----
+    pub fn fav_title(&self) -> &'static str {
+        match self {
+            Self::English => "Favorite servers",
+            Self::Russian => "Любимые серверы",
+            Self::Ukrainian => "Улюблені сервери",
+        }
+    }
+
+    pub fn fav_address_hint(&self) -> &'static str {
+        match self {
+            Self::English => "play.example.com:25565",
+            Self::Russian => "play.example.com:25565",
+            Self::Ukrainian => "play.example.com:25565",
+        }
+    }
+
+    pub fn fav_add(&self) -> &'static str {
+        match self {
+            Self::English => "Add",
+            Self::Russian => "Добавить",
+            Self::Ukrainian => "Додати",
+        }
+    }
+
+    pub fn fav_remove(&self) -> &'static str {
+        match self {
+            Self::English => "Remove",
+            Self::Russian => "Убрать",
+            Self::Ukrainian => "Прибрати",
+        }
+    }
+
+    pub fn fav_empty(&self) -> &'static str {
+        match self {
+            Self::English => "No favorites yet — they appear in every instance automatically",
+            Self::Russian => "Пока пусто — избранное само появится в каждой сборке",
+            Self::Ukrainian => "Поки порожньо — обране само з'явиться в кожній збірці",
+        }
+    }
+
+    // ---- Worlds backup/restore (CONCEPT, P9) ----
+    pub fn worlds_title(&self) -> &'static str {
+        match self {
+            Self::English => "Worlds",
+            Self::Russian => "Миры",
+            Self::Ukrainian => "Світи",
+        }
+    }
+
+    pub fn world_backup_now(&self) -> &'static str {
+        match self {
+            Self::English => "Back up",
+            Self::Russian => "Сделать бэкап",
+            Self::Ukrainian => "Зробити бекап",
+        }
+    }
+
+    pub fn world_backups(&self) -> &'static str {
+        match self {
+            Self::English => "Backups",
+            Self::Russian => "Бэкапы",
+            Self::Ukrainian => "Бекапи",
+        }
+    }
+
+    pub fn world_restore(&self) -> &'static str {
+        match self {
+            Self::English => "Restore",
+            Self::Russian => "Восстановить",
+            Self::Ukrainian => "Відновити",
+        }
+    }
+
+    pub fn world_no_saves(&self) -> &'static str {
+        match self {
+            Self::English => "No saves in this instance yet",
+            Self::Russian => "В этой сборке пока нет сохранений",
+            Self::Ukrainian => "У цій збірці поки немає збережень",
+        }
+    }
+
+    pub fn world_no_backups(&self) -> &'static str {
+        match self {
+            Self::English => "No backups yet",
+            Self::Russian => "Бэкапов пока нет",
+            Self::Ukrainian => "Бекапів поки немає",
+        }
+    }
+
+    pub fn world_auto_label(&self) -> &'static str {
+        match self {
+            Self::English => "Auto-backup every N days (0 = off)",
+            Self::Russian => "Автобэкап каждые N дней (0 = выкл)",
+            Self::Ukrainian => "Автобекап кожні N днів (0 = вимк)",
+        }
+    }
+
+    // ---- Screenshots gallery (CONCEPT, P10) ----
+    pub fn screens_title(&self) -> &'static str {
+        match self {
+            Self::English => "Screenshots",
+            Self::Russian => "Скриншоты",
+            Self::Ukrainian => "Скріншоти",
+        }
+    }
+
+    pub fn screens_empty(&self) -> &'static str {
+        match self {
+            Self::English => "No screenshots yet — press F2 in game",
+            Self::Russian => "Скриншотов пока нет — нажми F2 в игре",
+            Self::Ukrainian => "Скріншотів поки немає — натисни F2 у грі",
+        }
+    }
+
+    pub fn screens_open(&self) -> &'static str {
+        match self {
+            Self::English => "Open",
+            Self::Russian => "Открыть",
+            Self::Ukrainian => "Відкрити",
+        }
+    }
+
+    // ---- Notifications (CONCEPT, P10) ----
+    pub fn notif_title(&self) -> &'static str {
+        match self {
+            Self::English => "Notifications",
+            Self::Russian => "Уведомления",
+            Self::Ukrainian => "Сповіщення",
+        }
+    }
+
+    pub fn notif_updates(&self) -> &'static str {
+        match self {
+            Self::English => "Mod and pack updates",
+            Self::Russian => "Обновления модов и сборок",
+            Self::Ukrainian => "Оновлення модів і збірок",
+        }
+    }
+
+    pub fn notif_downloads(&self) -> &'static str {
+        match self {
+            Self::English => "Finished downloads",
+            Self::Russian => "Завершённые загрузки",
+            Self::Ukrainian => "Завершені завантаження",
+        }
+    }
+
+    pub fn notif_launcher(&self) -> &'static str {
+        match self {
+            Self::English => "Launcher news",
+            Self::Russian => "Новости лаунчера",
+            Self::Ukrainian => "Новини лаунчера",
+        }
+    }
+
+    // ---- Self-update (CONCEPT, P11) ----
+    pub fn update_title(&self) -> &'static str {
+        match self {
+            Self::English => "Launcher updates",
+            Self::Russian => "Обновления лаунчера",
+            Self::Ukrainian => "Оновлення лаунчера",
+        }
+    }
+
+    pub fn update_check(&self) -> &'static str {
+        match self {
+            Self::English => "Check now",
+            Self::Russian => "Проверить сейчас",
+            Self::Ukrainian => "Перевірити зараз",
+        }
+    }
+
+    pub fn update_available(&self, ver: &str) -> String {
+        match self {
+            Self::English => format!("Version {ver} is available on GitHub"),
+            Self::Russian => format!("На GitHub доступна версия {ver}"),
+            Self::Ukrainian => format!("На GitHub доступна версія {ver}"),
+        }
+    }
+
+    pub fn update_latest(&self) -> &'static str {
+        match self {
+            Self::English => "You have the latest version",
+            Self::Russian => "Установлена последняя версия",
+            Self::Ukrainian => "Встановлено останню версію",
+        }
+    }
+
+    // ---- Crash reports opt-out + diagnostics (CONCEPT, P12) ----
+    pub fn crash_title(&self) -> &'static str {
+        match self {
+            Self::English => "Diagnostics",
+            Self::Russian => "Диагностика",
+            Self::Ukrainian => "Діагностика",
+        }
+    }
+
+    pub fn crash_enable(&self) -> &'static str {
+        match self {
+            Self::English => "Send anonymous crash reports",
+            Self::Russian => "Отправлять анонимные краш-репорты",
+            Self::Ukrainian => "Надсилати анонімні краш-репорти",
+        }
+    }
+
+    pub fn crash_export(&self) -> &'static str {
+        match self {
+            Self::English => "Export diagnostics bundle",
+            Self::Russian => "Экспорт пакета диагностики",
+            Self::Ukrainian => "Експорт пакета діагностики",
+        }
+    }
+
+    // ---- Local dedicated server (CONCEPT Steam section, P13) ----
+    pub fn server_title(&self) -> &'static str {
+        match self {
+            Self::English => "Local server",
+            Self::Russian => "Локальный сервер",
+            Self::Ukrainian => "Локальний сервер",
+        }
+    }
+
+    pub fn server_create(&self) -> &'static str {
+        match self {
+            Self::English => "Create local server",
+            Self::Russian => "Создать локальный сервер",
+            Self::Ukrainian => "Створити локальний сервер",
+        }
+    }
+
+    pub fn server_stop(&self) -> &'static str {
+        match self {
+            Self::English => "Stop server",
+            Self::Russian => "Остановить сервер",
+            Self::Ukrainian => "Зупинити сервер",
+        }
+    }
+
+    pub fn server_running(&self, port: u16) -> String {
+        match self {
+            Self::English => format!("Server is running on port {port}"),
+            Self::Russian => format!("Сервер запущен на порту {port}"),
+            Self::Ukrainian => format!("Сервер запущено на порту {port}"),
+        }
+    }
+
+    pub fn server_eula(&self) -> &'static str {
+        match self {
+            Self::English => "I accept the Mojang EULA",
+            Self::Russian => "Я принимаю EULA Mojang",
+            Self::Ukrainian => "Я приймаю EULA Mojang",
+        }
+    }
+
+    // ---- Launch identity picker (CONCEPT "Аккаунты", P6) ----
+    pub fn picker_title(&self) -> &'static str {
+        match self {
+            Self::English => "Who is playing?",
+            Self::Russian => "Кто играет?",
+            Self::Ukrainian => "Хто грає?",
+        }
+    }
+
+    pub fn picker_remember(&self) -> &'static str {
+        match self {
+            Self::English => "Remember choice",
+            Self::Russian => "Запомнить выбор",
+            Self::Ukrainian => "Запам'ятати вибір",
+        }
+    }
+
+    pub fn settings_ask_identity(&self) -> &'static str {
+        match self {
+            Self::English => "Ask who is playing on every launch",
+            Self::Russian => "Спрашивать, кто играет, при каждом запуске",
+            Self::Ukrainian => "Питати, хто грає, за кожного запуску",
+        }
+    }
+
+    pub fn settings_forget_identity(&self) -> &'static str {
+        match self {
+            Self::English => "Forget remembered choice",
+            Self::Russian => "Забыть запомненный выбор",
+            Self::Ukrainian => "Забути запам'ятований вибір",
+        }
+    }
+
+    // ---- Player profile (CONCEPT, P7) ----
+    pub fn profile_title(&self) -> &'static str {
+        match self {
+            Self::English => "Player profile",
+            Self::Russian => "Профиль игрока",
+            Self::Ukrainian => "Профіль гравця",
+        }
+    }
+
+    pub fn profile_nickname(&self) -> &'static str {
+        match self {
+            Self::English => "Nickname",
+            Self::Russian => "Никнейм",
+            Self::Ukrainian => "Нікнейм",
+        }
+    }
+
+    pub fn profile_cape_none(&self) -> &'static str {
+        match self {
+            Self::English => "No cape",
+            Self::Russian => "Нет плаща",
+            Self::Ukrainian => "Немає плаща",
+        }
+    }
+
+    // ---- Mod compatibility & friends (CONCEPT, P4) ----
+    pub fn compat_ok(&self, mc: &str, loader: &str) -> String {
+        match self {
+            Self::English => format!("Compatible with {mc} + {loader}"),
+            Self::Russian => format!("Совместимо с {mc} + {loader}"),
+            Self::Ukrainian => format!("Сумісно з {mc} + {loader}"),
+        }
+    }
+
+    pub fn compat_unknown(&self) -> &'static str {
+        match self {
+            Self::English => "Compatibility unknown — installs latest file",
+            Self::Russian => "Совместимость неизвестна — ставится последний файл",
+            Self::Ukrainian => "Сумісність невідома — ставиться останній файл",
+        }
+    }
+
+    pub fn compat_none(&self, mc: &str) -> String {
+        match self {
+            Self::English => format!("No build for Minecraft {mc}"),
+            Self::Russian => format!("Нет сборки под Minecraft {mc}"),
+            Self::Ukrainian => format!("Немає збірки під Minecraft {mc}"),
+        }
+    }
+
+    pub fn wishlist_add(&self) -> &'static str {
+        match self {
+            Self::English => "Wishlist",
+            Self::Russian => "В вишлист",
+            Self::Ukrainian => "У вішліст",
+        }
+    }
+
+    pub fn wishlist_remove(&self) -> &'static str {
+        match self {
+            Self::English => "Wishlisted ✓",
+            Self::Russian => "В вишлисте ✓",
+            Self::Ukrainian => "У вішлісті ✓",
+        }
+    }
+
+    pub fn batch_select_all(&self) -> &'static str {
+        match self {
+            Self::English => "Select all",
+            Self::Russian => "Выбрать все",
+            Self::Ukrainian => "Обрати всі",
+        }
+    }
+
+    pub fn batch_enable(&self) -> &'static str {
+        match self {
+            Self::English => "Enable selected",
+            Self::Russian => "Включить выбранные",
+            Self::Ukrainian => "Увімкнути обрані",
+        }
+    }
+
+    pub fn batch_disable(&self) -> &'static str {
+        match self {
+            Self::English => "Disable selected",
+            Self::Russian => "Выключить выбранные",
+            Self::Ukrainian => "Вимкнути обрані",
+        }
+    }
+
+    pub fn batch_delete(&self) -> &'static str {
+        match self {
+            Self::English => "Delete selected",
+            Self::Russian => "Удалить выбранные",
+            Self::Ukrainian => "Видалити обрані",
+        }
+    }
+
+    pub fn mods_update_available(&self) -> &'static str {
+        match self {
+            Self::English => "Update available",
+            Self::Russian => "Есть обновление",
+            Self::Ukrainian => "Є оновлення",
+        }
+    }
+
+    pub fn mods_check_updates(&self) -> &'static str {
+        match self {
+            Self::English => "Check updates",
+            Self::Russian => "Проверить обновления",
+            Self::Ukrainian => "Перевірити оновлення",
+        }
+    }
+
     pub fn settings_show_snapshots(&self) -> &'static str {
         match self {
             Self::English => "Show snapshots in version list",
@@ -1770,6 +2412,22 @@ impl Language {
         }
     }
 
+    pub fn discover_title(&self) -> &'static str {
+        match self {
+            Self::English => "Trending",
+            Self::Russian => "В тренде",
+            Self::Ukrainian => "У тренді",
+        }
+    }
+
+    pub fn nav_profile(&self) -> &'static str {
+        match self {
+            Self::English => "Profile",
+            Self::Russian => "Профиль",
+            Self::Ukrainian => "Профіль",
+        }
+    }
+
     // ==========================================
     // Java manager: system discovery (ROADMAP P5)
     // ==========================================
@@ -2429,6 +3087,122 @@ mod tests {
             assert!(!lang.inst_pin_label().is_empty());
             assert!(!lang.inst_account_label().is_empty());
             assert!(!lang.inst_account_default().is_empty());
+            assert!(!lang.discover_title().is_empty());
+            assert!(!lang.tour_home_title().is_empty());
+            assert!(!lang.tour_home_body().is_empty());
+            assert!(!lang.tour_instances_title().is_empty());
+            assert!(!lang.tour_instances_body().is_empty());
+            assert!(!lang.tour_dismiss().is_empty());
+            assert!(!lang.mcreuse_title().is_empty());
+            assert!(!lang.mcreuse_body("/x").is_empty());
+            assert!(!lang.mcreuse_use().is_empty());
+            assert!(!lang.mcreuse_skip().is_empty());
+            assert!(!lang.inst_notes_label().is_empty());
+            assert!(!lang.inst_notes_hint().is_empty());
+            assert!(!lang.inst_pre_label().is_empty());
+            assert!(!lang.inst_post_label().is_empty());
+            assert!(!lang.settings_root_title().is_empty());
+            assert!(!lang.settings_root_pick().is_empty());
+            assert!(!lang.settings_root_restart().is_empty());
+            assert!(!lang.editor_title().is_empty());
+            assert!(!lang.editor_empty().is_empty());
+            assert!(!lang.editor_saved().is_empty());
+            assert!(!lang.health_title().is_empty());
+            assert!(!lang.health_ok().is_empty());
+            assert!(!lang.health_missing(3).is_empty());
+            assert!(!lang.health_repair().is_empty());
+            assert!(!lang.trash_title().is_empty());
+            assert!(!lang.trash_restore().is_empty());
+            assert!(!lang.trash_delete_forever().is_empty());
+            assert!(!lang.trash_empty().is_empty());
+            assert!(!lang.fav_title().is_empty());
+            assert!(!lang.fav_address_hint().is_empty());
+            assert!(!lang.fav_add().is_empty());
+            assert!(!lang.fav_remove().is_empty());
+            assert!(!lang.fav_empty().is_empty());
+            assert!(!lang.worlds_title().is_empty());
+            assert!(!lang.world_backup_now().is_empty());
+            assert!(!lang.world_backups().is_empty());
+            assert!(!lang.world_restore().is_empty());
+            assert!(!lang.world_no_saves().is_empty());
+            assert!(!lang.world_no_backups().is_empty());
+            assert!(!lang.world_auto_label().is_empty());
+            assert!(!lang.screens_title().is_empty());
+            assert!(!lang.screens_empty().is_empty());
+            assert!(!lang.screens_open().is_empty());
+            assert!(!lang.notif_title().is_empty());
+            assert!(!lang.notif_updates().is_empty());
+            assert!(!lang.notif_downloads().is_empty());
+            assert!(!lang.notif_launcher().is_empty());
+            assert!(!lang.update_title().is_empty());
+            assert!(!lang.update_check().is_empty());
+            assert!(!lang.update_available("1.0").is_empty());
+            assert!(!lang.update_latest().is_empty());
+            assert!(!lang.crash_title().is_empty());
+            assert!(!lang.crash_enable().is_empty());
+            assert!(!lang.crash_export().is_empty());
+            assert!(!lang.server_create().is_empty());
+            assert!(!lang.server_stop().is_empty());
+            assert!(!lang.server_running(25565).is_empty());
+            assert!(!lang.server_eula().is_empty());
+            assert!(!lang.picker_title().is_empty());
+            assert!(!lang.picker_remember().is_empty());
+            assert!(!lang.settings_ask_identity().is_empty());
+            assert!(!lang.settings_forget_identity().is_empty());
+            assert!(!lang.profile_title().is_empty());
+            assert!(!lang.profile_nickname().is_empty());
+            assert!(!lang.profile_cape_none().is_empty());
+            assert!(!lang.compat_ok("1.20", "Fabric").is_empty());
+            assert!(!lang.compat_unknown().is_empty());
+            assert!(!lang.compat_none("1.20").is_empty());
+            assert!(!lang.wishlist_add().is_empty());
+            assert!(!lang.wishlist_remove().is_empty());
+            assert!(!lang.batch_select_all().is_empty());
+            assert!(!lang.batch_enable().is_empty());
+            assert!(!lang.batch_disable().is_empty());
+            assert!(!lang.batch_delete().is_empty());
+            assert!(!lang.mods_update_available().is_empty());
+            assert!(!lang.mods_check_updates().is_empty());
+            assert!(!lang.nav_profile().is_empty());
+            assert!(!lang.tour_home_title().is_empty());
+            assert!(!lang.tour_home_body().is_empty());
+            assert!(!lang.tour_instances_title().is_empty());
+            assert!(!lang.tour_instances_body().is_empty());
+            assert!(!lang.tour_dismiss().is_empty());
+            assert!(!lang.mcreuse_title().is_empty());
+            assert!(!lang.mcreuse_body("/x").is_empty());
+            assert!(!lang.mcreuse_use().is_empty());
+            assert!(!lang.mcreuse_skip().is_empty());
+            assert!(!lang.inst_notes_label().is_empty());
+            assert!(!lang.inst_notes_hint().is_empty());
+            assert!(!lang.inst_pre_label().is_empty());
+            assert!(!lang.inst_post_label().is_empty());
+            assert!(!lang.settings_root_title().is_empty());
+            assert!(!lang.settings_root_pick().is_empty());
+            assert!(!lang.settings_root_restart().is_empty());
+            assert!(!lang.editor_title().is_empty());
+            assert!(!lang.editor_empty().is_empty());
+            assert!(!lang.editor_saved().is_empty());
+            assert!(!lang.health_title().is_empty());
+            assert!(!lang.health_ok().is_empty());
+            assert!(!lang.health_missing(3).is_empty());
+            assert!(!lang.health_repair().is_empty());
+            assert!(!lang.trash_title().is_empty());
+            assert!(!lang.trash_restore().is_empty());
+            assert!(!lang.trash_delete_forever().is_empty());
+            assert!(!lang.trash_empty().is_empty());
+            assert!(!lang.fav_title().is_empty());
+            assert!(!lang.fav_address_hint().is_empty());
+            assert!(!lang.fav_add().is_empty());
+            assert!(!lang.fav_remove().is_empty());
+            assert!(!lang.fav_empty().is_empty());
+            assert!(!lang.worlds_title().is_empty());
+            assert!(!lang.world_backup_now().is_empty());
+            assert!(!lang.world_backups().is_empty());
+            assert!(!lang.world_restore().is_empty());
+            assert!(!lang.world_no_saves().is_empty());
+            assert!(!lang.world_no_backups().is_empty());
+            assert!(!lang.world_auto_label().is_empty());
             assert!(!lang.inst_warn_legacy_forge().is_empty());
             assert!(!lang.settings_after_launch_title().is_empty());
             assert!(!lang.settings_after_close().is_empty());

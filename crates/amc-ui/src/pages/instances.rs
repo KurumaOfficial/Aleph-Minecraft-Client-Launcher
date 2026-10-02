@@ -42,11 +42,15 @@ pub struct InstancesPage {
     pub edit_instance_tags: String,
     pub edit_instance_pinned: bool,
     pub edit_instance_account: Option<Uuid>,
+    pub edit_instance_notes: String,
+    pub edit_instance_pre: String,
+    pub edit_instance_post: String,
 
     // Background disk-usage scan (CONCEPT "Место на диске").
     disk_sizes: HashMap<Uuid, u64>,
     disk_scanned_for: Vec<Uuid>,
-    disk_rx: Option<std::sync::mpsc::Receiver<Vec<(Uuid, u64)>>>,
+    disk_rx: Option<std::sync::mpsc::Receiver<Vec<(Uuid, u64, bool)>>>,
+    local_badges: HashMap<Uuid, bool>,
 
     // Organization (CONCEPT, P2): tag filter, sort, icon texture cache.
     pub active_tag: Option<String>,
@@ -75,16 +79,49 @@ impl Default for InstancesPage {
             edit_instance_tags: String::new(),
             edit_instance_pinned: false,
             edit_instance_account: None,
+            edit_instance_notes: String::new(),
+            edit_instance_pre: String::new(),
+            edit_instance_post: String::new(),
 
             disk_sizes: HashMap::new(),
             disk_scanned_for: Vec::new(),
             disk_rx: None,
+            local_badges: HashMap::new(),
             active_tag: None,
             sort_mode: InstanceSort::default(),
             icon_textures: HashMap::new(),
             icon_failed: std::collections::HashSet::new(),
         }
     }
+}
+
+/// True when `mods/` holds jars the launcher did not install itself
+/// (CONCEPT local-mod badge, P2). `.disabled` files count as mods.
+/// Pure over a filename list for tests; the IO wrapper is below.
+fn has_local_mods_in(list: &[String], installed: &[String]) -> bool {
+    list.iter().any(|name| {
+        let base = name.strip_suffix(".disabled").unwrap_or(name);
+        base.ends_with(".jar") && !installed.iter().any(|n| n == name || n == base)
+    })
+}
+
+fn has_local_mods(game_dir: &Path, installed: &[String]) -> bool {
+    let mods = game_dir.join("mods");
+    let entries = match std::fs::read_dir(&mods) {
+        Ok(entries) => entries,
+        Err(_) => return false,
+    };
+    let names: Vec<String> = entries
+        .flatten()
+        .filter(|e| e.path().is_file())
+        .filter_map(|e| {
+            e.path()
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(|s| s.to_string())
+        })
+        .collect();
+    has_local_mods_in(&names, installed)
 }
 
 /// Shorten a card title to one line (pure, unit-tested).
@@ -209,11 +246,19 @@ impl InstancesPage {
 
     /// Poll a finished background scan, or (re)start one when the instance
     /// set changed. Measuring runs on a worker thread — the UI never blocks.
+    /// Besides sizes it flags instances holding local (non-launcher) mods.
     fn poll_disk_sizes(&mut self, instances: &[Instance], instances_dir: &Path) {
         if let Some(rx) = &self.disk_rx {
             match rx.try_recv() {
-                Ok(sizes) => {
-                    self.disk_sizes = sizes.into_iter().collect();
+                Ok(entries) => {
+                    let mut sizes = HashMap::new();
+                    let mut badges = HashMap::new();
+                    for (id, bytes, has_local) in entries {
+                        sizes.insert(id, bytes);
+                        badges.insert(id, has_local);
+                    }
+                    self.disk_sizes = sizes;
+                    self.local_badges = badges;
                     self.disk_rx = None;
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => {}
@@ -228,19 +273,34 @@ impl InstancesPage {
             return;
         }
         self.disk_scanned_for = ids;
-        let pairs: Vec<(Uuid, PathBuf)> = instances
+        let jobs: Vec<(Uuid, PathBuf, Vec<String>)> = instances
             .iter()
-            .map(|i| (i.id, i.get_game_dir(instances_dir)))
+            .map(|i| {
+                (
+                    i.id,
+                    i.get_game_dir(instances_dir),
+                    i.installed_by_launcher.clone(),
+                )
+            })
             .collect();
         let (tx, rx) = std::sync::mpsc::channel();
         self.disk_rx = Some(rx);
         std::thread::spawn(move || {
-            let sizes: Vec<(Uuid, u64)> = pairs
+            let out: Vec<(Uuid, u64, bool)> = jobs
                 .into_iter()
-                .map(|(id, dir)| (id, Instance::disk_usage_dir(&dir)))
+                .map(|(id, dir, installed)| {
+                    let bytes = Instance::disk_usage_dir(&dir);
+                    let local = has_local_mods(&dir, &installed);
+                    (id, bytes, local)
+                })
                 .collect();
-            let _ = tx.send(sizes);
+            let _ = tx.send(out);
         });
+    }
+
+    /// Force disk + badge rescan (call after mods change on disk).
+    pub fn refresh_scans(&mut self) {
+        self.disk_scanned_for.clear();
     }
 
     /// Fill the create dialog from a quick-start template (ROADMAP P2).
@@ -584,6 +644,14 @@ impl InstancesPage {
                 .font(egui::FontId::proportional(11.0))
                 .color(TEXT_MUTED),
             );
+            if page.local_badges.get(&inst_id).copied().unwrap_or(false) {
+                card.label(
+                    egui::RichText::new(lang.badge_local_mods())
+                        .font(egui::FontId::proportional(10.0))
+                        .strong()
+                        .color(WARNING),
+                );
+            }
             if !inst.tags.is_empty() {
                 card.label(
                     egui::RichText::new(format!("🏷 {}", truncate_name(&inst.tags.join(", "), 40)))
@@ -619,6 +687,9 @@ impl InstancesPage {
                     page.edit_instance_tags = inst.tags.join(", ");
                     page.edit_instance_pinned = inst.pinned;
                     page.edit_instance_account = inst.default_account;
+                    page.edit_instance_notes = inst.notes.clone();
+                    page.edit_instance_pre = inst.pre_launch_cmd.clone();
+                    page.edit_instance_post = inst.post_exit_cmd.clone();
                     page.show_edit_modal = true;
                 }
                 if ui
@@ -997,6 +1068,30 @@ impl InstancesPage {
                             }
                         });
 
+                    ui.add_space(10.0);
+                    ui.label(egui::RichText::new(lang.inst_notes_label()).color(TEXT_PRIMARY));
+                    ui.add(
+                        TextEdit::singleline(&mut self.edit_instance_notes)
+                            .hint_text(lang.inst_notes_hint())
+                            .desired_width(400.0),
+                    );
+                    ui.add_space(10.0);
+                    ui.label(egui::RichText::new(lang.inst_pre_label()).color(TEXT_PRIMARY));
+                    ui.add(
+                        TextEdit::singleline(&mut self.edit_instance_pre)
+                            .hint_text("cmd /C ... / sh -c ...")
+                            .desired_width(400.0)
+                            .font(egui::FontId::monospace(12.0)),
+                    );
+                    ui.add_space(6.0);
+                    ui.label(egui::RichText::new(lang.inst_post_label()).color(TEXT_PRIMARY));
+                    ui.add(
+                        TextEdit::singleline(&mut self.edit_instance_post)
+                            .hint_text("cmd /C ... / sh -c ...")
+                            .desired_width(400.0)
+                            .font(egui::FontId::monospace(12.0)),
+                    );
+
                     ui.add_space(18.0);
                     ui.horizontal(|ui| {
                         if ui
@@ -1027,6 +1122,9 @@ impl InstancesPage {
                         inst.tags = parse_tags(&self.edit_instance_tags);
                         inst.pinned = self.edit_instance_pinned;
                         inst.default_account = self.edit_instance_account;
+                        inst.notes = self.edit_instance_notes.clone();
+                        inst.pre_launch_cmd = self.edit_instance_pre.trim().to_string();
+                        inst.post_exit_cmd = self.edit_instance_post.trim().to_string();
                         action = InstanceAction::Updated(inst.clone());
                     }
                     self.icon_textures.remove(&target_id);
@@ -1047,6 +1145,20 @@ impl InstancesPage {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_has_local_mods_in() {
+        let installed = vec!["sodium.jar".to_string()];
+        assert!(!has_local_mods_in(&[], &installed));
+        assert!(!has_local_mods_in(&["sodium.jar".to_string()], &installed));
+        assert!(has_local_mods_in(
+            &["sodium.jar".to_string(), "mystery.jar".to_string()],
+            &installed
+        ));
+        // Disabled files count as mods too.
+        assert!(has_local_mods_in(&["old.jar.disabled".to_string()], &[]));
+        assert!(!has_local_mods_in(&["config.txt".to_string()], &[]));
+    }
 
     #[test]
     fn test_truncate_name() {

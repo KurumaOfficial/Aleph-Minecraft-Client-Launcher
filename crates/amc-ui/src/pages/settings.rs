@@ -24,6 +24,12 @@ pub struct SettingsPage {
     java_scan: Option<Vec<amc_downloader::SystemJava>>,
     java_scan_rx: Option<std::sync::mpsc::Receiver<Vec<amc_downloader::SystemJava>>>,
     managed_runtimes: Option<Vec<String>>,
+    pub update_check_requested: bool,
+    pub crash_export_requested: bool,
+    pub update_note: Option<String>,
+    pub server_start_requested: bool,
+    pub server_stop_requested: bool,
+    pub server_eula_draft: bool,
 }
 
 impl Default for SettingsPage {
@@ -35,6 +41,12 @@ impl Default for SettingsPage {
             java_scan: None,
             java_scan_rx: None,
             managed_runtimes: None,
+            update_check_requested: false,
+            crash_export_requested: false,
+            update_note: None,
+            server_start_requested: false,
+            server_stop_requested: false,
+            server_eula_draft: false,
         }
     }
 }
@@ -46,6 +58,8 @@ impl SettingsPage {
         config: &mut LauncherConfig,
         account_mgr: &mut AccountManager,
         paths: &LauncherPaths,
+        server_running: bool,
+        server_status: &Option<String>,
     ) {
         let lang = config.ui.language();
         ui.add_space(20.0);
@@ -71,9 +85,11 @@ impl SettingsPage {
         ScrollArea::vertical()
             .auto_shrink([false, false])
             .show(ui, |ui| match self.sub_tab {
-                SettingsSubTab::General => self.show_general(ui, config, paths),
+                SettingsSubTab::General => {
+                    self.show_general(ui, config, paths, server_running, server_status)
+                }
                 SettingsSubTab::Java => self.show_java(ui, config, paths),
-                SettingsSubTab::Accounts => self.show_accounts(ui, account_mgr, lang),
+                SettingsSubTab::Accounts => self.show_accounts(ui, account_mgr, config, lang),
             });
     }
 
@@ -106,7 +122,14 @@ impl SettingsPage {
             self.sub_tab = tab;
         }
     }
-    fn show_general(&mut self, ui: &mut Ui, config: &mut LauncherConfig, paths: &LauncherPaths) {
+    fn show_general(
+        &mut self,
+        ui: &mut Ui,
+        config: &mut LauncherConfig,
+        paths: &LauncherPaths,
+        server_running: bool,
+        server_status: &Option<String>,
+    ) {
         let lang = config.ui.language();
 
         // Language selection group
@@ -308,7 +331,106 @@ impl SettingsPage {
                 if ui.button(lang.settings_folder_instances()).clicked() {
                     let _ = open::that(paths.instances_dir());
                 }
+                if ui.button(lang.settings_root_pick()).clicked() {
+                    if let Some(dir) = rfd::FileDialog::new().pick_folder() {
+                        config.root_override = Some(dir);
+                    }
+                }
+                if config.root_override.is_some()
+                    && ui
+                        .button(egui::RichText::new("✕").color(TEXT_MUTED))
+                        .clicked()
+                {
+                    config.root_override = None;
+                }
             });
+            if config.root_override.is_some() {
+                ui.label(egui::RichText::new(lang.settings_root_restart()).color(TEXT_MUTED));
+            }
+        });
+
+        ui.add_space(14.0);
+
+        // Notifications per type (CONCEPT "Уведомления").
+        ui.group(|ui| {
+            ui.label(
+                egui::RichText::new(lang.notif_title())
+                    .font(egui::FontId::proportional(16.0))
+                    .strong()
+                    .color(TEXT_HEADING),
+            );
+            ui.add_space(8.0);
+            ui.checkbox(&mut config.notifications.updates, lang.notif_updates());
+            ui.add_space(6.0);
+            ui.checkbox(&mut config.notifications.downloads, lang.notif_downloads());
+            ui.add_space(6.0);
+            ui.checkbox(&mut config.notifications.launcher, lang.notif_launcher());
+        });
+
+        ui.add_space(14.0);
+
+        // Launcher updates, crash reports, diagnostics export.
+        ui.group(|ui| {
+            ui.label(
+                egui::RichText::new(lang.update_title())
+                    .font(egui::FontId::proportional(16.0))
+                    .strong()
+                    .color(TEXT_HEADING),
+            );
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                if ui.button(lang.update_check()).clicked() {
+                    self.update_check_requested = true;
+                }
+                if let Some(note) = &self.update_note {
+                    ui.label(egui::RichText::new(note).color(TEXT_MUTED));
+                }
+            });
+            ui.add_space(8.0);
+            ui.label(
+                egui::RichText::new(lang.crash_title())
+                    .font(egui::FontId::proportional(14.0))
+                    .strong()
+                    .color(TEXT_HEADING),
+            );
+            ui.add_space(4.0);
+            ui.checkbox(&mut config.crash_reports, lang.crash_enable());
+            ui.add_space(6.0);
+            if ui.button(lang.crash_export()).clicked() {
+                self.crash_export_requested = true;
+            }
+        });
+
+        ui.add_space(14.0);
+
+        // Local dedicated server for the selected instance (CONCEPT P13).
+        // Stops with the launcher (kill_on_drop); no LAN tunneling in v1.0.
+        ui.group(|ui| {
+            ui.label(
+                egui::RichText::new(lang.server_title())
+                    .font(egui::FontId::proportional(16.0))
+                    .strong()
+                    .color(TEXT_HEADING),
+            );
+            ui.add_space(8.0);
+            if server_running {
+                if let Some(status) = server_status {
+                    ui.label(egui::RichText::new(status).color(TEXT_PRIMARY));
+                    ui.add_space(4.0);
+                }
+                if ui.button(lang.server_stop()).clicked() {
+                    self.server_stop_requested = true;
+                }
+            } else {
+                ui.checkbox(&mut self.server_eula_draft, lang.server_eula());
+                ui.add_space(4.0);
+                if ui.button(lang.server_create()).clicked() {
+                    self.server_start_requested = true;
+                }
+                if let Some(status) = server_status {
+                    ui.label(egui::RichText::new(status).color(TEXT_MUTED));
+                }
+            }
         });
     }
 
@@ -711,7 +833,13 @@ impl SettingsPage {
         });
     }
 
-    fn show_accounts(&mut self, ui: &mut Ui, account_mgr: &mut AccountManager, lang: Language) {
+    fn show_accounts(
+        &mut self,
+        ui: &mut Ui,
+        account_mgr: &mut AccountManager,
+        config: &mut LauncherConfig,
+        lang: Language,
+    ) {
         ui.group(|ui| {
             ui.label(
                 egui::RichText::new(lang.settings_accounts_title())
@@ -781,6 +909,17 @@ impl SettingsPage {
             }
             if let Some(id) = remove_id {
                 let _ = account_mgr.remove_account(id);
+            }
+
+            ui.add_space(10.0);
+            ui.checkbox(
+                &mut config.ask_identity_each_launch,
+                lang.settings_ask_identity(),
+            );
+            if config.remembered_identity.is_some()
+                && ui.button(lang.settings_forget_identity()).clicked()
+            {
+                config.remembered_identity = None;
             }
         });
     }

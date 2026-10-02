@@ -7,7 +7,7 @@ pub mod logging;
 pub mod paths;
 pub mod types;
 
-pub use config::{AppMode, LauncherConfig, UiSettings};
+pub use config::{AfterLaunch, AppMode, LauncherConfig, NotifSettings, UiSettings};
 pub use error::{LauncherError, Result};
 pub use hardware::{free_disk_mb, HardwareReport};
 pub use i18n::Language;

@@ -100,7 +100,7 @@ impl AppMode {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LauncherConfig {
     pub ui: UiSettings,
     pub default_launch_options: LaunchOptions,
@@ -118,6 +118,84 @@ pub struct LauncherConfig {
     /// Global download speed limit in KiB/s (P3). `None` (default) = unlimited.
     #[serde(default)]
     pub download_speed_limit_kbps: Option<u64>,
+    /// Custom storage root from Settings (CONCEPT "Хранение на диске").
+    /// Applied on next launcher start.
+    #[serde(default)]
+    pub root_override: Option<PathBuf>,
+    /// Per-type notification switches (CONCEPT "Уведомления").
+    #[serde(default)]
+    pub notifications: NotifSettings,
+    /// Anonymous crash reports, ON by default, disable in Settings (opt-out).
+    #[serde(default = "default_true")]
+    pub crash_reports: bool,
+    /// World backup folder override; default = launcher backups dir.
+    #[serde(default)]
+    pub world_backup_dir: Option<PathBuf>,
+    /// Automatic world backups every N days (0 = manual only).
+    #[serde(default)]
+    pub world_backup_days: u64,
+    /// Remembered launch identity (account UUID string); ask dialog when unset.
+    #[serde(default)]
+    pub remembered_identity: Option<String>,
+    /// Ask which identity to play with on every launch (CONCEPT "Аккаунты").
+    #[serde(default)]
+    pub ask_identity_each_launch: bool,
+    /// Tutorial hints already dismissed.
+    #[serde(default)]
+    pub tour_seen: bool,
+    /// `.minecraft` reuse offer already resolved.
+    #[serde(default)]
+    pub mc_reuse_done: bool,
+    /// Mod wishlist: `"source:id"` entries not yet installed.
+    #[serde(default)]
+    pub wishlist: Vec<String>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// Per-type notification switches; everything on by default.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NotifSettings {
+    pub updates: bool,
+    pub downloads: bool,
+    pub launcher: bool,
+}
+
+impl Default for NotifSettings {
+    fn default() -> Self {
+        Self {
+            updates: true,
+            downloads: true,
+            launcher: true,
+        }
+    }
+}
+
+impl Default for LauncherConfig {
+    fn default() -> Self {
+        Self {
+            ui: UiSettings::default(),
+            default_launch_options: LaunchOptions::default(),
+            custom_game_dir: None,
+            selected_version: None,
+            selected_instance: None,
+            app_mode: AppMode::default(),
+            first_run: false,
+            download_speed_limit_kbps: None,
+            root_override: None,
+            notifications: NotifSettings::default(),
+            crash_reports: true,
+            world_backup_dir: None,
+            world_backup_days: 0,
+            remembered_identity: None,
+            ask_identity_each_launch: false,
+            tour_seen: false,
+            mc_reuse_done: false,
+            wishlist: Vec::new(),
+        }
+    }
 }
 
 impl LauncherConfig {
@@ -209,6 +287,24 @@ mod tests {
             serde_json::from_str(r#"{"theme":"x","ui_scale":1.0,"show_snapshots":false,"show_betas":false,"show_alphas":false,"show_old":false,"language":"en"}"#)
                 .unwrap();
         assert_eq!(legacy.after_launch, AfterLaunch::Keep);
+    }
+
+    #[test]
+    fn test_fresh_defaults_reflect_concept() {
+        let fresh = LauncherConfig::default();
+        assert!(fresh.crash_reports);
+        assert!(fresh.notifications.updates);
+        assert!(fresh.notifications.downloads);
+        assert!(fresh.notifications.launcher);
+        assert_eq!(fresh.world_backup_days, 0);
+        assert!(fresh.wishlist.is_empty());
+        assert!(!fresh.ask_identity_each_launch);
+        // Legacy file without any new keys still parses.
+        let legacy: LauncherConfig =
+            serde_json::from_str(r#"{"ui":{"theme":"x","ui_scale":1.0,"show_snapshots":false,"show_betas":false,"show_alphas":false,"show_old":false,"language":"en"},"default_launch_options":{"memory_min_mb":1024,"memory_max_mb":4096,"java_path":null,"custom_jvm_args":[],"custom_game_args":[],"window_width":854,"window_height":480,"fullscreen":false,"quick_play_server":null,"quick_play_port":null},"custom_game_dir":null,"selected_version":null,"selected_instance":null}"#)
+                .unwrap();
+        assert!(legacy.crash_reports);
+        assert_eq!(legacy.world_backup_days, 0);
     }
 
     #[test]

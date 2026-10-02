@@ -11,6 +11,7 @@ pub enum NavTab {
     Modpacks,
     Mods,
     Skins,
+    Profile,
     Settings,
 }
 
@@ -50,6 +51,14 @@ impl Sidebar {
             }
             if Self::nav_item(ui, lang.nav_skins(), "👤", *current_tab == NavTab::Skins) {
                 *current_tab = NavTab::Skins;
+            }
+            if Self::nav_item(
+                ui,
+                lang.nav_profile(),
+                "🪪",
+                *current_tab == NavTab::Profile,
+            ) {
+                *current_tab = NavTab::Profile;
             }
 
             // Push bottom items down

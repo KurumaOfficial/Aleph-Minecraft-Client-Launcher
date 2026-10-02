@@ -10,21 +10,27 @@ use amc_minecraft::{
     QuiltLoader, VersionDetails, VersionManifest,
 };
 use amc_mods::{
-    CurseForgeClient, LocalModManager, ModCategory, ModSearchResult, ModSource, ModrinthClient,
+    CurseForgeClient, LocalModManager, ModCategory, ModDownloadFile, ModSearchResult, ModSource,
+    ModrinthClient,
 };
 use eframe::App;
 use egui::{CentralPanel, Context, SidePanel, TopBottomPanel, ViewportCommand};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
 
 use crate::modals::{
-    ConsoleModal, DownloadOverlay, LoginModal, LoginMode, OverlayAction, WizardAction, WizardFlow,
+    ConsoleModal, DownloadOverlay, IdentityPicker, LoginModal, LoginMode, OverlayAction,
+    PickerAction, ScreensModal, WizardAction, WizardFlow,
 };
 use crate::pages::{
-    HomeContext, HomePage, InstanceAction, InstancesPage, ModsPage, SettingsPage, SkinsPage,
+    HomeContext, HomePage, InstanceAction, InstancesPage, ModsPage, ProfileAction, ProfilePage,
+    SettingsPage, SkinsPage,
 };
 use crate::theme::{apply_aleph_theme, BG};
-use crate::widgets::{topbar, BottomBar, NavTab, Sidebar, TitleBar};
+use crate::widgets::{
+    push_toast, show_toasts, topbar, BottomBar, NavTab, Sidebar, TitleBar, Toast, ToastKind,
+};
 
 pub struct LauncherApp {
     paths: LauncherPaths,
@@ -51,6 +57,7 @@ pub struct LauncherApp {
     // Modals
     login_modal: LoginModal,
     console_modal: ConsoleModal,
+    screens_modal: ScreensModal,
 
     // First-run wizard (ROADMAP P1) and the one-time hardware notice.
     wizard: Option<WizardFlow>,
@@ -68,7 +75,19 @@ pub struct LauncherApp {
     versions_rx: Option<mpsc::Receiver<Vec<GameVersion>>>,
     server_ping_rx: Option<mpsc::Receiver<amc_minecraft::ServerStatus>>,
     mod_search_rx: Option<mpsc::Receiver<Vec<ModSearchResult>>>,
-    mod_install_rx: Option<mpsc::Receiver<Result<(String, String), String>>>,
+    mod_install_rx: Option<mpsc::Receiver<Result<InstallReport, String>>>,
+    wishlist_snapshot: Vec<String>,
+    mod_update_rx: Option<mpsc::Receiver<Vec<crate::pages::mods::UpdateOffer>>>,
+    update_rx: Option<mpsc::Receiver<Option<String>>>,
+    toasts: Vec<Toast>,
+    pending_identity_pick: bool,
+    identity_picker: IdentityPicker,
+    picker_nickname: String,
+    favorites: Vec<amc_minecraft::FavoriteServerEntry>,
+    profile_page: ProfilePage,
+    server_child: Option<tokio::process::Child>,
+    server_status: Option<String>,
+    server_rx: Option<mpsc::Receiver<Result<tokio::process::Child, String>>>,
     progress_init_rx: Option<mpsc::Receiver<Option<watch::Receiver<DownloadProgress>>>>,
     launch_status_rx: Option<mpsc::Receiver<String>>,
     download_progress_rx: Option<watch::Receiver<DownloadProgress>>,
@@ -83,11 +102,23 @@ pub struct LauncherApp {
     ms_poll_rx: Option<mpsc::Receiver<Result<Account, String>>>,
 }
 
+/// Outcome of one mod installation (CONCEPT P4): downloaded files plus
+/// provenance for the local-mod badge and old-file cleanup on updates.
+struct InstallReport {
+    mod_id: String,
+    title: String,
+    filenames: Vec<String>,
+    replaced_old: Option<String>,
+    instance_id: Option<uuid::Uuid>,
+    target_dir: std::path::PathBuf,
+    mc_version: Option<String>,
+    loader_name: String,
+}
+
 impl LauncherApp {
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+    pub fn new(cc: &eframe::CreationContext<'_>, paths: LauncherPaths) -> Self {
         apply_aleph_theme(&cc.egui_ctx);
 
-        let paths = LauncherPaths::default_paths().expect("Failed to initialize launcher paths");
         let config = LauncherConfig::load_from_path(&paths.config_file()).unwrap_or_default();
         let account_mgr = Self::load_accounts(&paths);
 
@@ -124,6 +155,11 @@ impl LauncherApp {
             None
         };
 
+        // Values derived from `config`/`paths` must be cloned before the
+        // struct literal moves them.
+        let wishlist_snapshot = config.wishlist.clone();
+        let favorites = amc_minecraft::load_favorites(&paths.root_dir);
+
         Self {
             paths,
             config,
@@ -145,6 +181,7 @@ impl LauncherApp {
             settings_page: SettingsPage::default(),
             login_modal: LoginModal::default(),
             console_modal: ConsoleModal::default(),
+            screens_modal: ScreensModal::default(),
             wizard,
             hw_notice: None,
             avatar_texture: None,
@@ -154,6 +191,18 @@ impl LauncherApp {
             server_ping_rx: None,
             mod_search_rx: None,
             mod_install_rx: None,
+            wishlist_snapshot,
+            mod_update_rx: None,
+            update_rx: None,
+            toasts: Vec::new(),
+            pending_identity_pick: false,
+            identity_picker: IdentityPicker::default(),
+            picker_nickname: String::new(),
+            favorites,
+            profile_page: ProfilePage::default(),
+            server_child: None,
+            server_status: None,
+            server_rx: None,
             progress_init_rx: None,
             launch_status_rx: None,
             download_progress_rx: None,
@@ -179,6 +228,62 @@ impl LauncherApp {
                 false
             }
         }
+    }
+
+    /// Add playtime to an instance, merging with whatever is on disk first
+    /// so parallel sessions (including the same instance ×N) never lose
+    /// minutes to a last-writer-wins overwrite.
+    fn add_playtime(
+        paths: &LauncherPaths,
+        instances: &mut [Instance],
+        inst_id: uuid::Uuid,
+        mins: u64,
+    ) {
+        let now = chrono::Utc::now();
+        let instances_file = paths.instances_file();
+        let mut disk = Instance::load_all(&instances_file).unwrap_or_default();
+        let mut applied = false;
+        if let Some(inst) = disk.iter_mut().find(|i| i.id == inst_id) {
+            inst.total_played_minutes += mins;
+            inst.last_played = Some(now);
+            applied = true;
+        }
+        if applied {
+            let _ = Instance::save_all(&instances_file, &disk);
+        }
+        if let Some(inst) = instances.iter_mut().find(|i| i.id == inst_id) {
+            if applied {
+                if let Some(saved) = disk.iter().find(|i| i.id == inst_id) {
+                    inst.total_played_minutes = saved.total_played_minutes;
+                    inst.last_played = saved.last_played;
+                }
+            } else {
+                inst.total_played_minutes += mins;
+                inst.last_played = Some(now);
+                let _ = Instance::save_all(&instances_file, instances);
+            }
+        }
+    }
+
+    /// Archive a crash log locally when reports are enabled (opt-out).
+    /// Nothing leaves the machine — upload needs a future endpoint.
+    fn archive_crash(paths: &LauncherPaths, message: &str) {
+        let dir = paths.logs_dir().join("crashes");
+        if std::fs::create_dir_all(&dir).is_err() {
+            return;
+        }
+        // Keep the archive bounded: drop oldest beyond 20 files.
+        if let Ok(entries) = std::fs::read_dir(&dir) {
+            let mut logs: Vec<_> = entries.flatten().collect();
+            if logs.len() >= 20 {
+                logs.sort_by_key(|e| e.metadata().and_then(|m| m.modified()).ok());
+                for stale in logs.iter().take(logs.len().saturating_sub(19)) {
+                    let _ = std::fs::remove_file(stale.path());
+                }
+            }
+        }
+        let stamp = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
+        let _ = std::fs::write(dir.join(format!("crash-{stamp}.log")), message);
     }
 
     /// Load stored accounts, degrading gracefully to an empty (signed-out)
@@ -241,6 +346,280 @@ impl LauncherApp {
         });
     }
 
+    /// Check installed mods against Modrinth (CONCEPT P4): exact-slug match,
+    /// compatible with the selected instance, newer version number = offer.
+    /// Heuristic and documented as such — a wrong guess just shows no offer.
+    fn check_mod_updates(&mut self) {
+        if self.mods_page.update_checking {
+            return;
+        }
+        self.mods_page.update_checking = true;
+        let (tx, rx) = mpsc::channel(1);
+        self.mod_update_rx = Some(rx);
+        let local: Vec<(String, String, String)> = self
+            .mods_page
+            .local_mods
+            .iter()
+            .map(|m| {
+                (
+                    m.name.clone(),
+                    m.version.clone(),
+                    m.path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default(),
+                )
+            })
+            .collect();
+        let (mc_version, loader_name) = if let Some(id) = self.selected_instance {
+            if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
+                (
+                    Some(inst.game_version.clone()),
+                    inst.loader.as_str().to_string(),
+                )
+            } else {
+                (None, "minecraft".to_string())
+            }
+        } else {
+            (None, "minecraft".to_string())
+        };
+
+        tokio::spawn(async move {
+            let client = ModrinthClient::default();
+            let mut offers = Vec::new();
+            for (name, version, old_filename) in local {
+                let slug_guess = name.to_lowercase().replace(' ', "-");
+                let hits = match client.search(&name, None, None, ModCategory::Mod, 3).await {
+                    Ok(h) => h,
+                    Err(_) => continue,
+                };
+                let hit = match hits
+                    .into_iter()
+                    .find(|h| h.id == slug_guess || h.title.eq_ignore_ascii_case(&name))
+                {
+                    Some(h) => h,
+                    None => continue,
+                };
+                let versions = match client.list_versions(&hit.id).await {
+                    Ok(v) => v,
+                    Err(_) => continue,
+                };
+                let picked = match &mc_version {
+                    Some(mc) => {
+                        ModrinthClient::select_compatible(&versions, mc, &loader_name).cloned()
+                    }
+                    None => versions.into_iter().next(),
+                };
+                let ver = match picked {
+                    Some(v) => v,
+                    None => continue,
+                };
+                if ver.version_number == version {
+                    continue;
+                }
+                let Some(file) = ver
+                    .files
+                    .iter()
+                    .find(|f| f.primary)
+                    .or_else(|| ver.files.first())
+                else {
+                    continue;
+                };
+                offers.push(crate::pages::mods::UpdateOffer {
+                    slug: hit.id,
+                    title: hit.title,
+                    version: ver.version_number,
+                    url: file.url.clone(),
+                    filename: file.filename.clone(),
+                    sha1: file.hashes.sha1.clone(),
+                    size: Some(file.size),
+                    old_filename,
+                });
+            }
+            let _ = tx.send(offers).await;
+        });
+    }
+
+    /// Check GitHub Releases for a newer launcher (CONCEPT P11).
+    /// Result arrives as a toast + settings note; download is manual.
+    pub fn check_launcher_update(&mut self) {
+        let (tx, rx) = mpsc::channel(1);
+        self.update_rx = Some(rx);
+        tokio::spawn(async move {
+            #[derive(serde::Deserialize)]
+            struct Release {
+                #[serde(default)]
+                tag_name: String,
+            }
+            let found: Option<String> = async {
+                let client = reqwest::Client::new();
+                let res = client
+                    .get("https://api.github.com/repos/KurumaOfficial/Aleph-Minecraft-Client-Launcher/releases/latest")
+                    .header("User-Agent", "amc-launcher")
+                    .send()
+                    .await
+                    .ok()?;
+                if !res.status().is_success() {
+                    return None;
+                }
+                let rel: Release = res.json().await.ok()?;
+                let latest = rel.tag_name.trim_start_matches(['v', 'V']).to_string();
+                if latest.is_empty() || latest == env!("CARGO_PKG_VERSION") {
+                    None
+                } else {
+                    Some(latest)
+                }
+            }
+            .await;
+            let _ = tx.send(found).await;
+        });
+    }
+
+    /// Export logs + config + instances as a support bundle (P12).
+    /// Runs inline: small text files only.
+    fn export_diagnostics(&mut self) {
+        let lang = self.config.ui.language();
+        let stamp = chrono::Utc::now().format("%Y%m%d-%H%M%S").to_string();
+        let dest = self.paths.root_dir.join(format!("diag-{stamp}.zip"));
+        let result: Result<PathBuf, String> = (|| {
+            let file = std::fs::File::create(&dest).map_err(|e| e.to_string())?;
+            let mut zip = zip::ZipWriter::new(file);
+            let opts = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Deflated);
+            let mut add_tree = |dir: &PathBuf, prefix: &str| -> Result<(), String> {
+                let mut stack = vec![dir.clone()];
+                while let Some(current) = stack.pop() {
+                    let entries = std::fs::read_dir(&current).map_err(|e| e.to_string())?;
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if path.is_dir() {
+                            stack.push(path);
+                        } else if path.is_file() {
+                            if entry.metadata().map(|m| m.len()).unwrap_or(0) > 5 * 1024 * 1024 {
+                                continue;
+                            }
+                            let rel = path.strip_prefix(&self.paths.root_dir).unwrap_or(&path);
+                            let name =
+                                format!("{prefix}/{}", rel.to_string_lossy().replace('\\', "/"));
+                            zip.start_file(name, opts).map_err(|e| e.to_string())?;
+                            let mut src = std::fs::File::open(&path).map_err(|e| e.to_string())?;
+                            std::io::copy(&mut src, &mut zip).map_err(|e| e.to_string())?;
+                        }
+                    }
+                }
+                Ok(())
+            };
+            add_tree(&self.paths.logs_dir(), "logs")?;
+            for single in [
+                self.paths.config_file(),
+                self.paths.instances_file(),
+                self.paths.accounts_file(),
+            ] {
+                if single.is_file() {
+                    let name = format!(
+                        "root/{}",
+                        single.file_name().unwrap_or_default().to_string_lossy()
+                    );
+                    zip.start_file(name, opts).map_err(|e| e.to_string())?;
+                    let mut src = std::fs::File::open(&single).map_err(|e| e.to_string())?;
+                    std::io::copy(&mut src, &mut zip).map_err(|e| e.to_string())?;
+                }
+            }
+            zip.finish().map_err(|e| e.to_string())?;
+            Ok(dest)
+        })();
+        match result {
+            Ok(path) => push_toast(
+                &mut self.toasts,
+                &self.config.notifications,
+                ToastKind::Launcher,
+                format!("{}: {}", lang.crash_export(), path.display()),
+            ),
+            Err(e) => tracing::error!("Diagnostics export failed: {e}"),
+        }
+    }
+
+    /// Start a local dedicated server for the selected instance (CONCEPT P13).
+    /// Downloads `server.jar`, writes `eula.txt` only after explicit UI
+    /// consent, resolves Java like the game does. The owned child uses
+    /// `kill_on_drop`, so the server always stops with the launcher.
+    fn start_local_server(&mut self, eula_ok: bool) {
+        // A fresh start always kills the previous server first.
+        self.server_child = None;
+        self.server_status = None;
+        let (tx, rx) = mpsc::channel(1);
+        self.server_rx = Some(rx);
+
+        let instances_dir = self.paths.instances_dir();
+        let picked = self
+            .selected_instance
+            .and_then(|id| self.instances.iter().find(|i| i.id == id));
+        let (game_dir, ver_id, mem_mb) = match picked {
+            Some(inst) => (
+                inst.get_game_dir(&instances_dir),
+                inst.game_version.clone(),
+                inst.ram_mb.unwrap_or(2048),
+            ),
+            None => {
+                let ver = self
+                    .selected_version
+                    .clone()
+                    .unwrap_or_else(|| "1.20.1".to_string());
+                (instances_dir.join(&ver), ver, 2048)
+            }
+        };
+
+        let engine = self.download_engine.clone();
+        let paths = self.paths.clone();
+        let java_override = self.config.default_launch_options.java_path.clone();
+        tokio::spawn(async move {
+            let outcome: Result<tokio::process::Child, String> = async {
+                let client = reqwest::Client::new();
+                let details =
+                    VersionDetails::fetch_or_load(&client, &ver_id, None, &paths.versions_dir())
+                        .await
+                        .map_err(|e| e.to_string())?;
+                let server_url = details
+                    .downloads
+                    .as_ref()
+                    .and_then(|d| d.server.as_ref())
+                    .map(|f| f.url.clone())
+                    .unwrap_or_else(|| amc_minecraft::DedicatedServer::mojang_server_url(&ver_id));
+                let server_dir = amc_minecraft::DedicatedServer::dir(&game_dir);
+                let jar = amc_minecraft::DedicatedServer::ensure_server_jar(
+                    &client,
+                    &server_url,
+                    &server_dir,
+                )
+                .await
+                .map_err(|e| e.to_string())?;
+                if !amc_minecraft::DedicatedServer::eula_accepted(&server_dir) {
+                    if !eula_ok {
+                        return Err("Accept the Mojang EULA to start the server".to_string());
+                    }
+                    amc_minecraft::DedicatedServer::write_eula(&server_dir)
+                        .map_err(|e| e.to_string())?;
+                }
+                let java_bin = if let Some(custom) = java_override {
+                    custom
+                } else {
+                    AdoptiumInstaller::ensure_java(
+                        &paths.runtimes_dir(),
+                        details.required_java_major(),
+                        &engine,
+                        None,
+                    )
+                    .await
+                    .map_err(|e| e.to_string())?
+                };
+                amc_minecraft::DedicatedServer::start(&java_bin, &server_dir, &jar, mem_mb, 25565)
+                    .map_err(|e| e.to_string())
+            }
+            .await;
+            let _ = tx.send(outcome).await;
+        });
+    }
+
     fn search_mods(&mut self, query: String, provider: ModSource, category: ModCategory) {
         self.mods_page.is_searching = true;
         let (tx, rx) = mpsc::channel(1);
@@ -262,7 +641,13 @@ impl LauncherApp {
                 }
                 _ => {
                     let client = ModrinthClient::default();
-                    match client.search(&query, None, None, category, 30).await {
+                    // Empty query = Discover: most downloaded first.
+                    let result = if query.trim().is_empty() {
+                        client.search_trending(category, 20).await
+                    } else {
+                        client.search(&query, None, None, category, 30).await
+                    };
+                    match result {
                         Ok(results) => {
                             let _ = tx.send(results).await;
                         }
@@ -276,7 +661,186 @@ impl LauncherApp {
         });
     }
 
-    fn install_mod(&mut self, mod_item: ModSearchResult) {
+    /// Drag-and-drop entry: `.mrpack` imports a pack, `.jar` installs a mod
+    /// file into the selected instance, a folder with `level.dat` imports
+    /// a world. Everything else is ignored with a toast.
+    fn handle_dropped_files(&mut self, files: Vec<std::path::PathBuf>) {
+        for path in files {
+            if path.is_dir() {
+                if path.join("level.dat").is_file() {
+                    self.import_dropped_world(path);
+                }
+                continue;
+            }
+            match path.extension().and_then(|e| e.to_str()) {
+                Some(ext) if ext.eq_ignore_ascii_case("mrpack") => self.import_mrpack(path),
+                Some(ext) if ext.eq_ignore_ascii_case("jar") => self.install_loose_jar(path),
+                _ => {}
+            }
+        }
+    }
+
+    fn content_base_dir(&self) -> std::path::PathBuf {
+        if let Some(id) = self.selected_instance {
+            if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
+                return inst.get_game_dir(&self.paths.instances_dir());
+            }
+        }
+        self.paths.root_dir.clone()
+    }
+
+    /// Copy a loose `.jar` into the active mods folder. Local by definition,
+    /// so it is deliberately NOT recorded as launcher-installed.
+    fn install_loose_jar(&mut self, path: std::path::PathBuf) {
+        let Some(filename) = path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .map(|s| s.to_string())
+        else {
+            return;
+        };
+        let target = self.content_base_dir().join("mods");
+        let _ = std::fs::create_dir_all(&target);
+        let lang = self.config.ui.language();
+        match std::fs::copy(&path, target.join(&filename)) {
+            Ok(_) => {
+                self.mods_page.local_mods = LocalModManager::scan_mods(&target).unwrap_or_default();
+                self.instances_page.refresh_scans();
+                push_toast(
+                    &mut self.toasts,
+                    &self.config.notifications,
+                    ToastKind::Downloads,
+                    format!("Мод \"{filename}\" установлен!"),
+                );
+                let _ = lang;
+            }
+            Err(e) => {
+                self.mods_page.status_message =
+                    Some((format!("Не удалось скопировать {filename}: {e}"), false));
+            }
+        }
+    }
+
+    /// Import a dropped world folder into the active instance `saves/`.
+    fn import_dropped_world(&mut self, folder: std::path::PathBuf) {
+        let name = folder
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "world".to_string());
+        let base = self.content_base_dir();
+        let saves = base.join("saves");
+        let _ = std::fs::create_dir_all(&saves);
+        let mut dest = saves.join(&name);
+        let mut n = 1;
+        while dest.exists() {
+            n += 1;
+            dest = saves.join(format!("{name}-{n}"));
+        }
+        let lang = self.config.ui.language();
+        match copy_dir_recursive(&folder, &dest) {
+            Ok(()) => push_toast(
+                &mut self.toasts,
+                &self.config.notifications,
+                ToastKind::Downloads,
+                format!(
+                    "Мир \"{}\" импортирован!",
+                    dest.file_name().unwrap_or_default().to_string_lossy()
+                ),
+            ),
+            Err(e) => {
+                self.mods_page.status_message =
+                    Some((format!("Не удалось импортировать мир: {e}"), false));
+                let _ = lang;
+            }
+        }
+    }
+
+    /// Import a Modrinth `.mrpack`: download files, extract overrides.
+    fn import_mrpack(&mut self, pack_path: std::path::PathBuf) {
+        let base_dir = self.content_base_dir();
+        let engine = self.download_engine.clone();
+        let (tx, rx) = mpsc::channel(1);
+        self.mod_install_rx = Some(rx);
+        let lang = self.config.ui.language();
+        let _ = lang;
+        tokio::spawn(async move {
+            let index = match amc_mods::parse_mrpack_index(&pack_path) {
+                Ok(index) => index,
+                Err(e) => {
+                    let _ = tx.send(Err(format!("Bad .mrpack: {e}"))).await;
+                    return;
+                }
+            };
+            let mut ok_count = 0usize;
+            for file in &index.files {
+                let Some(rel) = amc_mods::MrpackIndex::sanitize_path(&file.path) else {
+                    continue;
+                };
+                let Some(url) = file.downloads.first() else {
+                    continue;
+                };
+                let dest = base_dir.join(&rel);
+                if let Some(parent) = dest.parent() {
+                    let _ = tokio::fs::create_dir_all(parent).await;
+                }
+                let mut item = amc_downloader::DownloadItem::new(url, &dest);
+                if let Some(sha1) = file.hashes.as_ref().and_then(|h| h.sha1.as_ref()) {
+                    item = item.with_sha1(sha1);
+                }
+                if let Some(size) = file.file_size {
+                    item = item.with_size(size);
+                }
+                if engine
+                    .download_one(&item, None, DownloadCancel::default())
+                    .await
+                    .is_ok()
+                {
+                    ok_count += 1;
+                }
+            }
+            // Overrides tree (configs, resourcepacks, …).
+            let overrides_done = (|| {
+                let zip_file = std::fs::File::open(&pack_path).ok()?;
+                let mut archive = zip::ZipArchive::new(zip_file).ok()?;
+                for i in 0..archive.len() {
+                    let mut entry = archive.by_index(i).ok()?;
+                    let name = entry.name().to_string();
+                    let Some(rest) = name.strip_prefix("overrides/") else {
+                        continue;
+                    };
+                    let Some(rel) = amc_mods::MrpackIndex::sanitize_path(rest) else {
+                        continue;
+                    };
+                    if name.ends_with('/') {
+                        continue;
+                    }
+                    let dest = base_dir.join(&rel);
+                    if let Some(parent) = dest.parent() {
+                        std::fs::create_dir_all(parent).ok()?;
+                    }
+                    let mut out = std::fs::File::create(&dest).ok()?;
+                    std::io::copy(&mut entry, &mut out).ok()?;
+                }
+                Some(())
+            })();
+            let _ = overrides_done;
+            let _ = tx
+                .send(Ok(InstallReport {
+                    mod_id: format!("mrpack:{}", index.name),
+                    title: index.name.clone(),
+                    filenames: Vec::new(),
+                    replaced_old: None,
+                    instance_id: None,
+                    target_dir: base_dir.join("mods"),
+                    mc_version: None,
+                    loader_name: "minecraft".to_string(),
+                }))
+                .await;
+            let _ = ok_count;
+        });
+    }
+
+    fn install_mod(&mut self, mod_item: ModSearchResult, replaced_old: Option<String>) {
         let base_dir = if let Some(id) = self.selected_instance {
             if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
                 inst.get_game_dir(&self.paths.instances_dir())
@@ -294,44 +858,174 @@ impl LauncherApp {
         };
         let _ = std::fs::create_dir_all(&target_dir);
 
+        // Compatibility context from the selected instance (CONCEPT P4).
+        // Without it we install latest and say compatibility is unknown.
+        let (mc_version, loader_name) = if let Some(id) = self.selected_instance {
+            if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
+                (
+                    Some(inst.game_version.clone()),
+                    inst.loader.as_str().to_string(),
+                )
+            } else {
+                (None, "minecraft".to_string())
+            }
+        } else {
+            (None, "minecraft".to_string())
+        };
+        let install_instance = self.selected_instance;
+        let install_target = target_dir.clone();
+
         let engine = self.download_engine.clone();
         let (tx, rx) = mpsc::channel(1);
         self.mod_install_rx = Some(rx);
 
         tokio::spawn(async move {
-            let file_result = match mod_item.source {
-                ModSource::CurseForge => {
-                    let client = CurseForgeClient::default();
-                    client.get_download_file(&mod_item.id, None, None).await
-                }
-                _ => {
-                    let client = ModrinthClient::default();
-                    client.get_download_file(&mod_item.id, None, None).await
-                }
-            };
-
-            match file_result {
-                Ok(file_info) => {
-                    let dest = target_dir.join(&file_info.filename);
-                    let item = amc_downloader::DownloadItem::new(&file_info.url, dest);
-                    // Single-mod installs are not UI-cancellable yet (P3).
-                    if let Err(e) = engine
-                        .download_one(&item, None, DownloadCancel::default())
-                        .await
-                    {
-                        tracing::error!("Failed to download {}: {e}", file_info.filename);
-                        let _ = tx
-                            .send(Err(format!("Ошибка загрузки {}: {e}", file_info.filename)))
-                            .await;
-                    } else {
-                        tracing::info!("Item {} installed successfully!", file_info.filename);
-                        let _ = tx.send(Ok((mod_item.id, mod_item.title))).await;
+            let outcome: Result<Vec<(ModDownloadFile, String)>, String> = async {
+                let mut queue: Vec<(String, ModSource, ModCategory, Option<String>)> = vec![(
+                    mod_item.id.clone(),
+                    mod_item.source,
+                    mod_item.category,
+                    None,
+                )];
+                let mut installed: Vec<(ModDownloadFile, String)> = Vec::new();
+                let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+                // Depth-1 autodeps: the root mod plus what it strictly requires.
+                while let Some((slug, source, category, old_file)) = queue.pop() {
+                    if !seen.insert(format!("{slug:?}{source:?}")) {
+                        continue;
                     }
+                    let (file, deps) =
+                        resolve_mod_file(&slug, source, category, &mc_version, &loader_name)
+                            .await?;
+                    if installed.len() >= 8 {
+                        break;
+                    }
+                    installed.push((file, old_file.unwrap_or_default()));
+                    if installed.len() == 1 {
+                        for dep in deps.into_iter().take(4) {
+                            queue.push((dep, ModSource::Modrinth, ModCategory::Mod, None));
+                        }
+                    }
+                }
+                if installed.is_empty() {
+                    return Err("Nothing to install".to_string());
+                }
+                Ok(installed)
+            }
+            .await;
+
+            match outcome {
+                Ok(files) => {
+                    let mut names = Vec::new();
+                    for (file_info, _old) in &files {
+                        let dest = target_dir.join(&file_info.filename);
+                        let mut item = amc_downloader::DownloadItem::new(&file_info.url, &dest);
+                        if let Some(sha1) = &file_info.sha1 {
+                            item = item.with_sha1(sha1);
+                        }
+                        if let Some(size) = file_info.size {
+                            item = item.with_size(size);
+                        }
+                        if let Err(e) = engine
+                            .download_one(&item, None, DownloadCancel::default())
+                            .await
+                        {
+                            tracing::error!("Failed to download {}: {e}", file_info.filename);
+                            let _ = tx
+                                .send(Err(format!("Ошибка загрузки {}: {e}", file_info.filename)))
+                                .await;
+                            return;
+                        }
+                        names.push(file_info.filename.clone());
+                    }
+                    tracing::info!("Items {:?} installed successfully!", names);
+                    let _ = tx
+                        .send(Ok(InstallReport {
+                            mod_id: mod_item.id.clone(),
+                            title: mod_item.title.clone(),
+                            filenames: names,
+                            replaced_old,
+                            instance_id: install_instance,
+                            target_dir: install_target,
+                            mc_version,
+                            loader_name,
+                        }))
+                        .await;
                 }
                 Err(e) => {
                     tracing::error!("Failed to get file info: {e}");
                     let _ = tx.send(Err(format!("Не удалось получить файл: {e}"))).await;
                 }
+            }
+
+            async fn resolve_mod_file(
+                slug: &str,
+                source: ModSource,
+                category: ModCategory,
+                mc_version: &Option<String>,
+                loader_name: &str,
+            ) -> Result<(ModDownloadFile, Vec<String>), String> {
+                match source {
+                    ModSource::CurseForge => {
+                        let client = CurseForgeClient::default();
+                        let mc = mc_version.as_deref();
+                        // CurseTools filters server-side; empty means incompatible.
+                        let file = client
+                            .get_download_file(slug, Some(loader_name), mc)
+                            .await
+                            .map_err(|e| e.to_string())?;
+                        Ok((file, Vec::new()))
+                    }
+                    _ => {
+                        let client = ModrinthClient::default();
+                        if category != ModCategory::Mod {
+                            let file = client
+                                .get_download_file(slug, None, mc_version.as_deref())
+                                .await
+                                .map_err(|e| e.to_string())?;
+                            return Ok((file, Vec::new()));
+                        }
+                        let versions = client
+                            .list_versions(slug)
+                            .await
+                            .map_err(|e| e.to_string())?;
+                        match mc_version {
+                            Some(mc) => {
+                                let ver = amc_mods::ModrinthClient::select_compatible(
+                                    &versions,
+                                    mc,
+                                    loader_name,
+                                )
+                                .ok_or_else(|| format!("No build for Minecraft {mc}"))?;
+                                let file = mod_file_of(ver)?;
+                                Ok((file, ver.required_dependencies()))
+                            }
+                            None => {
+                                let ver = versions
+                                    .into_iter()
+                                    .next()
+                                    .ok_or_else(|| "No compatible mod version found".to_string())?;
+                                let file = mod_file_of(&ver)?;
+                                Ok((file, ver.required_dependencies()))
+                            }
+                        }
+                    }
+                }
+            }
+
+            fn mod_file_of(ver: &amc_mods::ProjectVersionFull) -> Result<ModDownloadFile, String> {
+                ver.files
+                    .iter()
+                    .find(|f| f.primary)
+                    .or_else(|| ver.files.first())
+                    .map(|file| ModDownloadFile {
+                        filename: file.filename.clone(),
+                        url: file.url.clone(),
+                        version: ver.version_number.clone(),
+                        sha1: file.hashes.sha1.clone(),
+                        size: Some(file.size),
+                    })
+                    .ok_or_else(|| "Mod version has no files".to_string())
             }
         });
     }
@@ -385,8 +1079,25 @@ impl LauncherApp {
     }
 
     fn handle_launch(&mut self) {
+        // Per-launch identity (CONCEPT "Аккаунты"): a remembered choice or
+        // the instance default wins outright; otherwise, when the user asked
+        // to choose every time and several identities exist, open the picker
+        // and continue after they pick.
+        let remembered = self.config.remembered_identity.clone();
+        let usable = self.account_mgr.accounts().to_vec();
+        if self.config.ask_identity_each_launch
+            && remembered.is_none()
+            && usable.len() > 1
+            && !self.pending_identity_pick
+        {
+            self.pending_identity_pick = true;
+            self.identity_picker.open = true;
+            self.picker_nickname.clear();
+            return;
+        }
+        self.pending_identity_pick = false;
         // Instance default account wins over the active one; unknown ids
-        // fall back to active (CONCEPT: no per-launch picker yet).
+        // fall back to active, then to the remembered choice.
         let session = self
             .selected_instance
             .and_then(|id| {
@@ -395,6 +1106,17 @@ impl LauncherApp {
                     .find(|i| i.id == id)
                     .and_then(|inst| inst.default_account)
                     .and_then(|acc_id| self.account_mgr.accounts().iter().find(|a| a.id == acc_id))
+                    .map(amc_auth::AuthSession::from_account)
+            })
+            .or_else(|| {
+                remembered
+                    .as_ref()
+                    .and_then(|id| {
+                        self.account_mgr
+                            .accounts()
+                            .iter()
+                            .find(|a| a.id.to_string() == *id)
+                    })
                     .map(amc_auth::AuthSession::from_account)
             })
             .or_else(|| self.account_mgr.get_session());
@@ -447,6 +1169,14 @@ impl LauncherApp {
             loader.as_str(),
             session.username
         );
+
+        // P8: seed launcher favorites into the instance (never overwrites
+        // the player's own servers.dat).
+        match amc_minecraft::inject_favorites(&game_dir, &self.favorites) {
+            Ok(true) => tracing::info!("Injected favorite servers into {}", game_dir.display()),
+            Ok(false) => {}
+            Err(e) => tracing::warn!("Favorite servers inject failed: {e}"),
+        }
 
         let lang = self.config.ui.language();
         self.is_launching = true;
@@ -960,6 +1690,22 @@ impl LauncherApp {
     }
 }
 
+/// Recursive directory copy (world import, backups). Skips nothing,
+/// fails on the first IO error.
+fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+    std::fs::create_dir_all(dst)?;
+    for entry in std::fs::read_dir(src)? {
+        let entry = entry?;
+        let dst_path = dst.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_dir_recursive(&entry.path(), &dst_path)?;
+        } else {
+            std::fs::copy(entry.path(), dst_path)?;
+        }
+    }
+    Ok(())
+}
+
 /// Fetch the vanilla parent for a loader branch, reporting a crash event.
 /// New loader arms share it instead of duplicating the boilerplate.
 async fn fetch_vanilla_details(
@@ -1008,6 +1754,53 @@ async fn resolve_java_for_install(
 
 impl App for LauncherApp {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
+        // In-app hotkeys (CONCEPT, P10): Ctrl+1..6 switch tabs, F5 plays.
+        // Skipped while typing or when a modal grabs input.
+        if !ctx.wants_keyboard_input() && !self.login_modal.is_open {
+            let tabs = [
+                NavTab::Home,
+                NavTab::Modpacks,
+                NavTab::Mods,
+                NavTab::Skins,
+                NavTab::Profile,
+                NavTab::Settings,
+            ];
+            for (i, tab) in tabs.iter().enumerate() {
+                let digit = match i {
+                    0 => egui::Key::Num1,
+                    1 => egui::Key::Num2,
+                    2 => egui::Key::Num3,
+                    3 => egui::Key::Num4,
+                    4 => egui::Key::Num5,
+                    _ => egui::Key::Num6,
+                };
+                if ctx.input(|inp| inp.modifiers.ctrl && inp.key_pressed(digit)) {
+                    self.current_tab = *tab;
+                }
+            }
+            if ctx.input(|inp| inp.key_pressed(egui::Key::F5)) {
+                self.handle_launch();
+            }
+        }
+
+        // Drag-and-drop install (CONCEPT P4): .mrpack pack, .jar mod,
+        // or a world folder (contains level.dat) into the window.
+        if !self.pending_identity_pick && self.wizard.is_none() {
+            let dropped: Vec<std::path::PathBuf> = ctx.input(|inp| {
+                inp.raw
+                    .dropped_files
+                    .iter()
+                    .filter_map(|f| f.path.clone())
+                    .collect()
+            });
+            if !dropped.is_empty() {
+                self.handle_dropped_files(dropped);
+            }
+        }
+
+        // Toast notifications render above all panels.
+        show_toasts(ctx, &mut self.toasts);
+
         // Receive version manifest updates
         if let Some(rx) = &mut self.versions_rx {
             if let Ok(versions) = rx.try_recv() {
@@ -1029,20 +1822,154 @@ impl App for LauncherApp {
         if let Some(rx) = &mut self.mod_install_rx {
             if let Ok(res) = rx.try_recv() {
                 match res {
-                    Ok((id, title)) => {
-                        self.mods_page.installing_ids.remove(&id);
-                        self.mods_page.installed_titles.insert(title.to_lowercase());
-                        let mods_dir = self.paths.root_dir.join("mods");
+                    Ok(report) => {
+                        let lang = self.config.ui.language();
+                        self.mods_page.installing_ids.remove(&report.mod_id);
+                        self.mods_page
+                            .installed_titles
+                            .insert(report.title.to_lowercase());
+                        // Provenance for the local-mod badge + old-file
+                        // cleanup on one-click updates.
+                        if let Some(inst_id) = report.instance_id {
+                            if let Some(inst) = self.instances.iter_mut().find(|i| i.id == inst_id)
+                            {
+                                for name in &report.filenames {
+                                    if !inst.installed_by_launcher.contains(name) {
+                                        inst.installed_by_launcher.push(name.clone());
+                                    }
+                                }
+                                if let Some(old) = &report.replaced_old {
+                                    let old_path = report.target_dir.join(old);
+                                    let _ = std::fs::remove_file(&old_path);
+                                    inst.installed_by_launcher.retain(|n| n != old);
+                                }
+                                let _ = Instance::save_all(
+                                    &self.paths.instances_file(),
+                                    &self.instances,
+                                );
+                            }
+                        }
                         self.mods_page.local_mods =
-                            LocalModManager::scan_mods(&mods_dir).unwrap_or_default();
-                        self.mods_page.status_message =
-                            Some((format!("Мод \"{title}\" успешно установлен!"), true));
+                            LocalModManager::scan_mods(&report.target_dir).unwrap_or_default();
+                        self.instances_page.refresh_scans();
+                        let compat = match &report.mc_version {
+                            Some(mc) => format!(" • {}", lang.compat_ok(mc, &report.loader_name)),
+                            None => format!(" • {}", lang.compat_unknown()),
+                        };
+                        self.mods_page.status_message = Some((
+                            format!("Мод \"{}\" установлен!{compat}", report.title),
+                            true,
+                        ));
+                        push_toast(
+                            &mut self.toasts,
+                            &self.config.notifications,
+                            ToastKind::Downloads,
+                            format!("Мод \"{}\" установлен!", report.title),
+                        );
                     }
                     Err(err) => {
                         self.mods_page.status_message = Some((err, false));
                     }
                 }
                 self.mod_install_rx = None;
+            }
+        }
+
+        // Trigger + receive mod update checks.
+        if self.mods_page.update_check_requested {
+            self.mods_page.update_check_requested = false;
+            self.check_mod_updates();
+        }
+        if let Some(rx) = &mut self.mod_update_rx {
+            if let Ok(offers) = rx.try_recv() {
+                self.mods_page.update_checking = false;
+                let n = offers.len();
+                // Row lookup uses the manifest display name, which is what
+                // the heuristic matched on.
+                self.mods_page.update_offers =
+                    offers.into_iter().map(|o| (o.title.clone(), o)).collect();
+                if n > 0 {
+                    push_toast(
+                        &mut self.toasts,
+                        &self.config.notifications,
+                        ToastKind::Updates,
+                        format!("Моды с обновлениями: {n}"),
+                    );
+                }
+                self.mod_update_rx = None;
+            }
+        }
+
+        // Launcher update check (manual button; auto-check runs once at
+        // startup from main.rs — CONCEPT checks only on launch).
+        if self.settings_page.update_check_requested {
+            self.settings_page.update_check_requested = false;
+            self.check_launcher_update();
+        }
+        if let Some(rx) = &mut self.update_rx {
+            if let Ok(found) = rx.try_recv() {
+                let lang = self.config.ui.language();
+                let note = match &found {
+                    Some(ver) => lang.update_available(ver),
+                    None => lang.update_latest().to_string(),
+                };
+                self.settings_page.update_note = Some(note.clone());
+                // Toast only for real updates; "latest" stays a settings note.
+                if found.is_some() {
+                    push_toast(
+                        &mut self.toasts,
+                        &self.config.notifications,
+                        ToastKind::Updates,
+                        note,
+                    );
+                }
+                self.update_rx = None;
+            }
+        }
+
+        // One-click diagnostics bundle (P12 crash export task).
+        if self.settings_page.crash_export_requested {
+            self.settings_page.crash_export_requested = false;
+            self.export_diagnostics();
+        }
+
+        // Local dedicated server (P13): start/stop requests, prep-task
+        // results, and reaping a server that exited on its own.
+        if self.settings_page.server_start_requested {
+            self.settings_page.server_start_requested = false;
+            let eula_ok = self.settings_page.server_eula_draft;
+            self.start_local_server(eula_ok);
+        }
+        if self.settings_page.server_stop_requested {
+            self.settings_page.server_stop_requested = false;
+            // Dropping the child kills the process (kill_on_drop).
+            self.server_child = None;
+            self.server_status = None;
+        }
+        if let Some(rx) = &mut self.server_rx {
+            if let Ok(outcome) = rx.try_recv() {
+                let lang = self.config.ui.language();
+                match outcome {
+                    Ok(child) => {
+                        self.server_child = Some(child);
+                        self.server_status = Some(lang.server_running(25565));
+                    }
+                    Err(err) => {
+                        tracing::warn!("Local server failed: {err}");
+                        self.server_status = Some(err);
+                    }
+                }
+                self.server_rx = None;
+            }
+        }
+        if let Some(child) = &mut self.server_child {
+            match child.try_wait() {
+                Ok(Some(_)) => {
+                    self.server_child = None;
+                    self.server_status = None;
+                }
+                Ok(None) => {}
+                Err(e) => tracing::warn!("Local server wait failed: {e}"),
             }
         }
 
@@ -1175,16 +2102,12 @@ impl App for LauncherApp {
                         if let Some(start) = self.session_start_time.take() {
                             let elapsed_mins = (start.elapsed().as_secs() / 60).max(1);
                             if let Some(inst_id) = self.launched_instance_id {
-                                if let Some(inst) =
-                                    self.instances.iter_mut().find(|i| i.id == inst_id)
-                                {
-                                    inst.total_played_minutes += elapsed_mins;
-                                    inst.last_played = Some(chrono::Utc::now());
-                                    let _ = Instance::save_all(
-                                        &self.paths.instances_file(),
-                                        &self.instances,
-                                    );
-                                }
+                                Self::add_playtime(
+                                    &self.paths,
+                                    &mut self.instances,
+                                    inst_id,
+                                    elapsed_mins,
+                                );
                                 // Clean exit (not a crash): remember the session
                                 // for the summary modal (CONCEPT "После запуска игры").
                                 if code == Some(0) {
@@ -1218,19 +2141,18 @@ impl App for LauncherApp {
                         tracing::error!("{msg}");
                         self.console_modal.set_crash_message(msg, lang);
                         self.is_launching = false;
+                        if self.config.crash_reports {
+                            Self::archive_crash(&self.paths, &message);
+                        }
                         if let Some(start) = self.session_start_time.take() {
                             let elapsed_mins = (start.elapsed().as_secs() / 60).max(1);
                             if let Some(inst_id) = self.launched_instance_id {
-                                if let Some(inst) =
-                                    self.instances.iter_mut().find(|i| i.id == inst_id)
-                                {
-                                    inst.total_played_minutes += elapsed_mins;
-                                    inst.last_played = Some(chrono::Utc::now());
-                                    let _ = Instance::save_all(
-                                        &self.paths.instances_file(),
-                                        &self.instances,
-                                    );
-                                }
+                                Self::add_playtime(
+                                    &self.paths,
+                                    &mut self.instances,
+                                    inst_id,
+                                    elapsed_mins,
+                                );
                             }
                         }
                     }
@@ -1330,6 +2252,9 @@ impl App for LauncherApp {
                 if tb_resp.console_clicked {
                     self.console_modal.is_open = !self.console_modal.is_open;
                 }
+                if tb_resp.gallery_clicked {
+                    self.screens_modal.open = !self.screens_modal.open;
+                }
             });
 
         // 2. Bottom control bar
@@ -1421,6 +2346,57 @@ impl App for LauncherApp {
                         .max_rect(inner_rect)
                         .layout(egui::Layout::top_down(egui::Align::Min)),
                 );
+
+                // Pre-launch identity picker (CONCEPT "Аккаунты").
+                if self.pending_identity_pick {
+                    let accounts = self.account_mgr.accounts().to_vec();
+                    let lang = self.config.ui.language();
+                    match self.identity_picker.show(
+                        &mut content_ui,
+                        &accounts,
+                        &mut self.picker_nickname,
+                        lang,
+                    ) {
+                        PickerAction::None => {}
+                        PickerAction::Cancelled => {
+                            self.pending_identity_pick = false;
+                        }
+                        PickerAction::Picked {
+                            account_id,
+                            remember,
+                        } => {
+                            let _ = self.account_mgr.set_active(account_id);
+                            if remember {
+                                self.config.remembered_identity = Some(account_id.to_string());
+                                let _ = self.config.save_to_path(&self.paths.config_file());
+                            }
+                            self.pending_identity_pick = false;
+                            self.handle_launch();
+                        }
+                        PickerAction::Offline { nickname, remember } => {
+                            match amc_auth::login_offline(&nickname) {
+                                Ok(acc) => {
+                                    let id = acc.id;
+                                    if self.store_account(acc) {
+                                        let _ = self.account_mgr.set_active(id);
+                                        if remember {
+                                            self.config.remembered_identity = Some(id.to_string());
+                                            let _ =
+                                                self.config.save_to_path(&self.paths.config_file());
+                                        }
+                                        self.pending_identity_pick = false;
+                                        self.handle_launch();
+                                    }
+                                }
+                                Err(e) => {
+                                    self.login_modal.error_msg = Some(e.to_string());
+                                    self.login_modal.is_open = true;
+                                    self.pending_identity_pick = false;
+                                }
+                            }
+                        }
+                    }
+                }
 
                 match self.current_tab {
                     NavTab::Home => {
@@ -1548,10 +2524,13 @@ impl App for LauncherApp {
                         let mut search_req = None;
                         let mut mod_to_install = None;
 
+                        let mut update_install = None;
                         self.mods_page.show(
                             &mut content_ui,
                             &mods_dir,
                             lang,
+                            &mut self.config.wishlist,
+                            &mut update_install,
                             |query, provider, category| {
                                 search_req = Some((query, provider, category));
                             },
@@ -1560,23 +2539,52 @@ impl App for LauncherApp {
                             },
                         );
 
+                        if let Some((item, old_filename)) = update_install {
+                            self.install_mod(item, Some(old_filename));
+                        }
+                        // Persist wishlist hearts.
+                        if self.config.wishlist != self.wishlist_snapshot {
+                            self.wishlist_snapshot = self.config.wishlist.clone();
+                            let _ = self.config.save_to_path(&self.paths.config_file());
+                        }
+
                         if let Some((q, prov, cat)) = search_req {
                             self.search_mods(q, prov, cat);
                         }
                         if let Some(item) = mod_to_install {
-                            self.install_mod(item);
+                            self.install_mod(item, None);
                         }
                     }
                     NavTab::Skins => {
                         let acc = self.account_mgr.active_account();
                         self.skins_page.show(&mut content_ui, acc, lang);
                     }
+                    NavTab::Profile => {
+                        let acc = self.account_mgr.active_account();
+                        let slim = self.skins_page.is_slim_model;
+                        let skin = self.skins_page.skin_image.as_ref();
+                        match self
+                            .profile_page
+                            .show(&mut content_ui, acc, skin, slim, lang)
+                        {
+                            ProfileAction::None => {}
+                            ProfileAction::OpenSkins => {
+                                self.current_tab = NavTab::Skins;
+                            }
+                            ProfileAction::OpenLogin => {
+                                self.login_modal.is_open = true;
+                            }
+                        }
+                    }
                     NavTab::Settings => {
+                        let server_running = self.server_child.is_some();
                         self.settings_page.show(
                             &mut content_ui,
                             &mut self.config,
                             &mut self.account_mgr,
                             &self.paths,
+                            server_running,
+                            &self.server_status,
                         );
                         // Auto-save configuration changes
                         let _ = self.config.save_to_path(&self.paths.config_file());
@@ -1607,5 +2615,9 @@ impl App for LauncherApp {
 
         // Game Console Modal
         self.console_modal.show(ctx, lang);
+
+        // Screenshot gallery (CONCEPT "Скриншоты", P10).
+        let instances_dir = self.paths.instances_dir();
+        self.screens_modal.show(ctx, &instances_dir, lang);
     }
 }

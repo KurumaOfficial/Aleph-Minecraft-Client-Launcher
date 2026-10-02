@@ -89,6 +89,7 @@ amc-ui = { workspace = true }
 image = { workspace = true }
 
 tokio = { workspace = true }
+reqwest = { workspace = true }
 eframe = { workspace = true }
 egui = { workspace = true }
 tracing = { workspace = true }

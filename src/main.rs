@@ -18,10 +18,42 @@ fn app_icon() -> Option<egui::IconData> {
     })
 }
 
+/// Storage root resolution order (CONCEPT "Хранение на диске" + portable):
+/// `portable.txt` next to the exe wins, then `AMC_ROOT`, then the saved
+/// `root_override` from settings, then the OS default.
+fn resolve_paths() -> LauncherPaths {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            if dir.join("portable.txt").is_file() {
+                if let Ok(paths) = LauncherPaths::custom(dir.to_path_buf()) {
+                    tracing::info!("Portable mode: storage at {}", dir.display());
+                    return paths;
+                }
+            }
+        }
+    }
+    if let Ok(root) = std::env::var("AMC_ROOT") {
+        if let Ok(paths) = LauncherPaths::custom(root) {
+            return paths;
+        }
+    }
+    if let Ok(default) = LauncherPaths::default_paths() {
+        if let Ok(cfg) = amc_core::LauncherConfig::load_from_path(&default.config_file()) {
+            if let Some(root) = cfg.root_override {
+                if let Ok(paths) = LauncherPaths::custom(root) {
+                    return paths;
+                }
+            }
+        }
+        return default;
+    }
+    LauncherPaths::custom("./AlephLauncher").expect("unwritable fallback root")
+}
+
 #[tokio::main]
 async fn main() -> Result<(), eframe::Error> {
-    let paths = LauncherPaths::default_paths().ok();
-    let logs_dir = paths.as_ref().map(|p| p.logs_dir());
+    let paths = resolve_paths();
+    let logs_dir = Some(paths.logs_dir());
 
     // Initialize structured logging to stdout and logs/launcher.log
     init_logging(logs_dir.as_deref());
@@ -49,10 +81,12 @@ async fn main() -> Result<(), eframe::Error> {
     eframe::run_native(
         "Aleph Launcher",
         options,
-        Box::new(|cc| {
+        Box::new(move |cc| {
             setup_fonts(&cc.egui_ctx);
-            let mut app = LauncherApp::new(cc);
+            let mut app = LauncherApp::new(cc, paths);
             app.load_initial_manifest();
+            // CONCEPT: launcher update check runs only at startup.
+            app.check_launcher_update();
             Ok(Box::new(app))
         }),
     )

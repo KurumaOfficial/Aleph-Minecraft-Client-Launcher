@@ -6,6 +6,7 @@ use egui::{vec2, Color32, Pos2, Rect, Response, Rounding, Sense, Stroke, Ui, Vie
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TitleBarResponse {
     pub console_clicked: bool,
+    pub gallery_clicked: bool,
 }
 
 pub struct TitleBar;
@@ -23,9 +24,9 @@ impl TitleBar {
             Stroke::new(1.0, BORDER_SUBTLE),
         );
 
-        // 4 buttons on right: Console, Minimize, Maximize, Close
+        // 5 buttons on right: Gallery, Console, Minimize, Maximize, Close
         let button_w = 36.0;
-        let controls_width = button_w * 4.0;
+        let controls_width = button_w * 5.0;
         let drag_rect = Rect::from_min_size(
             bar_rect.min,
             vec2((bar_rect.width() - controls_width).max(0.0), height),
@@ -54,9 +55,20 @@ impl TitleBar {
         // Window controls on the right
         let controls_start_x = bar_rect.right() - controls_width;
 
+        // Gallery Button (screenshots from every instance)
+        let gal_rect = Rect::from_min_size(
+            Pos2::new(controls_start_x, bar_rect.top()),
+            vec2(button_w, height),
+        );
+        let gal_resp = Self::draw_control_button(ui, gal_rect, "🖼", false);
+        if gal_resp.clicked() {
+            response.gallery_clicked = true;
+        }
+        gal_resp.on_hover_text(lang.screens_title());
+
         // Console Button
         let con_rect = Rect::from_min_size(
-            Pos2::new(controls_start_x, bar_rect.top()),
+            Pos2::new(controls_start_x + button_w, bar_rect.top()),
             vec2(button_w, height),
         );
         let con_resp = Self::draw_control_button(ui, con_rect, "📟", false);
@@ -67,7 +79,7 @@ impl TitleBar {
 
         // Minimize Button
         let min_rect = Rect::from_min_size(
-            Pos2::new(controls_start_x + button_w, bar_rect.top()),
+            Pos2::new(controls_start_x + button_w * 2.0, bar_rect.top()),
             vec2(button_w, height),
         );
         if Self::draw_control_button(ui, min_rect, "—", false).clicked() {
@@ -78,7 +90,7 @@ impl TitleBar {
         let is_maximized = ui.input(|i| i.viewport().maximized.unwrap_or(false));
         let max_symbol = if is_maximized { "❐" } else { "□" };
         let max_rect = Rect::from_min_size(
-            Pos2::new(controls_start_x + button_w * 2.0, bar_rect.top()),
+            Pos2::new(controls_start_x + button_w * 3.0, bar_rect.top()),
             vec2(button_w, height),
         );
         if Self::draw_control_button(ui, max_rect, max_symbol, false).clicked() {
@@ -88,7 +100,7 @@ impl TitleBar {
 
         // Close Button
         let close_rect = Rect::from_min_size(
-            Pos2::new(controls_start_x + button_w * 3.0, bar_rect.top()),
+            Pos2::new(controls_start_x + button_w * 4.0, bar_rect.top()),
             vec2(button_w, height),
         );
         if Self::draw_control_button(ui, close_rect, "✕", true).clicked() {

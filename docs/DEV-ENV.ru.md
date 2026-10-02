@@ -2,6 +2,13 @@
 
 > English version: [DEV-ENV.md](DEV-ENV.md).
 > Дата: 2026-09-14. Машина: Windows, пользователь без прав администратора.
+>
+> **Update 2026-10-02:** `stable` (rustc 1.98) снова запускается — Smart App Control
+> больше не блокирует тулчейн. Полная локальная проверка работает:
+> `cargo fmt --all`, затем `cargo check --workspace --locked`, затем
+> `cargo test --workspace --locked`, затем
+> `cargo clippy --workspace --all-targets --locked`. Разделы ниже про «лотерею» SAC
+> описывают состояние на 2026-09-14 и оставлены для истории.
 
 ## Главное правило
 

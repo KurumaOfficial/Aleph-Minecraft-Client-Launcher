@@ -5,7 +5,7 @@ use crate::theme::{
 use amc_core::Language;
 use amc_mods::types::{LocalMod, ModCategory, ModSearchResult, ModSource};
 use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -13,6 +13,19 @@ pub enum ModsSubTab {
     #[default]
     Local,
     Search,
+}
+
+/// One-click update offer for an installed mod (CONCEPT P4).
+#[derive(Debug, Clone)]
+pub struct UpdateOffer {
+    pub slug: String,
+    pub title: String,
+    pub version: String,
+    pub url: String,
+    pub filename: String,
+    pub sha1: Option<String>,
+    pub size: Option<u64>,
+    pub old_filename: String,
 }
 
 pub struct ModsPage {
@@ -26,6 +39,11 @@ pub struct ModsPage {
     pub installing_ids: HashSet<String>,
     pub installed_titles: HashSet<String>,
     pub status_message: Option<(String, bool)>,
+    pub selected_local: HashSet<String>,
+    pub update_check_requested: bool,
+    pub update_checking: bool,
+    pub update_offers: HashMap<String, UpdateOffer>,
+    pub pending_update_old: Option<String>,
 }
 
 impl Default for ModsPage {
@@ -41,6 +59,11 @@ impl Default for ModsPage {
             installing_ids: HashSet::new(),
             installed_titles: HashSet::new(),
             status_message: None,
+            selected_local: HashSet::new(),
+            update_check_requested: false,
+            update_checking: false,
+            update_offers: HashMap::new(),
+            pending_update_old: None,
         }
     }
 }
@@ -51,6 +74,8 @@ impl ModsPage {
         ui: &mut Ui,
         mods_dir: &Path,
         lang: Language,
+        wishlist: &mut Vec<String>,
+        update_install: &mut Option<(ModSearchResult, String)>,
         on_search: impl FnOnce(String, ModSource, ModCategory),
         on_install: impl FnOnce(ModSearchResult),
     ) {
@@ -175,12 +200,17 @@ impl ModsPage {
         ui.add_space(14.0);
 
         match self.sub_tab {
-            ModsSubTab::Local => self.show_local_mods(ui, lang),
-            ModsSubTab::Search => self.show_search(ui, lang, on_search, on_install),
+            ModsSubTab::Local => self.show_local_mods(ui, lang, update_install),
+            ModsSubTab::Search => self.show_search(ui, lang, wishlist, on_search, on_install),
         }
     }
 
-    fn show_local_mods(&mut self, ui: &mut Ui, lang: Language) {
+    fn show_local_mods(
+        &mut self,
+        ui: &mut Ui,
+        lang: Language,
+        update_install: &mut Option<(ModSearchResult, String)>,
+    ) {
         if self.local_mods.is_empty() {
             ui.add_space(50.0);
             ui.vertical_centered(|ui| {
@@ -197,6 +227,77 @@ impl ModsPage {
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 ui.spacing_mut().item_spacing = vec2(0.0, 8.0);
+
+                // Batch operations bar.
+                ui.horizontal(|ui| {
+                    let all_selected = !self.local_mods.is_empty()
+                        && self.selected_local.len() == self.local_mods.len();
+                    if ui
+                        .button(if all_selected {
+                            "☐"
+                        } else {
+                            lang.batch_select_all()
+                        })
+                        .clicked()
+                    {
+                        if all_selected {
+                            self.selected_local.clear();
+                        } else {
+                            self.selected_local = self
+                                .local_mods
+                                .iter()
+                                .map(|m| m.path.to_string_lossy().to_string())
+                                .collect();
+                        }
+                    }
+                    if ui.button(lang.batch_enable()).clicked() {
+                        for m in self.local_mods.iter_mut() {
+                            let key = m.path.to_string_lossy().to_string();
+                            if self.selected_local.contains(&key) && !m.enabled {
+                                if let Ok(new_path) = amc_mods::LocalModManager::toggle_mod(&m.path)
+                                {
+                                    m.path = new_path;
+                                    m.enabled = true;
+                                }
+                            }
+                        }
+                    }
+                    if ui.button(lang.batch_disable()).clicked() {
+                        for m in self.local_mods.iter_mut() {
+                            let key = m.path.to_string_lossy().to_string();
+                            if self.selected_local.contains(&key) && m.enabled {
+                                if let Ok(new_path) = amc_mods::LocalModManager::toggle_mod(&m.path)
+                                {
+                                    m.path = new_path;
+                                    m.enabled = false;
+                                }
+                            }
+                        }
+                    }
+                    if ui.button(lang.batch_delete()).clicked() {
+                        let doomed: Vec<String> = self.selected_local.iter().cloned().collect();
+                        for key in &doomed {
+                            if let Some(m) = self
+                                .local_mods
+                                .iter()
+                                .find(|m| m.path.to_string_lossy() == *key)
+                            {
+                                let _ = amc_mods::LocalModManager::delete_mod(&m.path);
+                            }
+                        }
+                        self.local_mods
+                            .retain(|m| !doomed.contains(&m.path.to_string_lossy().to_string()));
+                        self.selected_local.clear();
+                    }
+                    ui.add_space(16.0);
+                    if self.update_checking {
+                        ui.spinner();
+                    } else if ui.button(lang.mods_check_updates()).clicked() {
+                        self.update_check_requested = true;
+                    }
+                });
+
+                ui.add_space(8.0);
 
                 let mut to_toggle = None;
                 let mut to_delete = None;
@@ -218,6 +319,17 @@ impl ModsPage {
                             .layout(egui::Layout::left_to_right(egui::Align::Center)),
                     );
                     child.add_space(14.0);
+
+                    // Batch selection checkbox.
+                    let row_key = m.path.to_string_lossy().to_string();
+                    let mut row_sel = self.selected_local.contains(&row_key);
+                    child.checkbox(&mut row_sel, "");
+                    if row_sel {
+                        self.selected_local.insert(row_key);
+                    } else {
+                        self.selected_local
+                            .remove(&m.path.to_string_lossy().to_string());
+                    }
 
                     // Mod Icon
                     child.label(egui::RichText::new("🧩").font(egui::FontId::proportional(20.0)));
@@ -283,6 +395,31 @@ impl ModsPage {
                     {
                         to_delete = Some(idx);
                     }
+
+                    // One-click update when the checker found a newer build.
+                    if let Some(offer) = self.update_offers.get(&m.name).cloned() {
+                        child.add_space(8.0);
+                        if child
+                            .button(
+                                egui::RichText::new(lang.mods_update_available()).color(RUBY_LIGHT),
+                            )
+                            .clicked()
+                        {
+                            *update_install = Some((
+                                ModSearchResult {
+                                    source: ModSource::Modrinth,
+                                    id: offer.slug.clone(),
+                                    title: offer.title.clone(),
+                                    author: String::new(),
+                                    downloads: 0,
+                                    description: String::new(),
+                                    icon_url: None,
+                                    category: ModCategory::Mod,
+                                },
+                                offer.old_filename.clone(),
+                            ));
+                        }
+                    }
                 }
 
                 if let Some(idx) = to_toggle {
@@ -305,6 +442,7 @@ impl ModsPage {
         &mut self,
         ui: &mut Ui,
         lang: Language,
+        wishlist: &mut Vec<String>,
         on_search: impl FnOnce(String, ModSource, ModCategory),
         on_install: impl FnOnce(ModSearchResult),
     ) {
@@ -367,6 +505,7 @@ impl ModsPage {
 
             ui.add_space(8.0);
 
+            let mut on_search = Some(on_search);
             if ui
                 .button(
                     egui::RichText::new(lang.mods_btn_search())
@@ -376,11 +515,26 @@ impl ModsPage {
                 .clicked()
                 || enter_pressed
             {
-                on_search(
-                    self.search_query.clone(),
-                    self.search_provider,
-                    self.search_category,
-                );
+                if let Some(f) = on_search.take() {
+                    f(
+                        self.search_query.clone(),
+                        self.search_provider,
+                        self.search_category,
+                    );
+                }
+            }
+
+            if self.search_provider == ModSource::Modrinth {
+                ui.add_space(8.0);
+                if ui
+                    .button(egui::RichText::new(format!("🔥 {}", lang.discover_title())))
+                    .clicked()
+                {
+                    self.search_query.clear();
+                    if let Some(f) = on_search.take() {
+                        f(String::new(), self.search_provider, self.search_category);
+                    }
+                }
             }
         });
 
@@ -497,6 +651,11 @@ impl ModsPage {
                                     .font(egui::FontId::proportional(10.0))
                                     .color(RUBY_LIGHT),
                             );
+                            ui.label(
+                                egui::RichText::new(format!("⬇ {}", item.downloads))
+                                    .font(egui::FontId::proportional(10.0))
+                                    .color(TEXT_MUTED),
+                            );
                         });
 
                         ui.add(
@@ -511,6 +670,33 @@ impl ModsPage {
 
                     // Install button or Installed status
                     let is_downloading = self.installing_ids.contains(&item.id);
+                    let wish_key = match item.source {
+                        ModSource::Modrinth => Some(format!("modrinth:{}", item.id)),
+                        ModSource::CurseForge => Some(format!("curseforge:{}", item.id)),
+                        ModSource::Local => None,
+                    };
+                    if let Some(key) = wish_key {
+                        let wished = wishlist.contains(&key);
+                        if child
+                            .button(
+                                egui::RichText::new(if wished { "♥" } else { "♡" })
+                                    .color(if wished { RUBY_LIGHT } else { TEXT_MUTED }),
+                            )
+                            .on_hover_text(if wished {
+                                lang.wishlist_remove()
+                            } else {
+                                lang.wishlist_add()
+                            })
+                            .clicked()
+                        {
+                            if wished {
+                                wishlist.retain(|k| k != &key);
+                            } else {
+                                wishlist.push(key);
+                            }
+                        }
+                        child.add_space(6.0);
+                    }
                     let is_installed = self.installed_titles.contains(&item.title.to_lowercase())
                         || self.local_mods.iter().any(|lm| {
                             let lm_lower = lm.name.to_lowercase();

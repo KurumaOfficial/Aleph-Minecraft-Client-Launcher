@@ -46,6 +46,8 @@ impl LauncherPaths {
             self.runtimes_dir(),
             self.cache_dir(),
             self.logs_dir(),
+            self.backups_dir(),
+            self.trash_dir(),
         ];
 
         for dir in dirs {
@@ -89,6 +91,14 @@ impl LauncherPaths {
 
     pub fn cache_dir(&self) -> PathBuf {
         self.root_dir.join("cache")
+    }
+
+    pub fn backups_dir(&self) -> PathBuf {
+        self.root_dir.join("backups")
+    }
+
+    pub fn trash_dir(&self) -> PathBuf {
+        self.root_dir.join("trash")
     }
 
     pub fn logs_dir(&self) -> PathBuf {

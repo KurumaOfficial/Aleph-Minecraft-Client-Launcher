@@ -111,6 +111,7 @@ dependencies = [
  "eframe",
  "egui",
  "image",
+ "reqwest",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -166,9 +167,12 @@ dependencies = [
  "parking_lot",
  "reqwest",
  "rfd",
+ "serde",
+ "serde_json",
  "tokio",
  "tracing",
  "uuid",
+ "zip",
 ]
 
 [[package]]

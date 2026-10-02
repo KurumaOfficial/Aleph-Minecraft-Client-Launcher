@@ -25,3 +25,6 @@ tracing = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 rfd = { workspace = true }
+zip = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }

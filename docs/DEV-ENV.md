@@ -2,6 +2,12 @@
 
 > Russian version: [DEV-ENV.ru.md](DEV-ENV.ru.md).
 > Date: 2026-09-14. Machine: Windows, user without administrator rights.
+>
+> **Update 2026-10-02:** `stable` (rustc 1.98) runs again — Smart App Control no
+> longer blocks the toolchain. The full local loop works: `cargo fmt --all`, then
+> `cargo check --workspace --locked`, then `cargo test --workspace --locked`, then
+> `cargo clippy --workspace --all-targets --locked`. The SAC "lottery" sections below
+> describe the state on 2026-09-14 and are kept for history.
 
 ## The main rule
 

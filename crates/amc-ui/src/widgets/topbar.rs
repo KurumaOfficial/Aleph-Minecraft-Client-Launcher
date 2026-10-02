@@ -15,12 +15,13 @@ pub struct TopBarResponse {
 }
 
 /// Tabs in Full-style top navigation order.
-pub fn pro_tabs() -> [NavTab; 5] {
+pub fn pro_tabs() -> [NavTab; 6] {
     [
         NavTab::Home,
         NavTab::Modpacks,
         NavTab::Mods,
         NavTab::Skins,
+        NavTab::Profile,
         NavTab::Settings,
     ]
 }
@@ -31,6 +32,7 @@ fn tab_label(tab: NavTab, lang: Language) -> &'static str {
         NavTab::Modpacks => lang.nav_instances(),
         NavTab::Mods => lang.nav_mods(),
         NavTab::Skins => lang.nav_skins(),
+        NavTab::Profile => lang.nav_profile(),
         NavTab::Settings => lang.nav_settings(),
     }
 }
@@ -188,12 +190,13 @@ mod tests {
     #[test]
     fn test_pro_tabs_cover_all_nav() {
         let tabs = pro_tabs();
-        assert_eq!(tabs.len(), 5);
+        assert_eq!(tabs.len(), 6);
         for expected in [
             NavTab::Home,
             NavTab::Modpacks,
             NavTab::Mods,
             NavTab::Skins,
+            NavTab::Profile,
             NavTab::Settings,
         ] {
             assert!(tabs.contains(&expected));

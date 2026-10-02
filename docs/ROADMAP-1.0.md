@@ -133,7 +133,7 @@ with zero telemetry (network only: Mojang, Adoptium, Modrinth, CurseForge).
 | In-launcher console/logs | ✅ Done | `console.rs` + `launch.rs` |
 | Disk usage per instance/folder | ✅ Done | Card + pre-download free-space check ✅ |
 | Hybrid Java: auto + manual + system/other-launcher discovery | 🟡 Partial | Auto+manual ✅; system discovery — P5 |
-| Server browser | 🚫 Out | Not built; favorites + inject — P8 |
+| Server browser | 🚫 Out | Not built; favorites + inject — P8 (`servers.dat` inject at launch ✅, favorites UI — no) |
 | Windows + Linux | 🟡 Partial | Primary Win, Linux X11/Wayland via `eframe`; Win7/GT710 — verify in P11 |
 | Resource packs/shaders from launcher | 🟡 Partial | Folder routing ✅; search UI — P10 |
 | Launcher self-update | ⬜ Todo | P11 |
@@ -152,14 +152,14 @@ with zero telemetry (network only: Mojang, Adoptium, Modrinth, CurseForge).
 | Steam co-op for all account types, no chat | ⬜ Todo | P13 |
 | Cloud | 🚫 Out | — |
 | News feed | ❓ Open | Undecided; plan default: not in 1.0 without a "yes" |
-| Screenshot gallery | ⬜ Todo | P10 (`screenshots/` already created) |
+| Screenshot gallery | 🟡 Partial | `ScreensModal` gallery + 🖼 titlebar button ✅; delete/share — no (P10) |
 | Multi-MS ✅, single WetID | 🟡 Partial | Second-WetID ban — P6 |
 | Anonymous auto crash reports + conflicts only in logs | ⬜/✅ | Non-interference ✅; auto reports — P12 (opt-out) |
 | World backup (manual + scheduled) | ⬜ Todo | P9 |
 | Guard/anticheat | 🚫 Out | 2.0 |
 | Skins: free selection/upload, NameMC validation + auto command, launcher fallback | 🟡 Partial | Upload+2D ✅; rest — P7 |
 | Account combo logic + per-launch picker + "remember" | ⬜ Todo | P6 |
-| Profile (nickname/skin/cape) | ⬜ Todo | P7 |
+| Profile (nickname/skin/cape) | 🟡 Partial | Summary tab + navigation (`NavTab::Profile`) ✅; NameMC auto-command/cape — no (P7) |
 | After launch: minimize/keep; parallel launches incl. same instance ×N | 🟡 Partial | `close_after_launch` bool ✅; 3 states + parallel — P2 |
 
 ### Folded back from the working copy (returned to the concept on 2026-09-30)
@@ -185,18 +185,18 @@ with zero telemetry (network only: Mojang, Adoptium, Modrinth, CurseForge).
 | OS autostart | ⬜ Todo | P11 |
 | .NET/VC++ check in the installer | ⬜ Todo | P11 |
 | Resource pack previews + resolution filter | ⬜ Todo | P10 |
-| Launcher updates: at startup only, changelog, signature, portable settings, Linux formats, trusted mode | ⬜ Todo | P11 |
+| Launcher updates: at startup only, changelog, signature, portable settings, Linux formats, trusted mode | 🟡 Partial | Startup check + button + toast/changelog ✅; signature/rollback/trusted mode — no (P11) |
 | Process priority + FPS overlay | ⬜ Todo | P2/P11 |
 | Pack rollback + autobackup + changelog; version pinning | ⬜ Todo | P4 |
 | Settings export/import via file | ⬜ Todo | P10 |
-| Crash reports opt-out (concept requires opt-out, not opt-in) | ⬜ Todo | P12 |
+| Crash reports opt-out (concept requires opt-out, not opt-in) | 🟡 Partial | Local archive + 1-click diag-`.zip` export ✅; auto-send — no, needs an endpoint (P12) |
 | Verify/repair files + health score | ⬜ Todo | P2 |
 | Deletion trash; uninstall data question; instance backup to disk | ⬜ Todo | P2/P9/P11 |
 | Scheduled world backups + folder choice | ⬜ Todo | P9 |
 | WetID 2FA; per-launch identity picker + "remember"; default account per instance | ⬜ Todo | P6 |
 | Post-exit session summary | ✅ Done | Modal on clean exit ✅ |
 | Hotkeys + gamepad; per-type notifications | ⬜ Todo | P10 |
-| Local server button (tunneling — ❓ open) | ⬜ Todo | P13 |
+| Local server button (tunneling — ❓ open) | 🟡 Partial | Start/stop + EULA checkbox + server.jar/Java resolving ✅; tunneling — ❓ open (P13) |
 
 ## 4. Work phases
 
