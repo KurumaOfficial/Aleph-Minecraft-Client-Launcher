@@ -230,9 +230,20 @@ impl WizardFlow {
 }
 
 /// One-time weak-hardware notice shown right after the wizard.
-/// Returns true once the user dismisses it.
-pub fn show_hardware_notice(ctx: &egui::Context, lang: Language, report: &HardwareReport) -> bool {
-    let mut dismissed = false;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HwNoticeAction {
+    /// Still on screen (user clicked neither button).
+    None,
+    Dismissed,
+    InstallSodium,
+}
+
+pub fn show_hardware_notice(
+    ctx: &egui::Context,
+    lang: Language,
+    report: &HardwareReport,
+) -> HwNoticeAction {
+    let mut action = HwNoticeAction::None;
     let ram_text = report
         .total_ram_mb
         .map(|mb| format!("{} GB", mb / 1024))
@@ -268,12 +279,15 @@ pub fn show_hardware_notice(ctx: &egui::Context, lang: Language, report: &Hardwa
             ui.horizontal(|ui| {
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.button(lang.wizard_hw_ok()).clicked() {
-                        dismissed = true;
+                        action = HwNoticeAction::Dismissed;
+                    }
+                    if ui.button(lang.wizard_hw_sodium()).clicked() {
+                        action = HwNoticeAction::InstallSodium;
                     }
                 });
             });
         });
-    dismissed
+    action
 }
 
 #[cfg(test)]

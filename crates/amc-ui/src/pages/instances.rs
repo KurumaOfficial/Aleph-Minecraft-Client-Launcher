@@ -1,3 +1,4 @@
+use crate::pages::instance_manage::InstanceManage;
 use crate::theme::{
     lerp_color, BG_CARD, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_DIM, RUBY_LIGHT, TEXT_HEADING,
     TEXT_MUTED, TEXT_PRIMARY, WARNING,
@@ -17,10 +18,23 @@ pub enum InstanceAction {
     None,
     Created(Instance),
     Updated(Instance),
-    Deleted(Uuid),
+    /// Soft-delete: the app moves the game dir to trash.
+    Trashed(Uuid),
+    Restored(Uuid),
+    TrashPurged(Uuid),
+    TrashEmptied,
     Selected(Uuid),
     Cloned(Uuid),
     Launch(Uuid),
+}
+
+/// Ambient data for the instances page, bundled so `show` stays under
+/// the argument-count lint.
+pub struct InstancesContext<'a> {
+    pub instances_dir: &'a Path,
+    pub trash_dir: &'a Path,
+    pub backups_root: &'a Path,
+    pub accounts: &'a [Account],
 }
 
 pub struct InstancesPage {
@@ -57,6 +71,9 @@ pub struct InstancesPage {
     pub sort_mode: InstanceSort,
     icon_textures: HashMap<Uuid, egui::TextureHandle>,
     icon_failed: std::collections::HashSet<Uuid>,
+
+    // Per-instance management (worlds / configs / health modal).
+    manage: InstanceManage,
 }
 
 impl Default for InstancesPage {
@@ -91,6 +108,7 @@ impl Default for InstancesPage {
             sort_mode: InstanceSort::default(),
             icon_textures: HashMap::new(),
             icon_failed: std::collections::HashSet::new(),
+            manage: InstanceManage::default(),
         }
     }
 }
@@ -318,11 +336,12 @@ impl InstancesPage {
         ui: &mut Ui,
         instances: &mut Vec<Instance>,
         selected_instance: &mut Option<Uuid>,
-        instances_dir: &Path,
-        accounts: &[Account],
+        ctx: &InstancesContext,
         lang: Language,
     ) -> InstanceAction {
         let mut action = InstanceAction::None;
+        let instances_dir = ctx.instances_dir;
+        let accounts = ctx.accounts;
         self.poll_disk_sizes(instances, instances_dir);
         ui.add_space(20.0);
 
@@ -700,11 +719,18 @@ impl InstancesPage {
                     *action = InstanceAction::Cloned(inst_id);
                 }
                 if ui
+                    .button(egui::RichText::new("🛠").color(TEXT_PRIMARY))
+                    .on_hover_text(lang.editor_title())
+                    .clicked()
+                {
+                    page.manage.open_for(inst_id);
+                }
+                if ui
                     .button(egui::RichText::new("🗑").color(TEXT_MUTED))
                     .on_hover_text(lang.inst_btn_delete())
                     .clicked()
                 {
-                    *action = InstanceAction::Deleted(inst_id);
+                    *action = InstanceAction::Trashed(inst_id);
                 }
             });
 
@@ -739,6 +765,56 @@ impl InstancesPage {
                 *selected_instance = Some(inst_id);
                 *action = InstanceAction::Selected(inst_id);
             }
+        }
+
+        // Trash (CONCEPT "Корзина", P2): soft-deleted instances wait here
+        // for restore or permanent deletion.
+        let trashed = amc_core::list_trash(ctx.trash_dir);
+        ui.add_space(16.0);
+        ui.horizontal(|ui| {
+            ui.label(
+                egui::RichText::new(lang.trash_title())
+                    .font(egui::FontId::proportional(18.0))
+                    .strong()
+                    .color(TEXT_HEADING),
+            );
+            if !trashed.is_empty() {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button(lang.trash_empty_all()).clicked() {
+                        action = InstanceAction::TrashEmptied;
+                    }
+                });
+            }
+        });
+        ui.add_space(6.0);
+        if trashed.is_empty() {
+            ui.label(
+                egui::RichText::new(lang.trash_empty())
+                    .font(egui::FontId::proportional(12.0))
+                    .color(TEXT_MUTED),
+            );
+        }
+        for entry in &trashed {
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new(format!(
+                        "{} • {} {}",
+                        truncate_name(&entry.instance.name, 28),
+                        entry.instance.game_version,
+                        entry.instance.loader.as_str(),
+                    ))
+                    .font(egui::FontId::proportional(12.0))
+                    .color(TEXT_PRIMARY),
+                );
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button(lang.trash_delete_forever()).clicked() {
+                        action = InstanceAction::TrashPurged(entry.instance.id);
+                    }
+                    if ui.button(lang.trash_restore()).clicked() {
+                        action = InstanceAction::Restored(entry.instance.id);
+                    }
+                });
+            });
         }
 
         // Create Instance Modal Dialog
@@ -1137,6 +1213,16 @@ impl InstancesPage {
                 self.show_edit_modal = false;
             }
         }
+
+        // Per-instance management modal (worlds / configs / health).
+        let egui_ctx = ui.ctx().clone();
+        self.manage.show(
+            &egui_ctx,
+            instances,
+            ctx.instances_dir,
+            ctx.backups_root,
+            lang,
+        );
 
         action
     }

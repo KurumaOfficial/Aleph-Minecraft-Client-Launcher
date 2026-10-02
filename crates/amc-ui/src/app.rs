@@ -20,12 +20,12 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
 
 use crate::modals::{
-    ConsoleModal, DownloadOverlay, IdentityPicker, LoginModal, LoginMode, OverlayAction,
-    PickerAction, ScreensModal, WizardAction, WizardFlow,
+    ConsoleModal, DownloadOverlay, HwNoticeAction, IdentityPicker, LoginModal, LoginMode,
+    OverlayAction, PickerAction, ScreensModal, WizardAction, WizardFlow,
 };
 use crate::pages::{
-    HomeContext, HomePage, InstanceAction, InstancesPage, ModsPage, ProfileAction, ProfilePage,
-    SettingsPage, SkinsPage,
+    HomeContext, HomePage, InstanceAction, InstancesContext, InstancesPage, ModsPage,
+    ProfileAction, ProfilePage, SettingsPage, SkinsPage,
 };
 use crate::theme::{apply_aleph_theme, BG};
 use crate::widgets::{
@@ -62,6 +62,9 @@ pub struct LauncherApp {
     // First-run wizard (ROADMAP P1) and the one-time hardware notice.
     wizard: Option<WizardFlow>,
     hw_notice: Option<HardwareReport>,
+    /// Legacy `.minecraft` reuse offer (CONCEPT P1).
+    mcreuse_path: Option<PathBuf>,
+    mcreuse_rx: Option<mpsc::Receiver<(u64, u64)>>,
 
     // Dynamic textures
     avatar_texture: Option<egui::TextureHandle>,
@@ -77,7 +80,9 @@ pub struct LauncherApp {
     mod_search_rx: Option<mpsc::Receiver<Vec<ModSearchResult>>>,
     mod_install_rx: Option<mpsc::Receiver<Result<InstallReport, String>>>,
     wishlist_snapshot: Vec<String>,
+    favorites_snapshot: Vec<amc_minecraft::FavoriteServerEntry>,
     mod_update_rx: Option<mpsc::Receiver<Vec<crate::pages::mods::UpdateOffer>>>,
+    fav_ping_rx: Option<mpsc::Receiver<Vec<(String, amc_minecraft::ServerStatus)>>>,
     update_rx: Option<mpsc::Receiver<Option<String>>>,
     toasts: Vec<Toast>,
     pending_identity_pick: bool,
@@ -184,6 +189,8 @@ impl LauncherApp {
             screens_modal: ScreensModal::default(),
             wizard,
             hw_notice: None,
+            mcreuse_path: None,
+            mcreuse_rx: None,
             avatar_texture: None,
             session_start_time: None,
             launched_instance_id: None,
@@ -192,7 +199,9 @@ impl LauncherApp {
             mod_search_rx: None,
             mod_install_rx: None,
             wishlist_snapshot,
+            favorites_snapshot: favorites.clone(),
             mod_update_rx: None,
+            fav_ping_rx: None,
             update_rx: None,
             toasts: Vec::new(),
             pending_identity_pick: false,
@@ -316,6 +325,17 @@ impl LauncherApp {
         let report = HardwareReport::gather(&self.paths.root_dir);
         if report.is_weak() || report.is_low_disk() {
             self.hw_notice = Some(report);
+        }
+        // Offer to reuse another launcher's `.minecraft` instead of
+        // re-downloading shared files (CONCEPT "Первый запуск", P1).
+        if !self.config.mc_reuse_done {
+            let legacy = LauncherPaths::default_minecraft_dir();
+            if legacy.is_dir() && amc_core::looks_like_minecraft(&legacy) {
+                self.mcreuse_path = Some(legacy);
+            } else {
+                self.config.mc_reuse_done = true;
+                let _ = self.config.save_to_path(&self.paths.config_file());
+            }
         }
     }
 
@@ -602,6 +622,10 @@ impl LauncherApp {
                 }
                 let java_bin = if let Some(custom) = java_override {
                     custom
+                } else if let Some(sys) =
+                    amc_downloader::find_system_java(details.required_java_major()).await
+                {
+                    sys
                 } else {
                     AdoptiumInstaller::ensure_java(
                         &paths.runtimes_dir(),
@@ -840,6 +864,52 @@ impl LauncherApp {
         });
     }
 
+    /// One-click Sodium install for weak hardware (CONCEPT P1/P4).
+    /// Reuses the standard install pipeline (compat check, hash verify,
+    /// provenance), replacing any installed Sodium in place.
+    fn install_sodium(&mut self) {
+        let lang = self.config.ui.language();
+        let loader = self
+            .selected_instance
+            .and_then(|id| self.instances.iter().find(|i| i.id == id))
+            .map(|inst| inst.loader);
+        let ok = matches!(loader, Some(LoaderType::Fabric | LoaderType::Quilt));
+        if !ok {
+            let msg = if loader.is_none() {
+                lang.wizard_hw_no_instance().to_string()
+            } else {
+                lang.wizard_hw_bad_loader().to_string()
+            };
+            push_toast(
+                &mut self.toasts,
+                &self.config.notifications,
+                ToastKind::Downloads,
+                msg,
+            );
+            return;
+        }
+        // Replace the installed Sodium file instead of duplicating it.
+        let old = self
+            .mods_page
+            .local_mods
+            .iter()
+            .find(|m| m.name.eq_ignore_ascii_case("sodium"))
+            .and_then(|m| m.path.file_name().map(|n| n.to_string_lossy().to_string()));
+        self.install_mod(
+            ModSearchResult {
+                source: ModSource::Modrinth,
+                id: "sodium".to_string(),
+                title: "Sodium".to_string(),
+                author: "JellySquid".to_string(),
+                downloads: 0,
+                description: String::new(),
+                icon_url: None,
+                category: ModCategory::Mod,
+            },
+            old,
+        );
+    }
+
     fn install_mod(&mut self, mod_item: ModSearchResult, replaced_old: Option<String>) {
         let base_dir = if let Some(id) = self.selected_instance {
             if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
@@ -1030,6 +1100,80 @@ impl LauncherApp {
         });
     }
 
+    /// Root folder for world backups (CONCEPT, P9): the user override
+    /// from settings, or the launcher default `backups/` folder.
+    fn world_backups_root(&self) -> PathBuf {
+        self.config
+            .world_backup_dir
+            .clone()
+            .unwrap_or_else(|| self.paths.backups_dir())
+    }
+
+    /// Copy shared files from a foreign `.minecraft` (versions, assets,
+    /// libraries) so they are not re-downloaded (CONCEPT P1). Only missing
+    /// files are copied, never overwriting. Heavy work runs blocking-style
+    /// off the UI thread; the result lands in `mcreuse_rx`.
+    fn import_legacy_minecraft(&mut self, src: PathBuf) {
+        self.mcreuse_path = None;
+        self.config.mc_reuse_done = true;
+        let _ = self.config.save_to_path(&self.paths.config_file());
+        let (tx, rx) = mpsc::channel(1);
+        self.mcreuse_rx = Some(rx);
+        let paths = self.paths.clone();
+        tokio::spawn(async move {
+            let result = tokio::task::spawn_blocking(move || {
+                let mut files = 0u64;
+                let mut bytes = 0u64;
+                for (sub, dest_root) in [
+                    ("versions", paths.versions_dir()),
+                    ("assets", paths.assets_dir()),
+                    ("libraries", paths.libraries_dir()),
+                ] {
+                    let from = src.join(sub);
+                    if !from.is_dir() {
+                        continue;
+                    }
+                    let mut stack = vec![from.clone()];
+                    while let Some(dir) = stack.pop() {
+                        let Ok(entries) = std::fs::read_dir(&dir) else {
+                            continue;
+                        };
+                        for entry in entries.flatten() {
+                            let path = entry.path();
+                            if path.is_symlink() {
+                                continue;
+                            }
+                            if path.is_dir() {
+                                stack.push(path);
+                                continue;
+                            }
+                            let Ok(rel) = path.strip_prefix(&from) else {
+                                continue;
+                            };
+                            let dest = dest_root.join(rel);
+                            if dest.is_file() {
+                                continue;
+                            }
+                            if let Some(parent) = dest.parent() {
+                                if std::fs::create_dir_all(parent).is_err() {
+                                    continue;
+                                }
+                            }
+                            if std::fs::copy(&path, &dest).is_ok() {
+                                files += 1;
+                                bytes += entry.metadata().map(|m| m.len()).unwrap_or(0);
+                            }
+                        }
+                    }
+                }
+                (files, bytes)
+            })
+            .await
+            .unwrap_or((0, 0));
+            let _ = tx.send(result).await;
+        });
+    }
+
     fn handle_direct_connect(&mut self, server: String, port: u16) {
         self.pending_direct_connect = Some((server, port));
         self.handle_launch();
@@ -1128,6 +1272,13 @@ impl LauncherApp {
         self.launched_instance_id = self.selected_instance;
 
         let paths = self.paths.clone();
+        // P9: scheduled world backups run inside the launch task below.
+        let backup_days = self.config.world_backup_days;
+        let backups_root = self.world_backups_root();
+        let backup_inst_name = self
+            .selected_instance
+            .and_then(|id| self.instances.iter().find(|i| i.id == id))
+            .map(|inst| inst.name.clone());
         let (game_dir, ver_id, ram_override, loader) = if let Some(inst_id) = self.selected_instance
         {
             if let Some(inst) = self.instances.iter().find(|i| i.id == inst_id) {
@@ -1205,6 +1356,40 @@ impl LauncherApp {
 
         tokio::spawn(async move {
             let client = reqwest::Client::new();
+
+            // 0. Scheduled world backups (CONCEPT, P9): due worlds are
+            // copied before anything is downloaded or started.
+            if backup_days > 0 {
+                if let Some(inst_name) = backup_inst_name {
+                    let _ = status_tx
+                        .send(lang.status_backup_worlds().to_string())
+                        .await;
+                    let now = std::time::SystemTime::now();
+                    for world in amc_core::list_saves(&game_dir) {
+                        if amc_core::needs_auto_backup(
+                            &backups_root,
+                            &inst_name,
+                            &world,
+                            backup_days,
+                            now,
+                        ) {
+                            match amc_core::backup_world(
+                                &backups_root,
+                                &inst_name,
+                                &world,
+                                &game_dir.join("saves"),
+                            ) {
+                                Ok(path) => {
+                                    tracing::info!("Auto-backup {} -> {}", world, path.display())
+                                }
+                                Err(e) => {
+                                    tracing::warn!("Auto-backup failed: {e}")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             // 1. Resolve Version Details
             let _ = status_tx
@@ -1515,6 +1700,10 @@ impl LauncherApp {
                         .await
                         .unwrap_or_else(|_| custom_java.clone())
                 }
+            } else if let Some(sys) = amc_downloader::find_system_java(req_java).await {
+                // P5 auto-offer: a matching system Java wins over downloading.
+                tracing::info!("Using system Java {} for Java {req_java}", sys.display());
+                sys
             } else {
                 match AdoptiumInstaller::ensure_java(&paths.runtimes_dir(), req_java, &engine, None)
                     .await
@@ -1746,6 +1935,9 @@ async fn resolve_java_for_install(
         }
     } else {
         let major = vanilla.required_java_major();
+        if let Some(sys) = amc_downloader::find_system_java(major).await {
+            return Ok(sys);
+        }
         AdoptiumInstaller::ensure_java(&paths.runtimes_dir(), major, engine, None)
             .await
             .map_err(|e| format!("Java {major}: {e}"))
@@ -1970,6 +2162,38 @@ impl App for LauncherApp {
                 }
                 Ok(None) => {}
                 Err(e) => tracing::warn!("Local server wait failed: {e}"),
+            }
+        }
+
+        // Server favorites ping pass (P8): status + players without joining.
+        if self.home_page.fav_ping_request {
+            self.home_page.fav_ping_request = false;
+            let targets: Vec<(String, String, u16)> = self
+                .favorites
+                .iter()
+                .filter_map(|f| {
+                    amc_minecraft::parse_server_address(&f.address)
+                        .map(|(host, port)| (f.address.clone(), host, port))
+                })
+                .collect();
+            let (tx, rx) = mpsc::channel(1);
+            self.fav_ping_rx = Some(rx);
+            tokio::spawn(async move {
+                let mut out = Vec::new();
+                for (addr, host, port) in targets {
+                    match amc_minecraft::ServerPinger::ping(&host, port).await {
+                        Ok(status) => out.push((addr, status)),
+                        Err(e) => tracing::warn!("Favorite ping failed: {e}"),
+                    }
+                }
+                let _ = tx.send(out).await;
+            });
+        }
+        if let Some(rx) = &mut self.fav_ping_rx {
+            if let Ok(list) = rx.try_recv() {
+                self.home_page.fav_status = list.into_iter().collect();
+                self.home_page.fav_pinging = false;
+                self.fav_ping_rx = None;
             }
         }
 
@@ -2201,8 +2425,81 @@ impl App for LauncherApp {
 
         // One-time weak-hardware notice right after the wizard.
         if let Some(report) = self.hw_notice.take() {
-            if !crate::modals::wizard::show_hardware_notice(ctx, lang, &report) {
-                self.hw_notice = Some(report);
+            match crate::modals::wizard::show_hardware_notice(ctx, lang, &report) {
+                HwNoticeAction::None => self.hw_notice = Some(report),
+                HwNoticeAction::Dismissed => {}
+                HwNoticeAction::InstallSodium => self.install_sodium(),
+            }
+        }
+
+        // .minecraft reuse offer (CONCEPT "Первый запуск", P1).
+        if let Some(legacy) = self.mcreuse_path.clone() {
+            let mut resolve: Option<bool> = None;
+            egui::Window::new(lang.mcreuse_title())
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
+                .min_width(420.0)
+                .show(ctx, |ui| {
+                    ui.add_space(8.0);
+                    ui.label(egui::RichText::new(
+                        lang.mcreuse_body(&legacy.to_string_lossy()),
+                    ));
+                    ui.add_space(12.0);
+                    ui.horizontal(|ui| {
+                        if ui.button(lang.mcreuse_use()).clicked() {
+                            resolve = Some(true);
+                        }
+                        if ui.button(lang.mcreuse_skip()).clicked() {
+                            resolve = Some(false);
+                        }
+                    });
+                });
+            match resolve {
+                Some(true) => self.import_legacy_minecraft(legacy),
+                Some(false) => {
+                    self.mcreuse_path = None;
+                    self.config.mc_reuse_done = true;
+                    let _ = self.config.save_to_path(&self.paths.config_file());
+                }
+                None => {}
+            }
+        }
+        if let Some(rx) = &mut self.mcreuse_rx {
+            if let Ok((files, bytes)) = rx.try_recv() {
+                push_toast(
+                    &mut self.toasts,
+                    &self.config.notifications,
+                    ToastKind::Downloads,
+                    lang.mcreuse_copied(files, bytes / 1_048_576),
+                );
+                self.mcreuse_rx = None;
+            }
+        }
+
+        // Tutorial banners for newcomers (CONCEPT "Первый запуск", P1):
+        // one dismissible hint per main tab, shown until dismissed.
+        if self.wizard.is_none() && self.mcreuse_path.is_none() && !self.config.tour_seen {
+            let hint = match self.current_tab {
+                NavTab::Home => Some((lang.tour_home_title(), lang.tour_home_body())),
+                NavTab::Modpacks => Some((lang.tour_instances_title(), lang.tour_instances_body())),
+                _ => None,
+            };
+            if let Some((title, body)) = hint {
+                egui::Window::new(title)
+                    .collapsible(false)
+                    .resizable(false)
+                    .anchor(egui::Align2::CENTER_BOTTOM, egui::vec2(0.0, -100.0))
+                    .min_width(420.0)
+                    .show(ctx, |ui| {
+                        ui.add_space(4.0);
+                        ui.label(body);
+                        ui.add_space(8.0);
+                        if ui.button(lang.tour_dismiss()).clicked() {
+                            self.config.tour_seen = true;
+                            let _ = self.config.save_to_path(&self.paths.config_file());
+                        }
+                    });
             }
         }
 
@@ -2410,6 +2707,7 @@ impl App for LauncherApp {
                             &self.versions,
                             &mut self.selected_version,
                             &home_ctx,
+                            &mut self.favorites,
                             lang,
                         );
                         if let Some((server, port)) = self.home_page.direct_connect_request.take() {
@@ -2423,14 +2721,28 @@ impl App for LauncherApp {
                             self.selected_version = Some(id);
                             self.handle_launch();
                         }
+                        // Persist favorite servers.
+                        if self.favorites != self.favorites_snapshot {
+                            self.favorites_snapshot = self.favorites.clone();
+                            if let Err(e) =
+                                amc_minecraft::save_favorites(&self.paths.root_dir, &self.favorites)
+                            {
+                                tracing::warn!("Favorites persist failed: {e}");
+                            }
+                        }
                     }
                     NavTab::Modpacks => {
+                        let instances_ctx = InstancesContext {
+                            instances_dir: &self.paths.instances_dir(),
+                            trash_dir: &self.paths.trash_dir(),
+                            backups_root: &self.world_backups_root(),
+                            accounts: self.account_mgr.accounts(),
+                        };
                         let action = self.instances_page.show(
                             &mut content_ui,
                             &mut self.instances,
                             &mut self.selected_instance,
-                            &self.paths.instances_dir(),
-                            self.account_mgr.accounts(),
+                            &instances_ctx,
                             lang,
                         );
 
@@ -2485,7 +2797,18 @@ impl App for LauncherApp {
                                     }
                                 }
                             }
-                            InstanceAction::Deleted(id) => {
+                            InstanceAction::Trashed(id) => {
+                                if let Some(inst) =
+                                    self.instances.iter().find(|i| i.id == id).cloned()
+                                {
+                                    if let Err(e) = amc_core::trash_instance(
+                                        &self.paths.instances_dir(),
+                                        &self.paths.trash_dir(),
+                                        &inst,
+                                    ) {
+                                        tracing::error!("Move to trash failed: {e}");
+                                    }
+                                }
                                 self.instances.retain(|i| i.id != id);
                                 if self.selected_instance == Some(id) {
                                     self.selected_instance = self.instances.first().map(|i| i.id);
@@ -2494,6 +2817,35 @@ impl App for LauncherApp {
                                     &self.paths.instances_file(),
                                     &self.instances,
                                 );
+                            }
+                            InstanceAction::Restored(id) => {
+                                match amc_core::restore_instance(
+                                    &self.paths.instances_dir(),
+                                    &self.paths.trash_dir(),
+                                    id,
+                                ) {
+                                    Ok(inst) => {
+                                        let new_id = inst.id;
+                                        self.instances.push(inst);
+                                        self.selected_instance = Some(new_id);
+                                        let _ = Instance::save_all(
+                                            &self.paths.instances_file(),
+                                            &self.instances,
+                                        );
+                                    }
+                                    Err(e) => tracing::error!("Restore failed: {e}"),
+                                }
+                            }
+                            InstanceAction::TrashPurged(id) => {
+                                if let Err(e) =
+                                    amc_core::purge_trash_entry(&self.paths.trash_dir(), id)
+                                {
+                                    tracing::error!("Trash purge failed: {e}");
+                                }
+                            }
+                            InstanceAction::TrashEmptied => {
+                                let n = amc_core::purge_trash_all(&self.paths.trash_dir());
+                                tracing::info!("Emptied trash ({n} entries)");
                             }
                             InstanceAction::Selected(id) => {
                                 if let Some(inst) = self.instances.iter().find(|i| i.id == id) {

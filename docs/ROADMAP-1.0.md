@@ -132,12 +132,12 @@ with zero telemetry (network only: Mojang, Adoptium, Modrinth, CurseForge).
 | Self-contained instances, no dedup | ✅ Done | Confirmed by architecture |
 | In-launcher console/logs | ✅ Done | `console.rs` + `launch.rs` |
 | Disk usage per instance/folder | ✅ Done | Card + pre-download free-space check ✅ |
-| Hybrid Java: auto + manual + system/other-launcher discovery | 🟡 Partial | Auto+manual ✅; system discovery — P5 |
-| Server browser | 🚫 Out | Not built; favorites + inject — P8 (`servers.dat` inject at launch ✅, favorites UI — no) |
+| Hybrid Java: auto + manual + system/other-launcher discovery | 🟡 Partial | Auto+manual ✅; system discovery ✅ + auto-pick in resolve ✅ |
+| Server browser | 🚫 Out | Not built; favorites + inject — P8 (`servers.dat` inject ✅, favorites UI + ping/online ✅) |
 | Windows + Linux | 🟡 Partial | Primary Win, Linux X11/Wayland via `eframe`; Win7/GT710 — verify in P11 |
 | Resource packs/shaders from launcher | 🟡 Partial | Folder routing ✅; search UI — P10 |
 | Launcher self-update | ⬜ Todo | P11 |
-| Sodium/Lithium suggestion on weak hardware | ⬜ Todo | P1 (with hardware test) + P4 |
+| Sodium/Lithium suggestion on weak hardware | 🟡 Partial | 1-click Sodium button (Fabric/Quilt, in-place replace) ✅; Lithium — no (P1/P4) |
 | One-button mod/pack updates + rollback | ⬜ Todo | P4 |
 | Discover inside instances tab | ⬜ Todo | P4 |
 | Download manager (pause/limit/queue/retry/progress/ETA/parallel) | 🟡 Partial | Parallel+retry ✅; rest — P3 |
@@ -155,7 +155,7 @@ with zero telemetry (network only: Mojang, Adoptium, Modrinth, CurseForge).
 | Screenshot gallery | 🟡 Partial | `ScreensModal` gallery + 🖼 titlebar button ✅; delete/share — no (P10) |
 | Multi-MS ✅, single WetID | 🟡 Partial | Second-WetID ban — P6 |
 | Anonymous auto crash reports + conflicts only in logs | ⬜/✅ | Non-interference ✅; auto reports — P12 (opt-out) |
-| World backup (manual + scheduled) | ⬜ Todo | P9 |
+| World backup (manual + scheduled) | 🟡 Partial | Backup/restore/delete + auto-backup by days + folder choice ✅; background scheduler — no (P9) |
 | Guard/anticheat | 🚫 Out | 2.0 |
 | Skins: free selection/upload, NameMC validation + auto command, launcher fallback | 🟡 Partial | Upload+2D ✅; rest — P7 |
 | Account combo logic + per-launch picker + "remember" | ⬜ Todo | P6 |
@@ -166,7 +166,7 @@ with zero telemetry (network only: Mojang, Adoptium, Modrinth, CurseForge).
 
 | Concept item | Status | Location / note |
 |---|---|---|
-| Newcomer tutorial tour; .minecraft reuse instead of re-download | ⬜ Todo | P1 |
+| Newcomer tutorial tour; .minecraft reuse instead of re-download | 🟡 Partial | Hint banners + copy modal for versions/assets/libraries ✅; step-by-step tour — no (P1) |
 | Quick start = last played version; single setup in Simple; classic versions | ⬜ Todo | P1/P2 |
 | AMC-only templates; clone with worlds/mods choice; folders/tags/sort/pin/search; notes; pre/post scripts; Java/RAM groups | ⬜ Todo | P2 |
 | Instance card (glanceable content); disk usage | ✅ Done | Card grid + usage ✅ |
@@ -178,7 +178,7 @@ with zero telemetry (network only: Mojang, Adoptium, Modrinth, CurseForge).
 | CLI mode (automation, servers) | ⬜ Todo | New phase P14 |
 | Local-mod instance badge; "no antivirus scan" policy | ⬜/✅ | Badge — P2; policy fixed |
 | Instance shortcuts with direct launch; GPU choice; per-instance resolution; instance icon in taskbar | ⬜ Todo | P11/P14 (shortcuts need CLI) |
-| Config editor (Pro) | ⬜ Todo | P2 |
+| Config editor (Pro) | 🟡 Partial | 🛠 modal: list/edit/save ✅; search/highlight — no (P2) |
 | Free-space check before downloading | ✅ Done | Warning with numbers ✅ |
 | Java manager screen (add/remove) | ✅ Done | System discovery + runtime list ✅ |
 | Server-required mods (window + auto-install) | ⬜ Todo | P8 |
@@ -190,9 +190,9 @@ with zero telemetry (network only: Mojang, Adoptium, Modrinth, CurseForge).
 | Pack rollback + autobackup + changelog; version pinning | ⬜ Todo | P4 |
 | Settings export/import via file | ⬜ Todo | P10 |
 | Crash reports opt-out (concept requires opt-out, not opt-in) | 🟡 Partial | Local archive + 1-click diag-`.zip` export ✅; auto-send — no, needs an endpoint (P12) |
-| Verify/repair files + health score | ⬜ Todo | P2 |
-| Deletion trash; uninstall data question; instance backup to disk | ⬜ Todo | P2/P9/P11 |
-| Scheduled world backups + folder choice | ⬜ Todo | P9 |
+| Verify/repair files + health score | 🟡 Partial | Verify + 0–100 score + folder repair in modal ✅; mod re-download — no (P2) |
+| Deletion trash; uninstall data question; instance backup to disk | 🟡 Partial | Trash: move/restore/purge ✅; uninstaller question and pack archive — no (P2/P9/P11) |
+| Scheduled world backups + folder choice | 🟡 Partial | Day interval + custom folder + auto-backup at launch ✅; background scheduler — no (P9) |
 | WetID 2FA; per-launch identity picker + "remember"; default account per instance | ⬜ Todo | P6 |
 | Post-exit session summary | ✅ Done | Modal on clean exit ✅ |
 | Hotkeys + gamepad; per-type notifications | ⬜ Todo | P10 |

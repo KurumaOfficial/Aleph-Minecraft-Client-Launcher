@@ -229,6 +229,21 @@ pub fn discover_system_java() -> Vec<SystemJava> {
     out
 }
 
+/// Auto-offer (CONCEPT P5): a system Java with exactly `major`, if any.
+/// The scan runs off-thread so slow probes never stall async tasks.
+/// Returns the `java` binary path ready to launch with.
+pub async fn find_system_java(major: u32) -> Option<PathBuf> {
+    tokio::task::spawn_blocking(move || {
+        discover_system_java()
+            .into_iter()
+            .find(|j| j.major == Some(major))
+            .map(|j| j.path)
+    })
+    .await
+    .ok()
+    .flatten()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

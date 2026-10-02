@@ -5,9 +5,9 @@ use crate::theme::{
 use crate::widgets::draw_custom_badge;
 use crate::widgets::full::{ghost_link, image_cover, kicker, red_button, red_square_deco, tag};
 use amc_core::types::{GameVersion, ReleaseType};
-use amc_minecraft::ServerStatus;
+use amc_minecraft::{FavoriteServerEntry, ServerStatus};
 use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -43,6 +43,17 @@ pub struct HomePage {
     hero_failed: bool,
     installed_cache: HashSet<String>,
     installed_for: usize,
+    // Server favorites (CONCEPT, P8): no shared browser, but the player's
+    // own servers persist here and are injected into every instance.
+    // Ping results are transient (keyed by address); the list itself is
+    // owned by the app and persisted to favorites.json.
+    fav_name_input: String,
+    fav_addr_input: String,
+    fav_error: Option<String>,
+    pub fav_ping_request: bool,
+    pub fav_pinging: bool,
+    fav_pinged_for: Vec<String>,
+    pub fav_status: HashMap<String, ServerStatus>,
 }
 
 impl Default for HomePage {
@@ -62,6 +73,13 @@ impl Default for HomePage {
             hero_failed: false,
             installed_cache: HashSet::new(),
             installed_for: usize::MAX,
+            fav_name_input: String::new(),
+            fav_addr_input: String::new(),
+            fav_error: None,
+            fav_ping_request: false,
+            fav_pinging: false,
+            fav_pinged_for: Vec::new(),
+            fav_status: HashMap::new(),
         }
     }
 }
@@ -81,6 +99,7 @@ impl HomePage {
         versions: &[GameVersion],
         selected_version: &mut Option<String>,
         ctx_data: &HomeContext,
+        favorites: &mut Vec<FavoriteServerEntry>,
         lang: amc_core::Language,
     ) {
         self.refresh_installed(versions, ctx_data.versions_dir);
@@ -93,6 +112,10 @@ impl HomePage {
             ctx_data.memory_mb,
             lang,
         );
+
+        ui.add_space(20.0);
+
+        self.show_favorites(ui, favorites, lang);
 
         ui.add_space(20.0);
 
@@ -408,6 +431,167 @@ impl HomePage {
             Err(_) => self.hero_failed = true,
         }
     }
+}
+
+/// Default favorite name: explicit name wins, otherwise the host part.
+/// Pure for tests.
+fn fav_display_name(name: &str, host: &str) -> String {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        host.to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+impl HomePage {
+    /// Server favorites section (CONCEPT, P8). Deliberately no "play"
+    /// button: favorite servers are pre-registered in every instance's
+    /// multiplayer menu instead of launching from here.
+    fn show_favorites(
+        &mut self,
+        ui: &mut Ui,
+        favorites: &mut Vec<FavoriteServerEntry>,
+        lang: amc_core::Language,
+    ) {
+        ui.horizontal(|ui| {
+            ui.label(
+                egui::RichText::new(lang.fav_title())
+                    .font(egui::FontId::proportional(20.0))
+                    .strong()
+                    .color(TEXT_HEADING),
+            );
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui.button(lang.fav_refresh()).clicked() {
+                    self.request_fav_ping(favorites);
+                }
+            });
+        });
+
+        ui.add_space(8.0);
+
+        // Add row.
+        ui.horizontal(|ui| {
+            let name_w = 150.0;
+            let addr_w = (ui.available_width() - name_w - 110.0).max(140.0);
+            ui.add(
+                TextEdit::singleline(&mut self.fav_name_input)
+                    .hint_text(egui::RichText::new(lang.fav_name_hint()).color(TEXT_MUTED))
+                    .desired_width(name_w)
+                    .font(egui::FontId::proportional(12.0)),
+            );
+            ui.add(
+                TextEdit::singleline(&mut self.fav_addr_input)
+                    .hint_text(egui::RichText::new(lang.fav_address_hint()).color(TEXT_MUTED))
+                    .desired_width(addr_w)
+                    .font(egui::FontId::proportional(12.0)),
+            );
+            if ui.button(lang.fav_add()).clicked() {
+                self.fav_error = None;
+                match amc_minecraft::parse_server_address(&self.fav_addr_input) {
+                    Some((host, port)) => {
+                        let address = if self.fav_addr_input.trim().contains(':') {
+                            self.fav_addr_input.trim().to_string()
+                        } else {
+                            format!("{host}:{port}")
+                        };
+                        let name = fav_display_name(&self.fav_name_input, &host);
+                        if let Some(existing) = favorites.iter_mut().find(|f| f.address == address)
+                        {
+                            existing.name = name;
+                        } else {
+                            favorites.push(FavoriteServerEntry { name, address });
+                        }
+                        self.fav_name_input.clear();
+                        self.fav_addr_input.clear();
+                        self.request_fav_ping(favorites);
+                    }
+                    None => {
+                        self.fav_error = Some(lang.fav_invalid().to_string());
+                    }
+                }
+            }
+        });
+
+        if let Some(err) = self.fav_error.clone() {
+            ui.add_space(4.0);
+            ui.label(egui::RichText::new(err).color(Color32::from_rgb(0xE8, 0x55, 0x70)));
+        }
+
+        ui.add_space(8.0);
+
+        if favorites.is_empty() {
+            ui.label(
+                egui::RichText::new(lang.fav_empty())
+                    .font(egui::FontId::proportional(12.0))
+                    .color(TEXT_MUTED),
+            );
+        }
+
+        let mut remove_idx: Option<usize> = None;
+        for (idx, fav) in favorites.iter().enumerate() {
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new(&fav.name)
+                        .font(egui::FontId::proportional(13.0))
+                        .strong()
+                        .color(TEXT_PRIMARY),
+                );
+                ui.add_space(8.0);
+                ui.label(
+                    egui::RichText::new(&fav.address)
+                        .font(egui::FontId::proportional(12.0))
+                        .color(TEXT_MUTED),
+                );
+                ui.add_space(8.0);
+                if let Some(status) = self.fav_status.get(&fav.address) {
+                    let (dot, text) = if status.is_online {
+                        (
+                            "🟢",
+                            format!(
+                                "{} ms • {}/{} • {}",
+                                status.ping_ms,
+                                status.online_players,
+                                status.max_players,
+                                status.motd
+                            ),
+                        )
+                    } else {
+                        ("🔴", status.motd.clone())
+                    };
+                    ui.label(
+                        egui::RichText::new(format!("{dot} {text}"))
+                            .font(egui::FontId::proportional(12.0))
+                            .color(TEXT_MUTED),
+                    );
+                } else if self.fav_pinging {
+                    ui.spinner();
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button(lang.fav_remove()).clicked() {
+                        remove_idx = Some(idx);
+                    }
+                });
+            });
+        }
+        if let Some(idx) = remove_idx {
+            favorites.remove(idx);
+            self.request_fav_ping(favorites);
+        }
+
+        // First paint (or list change) triggers one ping pass.
+        let current: Vec<String> = favorites.iter().map(|f| f.address.clone()).collect();
+        if !self.fav_pinging && current != self.fav_pinged_for && !favorites.is_empty() {
+            self.request_fav_ping(favorites);
+        }
+    }
+
+    /// Arm a favorites ping pass; the app task fills `fav_status`.
+    fn request_fav_ping(&mut self, favorites: &[FavoriteServerEntry]) {
+        self.fav_pinged_for = favorites.iter().map(|f| f.address.clone()).collect();
+        self.fav_pinging = true;
+        self.fav_ping_request = true;
+    }
 
     /// Full-style hero: cover art, red-square deco, display titles,
     /// big Play + ghost pick link, stats row.
@@ -719,5 +903,12 @@ mod tests {
         let mut page = HomePage::default();
         page.open_drawer(None);
         assert!(!page.drawer_open);
+    }
+
+    #[test]
+    fn test_fav_display_name() {
+        assert_eq!(fav_display_name("Survival", "play.ex.com"), "Survival");
+        assert_eq!(fav_display_name("  ", "play.ex.com"), "play.ex.com");
+        assert_eq!(fav_display_name("", "play.ex.com"), "play.ex.com");
     }
 }

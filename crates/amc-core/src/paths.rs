@@ -133,3 +133,34 @@ impl LauncherPaths {
         }
     }
 }
+
+/// Heuristic for a foreign `.minecraft` worth reusing (CONCEPT P1):
+/// at least one of the heavy shared folders exists.
+pub fn looks_like_minecraft(dir: &std::path::Path) -> bool {
+    ["versions", "assets", "libraries", "saves"]
+        .iter()
+        .any(|sub| dir.join(sub).is_dir())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_looks_like_minecraft() {
+        let root = std::env::temp_dir().join(format!(
+            "amc_mc_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        assert!(!looks_like_minecraft(&root));
+        std::fs::create_dir_all(root.join("versions")).unwrap();
+        assert!(looks_like_minecraft(&root));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+}

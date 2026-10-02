@@ -351,6 +351,51 @@ impl SettingsPage {
 
         ui.add_space(14.0);
 
+        // World backups folder + schedule (CONCEPT "Управление мирами", P9).
+        ui.group(|ui| {
+            ui.label(
+                egui::RichText::new(lang.worlds_title())
+                    .font(egui::FontId::proportional(16.0))
+                    .strong()
+                    .color(TEXT_HEADING),
+            );
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                let current = config
+                    .world_backup_dir
+                    .as_ref()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|| paths.backups_dir().to_string_lossy().to_string());
+                ui.label(
+                    egui::RichText::new(current)
+                        .font(egui::FontId::proportional(12.0))
+                        .color(TEXT_PRIMARY),
+                );
+            });
+            ui.add_space(4.0);
+            ui.horizontal(|ui| {
+                if ui.button(lang.world_pick_folder()).clicked() {
+                    if let Some(dir) = rfd::FileDialog::new().pick_folder() {
+                        config.world_backup_dir = Some(dir);
+                    }
+                }
+                if config.world_backup_dir.is_some()
+                    && ui
+                        .button(egui::RichText::new("✕").color(TEXT_MUTED))
+                        .clicked()
+                {
+                    config.world_backup_dir = None;
+                }
+            });
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new(lang.world_auto_label()).color(TEXT_MUTED));
+                ui.add(egui::DragValue::new(&mut config.world_backup_days).speed(1));
+            });
+        });
+
+        ui.add_space(14.0);
+
         // Notifications per type (CONCEPT "Уведомления").
         ui.group(|ui| {
             ui.label(

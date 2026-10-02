@@ -957,6 +957,14 @@ impl Language {
         }
     }
 
+    pub fn mcreuse_copied(&self, files: u64, mb: u64) -> String {
+        match self {
+            Self::English => format!("Copied {files} files ({mb} MB)"),
+            Self::Russian => format!("Скопировано файлов: {files} ({mb} МБ)"),
+            Self::Ukrainian => format!("Скопійовано файлів: {files} ({mb} МБ)"),
+        }
+    }
+
     // ---- Instance notes & scripts (CONCEPT, P2) ----
     pub fn inst_notes_label(&self) -> &'static str {
         match self {
@@ -1073,6 +1081,14 @@ impl Language {
         }
     }
 
+    pub fn health_verify(&self) -> &'static str {
+        match self {
+            Self::English => "Verify again",
+            Self::Russian => "Проверить снова",
+            Self::Ukrainian => "Перевірити знову",
+        }
+    }
+
     pub fn trash_title(&self) -> &'static str {
         match self {
             Self::English => "Trash",
@@ -1102,6 +1118,14 @@ impl Language {
             Self::English => "Trash is empty",
             Self::Russian => "Корзина пуста",
             Self::Ukrainian => "Кошик порожній",
+        }
+    }
+
+    pub fn trash_empty_all(&self) -> &'static str {
+        match self {
+            Self::English => "Empty trash",
+            Self::Russian => "Очистить корзину",
+            Self::Ukrainian => "Очистити кошик",
         }
     }
 
@@ -1151,6 +1175,30 @@ impl Language {
             Self::English => "No favorites yet — they appear in every instance automatically",
             Self::Russian => "Пока пусто — избранное само появится в каждой сборке",
             Self::Ukrainian => "Поки порожньо — обране само з'явиться в кожній збірці",
+        }
+    }
+
+    pub fn fav_name_hint(&self) -> &'static str {
+        match self {
+            Self::English => "Name (optional)",
+            Self::Russian => "Название (необязательно)",
+            Self::Ukrainian => "Назва (необов'язково)",
+        }
+    }
+
+    pub fn fav_refresh(&self) -> &'static str {
+        match self {
+            Self::English => "Refresh status",
+            Self::Russian => "Обновить статус",
+            Self::Ukrainian => "Оновити статус",
+        }
+    }
+
+    pub fn fav_invalid(&self) -> &'static str {
+        match self {
+            Self::English => "Enter a valid address like play.example.com:25565",
+            Self::Russian => "Введи корректный адрес вида play.example.com:25565",
+            Self::Ukrainian => "Введи коректну адресу виду play.example.com:25565",
         }
     }
 
@@ -1208,6 +1256,22 @@ impl Language {
             Self::English => "Auto-backup every N days (0 = off)",
             Self::Russian => "Автобэкап каждые N дней (0 = выкл)",
             Self::Ukrainian => "Автобекап кожні N днів (0 = вимк)",
+        }
+    }
+
+    pub fn world_delete(&self) -> &'static str {
+        match self {
+            Self::English => "Delete backup",
+            Self::Russian => "Удалить бэкап",
+            Self::Ukrainian => "Видалити бекап",
+        }
+    }
+
+    pub fn world_pick_folder(&self) -> &'static str {
+        match self {
+            Self::English => "Choose backup folder",
+            Self::Russian => "Выбрать папку бэкапов",
+            Self::Ukrainian => "Вибрати папку бекапів",
         }
     }
 
@@ -1716,6 +1780,30 @@ impl Language {
         }
     }
 
+    pub fn wizard_hw_sodium(&self) -> &'static str {
+        match self {
+            Self::English => "Install Sodium",
+            Self::Russian => "Установить Sodium",
+            Self::Ukrainian => "Встановити Sodium",
+        }
+    }
+
+    pub fn wizard_hw_no_instance(&self) -> &'static str {
+        match self {
+            Self::English => "Create or select an instance first",
+            Self::Russian => "Сначала создай или выбери сборку",
+            Self::Ukrainian => "Спершу створи або вибери збірку",
+        }
+    }
+
+    pub fn wizard_hw_bad_loader(&self) -> &'static str {
+        match self {
+            Self::English => "Sodium needs a Fabric or Quilt instance",
+            Self::Russian => "Для Sodium нужна сборка на Fabric или Quilt",
+            Self::Ukrainian => "Для Sodium потрібна збірка на Fabric або Quilt",
+        }
+    }
+
     pub fn settings_resolution_title(&self) -> &'static str {
         match self {
             Self::English => "Game Window Resolution",
@@ -2162,6 +2250,14 @@ impl Language {
             Self::English => "Checking Java runtime...",
             Self::Russian => "Проверка Java...",
             Self::Ukrainian => "Перевірка середовища Java...",
+        }
+    }
+
+    pub fn status_backup_worlds(&self) -> &'static str {
+        match self {
+            Self::English => "Backing up worlds...",
+            Self::Russian => "Бэкап миров...",
+            Self::Ukrainian => "Бекап світів...",
         }
     }
 
@@ -3048,6 +3144,9 @@ mod tests {
             assert!(!lang.wizard_hw_body().is_empty());
             assert!(!lang.wizard_hw_specs("8 GB", 8, "100 GB").is_empty());
             assert!(!lang.wizard_hw_ok().is_empty());
+            assert!(!lang.wizard_hw_sodium().is_empty());
+            assert!(!lang.wizard_hw_no_instance().is_empty());
+            assert!(!lang.wizard_hw_bad_loader().is_empty());
             assert!(!lang.status_resolving_loader("Forge", "1.20.1").is_empty());
             assert!(!lang.err_loader_failed("Forge", "x").is_empty());
             assert!(!lang.disk_size(500).is_empty());
@@ -3097,6 +3196,7 @@ mod tests {
             assert!(!lang.mcreuse_body("/x").is_empty());
             assert!(!lang.mcreuse_use().is_empty());
             assert!(!lang.mcreuse_skip().is_empty());
+            assert!(!lang.mcreuse_copied(10, 20).is_empty());
             assert!(!lang.inst_notes_label().is_empty());
             assert!(!lang.inst_notes_hint().is_empty());
             assert!(!lang.inst_pre_label().is_empty());
@@ -3111,15 +3211,20 @@ mod tests {
             assert!(!lang.health_ok().is_empty());
             assert!(!lang.health_missing(3).is_empty());
             assert!(!lang.health_repair().is_empty());
+            assert!(!lang.health_verify().is_empty());
             assert!(!lang.trash_title().is_empty());
             assert!(!lang.trash_restore().is_empty());
             assert!(!lang.trash_delete_forever().is_empty());
             assert!(!lang.trash_empty().is_empty());
+            assert!(!lang.trash_empty_all().is_empty());
             assert!(!lang.fav_title().is_empty());
             assert!(!lang.fav_address_hint().is_empty());
             assert!(!lang.fav_add().is_empty());
             assert!(!lang.fav_remove().is_empty());
             assert!(!lang.fav_empty().is_empty());
+            assert!(!lang.fav_name_hint().is_empty());
+            assert!(!lang.fav_refresh().is_empty());
+            assert!(!lang.fav_invalid().is_empty());
             assert!(!lang.worlds_title().is_empty());
             assert!(!lang.world_backup_now().is_empty());
             assert!(!lang.world_backups().is_empty());
@@ -3127,6 +3232,8 @@ mod tests {
             assert!(!lang.world_no_saves().is_empty());
             assert!(!lang.world_no_backups().is_empty());
             assert!(!lang.world_auto_label().is_empty());
+            assert!(!lang.world_delete().is_empty());
+            assert!(!lang.world_pick_folder().is_empty());
             assert!(!lang.screens_title().is_empty());
             assert!(!lang.screens_empty().is_empty());
             assert!(!lang.screens_open().is_empty());
@@ -3173,6 +3280,7 @@ mod tests {
             assert!(!lang.mcreuse_body("/x").is_empty());
             assert!(!lang.mcreuse_use().is_empty());
             assert!(!lang.mcreuse_skip().is_empty());
+            assert!(!lang.mcreuse_copied(10, 20).is_empty());
             assert!(!lang.inst_notes_label().is_empty());
             assert!(!lang.inst_notes_hint().is_empty());
             assert!(!lang.inst_pre_label().is_empty());
@@ -3187,10 +3295,12 @@ mod tests {
             assert!(!lang.health_ok().is_empty());
             assert!(!lang.health_missing(3).is_empty());
             assert!(!lang.health_repair().is_empty());
+            assert!(!lang.health_verify().is_empty());
             assert!(!lang.trash_title().is_empty());
             assert!(!lang.trash_restore().is_empty());
             assert!(!lang.trash_delete_forever().is_empty());
             assert!(!lang.trash_empty().is_empty());
+            assert!(!lang.trash_empty_all().is_empty());
             assert!(!lang.fav_title().is_empty());
             assert!(!lang.fav_address_hint().is_empty());
             assert!(!lang.fav_add().is_empty());
@@ -3203,6 +3313,8 @@ mod tests {
             assert!(!lang.world_no_saves().is_empty());
             assert!(!lang.world_no_backups().is_empty());
             assert!(!lang.world_auto_label().is_empty());
+            assert!(!lang.world_delete().is_empty());
+            assert!(!lang.world_pick_folder().is_empty());
             assert!(!lang.inst_warn_legacy_forge().is_empty());
             assert!(!lang.settings_after_launch_title().is_empty());
             assert!(!lang.settings_after_close().is_empty());
