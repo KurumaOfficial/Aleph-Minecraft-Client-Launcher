@@ -296,6 +296,32 @@ impl LauncherApp {
         }
     }
 
+    /// Persist a resolved loader version pin to `instances.json`
+    /// (reproducible launches). In-memory state syncs back from disk
+    /// when the game exits; a stale pin retries at latest once.
+    fn persist_loader_pin(paths: &LauncherPaths, inst_id: uuid::Uuid, ver: &str) {
+        let file = paths.instances_file();
+        let mut disk = Instance::load_all(&file).unwrap_or_default();
+        if let Some(inst) = disk.iter_mut().find(|i| i.id == inst_id) {
+            inst.loader_version = Some(ver.to_string());
+            let _ = Instance::save_all(&file, &disk);
+        }
+    }
+
+    /// Refresh one instance's loader pin from disk (see
+    /// [`Self::persist_loader_pin`]). Associated function like
+    /// [`Self::add_playtime`] so it can run while event channels
+    /// are borrowed.
+    fn sync_loader_pin(paths: &LauncherPaths, instances: &mut [Instance], inst_id: uuid::Uuid) {
+        if let Ok(disk) = Instance::load_all(&paths.instances_file()) {
+            if let (Some(saved), Some(live)) = (
+                disk.iter().find(|i| i.id == inst_id),
+                instances.iter_mut().find(|i| i.id == inst_id),
+            ) {
+                live.loader_version = saved.loader_version.clone();
+            }
+        }
+    }
     /// Archive a crash log locally when reports are enabled (opt-out).
     /// Nothing leaves the machine — upload needs a future endpoint.
     fn archive_crash(paths: &LauncherPaths, message: &str) {
@@ -1663,6 +1689,17 @@ impl LauncherApp {
         } else {
             (String::new(), String::new())
         };
+        // Pinned loader version + owner for persistence (reproducible,
+        // offline-friendly launches; latest is looked up only when needed).
+        let (pinned_loader_ver, pin_instance_id) = if let Some(inst_id) = self.selected_instance {
+            self.instances
+                .iter()
+                .find(|i| i.id == inst_id)
+                .map(|inst| (inst.loader_version.clone(), Some(inst_id)))
+                .unwrap_or((None, None))
+        } else {
+            (None, None)
+        };
         // P9: scheduled world backups run inside the launch task below.
         let backup_days = self.config.world_backup_days;
         let backups_root = self.world_backups_root();
@@ -1845,58 +1882,80 @@ impl LauncherApp {
             let details = match loader {
                 LoaderType::Fabric => {
                     let _ = status_tx.send("Fabric Loader...".to_string()).await;
-                    match FabricLoader::get_latest_loader_version(&client, &ver_id).await {
-                        Ok(loader_ver) => {
-                            let _ = status_tx
-                                .send(format!("Загрузка профиля Fabric {loader_ver}..."))
-                                .await;
-                            match FabricLoader::fetch_profile_json(&client, &ver_id, &loader_ver)
-                                .await
-                            {
-                                Ok(mut fab_details) => {
-                                    if let Ok(vanilla) = VersionDetails::fetch_or_load(
-                                        &client,
-                                        &ver_id,
-                                        None,
-                                        &paths.versions_dir(),
-                                    )
-                                    .await
-                                    {
-                                        fab_details.merge_parent(vanilla);
+                    // Pinned version first (reproducible, offline-friendly);
+                    // latest is looked up only when unpinned or stale.
+                    let mut candidates = amc_minecraft::pin_candidates(pinned_loader_ver.clone());
+                    if candidates.is_empty() {
+                        match FabricLoader::get_latest_loader_version(&client, &ver_id).await {
+                            Ok(v) => candidates.push((v, true)),
+                            Err(e) => {
+                                // No candidates at all: the tail below
+                                // falls back to vanilla.
+                                tracing::warn!(
+                                    "Fabric loader lookup error: {e}, falling back to Vanilla"
+                                );
+                            }
+                        }
+                    }
+                    let mut fetched: Option<VersionDetails> = None;
+                    for (loader_ver, persist) in candidates {
+                        let _ = status_tx
+                            .send(format!("Загрузка профиля Fabric {loader_ver}..."))
+                            .await;
+                        match FabricLoader::fetch_profile_json(&client, &ver_id, &loader_ver).await
+                        {
+                            Ok(d) => {
+                                fetched = Some(d);
+                                if persist {
+                                    if let Some(id) = pin_instance_id {
+                                        Self::persist_loader_pin(&paths, id, &loader_ver);
                                     }
-                                    fab_details
                                 }
-                                Err(e) => {
-                                    tracing::warn!(
-                                        "Fabric profile fetch error: {e}, falling back to Vanilla"
-                                    );
-                                    match VersionDetails::fetch_or_load(
-                                        &client,
-                                        &ver_id,
-                                        None,
-                                        &paths.versions_dir(),
-                                    )
-                                    .await
-                                    {
-                                        Ok(d) => d,
-                                        Err(err) => {
-                                            let _ = game_tx
-                                                .send(GameEvent::Crashed {
-                                                    message: format!(
-                                                        "Ошибка загрузки версии {ver_id}: {err}"
-                                                    ),
-                                                })
-                                                .await;
-                                            return;
-                                        }
-                                    }
+                                break;
+                            }
+                            Err(e) => {
+                                tracing::warn!("Fabric profile {loader_ver} fetch error: {e}");
+                            }
+                        }
+                    }
+                    // Stale pin: single retry at latest before vanilla.
+                    if fetched.is_none()
+                        && pinned_loader_ver
+                            .as_ref()
+                            .is_some_and(|v| !v.trim().is_empty())
+                    {
+                        if let Ok(latest) =
+                            FabricLoader::get_latest_loader_version(&client, &ver_id).await
+                        {
+                            let _ = status_tx
+                                .send(format!("Загрузка профиля Fabric {latest}..."))
+                                .await;
+                            if let Ok(d) =
+                                FabricLoader::fetch_profile_json(&client, &ver_id, &latest).await
+                            {
+                                fetched = Some(d);
+                                if let Some(id) = pin_instance_id {
+                                    Self::persist_loader_pin(&paths, id, &latest);
                                 }
                             }
                         }
-                        Err(e) => {
-                            tracing::warn!(
-                                "Fabric loader lookup error: {e}, falling back to Vanilla"
-                            );
+                    }
+                    match fetched {
+                        Some(mut fab_details) => {
+                            if let Ok(vanilla) = VersionDetails::fetch_or_load(
+                                &client,
+                                &ver_id,
+                                None,
+                                &paths.versions_dir(),
+                            )
+                            .await
+                            {
+                                fab_details.merge_parent(vanilla);
+                            }
+                            fab_details
+                        }
+                        None => {
+                            tracing::warn!("Fabric profiles unavailable, falling back to Vanilla");
                             match VersionDetails::fetch_or_load(
                                 &client,
                                 &ver_id,
@@ -1922,58 +1981,79 @@ impl LauncherApp {
                 }
                 LoaderType::Quilt => {
                     let _ = status_tx.send("Поиск Quilt Loader...".to_string()).await;
-                    match QuiltLoader::get_latest_loader_version(&client, &ver_id).await {
-                        Ok(loader_ver) => {
-                            let _ = status_tx
-                                .send(format!("Загрузка профиля Quilt {loader_ver}..."))
-                                .await;
-                            match QuiltLoader::fetch_profile_json(&client, &ver_id, &loader_ver)
-                                .await
-                            {
-                                Ok(mut quilt_details) => {
-                                    if let Ok(vanilla) = VersionDetails::fetch_or_load(
-                                        &client,
-                                        &ver_id,
-                                        None,
-                                        &paths.versions_dir(),
-                                    )
-                                    .await
-                                    {
-                                        quilt_details.merge_parent(vanilla);
+                    // Pinned version first (reproducible, offline-friendly);
+                    // latest is looked up only when unpinned or stale.
+                    let mut candidates = amc_minecraft::pin_candidates(pinned_loader_ver.clone());
+                    if candidates.is_empty() {
+                        match QuiltLoader::get_latest_loader_version(&client, &ver_id).await {
+                            Ok(v) => candidates.push((v, true)),
+                            Err(e) => {
+                                // No candidates at all: the tail below
+                                // falls back to vanilla.
+                                tracing::warn!(
+                                    "Quilt loader lookup error: {e}, falling back to Vanilla"
+                                );
+                            }
+                        }
+                    }
+                    let mut fetched: Option<VersionDetails> = None;
+                    for (loader_ver, persist) in candidates {
+                        let _ = status_tx
+                            .send(format!("Загрузка профиля Quilt {loader_ver}..."))
+                            .await;
+                        match QuiltLoader::fetch_profile_json(&client, &ver_id, &loader_ver).await {
+                            Ok(d) => {
+                                fetched = Some(d);
+                                if persist {
+                                    if let Some(id) = pin_instance_id {
+                                        Self::persist_loader_pin(&paths, id, &loader_ver);
                                     }
-                                    quilt_details
                                 }
-                                Err(e) => {
-                                    tracing::warn!(
-                                        "Quilt profile fetch error: {e}, falling back to Vanilla"
-                                    );
-                                    match VersionDetails::fetch_or_load(
-                                        &client,
-                                        &ver_id,
-                                        None,
-                                        &paths.versions_dir(),
-                                    )
-                                    .await
-                                    {
-                                        Ok(d) => d,
-                                        Err(err) => {
-                                            let _ = game_tx
-                                                .send(GameEvent::Crashed {
-                                                    message: format!(
-                                                        "Ошибка загрузки версии {ver_id}: {err}"
-                                                    ),
-                                                })
-                                                .await;
-                                            return;
-                                        }
-                                    }
+                                break;
+                            }
+                            Err(e) => {
+                                tracing::warn!("Quilt profile {loader_ver} fetch error: {e}");
+                            }
+                        }
+                    }
+                    // Stale pin: single retry at latest before vanilla.
+                    if fetched.is_none()
+                        && pinned_loader_ver
+                            .as_ref()
+                            .is_some_and(|v| !v.trim().is_empty())
+                    {
+                        if let Ok(latest) =
+                            QuiltLoader::get_latest_loader_version(&client, &ver_id).await
+                        {
+                            let _ = status_tx
+                                .send(format!("Загрузка профиля Quilt {latest}..."))
+                                .await;
+                            if let Ok(d) =
+                                QuiltLoader::fetch_profile_json(&client, &ver_id, &latest).await
+                            {
+                                fetched = Some(d);
+                                if let Some(id) = pin_instance_id {
+                                    Self::persist_loader_pin(&paths, id, &latest);
                                 }
                             }
                         }
-                        Err(e) => {
-                            tracing::warn!(
-                                "Quilt loader lookup error: {e}, falling back to Vanilla"
-                            );
+                    }
+                    match fetched {
+                        Some(mut quilt_details) => {
+                            if let Ok(vanilla) = VersionDetails::fetch_or_load(
+                                &client,
+                                &ver_id,
+                                None,
+                                &paths.versions_dir(),
+                            )
+                            .await
+                            {
+                                quilt_details.merge_parent(vanilla);
+                            }
+                            quilt_details
+                        }
+                        None => {
+                            tracing::warn!("Quilt profiles unavailable, falling back to Vanilla");
                             match VersionDetails::fetch_or_load(
                                 &client,
                                 &ver_id,
@@ -2911,6 +2991,9 @@ impl App for LauncherApp {
                                     inst_id,
                                     elapsed_mins,
                                 );
+                                // A loader pin resolved mid-launch lands in
+                                // memory now (disk was already updated).
+                                Self::sync_loader_pin(&self.paths, &mut self.instances, inst_id);
                                 // Clean exit (not a crash): remember the session
                                 // for the summary modal (CONCEPT "После запуска игры").
                                 if code == Some(0) {
@@ -2956,6 +3039,7 @@ impl App for LauncherApp {
                                     inst_id,
                                     elapsed_mins,
                                 );
+                                Self::sync_loader_pin(&self.paths, &mut self.instances, inst_id);
                             }
                         }
                     }
@@ -3464,6 +3548,17 @@ impl App for LauncherApp {
                             );
                             if self.selected_instance == Some(id) {
                                 self.mods_page.update_check_requested = true;
+                            }
+                        }
+                        // Loader pin reset: forget the pinned version so the
+                        // next launch resolves latest again.
+                        if let Some(id) = self.instances_page.loader_pin_reset.take() {
+                            if let Some(inst) = self.instances.iter_mut().find(|i| i.id == id) {
+                                inst.loader_version = None;
+                                let _ = Instance::save_all(
+                                    &self.paths.instances_file(),
+                                    &self.instances,
+                                );
                             }
                         }
                     }

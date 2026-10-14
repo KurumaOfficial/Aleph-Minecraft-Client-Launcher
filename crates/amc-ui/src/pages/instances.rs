@@ -54,6 +54,8 @@ pub struct InstancesPage {
     pub edit_instance_name: String,
     pub edit_instance_version: String,
     pub edit_instance_loader: LoaderType,
+    pub edit_loader_pin: Option<String>,
+    pub loader_pin_reset: Option<Uuid>,
     pub edit_instance_ram: u32,
     pub edit_instance_icon: Option<String>,
     pub edit_instance_tags: String,
@@ -111,6 +113,8 @@ impl Default for InstancesPage {
             edit_instance_name: String::new(),
             edit_instance_version: String::new(),
             edit_instance_loader: LoaderType::Vanilla,
+            edit_loader_pin: None,
+            loader_pin_reset: None,
             edit_instance_ram: 4096,
             edit_instance_icon: None,
             edit_instance_tags: String::new(),
@@ -805,6 +809,7 @@ impl InstancesPage {
                     page.edit_instance_name = inst.name.clone();
                     page.edit_instance_version = inst.game_version.clone();
                     page.edit_instance_loader = inst.loader;
+                    page.edit_loader_pin = inst.loader_version.clone();
                     page.edit_instance_ram = inst.ram_mb.unwrap_or(4096);
                     page.edit_instance_icon = inst.icon.clone();
                     page.edit_instance_tags = inst.tags.join(", ");
@@ -1124,6 +1129,23 @@ impl InstancesPage {
                                 .font(egui::FontId::proportional(12.0))
                                 .color(WARNING),
                         );
+                    }
+                    // Pinned loader version (reproducible launches): reset
+                    // returns to latest on the next launch.
+                    if let Some(pin) = self.edit_loader_pin.clone() {
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                egui::RichText::new(lang.loader_pinned(&pin))
+                                    .font(egui::FontId::proportional(12.0))
+                                    .color(TEXT_MUTED),
+                            );
+                            if ui.button(lang.loader_pin_reset()).clicked() {
+                                if let Some(id) = self.edit_instance_id {
+                                    self.loader_pin_reset = Some(id);
+                                }
+                                self.edit_loader_pin = None;
+                            }
+                        });
                     }
 
                     ui.add_space(10.0);

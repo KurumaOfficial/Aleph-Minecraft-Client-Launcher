@@ -1546,6 +1546,23 @@ impl Language {
         }
     }
 
+    // ---- Loader version pin (reproducible launches) ----
+    pub fn loader_pinned(&self, version: &str) -> String {
+        match self {
+            Self::English => format!("Loader {version} (pinned)"),
+            Self::Russian => format!("Загрузчик {version} (зафиксирован)"),
+            Self::Ukrainian => format!("Завантажувач {version} (зафіксовано)"),
+        }
+    }
+
+    pub fn loader_pin_reset(&self) -> &'static str {
+        match self {
+            Self::English => "Use latest",
+            Self::Russian => "На последнюю версию",
+            Self::Ukrainian => "На останню версію",
+        }
+    }
+
     // ---- Local dedicated server (CONCEPT Steam section, P13) ----
     pub fn server_title(&self) -> &'static str {
         match self {
@@ -3558,6 +3575,8 @@ mod tests {
             assert!(!lang.group_add().is_empty());
             assert!(!lang.hotkey_title().is_empty());
             assert!(!lang.hotkey_launch().is_empty());
+            assert!(!lang.loader_pinned("0.15.11").is_empty());
+            assert!(!lang.loader_pin_reset().is_empty());
             assert!(!lang.server_create().is_empty());
             assert!(!lang.server_stop().is_empty());
             assert!(!lang.server_running(25565).is_empty());

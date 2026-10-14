@@ -14,7 +14,9 @@ pub use args::ArgumentBuilder;
 pub use assets::AssetIndex;
 pub use hooks::run_hook_script;
 pub use launch::{GameEvent, MinecraftLauncher};
-pub use loaders::{FabricLoader, ForgeLoader, NeoForgeLoader, OptiFineLoader, QuiltLoader};
+pub use loaders::{
+    pin_candidates, FabricLoader, ForgeLoader, NeoForgeLoader, OptiFineLoader, QuiltLoader,
+};
 pub use manifest::{VersionManifest, VersionManifestEntry};
 pub use rules::{allows, current_arch, current_os, Rule};
 pub use server::{ServerPinger, ServerStatus};
