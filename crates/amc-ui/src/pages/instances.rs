@@ -737,9 +737,14 @@ impl InstancesPage {
                 Some(ram) => format!(" • {ram} MB"),
                 None => String::new(),
             };
+            let sessions_text = if inst.sessions > 0 {
+                format!(" • ▶ {}", lang.inst_sessions_label(inst.sessions))
+            } else {
+                String::new()
+            };
             card.label(
                 egui::RichText::new(format!(
-                    "• ⏱ {} • 💾 {size_text}{ram_text}",
+                    "• ⏱ {} • 💾 {size_text}{ram_text}{sessions_text}",
                     lang.inst_playtime_label(&play_time_str)
                 ))
                 .font(egui::FontId::proportional(11.0))
