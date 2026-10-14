@@ -478,6 +478,7 @@ impl LauncherApp {
                     sha1: file.hashes.sha1.clone(),
                     size: Some(file.size),
                     old_filename,
+                    changelog: ver.changelog.clone(),
                 });
             }
             let _ = tx.send(offers).await;

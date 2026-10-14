@@ -1,4 +1,4 @@
-use crate::types::{ModCategory, ModDownloadFile, ModSearchResult, ModSource};
+﻿use crate::types::{ModCategory, ModDownloadFile, ModSearchResult, ModSource};
 use amc_core::error::{LauncherError, Result};
 use reqwest::Client;
 use serde::Deserialize;
@@ -55,6 +55,9 @@ pub struct ProjectVersionFull {
     pub loaders: Vec<String>,
     #[serde(default)]
     pub dependencies: Vec<ModDependency>,
+    /// Author-written changelog (markdown, may be null/empty).
+    #[serde(default)]
+    pub changelog: Option<String>,
 }
 
 impl ProjectVersionFull {
@@ -415,6 +418,30 @@ mod tests {
     fn test_select_compatible_none() {
         let versions = fixture();
         assert!(ModrinthClient::select_compatible(&versions, "1.18.2", "fabric").is_none());
+    }
+
+    #[test]
+    fn test_version_changelog_parsing() {
+        let with_notes: Vec<ProjectVersionFull> = serde_json::from_str(
+            r##"[{"version_number":"3.0","files":[],"game_versions":[],"loaders":[],
+                "changelog":"Fixed a crash on startup"}]"##,
+        )
+        .expect("changelog parses");
+        assert_eq!(
+            with_notes[0].changelog.as_deref(),
+            Some("Fixed a crash on startup")
+        );
+        let without: Vec<ProjectVersionFull> = serde_json::from_str(
+            r#"[{"version_number":"2.0","files":[],"game_versions":[],"loaders":[]}]"#,
+        )
+        .expect("missing changelog defaults");
+        assert_eq!(without[0].changelog, None);
+        let null_notes: Vec<ProjectVersionFull> = serde_json::from_str(
+            r#"[{"version_number":"1.0","files":[],"game_versions":[],"loaders":[],
+                "changelog":null}]"#,
+        )
+        .expect("null changelog defaults");
+        assert_eq!(null_notes[0].changelog, None);
     }
 
     #[test]

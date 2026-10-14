@@ -26,6 +26,34 @@ pub struct UpdateOffer {
     pub sha1: Option<String>,
     pub size: Option<u64>,
     pub old_filename: String,
+    /// Author changelog of the new version, when the source provides one.
+    pub changelog: Option<String>,
+}
+
+/// Tooltip body for an update offer (CONCEPT "обновление показывает
+/// список изменений"): new version plus a collapsed changelog preview.
+/// Pure function, unit-tested below.
+pub fn changelog_preview(version: &str, changelog: &Option<String>) -> String {
+    const LIMIT: usize = 280;
+    let Some(notes) = changelog else {
+        return format!("→ {version}");
+    };
+    let collapsed: String = notes
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .trim()
+        .to_string();
+    if collapsed.is_empty() {
+        return format!("→ {version}");
+    }
+    let short: String = collapsed.chars().take(LIMIT).collect();
+    let tail = if collapsed.chars().count() > LIMIT {
+        "…"
+    } else {
+        ""
+    };
+    format!("→ {version}\n{short}{tail}")
 }
 
 pub struct ModsPage {
@@ -445,6 +473,7 @@ impl ModsPage {
                                     egui::RichText::new(lang.mods_update_available())
                                         .color(RUBY_LIGHT),
                                 )
+                                .on_hover_text(changelog_preview(&offer.version, &offer.changelog))
                                 .clicked()
                             {
                                 *update_install = Some((
@@ -844,5 +873,22 @@ impl ModsPage {
                     on_install(item);
                 }
             });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_changelog_preview() {
+        let arrow = '→';
+        let ellipsis = '…';
+        assert_eq!(changelog_preview("2.0", &None), format!("{arrow} 2.0"));
+        assert!(changelog_preview("2.0", &Some("a b".to_string())).contains("a b"));
+        let long = "x".repeat(400);
+        let preview = changelog_preview("3.0", &Some(long));
+        assert!(preview.starts_with(&format!("{arrow} 3.0")));
+        assert!(preview.ends_with(ellipsis));
     }
 }
