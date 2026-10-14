@@ -1187,6 +1187,56 @@ impl LauncherApp {
         });
     }
 
+    /// Install OptiFine as a regular mod jar into the instance `mods/`
+    /// (CONCEPT P4: OptiFine is a mod, not a loader). Resolves the
+    /// stable build for the instance MC version and reuses the standard
+    /// install report pipeline (provenance, rescan, toasts).
+    fn install_optifine_mod(
+        &mut self,
+        mc_version: String,
+        mods_dir: PathBuf,
+        instance_id: Option<uuid::Uuid>,
+    ) {
+        let (tx, rx) = mpsc::channel(1);
+        self.mod_install_rx = Some(rx);
+        let engine = self.download_engine.clone();
+        tokio::spawn(async move {
+            let outcome: Result<InstallReport, String> = async {
+                let client = reqwest::Client::new();
+                let versions = OptiFineLoader::get_versions_for_mc(&client, &mc_version)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let selected = OptiFineLoader::select_patch(&versions)
+                    .ok_or_else(|| format!("No OptiFine builds published for MC {mc_version}"))?;
+                let url = OptiFineLoader::download_url(&selected.filename);
+                let dest = mods_dir.join(&selected.filename);
+                if let Some(parent) = dest.parent() {
+                    tokio::fs::create_dir_all(parent)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                }
+                let item = amc_downloader::DownloadItem::new(&url, &dest);
+                engine
+                    .download_one(&item, None, DownloadCancel::default())
+                    .await
+                    .map_err(|e| e.to_string())?;
+                Ok(InstallReport {
+                    mod_id: format!("optifine:{}", selected.filename),
+                    title: "OptiFine".to_string(),
+                    extra: Vec::new(),
+                    filenames: vec![selected.filename.clone()],
+                    replaced_olds: Vec::new(),
+                    instance_id,
+                    target_dir: mods_dir.clone(),
+                    mc_version: Some(mc_version),
+                    loader_name: "minecraft".to_string(),
+                })
+            }
+            .await;
+            let _ = tx.send(outcome).await;
+        });
+    }
+
     /// One-click Sodium + Lithium install for weak hardware (CONCEPT P1/P4).
     /// Reuses the standard install pipeline (compat check, hash verify,
     /// provenance), replacing any installed copies in place.
@@ -3807,7 +3857,24 @@ impl App for LauncherApp {
                         // Rollback replaced files stashed by updates.
                         if self.mods_page.rollback_requested {
                             self.mods_page.rollback_requested = false;
-                            self.rollback_mod_updates(mods_dir);
+                            self.rollback_mod_updates(mods_dir.clone());
+                        }
+                        // OptiFine-as-mod install (CONCEPT P4).
+                        if self.mods_page.optifine_install_requested {
+                            self.mods_page.optifine_install_requested = false;
+                            match self.mods_page.compat_mc.clone() {
+                                Some(mc) => self.install_optifine_mod(
+                                    mc,
+                                    mods_dir.clone(),
+                                    self.selected_instance,
+                                ),
+                                None => {
+                                    self.mods_page.status_message = Some((
+                                        lang.mods_optifine_need_instance().to_string(),
+                                        false,
+                                    ));
+                                }
+                            }
                         }
                         // Persist version pins.
                         if let Some(slug) = self.mods_page.pin_toggle.take() {

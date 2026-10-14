@@ -92,6 +92,9 @@ pub struct ModsPage {
     /// Rollback of replaced files stashed by updates (CONCEPT P4).
     pub rollback_available: bool,
     pub rollback_requested: bool,
+    /// OptiFine-as-mod install request (CONCEPT P4: OptiFine is a
+    /// regular mod, not a loader). Handled by the app.
+    pub optifine_install_requested: bool,
     /// Compat context for per-row hints, set by the app each frame.
     pub compat_mc: Option<String>,
     pub compat_loader: String,
@@ -126,6 +129,7 @@ impl Default for ModsPage {
             pin_toggle: None,
             rollback_available: false,
             rollback_requested: false,
+            optifine_install_requested: false,
             compat_mc: None,
             compat_loader: "minecraft".to_string(),
             icon_textures: HashMap::new(),
@@ -368,6 +372,9 @@ impl ModsPage {
                     }
                     if self.rollback_available && ui.button(lang.mods_rollback()).clicked() {
                         self.rollback_requested = true;
+                    }
+                    if ui.button(lang.mods_install_optifine()).clicked() {
+                        self.optifine_install_requested = true;
                     }
                 });
 

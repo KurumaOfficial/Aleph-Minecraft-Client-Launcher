@@ -3311,6 +3311,22 @@ impl Language {
         }
     }
 
+    pub fn mods_install_optifine(&self) -> &'static str {
+        match self {
+            Self::English => "Install OptiFine",
+            Self::Russian => "Установить OptiFine",
+            Self::Ukrainian => "Встановити OptiFine",
+        }
+    }
+
+    pub fn mods_optifine_need_instance(&self) -> &'static str {
+        match self {
+            Self::English => "Select an instance first",
+            Self::Russian => "Сначала выбери сборку",
+            Self::Ukrainian => "Спочатку вибери збірку",
+        }
+    }
+
     pub fn home_direct_play(&self) -> &'static str {
         match self {
             Self::English => "Direct Connect",
@@ -3642,6 +3658,8 @@ mod tests {
             assert!(!lang.mods_unpin().is_empty());
             assert!(!lang.mods_sort_relevance().is_empty());
             assert!(!lang.mods_sort_downloads().is_empty());
+            assert!(!lang.mods_install_optifine().is_empty());
+            assert!(!lang.mods_optifine_need_instance().is_empty());
             assert!(!lang.nav_profile().is_empty());
             assert!(!lang.tour_home_title().is_empty());
             assert!(!lang.tour_home_body().is_empty());

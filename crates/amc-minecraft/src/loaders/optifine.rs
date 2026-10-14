@@ -257,5 +257,22 @@ mod tests {
             .expect("OptiFine 1.20.1 resolves");
         assert_eq!(details.inherits_from.as_deref(), Some("1.20.1"));
         assert!(!details.libraries.is_empty());
+        // The produced jar URL must resolve (HEAD only, no download).
+        let jar_url = details.libraries[0]
+            .downloads
+            .as_ref()
+            .and_then(|d| d.artifact.as_ref())
+            .map(|a| a.url.clone())
+            .expect("OptiFine library carries a jar URL");
+        let head = client
+            .head(&jar_url)
+            .send()
+            .await
+            .expect("OptiFine jar URL answers");
+        assert!(
+            head.status().is_success(),
+            "OptiFine jar HEAD: {}",
+            head.status()
+        );
     }
 }
