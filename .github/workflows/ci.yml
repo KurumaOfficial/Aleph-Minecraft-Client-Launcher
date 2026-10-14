@@ -46,7 +46,9 @@ jobs:
         run: cargo build --workspace --locked
 
       - name: CLI smoke (P14)
-        run: ./target/debug/amc.exe --help
+        run: |
+          ./target/debug/amc.exe --help
+          ./target/debug/amc.exe --list
 
       - name: Upload Binary Artifact
         uses: actions/upload-artifact@v4
