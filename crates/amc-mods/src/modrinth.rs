@@ -113,6 +113,16 @@ impl Default for ModrinthClient {
 }
 
 impl ModrinthClient {
+    /// Loader names the marketplace search understands (CONCEPT P4 filters).
+    /// Only real loader categories pass through — Vanilla/OptiFine and the
+    /// `"minecraft"` fallback (no instance selected) mean "no loader facet".
+    pub fn search_loader_filter(loader: &str) -> Option<String> {
+        match loader.to_lowercase().as_str() {
+            "fabric" | "quilt" | "forge" | "neoforge" => Some(loader.to_lowercase()),
+            _ => None,
+        }
+    }
+
     pub async fn search(
         &self,
         query: &str,
@@ -227,7 +237,29 @@ impl ModrinthClient {
         category: ModCategory,
         limit: usize,
     ) -> Result<Vec<ModSearchResult>> {
-        Self::search_sorted(&self.client, "", None, None, category, limit, "downloads").await
+        self.search_trending_filtered(category, None, None, limit)
+            .await
+    }
+
+    /// Discover scoped to instance filters (CONCEPT P4): same
+    /// popularity index, plus loader/MC facets when present.
+    pub async fn search_trending_filtered(
+        &self,
+        category: ModCategory,
+        loader: Option<&str>,
+        mc_version: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<ModSearchResult>> {
+        Self::search_sorted(
+            &self.client,
+            "",
+            loader,
+            mc_version,
+            category,
+            limit,
+            "downloads",
+        )
+        .await
     }
 
     /// Discover modpacks (CONCEPT P4, inside the instances tab):
@@ -383,6 +415,22 @@ mod tests {
     fn test_select_compatible_none() {
         let versions = fixture();
         assert!(ModrinthClient::select_compatible(&versions, "1.18.2", "fabric").is_none());
+    }
+
+    #[test]
+    fn test_search_loader_filter() {
+        assert_eq!(
+            ModrinthClient::search_loader_filter("Fabric"),
+            Some("fabric".to_string())
+        );
+        assert_eq!(
+            ModrinthClient::search_loader_filter("neoforge"),
+            Some("neoforge".to_string())
+        );
+        assert_eq!(ModrinthClient::search_loader_filter("Vanilla"), None);
+        assert_eq!(ModrinthClient::search_loader_filter("OptiFine"), None);
+        assert_eq!(ModrinthClient::search_loader_filter("minecraft"), None);
+        assert_eq!(ModrinthClient::search_loader_filter(""), None);
     }
 
     #[test]

@@ -731,7 +731,17 @@ impl LauncherApp {
         });
     }
 
-    fn search_mods(&mut self, query: String, provider: ModSource, category: ModCategory) {
+    /// Marketplace search pre-filtered by the selected instance
+    /// (CONCEPT P4: filters by Minecraft version; loader only when it is a
+    /// real Modrinth/CurseForge loader category — vanilla/optifine pass None).
+    fn search_mods(
+        &mut self,
+        query: String,
+        provider: ModSource,
+        category: ModCategory,
+        loader: Option<String>,
+        mc_version: Option<String>,
+    ) {
         self.mods_page.is_searching = true;
         let (tx, rx) = mpsc::channel(1);
         self.mod_search_rx = Some(rx);
@@ -740,7 +750,10 @@ impl LauncherApp {
             match provider {
                 ModSource::CurseForge => {
                     let client = CurseForgeClient::default();
-                    match client.search(&query, None, None, 30).await {
+                    match client
+                        .search(&query, loader.as_deref(), mc_version.as_deref(), 30)
+                        .await
+                    {
                         Ok(results) => {
                             let _ = tx.send(results).await;
                         }
@@ -752,11 +765,27 @@ impl LauncherApp {
                 }
                 _ => {
                     let client = ModrinthClient::default();
-                    // Empty query = Discover: most downloaded first.
+                    // Empty query = Discover: most downloaded first, still
+                    // scoped to the instance filters when present.
                     let result = if query.trim().is_empty() {
-                        client.search_trending(category, 20).await
+                        client
+                            .search_trending_filtered(
+                                category,
+                                loader.as_deref(),
+                                mc_version.as_deref(),
+                                20,
+                            )
+                            .await
                     } else {
-                        client.search(&query, None, None, category, 30).await
+                        client
+                            .search(
+                                &query,
+                                loader.as_deref(),
+                                mc_version.as_deref(),
+                                category,
+                                30,
+                            )
+                            .await
                     };
                     match result {
                         Ok(results) => {
@@ -3102,8 +3131,8 @@ impl App for LauncherApp {
                             ),
                             None => (None, "minecraft".to_string()),
                         };
-                        self.mods_page.compat_mc = compat_mc;
-                        self.mods_page.compat_loader = compat_loader;
+                        self.mods_page.compat_mc = compat_mc.clone();
+                        self.mods_page.compat_loader = compat_loader.clone();
                         self.mods_page.pinned_keys = self.config.pinned_mods.clone();
 
                         let mut update_install = None;
@@ -3176,7 +3205,12 @@ impl App for LauncherApp {
                         }
 
                         if let Some((q, prov, cat)) = search_req {
-                            self.search_mods(q, prov, cat);
+                            // Server-side pre-filter (CONCEPT P4): the
+                            // marketplace only returns builds for this
+                            // MC version/loader; row hints still show why.
+                            let filter_loader =
+                                ModrinthClient::search_loader_filter(&compat_loader);
+                            self.search_mods(q, prov, cat, filter_loader, compat_mc.clone());
                         }
                         if let Some(item) = mod_to_install {
                             self.install_mod(item, None);
