@@ -1579,6 +1579,38 @@ impl Language {
         }
     }
 
+    pub fn mods_update_all(&self) -> &'static str {
+        match self {
+            Self::English => "Update all",
+            Self::Russian => "Обновить всё",
+            Self::Ukrainian => "Оновити все",
+        }
+    }
+
+    pub fn mods_rollback(&self) -> &'static str {
+        match self {
+            Self::English => "Roll back updates",
+            Self::Russian => "Откатить обновления",
+            Self::Ukrainian => "Відкотити оновлення",
+        }
+    }
+
+    pub fn mods_pin(&self) -> &'static str {
+        match self {
+            Self::English => "Pin this version (skip in updates)",
+            Self::Russian => "Зафиксировать версию (не обновлять)",
+            Self::Ukrainian => "Зафіксувати версію (не оновлювати)",
+        }
+    }
+
+    pub fn mods_unpin(&self) -> &'static str {
+        match self {
+            Self::English => "Unpin version",
+            Self::Russian => "Открепить версию",
+            Self::Ukrainian => "Відкріпити версію",
+        }
+    }
+
     pub fn settings_show_snapshots(&self) -> &'static str {
         match self {
             Self::English => "Show snapshots in version list",
@@ -1782,9 +1814,9 @@ impl Language {
 
     pub fn wizard_hw_sodium(&self) -> &'static str {
         match self {
-            Self::English => "Install Sodium",
-            Self::Russian => "Установить Sodium",
-            Self::Ukrainian => "Встановити Sodium",
+            Self::English => "Install Sodium + Lithium",
+            Self::Russian => "Установить Sodium + Lithium",
+            Self::Ukrainian => "Встановити Sodium + Lithium",
         }
     }
 
@@ -2516,6 +2548,30 @@ impl Language {
         }
     }
 
+    pub fn discover_refresh(&self) -> &'static str {
+        match self {
+            Self::English => "Refresh",
+            Self::Russian => "Обновить",
+            Self::Ukrainian => "Оновити",
+        }
+    }
+
+    pub fn discover_install(&self) -> &'static str {
+        match self {
+            Self::English => "Install pack",
+            Self::Russian => "Установить сборку",
+            Self::Ukrainian => "Встановити збірку",
+        }
+    }
+
+    pub fn discover_no_instance(&self) -> &'static str {
+        match self {
+            Self::English => "Select an instance to install the pack into",
+            Self::Russian => "Выбери сборку для установки пака",
+            Self::Ukrainian => "Вибери збірку для встановлення паку",
+        }
+    }
+
     pub fn nav_profile(&self) -> &'static str {
         match self {
             Self::English => "Profile",
@@ -3187,6 +3243,9 @@ mod tests {
             assert!(!lang.inst_account_label().is_empty());
             assert!(!lang.inst_account_default().is_empty());
             assert!(!lang.discover_title().is_empty());
+            assert!(!lang.discover_refresh().is_empty());
+            assert!(!lang.discover_install().is_empty());
+            assert!(!lang.discover_no_instance().is_empty());
             assert!(!lang.tour_home_title().is_empty());
             assert!(!lang.tour_home_body().is_empty());
             assert!(!lang.tour_instances_title().is_empty());
@@ -3270,6 +3329,10 @@ mod tests {
             assert!(!lang.batch_delete().is_empty());
             assert!(!lang.mods_update_available().is_empty());
             assert!(!lang.mods_check_updates().is_empty());
+            assert!(!lang.mods_update_all().is_empty());
+            assert!(!lang.mods_rollback().is_empty());
+            assert!(!lang.mods_pin().is_empty());
+            assert!(!lang.mods_unpin().is_empty());
             assert!(!lang.nav_profile().is_empty());
             assert!(!lang.tour_home_title().is_empty());
             assert!(!lang.tour_home_body().is_empty());

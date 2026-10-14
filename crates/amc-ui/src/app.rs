@@ -83,6 +83,8 @@ pub struct LauncherApp {
     favorites_snapshot: Vec<amc_minecraft::FavoriteServerEntry>,
     mod_update_rx: Option<mpsc::Receiver<Vec<crate::pages::mods::UpdateOffer>>>,
     fav_ping_rx: Option<mpsc::Receiver<Vec<(String, amc_minecraft::ServerStatus)>>>,
+    discover_rx: Option<mpsc::Receiver<Vec<ModSearchResult>>>,
+    discover_dl_rx: Option<mpsc::Receiver<Result<PathBuf, String>>>,
     update_rx: Option<mpsc::Receiver<Option<String>>>,
     toasts: Vec<Toast>,
     pending_identity_pick: bool,
@@ -107,13 +109,16 @@ pub struct LauncherApp {
     ms_poll_rx: Option<mpsc::Receiver<Result<Account, String>>>,
 }
 
-/// Outcome of one mod installation (CONCEPT P4): downloaded files plus
-/// provenance for the local-mod badge and old-file cleanup on updates.
+/// Outcome of a mod installation batch (CONCEPT P4): downloaded files plus
+/// provenance for the local-mod badge; replaced files move to the rollback
+/// area instead of being deleted so updates stay undoable.
 struct InstallReport {
     mod_id: String,
     title: String,
+    /// Batch mates beyond the primary item: (id, title) for badges.
+    extra: Vec<(String, String)>,
     filenames: Vec<String>,
-    replaced_old: Option<String>,
+    replaced_olds: Vec<String>,
     instance_id: Option<uuid::Uuid>,
     target_dir: std::path::PathBuf,
     mc_version: Option<String>,
@@ -164,6 +169,13 @@ impl LauncherApp {
         // struct literal moves them.
         let wishlist_snapshot = config.wishlist.clone();
         let favorites = amc_minecraft::load_favorites(&paths.root_dir);
+        // Rollback stash survives restarts (CONCEPT P4): reflect it on the
+        // Mods page from the first frame instead of after the first update.
+        let backups_root = config
+            .world_backup_dir
+            .clone()
+            .unwrap_or_else(|| paths.backups_dir());
+        mods_page.rollback_available = Self::rollback_stash_nonempty_at(&backups_root);
 
         Self {
             paths,
@@ -202,6 +214,8 @@ impl LauncherApp {
             favorites_snapshot: favorites.clone(),
             mod_update_rx: None,
             fav_ping_rx: None,
+            discover_rx: None,
+            discover_dl_rx: None,
             update_rx: None,
             toasts: Vec::new(),
             pending_identity_pick: false,
@@ -241,7 +255,8 @@ impl LauncherApp {
 
     /// Add playtime to an instance, merging with whatever is on disk first
     /// so parallel sessions (including the same instance ×N) never lose
-    /// minutes to a last-writer-wins overwrite.
+    /// minutes to a last-writer-wins overwrite. Every call also bumps the
+    /// launched-sessions counter (CONCEPT "Статистика игры", P10).
     fn add_playtime(
         paths: &LauncherPaths,
         instances: &mut [Instance],
@@ -254,6 +269,7 @@ impl LauncherApp {
         let mut applied = false;
         if let Some(inst) = disk.iter_mut().find(|i| i.id == inst_id) {
             inst.total_played_minutes += mins;
+            inst.sessions += 1;
             inst.last_played = Some(now);
             applied = true;
         }
@@ -264,10 +280,12 @@ impl LauncherApp {
             if applied {
                 if let Some(saved) = disk.iter().find(|i| i.id == inst_id) {
                     inst.total_played_minutes = saved.total_played_minutes;
+                    inst.sessions = saved.sessions;
                     inst.last_played = saved.last_played;
                 }
             } else {
                 inst.total_played_minutes += mins;
+                inst.sessions += 1;
                 inst.last_played = Some(now);
                 let _ = Instance::save_all(&instances_file, instances);
             }
@@ -403,6 +421,7 @@ impl LauncherApp {
         } else {
             (None, "minecraft".to_string())
         };
+        let pins = self.config.pinned_mods.clone();
 
         tokio::spawn(async move {
             let client = ModrinthClient::default();
@@ -420,6 +439,11 @@ impl LauncherApp {
                     Some(h) => h,
                     None => continue,
                 };
+                // Pinned versions never get offers (CONCEPT P4): compare the
+                // real project slug, not the filename guess.
+                if pins.contains(&hit.id) {
+                    continue;
+                }
                 let versions = match client.list_versions(&hit.id).await {
                     Ok(v) => v,
                     Err(_) => continue,
@@ -644,6 +668,69 @@ impl LauncherApp {
         });
     }
 
+    /// Fetch trending Modrinth packs for the Discover section
+    /// (CONCEPT P4, inside the instances tab).
+    fn load_discover(&mut self) {
+        let (tx, rx) = mpsc::channel(1);
+        self.discover_rx = Some(rx);
+        tokio::spawn(async move {
+            let client = ModrinthClient::default();
+            let packs = client.search_modpacks(20).await.unwrap_or_default();
+            let _ = tx.send(packs).await;
+        });
+    }
+
+    /// Download a Discover pack `.mrpack` and import it into the selected
+    /// instance through the standard mrpack pipeline.
+    fn install_discover_pack(&mut self, slug: String) {
+        let lang = self.config.ui.language();
+        if self.selected_instance.is_none() {
+            push_toast(
+                &mut self.toasts,
+                &self.config.notifications,
+                ToastKind::Downloads,
+                lang.discover_no_instance().to_string(),
+            );
+            return;
+        }
+        let (tx, rx) = mpsc::channel(1);
+        self.discover_dl_rx = Some(rx);
+        let engine = self.download_engine.clone();
+        let dest = self
+            .paths
+            .cache_dir()
+            .join("discover")
+            .join(format!("{slug}.mrpack"));
+        tokio::spawn(async move {
+            let result: Result<PathBuf, String> = async {
+                let client = ModrinthClient::default();
+                let versions = client
+                    .list_versions(&slug)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let file = versions
+                    .iter()
+                    .flat_map(|v| v.files.clone())
+                    .find(|f| f.filename.ends_with(".mrpack"))
+                    .or_else(|| versions.iter().flat_map(|v| v.files.clone()).next())
+                    .ok_or_else(|| "Pack has no downloadable files".to_string())?;
+                if let Some(parent) = dest.parent() {
+                    tokio::fs::create_dir_all(parent)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                }
+                let item = amc_downloader::DownloadItem::new(&file.url, &dest);
+                engine
+                    .download_one(&item, None, DownloadCancel::default())
+                    .await
+                    .map_err(|e| e.to_string())?;
+                Ok(dest)
+            }
+            .await;
+            let _ = tx.send(result).await;
+        });
+    }
+
     fn search_mods(&mut self, query: String, provider: ModSource, category: ModCategory) {
         self.mods_page.is_searching = true;
         let (tx, rx) = mpsc::channel(1);
@@ -852,8 +939,9 @@ impl LauncherApp {
                 .send(Ok(InstallReport {
                     mod_id: format!("mrpack:{}", index.name),
                     title: index.name.clone(),
+                    extra: Vec::new(),
                     filenames: Vec::new(),
-                    replaced_old: None,
+                    replaced_olds: Vec::new(),
                     instance_id: None,
                     target_dir: base_dir.join("mods"),
                     mc_version: None,
@@ -864,9 +952,9 @@ impl LauncherApp {
         });
     }
 
-    /// One-click Sodium install for weak hardware (CONCEPT P1/P4).
+    /// One-click Sodium + Lithium install for weak hardware (CONCEPT P1/P4).
     /// Reuses the standard install pipeline (compat check, hash verify,
-    /// provenance), replacing any installed Sodium in place.
+    /// provenance), replacing any installed copies in place.
     fn install_sodium(&mut self) {
         let lang = self.config.ui.language();
         let loader = self
@@ -888,29 +976,46 @@ impl LauncherApp {
             );
             return;
         }
-        // Replace the installed Sodium file instead of duplicating it.
-        let old = self
-            .mods_page
-            .local_mods
-            .iter()
-            .find(|m| m.name.eq_ignore_ascii_case("sodium"))
-            .and_then(|m| m.path.file_name().map(|n| n.to_string_lossy().to_string()));
-        self.install_mod(
-            ModSearchResult {
-                source: ModSource::Modrinth,
-                id: "sodium".to_string(),
-                title: "Sodium".to_string(),
-                author: "JellySquid".to_string(),
-                downloads: 0,
-                description: String::new(),
-                icon_url: None,
-                category: ModCategory::Mod,
-            },
-            old,
-        );
+        // Replace installed copies instead of duplicating them.
+        let old_for = |name: &str| {
+            self.mods_page
+                .local_mods
+                .iter()
+                .find(|m| m.name.eq_ignore_ascii_case(name))
+                .and_then(|m| m.path.file_name().map(|n| n.to_string_lossy().to_string()))
+        };
+        let sodium_old = old_for("sodium");
+        let lithium_old = old_for("lithium");
+        let item = |id: &str, title: &str, author: &str| ModSearchResult {
+            source: ModSource::Modrinth,
+            id: id.to_string(),
+            title: title.to_string(),
+            author: author.to_string(),
+            downloads: 0,
+            description: String::new(),
+            icon_url: None,
+            category: ModCategory::Mod,
+            game_versions: Vec::new(),
+            loaders: Vec::new(),
+        };
+        self.install_mods(vec![
+            (item("sodium", "Sodium", "JellySquid"), sodium_old),
+            (item("lithium", "Lithium", "JellySquid"), lithium_old),
+        ]);
     }
 
     fn install_mod(&mut self, mod_item: ModSearchResult, replaced_old: Option<String>) {
+        self.install_mods(vec![(mod_item, replaced_old)]);
+    }
+
+    /// Batch install (CONCEPT P4 "обновить всё"): every root resolves like
+    /// a single install; one report carries all files and replaced olds.
+    /// Autodeps stay depth-1 off the first root to bound the download set.
+    fn install_mods(&mut self, items: Vec<(ModSearchResult, Option<String>)>) {
+        let Some((first, _)) = items.first() else {
+            return;
+        };
+        let first = first.clone();
         let base_dir = if let Some(id) = self.selected_instance {
             if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
                 inst.get_game_dir(&self.paths.instances_dir())
@@ -921,7 +1026,7 @@ impl LauncherApp {
             self.paths.root_dir.clone()
         };
 
-        let target_dir = match mod_item.category {
+        let target_dir = match first.category {
             ModCategory::ResourcePack => base_dir.join("resourcepacks"),
             ModCategory::Shader => base_dir.join("shaderpacks"),
             ModCategory::Mod => base_dir.join("mods"),
@@ -950,42 +1055,45 @@ impl LauncherApp {
         self.mod_install_rx = Some(rx);
 
         tokio::spawn(async move {
-            let outcome: Result<Vec<(ModDownloadFile, String)>, String> = async {
-                let mut queue: Vec<(String, ModSource, ModCategory, Option<String>)> = vec![(
-                    mod_item.id.clone(),
-                    mod_item.source,
-                    mod_item.category,
-                    None,
-                )];
-                let mut installed: Vec<(ModDownloadFile, String)> = Vec::new();
-                let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
-                // Depth-1 autodeps: the root mod plus what it strictly requires.
-                while let Some((slug, source, category, old_file)) = queue.pop() {
-                    if !seen.insert(format!("{slug:?}{source:?}")) {
-                        continue;
+            let outcome: Result<(Vec<(ModDownloadFile, String)>, Vec<(String, String)>), String> =
+                async {
+                    let mut queue: Vec<(String, ModSource, ModCategory, Option<String>)> =
+                        Vec::new();
+                    let mut meta: Vec<(String, String)> = Vec::new();
+                    for (item, old) in items {
+                        meta.push((item.id.clone(), item.title.clone()));
+                        queue.push((item.id, item.source, item.category, old));
                     }
-                    let (file, deps) =
-                        resolve_mod_file(&slug, source, category, &mc_version, &loader_name)
-                            .await?;
-                    if installed.len() >= 8 {
-                        break;
-                    }
-                    installed.push((file, old_file.unwrap_or_default()));
-                    if installed.len() == 1 {
-                        for dep in deps.into_iter().take(4) {
-                            queue.push((dep, ModSource::Modrinth, ModCategory::Mod, None));
+                    let mut installed: Vec<(ModDownloadFile, String)> = Vec::new();
+                    let mut seen: std::collections::HashSet<String> =
+                        std::collections::HashSet::new();
+                    // Depth-1 autodeps: the root mod plus what it strictly requires.
+                    while let Some((slug, source, category, old_file)) = queue.pop() {
+                        if !seen.insert(format!("{slug:?}{source:?}")) {
+                            continue;
+                        }
+                        let (file, deps) =
+                            resolve_mod_file(&slug, source, category, &mc_version, &loader_name)
+                                .await?;
+                        if installed.len() >= 8 {
+                            break;
+                        }
+                        installed.push((file, old_file.unwrap_or_default()));
+                        if installed.len() == 1 {
+                            for dep in deps.into_iter().take(4) {
+                                queue.push((dep, ModSource::Modrinth, ModCategory::Mod, None));
+                            }
                         }
                     }
+                    if installed.is_empty() {
+                        return Err("Nothing to install".to_string());
+                    }
+                    Ok((installed, meta))
                 }
-                if installed.is_empty() {
-                    return Err("Nothing to install".to_string());
-                }
-                Ok(installed)
-            }
-            .await;
+                .await;
 
             match outcome {
-                Ok(files) => {
+                Ok((files, meta)) => {
                     let mut names = Vec::new();
                     for (file_info, _old) in &files {
                         let dest = target_dir.join(&file_info.filename);
@@ -1009,12 +1117,20 @@ impl LauncherApp {
                         names.push(file_info.filename.clone());
                     }
                     tracing::info!("Items {:?} installed successfully!", names);
+                    let replaced_olds: Vec<String> = files
+                        .iter()
+                        .map(|(_, old)| old.clone())
+                        .filter(|old| !old.is_empty())
+                        .collect();
+                    let mut meta_iter = meta.into_iter();
+                    let (primary_id, primary_title) = meta_iter.next().unwrap_or_default();
                     let _ = tx
                         .send(Ok(InstallReport {
-                            mod_id: mod_item.id.clone(),
-                            title: mod_item.title.clone(),
+                            mod_id: primary_id,
+                            title: primary_title,
+                            extra: meta_iter.collect(),
                             filenames: names,
-                            replaced_old,
+                            replaced_olds,
                             instance_id: install_instance,
                             target_dir: install_target,
                             mc_version,
@@ -1107,6 +1223,60 @@ impl LauncherApp {
             .world_backup_dir
             .clone()
             .unwrap_or_else(|| self.paths.backups_dir())
+    }
+
+    /// Rollback stash for mod files replaced by updates (CONCEPT P4),
+    /// namespaced per game folder.
+    fn mod_rollback_dir(&self, target_mods_dir: &std::path::Path) -> PathBuf {
+        let key = target_mods_dir
+            .parent()
+            .and_then(|p| p.file_name())
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| "shared".to_string());
+        self.world_backups_root().join("mod-rollback").join(key)
+    }
+
+    /// Restore stashed pre-update mod files over the current ones.
+    fn rollback_mod_updates(&mut self, mods_dir: PathBuf) {
+        let stash = self.mod_rollback_dir(&mods_dir);
+        let mut restored = 0u32;
+        if let Ok(entries) = std::fs::read_dir(&stash) {
+            for entry in entries.flatten() {
+                let src = entry.path();
+                if !src.is_file() {
+                    continue;
+                }
+                let dst = mods_dir.join(entry.file_name());
+                let _ = std::fs::remove_file(&dst);
+                if std::fs::rename(&src, &dst).is_ok() {
+                    restored += 1;
+                }
+            }
+        }
+        let _ = std::fs::remove_dir(&stash);
+        self.mods_page.local_mods = LocalModManager::scan_mods(&mods_dir).unwrap_or_default();
+        self.instances_page.refresh_scans();
+        self.mods_page.rollback_available = self.rollback_stash_nonempty();
+        let lang = self.config.ui.language();
+        self.mods_page.status_message =
+            Some((format!("{}: {restored}", lang.mods_rollback()), true));
+    }
+
+    fn rollback_stash_nonempty(&self) -> bool {
+        Self::rollback_stash_nonempty_at(&self.world_backups_root())
+    }
+
+    fn rollback_stash_nonempty_at(root_base: &std::path::Path) -> bool {
+        let root = root_base.join("mod-rollback");
+        let Ok(namespaces) = std::fs::read_dir(&root) else {
+            return false;
+        };
+        namespaces.flatten().any(|ns| {
+            ns.path().is_dir()
+                && std::fs::read_dir(ns.path())
+                    .map(|mut e| e.any(|f| f.map(|f| f.path().is_file()).unwrap_or(false)))
+                    .unwrap_or(false)
+        })
     }
 
     /// Copy shared files from a foreign `.minecraft` (versions, assets,
@@ -2016,12 +2186,19 @@ impl App for LauncherApp {
                 match res {
                     Ok(report) => {
                         let lang = self.config.ui.language();
+                        let rollback = self.mod_rollback_dir(&report.target_dir);
                         self.mods_page.installing_ids.remove(&report.mod_id);
+                        for (id, _) in &report.extra {
+                            self.mods_page.installing_ids.remove(id);
+                        }
                         self.mods_page
                             .installed_titles
                             .insert(report.title.to_lowercase());
-                        // Provenance for the local-mod badge + old-file
-                        // cleanup on one-click updates.
+                        for (_, title) in &report.extra {
+                            self.mods_page.installed_titles.insert(title.to_lowercase());
+                        }
+                        // Provenance for the local-mod badge; replaced files
+                        // move to the rollback area so updates stay undoable.
                         if let Some(inst_id) = report.instance_id {
                             if let Some(inst) = self.instances.iter_mut().find(|i| i.id == inst_id)
                             {
@@ -2030,10 +2207,19 @@ impl App for LauncherApp {
                                         inst.installed_by_launcher.push(name.clone());
                                     }
                                 }
-                                if let Some(old) = &report.replaced_old {
-                                    let old_path = report.target_dir.join(old);
-                                    let _ = std::fs::remove_file(&old_path);
-                                    inst.installed_by_launcher.retain(|n| n != old);
+                                if !report.replaced_olds.is_empty() {
+                                    let _ = std::fs::create_dir_all(&rollback);
+                                    for old in &report.replaced_olds {
+                                        let src = report.target_dir.join(old);
+                                        let dst = rollback.join(old);
+                                        if src.is_file() {
+                                            let _ = std::fs::remove_file(&dst);
+                                            if std::fs::rename(&src, &dst).is_ok() {
+                                                self.mods_page.rollback_available = true;
+                                            }
+                                        }
+                                        inst.installed_by_launcher.retain(|n| n != old);
+                                    }
                                 }
                                 let _ = Instance::save_all(
                                     &self.paths.instances_file(),
@@ -2194,6 +2380,26 @@ impl App for LauncherApp {
                 self.home_page.fav_status = list.into_iter().collect();
                 self.home_page.fav_pinging = false;
                 self.fav_ping_rx = None;
+            }
+        }
+
+        // Discover packs list + .mrpack download results.
+        if let Some(rx) = &mut self.discover_rx {
+            if let Ok(packs) = rx.try_recv() {
+                self.instances_page.discover = packs;
+                self.instances_page.discover_loading = false;
+                self.discover_rx = None;
+            }
+        }
+        if let Some(rx) = &mut self.discover_dl_rx {
+            if let Ok(result) = rx.try_recv() {
+                match result {
+                    Ok(path) => self.import_mrpack(path),
+                    Err(e) => {
+                        self.mods_page.status_message = Some((e, false));
+                    }
+                }
+                self.discover_dl_rx = None;
             }
         }
 
@@ -2861,6 +3067,14 @@ impl App for LauncherApp {
                             }
                             InstanceAction::None => {}
                         }
+                        // Discover trending packs (CONCEPT P4).
+                        if self.instances_page.discover_requested {
+                            self.instances_page.discover_requested = false;
+                            self.load_discover();
+                        }
+                        if let Some(slug) = self.instances_page.discover_install.take() {
+                            self.install_discover_pack(slug);
+                        }
                     }
                     NavTab::Mods => {
                         let base_dir = if let Some(id) = self.selected_instance {
@@ -2875,6 +3089,21 @@ impl App for LauncherApp {
                         let mods_dir = base_dir.join("mods");
                         let mut search_req = None;
                         let mut mod_to_install = None;
+
+                        // Compat context for per-row hints (no signature change).
+                        let (compat_mc, compat_loader) = match self
+                            .selected_instance
+                            .and_then(|id| self.instances.iter().find(|i| i.id == id))
+                        {
+                            Some(inst) => (
+                                Some(inst.game_version.clone()),
+                                inst.loader.as_str().to_string(),
+                            ),
+                            None => (None, "minecraft".to_string()),
+                        };
+                        self.mods_page.compat_mc = compat_mc;
+                        self.mods_page.compat_loader = compat_loader;
+                        self.mods_page.pinned_keys = self.config.pinned_mods.clone();
 
                         let mut update_install = None;
                         self.mods_page.show(
@@ -2893,6 +3122,50 @@ impl App for LauncherApp {
 
                         if let Some((item, old_filename)) = update_install {
                             self.install_mod(item, Some(old_filename));
+                        }
+                        // "Update all": one batch for every unpinned offer.
+                        if self.mods_page.update_all_requested {
+                            self.mods_page.update_all_requested = false;
+                            let batch: Vec<(ModSearchResult, Option<String>)> = self
+                                .mods_page
+                                .update_offers
+                                .values()
+                                .filter(|o| !self.config.pinned_mods.contains(&o.slug))
+                                .map(|o| {
+                                    (
+                                        ModSearchResult {
+                                            source: ModSource::Modrinth,
+                                            id: o.slug.clone(),
+                                            title: o.title.clone(),
+                                            author: String::new(),
+                                            downloads: 0,
+                                            description: String::new(),
+                                            icon_url: None,
+                                            category: ModCategory::Mod,
+                                            game_versions: Vec::new(),
+                                            loaders: Vec::new(),
+                                        },
+                                        Some(o.old_filename.clone()),
+                                    )
+                                })
+                                .collect();
+                            if !batch.is_empty() {
+                                self.install_mods(batch);
+                            }
+                        }
+                        // Rollback replaced files stashed by updates.
+                        if self.mods_page.rollback_requested {
+                            self.mods_page.rollback_requested = false;
+                            self.rollback_mod_updates(mods_dir);
+                        }
+                        // Persist version pins.
+                        if let Some(slug) = self.mods_page.pin_toggle.take() {
+                            if self.config.pinned_mods.contains(&slug) {
+                                self.config.pinned_mods.retain(|s| s != &slug);
+                            } else {
+                                self.config.pinned_mods.push(slug);
+                            }
+                            let _ = self.config.save_to_path(&self.paths.config_file());
                         }
                         // Persist wishlist hearts.
                         if self.config.wishlist != self.wishlist_snapshot {

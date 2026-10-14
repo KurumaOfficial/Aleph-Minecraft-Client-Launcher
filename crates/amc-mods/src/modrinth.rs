@@ -21,6 +21,12 @@ struct SearchHit {
     description: String,
     #[serde(default)]
     icon_url: Option<String>,
+    /// Game versions from the search hit (Modrinth `versions`).
+    #[serde(default)]
+    versions: Vec<String>,
+    /// Loader/category slugs from the search hit (Modrinth `categories`).
+    #[serde(default)]
+    categories: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -154,6 +160,19 @@ impl ModrinthClient {
             }
         }
 
+        Self::search_projects(client, query, facets, limit, index, category).await
+    }
+
+    /// Raw project search with explicit facets (unit-tested URL building
+    /// lives in the facet assembly above and in `search_modpacks`).
+    async fn search_projects(
+        client: &Client,
+        query: &str,
+        facets: Vec<Vec<String>>,
+        limit: usize,
+        index: &str,
+        category: ModCategory,
+    ) -> Result<Vec<ModSearchResult>> {
         let res = client
             .get(&format!("{API_BASE}/search"))
             .query(&[
@@ -193,6 +212,8 @@ impl ModrinthClient {
                 description: h.description,
                 icon_url: h.icon_url,
                 category,
+                game_versions: h.versions,
+                loaders: h.categories,
             })
             .collect())
     }
@@ -204,6 +225,20 @@ impl ModrinthClient {
         limit: usize,
     ) -> Result<Vec<ModSearchResult>> {
         Self::search_sorted(&self.client, "", None, None, category, limit, "downloads").await
+    }
+
+    /// Discover modpacks (CONCEPT P4, inside the instances tab):
+    /// most-downloaded `project_type:modpack` projects.
+    pub async fn search_modpacks(&self, limit: usize) -> Result<Vec<ModSearchResult>> {
+        Self::search_projects(
+            &self.client,
+            "",
+            vec![vec!["project_type:modpack".to_string()]],
+            limit,
+            "downloads",
+            ModCategory::Mod,
+        )
+        .await
     }
 
     /// All versions of a project, newest first (API default order).

@@ -8,6 +8,7 @@ use crate::widgets::full::tag;
 use amc_auth::Account;
 use amc_core::types::{Instance, InstanceIcon, InstanceTemplate, LoaderType};
 use amc_core::Language;
+use amc_mods::ModSearchResult;
 use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -74,6 +75,14 @@ pub struct InstancesPage {
 
     // Per-instance management (worlds / configs / health modal).
     manage: InstanceManage,
+
+    // Discover trending modpacks (CONCEPT P4): list + one-click .mrpack
+    // import into the selected instance. Fetched once per session.
+    pub discover_open: bool,
+    pub discover: Vec<ModSearchResult>,
+    pub discover_loading: bool,
+    pub discover_requested: bool,
+    pub discover_install: Option<String>,
 }
 
 impl Default for InstancesPage {
@@ -109,6 +118,11 @@ impl Default for InstancesPage {
             icon_textures: HashMap::new(),
             icon_failed: std::collections::HashSet::new(),
             manage: InstanceManage::default(),
+            discover_open: true,
+            discover: Vec::new(),
+            discover_loading: false,
+            discover_requested: false,
+            discover_install: None,
         }
     }
 }
@@ -437,6 +451,67 @@ impl InstancesPage {
         });
 
         ui.add_space(8.0);
+
+        // Discover trending modpacks (CONCEPT P4): inside the instances
+        // tab, never on the home screen.
+        ui.horizontal(|ui| {
+            let label = if self.discover_open {
+                format!("🔥 {} ▾", lang.discover_title())
+            } else {
+                format!("🔥 {} ▸", lang.discover_title())
+            };
+            if ui
+                .button(
+                    egui::RichText::new(label)
+                        .font(egui::FontId::proportional(14.0))
+                        .strong()
+                        .color(TEXT_HEADING),
+                )
+                .clicked()
+            {
+                self.discover_open = !self.discover_open;
+            }
+            if self.discover_open
+                && !self.discover_loading
+                && ui.button(lang.discover_refresh()).clicked()
+            {
+                self.discover_requested = true;
+                self.discover_loading = true;
+            }
+        });
+        if self.discover_open {
+            if self.discover.is_empty() && !self.discover_loading {
+                // First paint fetches once; refresh reuses the button above.
+                self.discover_requested = true;
+                self.discover_loading = true;
+            }
+            if self.discover_loading && self.discover.is_empty() {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                });
+            }
+            for pack in self.discover.clone() {
+                ui.horizontal(|ui| {
+                    ui.label(
+                        egui::RichText::new(truncate_name(&pack.title, 34))
+                            .font(egui::FontId::proportional(12.0))
+                            .strong()
+                            .color(TEXT_PRIMARY),
+                    );
+                    ui.label(
+                        egui::RichText::new(format!("⬇ {}", pack.downloads))
+                            .font(egui::FontId::proportional(11.0))
+                            .color(TEXT_MUTED),
+                    );
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.button(lang.discover_install()).clicked() {
+                            self.discover_install = Some(pack.id.clone());
+                        }
+                    });
+                });
+            }
+            ui.add_space(8.0);
+        }
 
         // Filter + sort instances (pinned float on top).
         let query = self.search_query.trim().to_lowercase();

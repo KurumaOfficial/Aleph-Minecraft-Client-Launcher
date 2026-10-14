@@ -140,6 +140,9 @@ impl CurseForgeClient {
                 description: item.summary,
                 icon_url: item.logo.map(|l| l.url),
                 category: ModCategory::Mod,
+                // CurseTools search items carry no version metadata.
+                game_versions: Vec::new(),
+                loaders: Vec::new(),
             })
             .collect())
     }

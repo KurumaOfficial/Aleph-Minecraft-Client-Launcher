@@ -149,6 +149,9 @@ pub struct LauncherConfig {
     /// Mod wishlist: `"source:id"` entries not yet installed.
     #[serde(default)]
     pub wishlist: Vec<String>,
+    /// Pinned mod slugs (Modrinth): skipped by update checks.
+    #[serde(default)]
+    pub pinned_mods: Vec<String>,
 }
 
 fn default_true() -> bool {
@@ -194,6 +197,7 @@ impl Default for LauncherConfig {
             tour_seen: false,
             mc_reuse_done: false,
             wishlist: Vec::new(),
+            pinned_mods: Vec::new(),
         }
     }
 }
@@ -298,6 +302,7 @@ mod tests {
         assert!(fresh.notifications.launcher);
         assert_eq!(fresh.world_backup_days, 0);
         assert!(fresh.wishlist.is_empty());
+        assert!(fresh.pinned_mods.is_empty());
         assert!(!fresh.ask_identity_each_launch);
         // Legacy file without any new keys still parses.
         let legacy: LauncherConfig =

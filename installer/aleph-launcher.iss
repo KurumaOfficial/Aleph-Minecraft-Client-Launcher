@@ -61,12 +61,28 @@ begin
     Result := True;
 end;
 
+function IsVcRedistAvailable(): Boolean;
+var
+  Installed: Cardinal;
+begin
+  Result := False;
+  if RegQueryDWordValue(HKLM, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64', 'Installed', Installed) then
+    Result := Installed = 1;
+  if (not Result) and RegQueryDWordValue(HKLM, 'SOFTWARE\WOW6432Node\Microsoft\VisualStudio\14.0\VC\Runtimes\x64', 'Installed', Installed) then
+    Result := Installed = 1;
+end;
+
 function InitializeSetup(): Boolean;
 begin
   Result := True;
   if not IsDotNetAvailable() then
   begin
     if MsgBox('Microsoft .NET Framework 4.8 was not detected. The launcher itself does not need it, but some Java distributions do. Continue anyway?', mbConfirmation, MB_YESNO) = IDNO then
+      Result := False;
+  end;
+  if Result and (not IsVcRedistAvailable()) then
+  begin
+    if MsgBox('Microsoft Visual C++ Redistributable (x64) was not detected. Minecraft needs it (MSVCP140.dll). The installer can continue, but the game may fail to start. Continue anyway?', mbConfirmation, MB_YESNO) = IDNO then
       Result := False;
   end;
 end;

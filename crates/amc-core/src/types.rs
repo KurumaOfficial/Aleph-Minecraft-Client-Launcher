@@ -85,6 +85,9 @@ pub struct Instance {
     pub created_at: DateTime<Utc>,
     pub last_played: Option<DateTime<Utc>>,
     pub total_played_minutes: u64,
+    /// Launched sessions counter (CONCEPT "Статистика игры", P10).
+    #[serde(default)]
+    pub sessions: u64,
     /// Preset icon key (`InstanceIcon::ALL`), `None` = loader glyph.
     /// A custom `icon.png` in the game dir wins over any preset.
     #[serde(default)]
@@ -162,6 +165,7 @@ impl Instance {
             created_at: Utc::now(),
             last_played: None,
             total_played_minutes: 0,
+            sessions: 0,
             icon: None,
             tags: Vec::new(),
             pinned: false,
@@ -260,6 +264,7 @@ impl Instance {
         cloned.created_at = Utc::now();
         cloned.last_played = None;
         cloned.total_played_minutes = 0;
+        cloned.sessions = 0;
         cloned.custom_dir = None;
 
         let src_dir = self.get_game_dir(base_instances_dir);
@@ -442,6 +447,7 @@ mod tests {
         assert!(inst.pre_launch_cmd.is_empty());
         assert!(inst.post_exit_cmd.is_empty());
         assert!(inst.installed_by_launcher.is_empty());
+        assert_eq!(inst.sessions, 0);
     }
 
     #[test]

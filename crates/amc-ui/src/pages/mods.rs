@@ -44,6 +44,17 @@ pub struct ModsPage {
     pub update_checking: bool,
     pub update_offers: HashMap<String, UpdateOffer>,
     pub pending_update_old: Option<String>,
+    /// "Update all" button state (CONCEPT P4).
+    pub update_all_requested: bool,
+    /// Version pins, mirrored from config each frame; slug toggle requests.
+    pub pinned_keys: Vec<String>,
+    pub pin_toggle: Option<String>,
+    /// Rollback of replaced files stashed by updates (CONCEPT P4).
+    pub rollback_available: bool,
+    pub rollback_requested: bool,
+    /// Compat context for per-row hints, set by the app each frame.
+    pub compat_mc: Option<String>,
+    pub compat_loader: String,
 }
 
 impl Default for ModsPage {
@@ -64,6 +75,13 @@ impl Default for ModsPage {
             update_checking: false,
             update_offers: HashMap::new(),
             pending_update_old: None,
+            update_all_requested: false,
+            pinned_keys: Vec::new(),
+            pin_toggle: None,
+            rollback_available: false,
+            rollback_requested: false,
+            compat_mc: None,
+            compat_loader: "minecraft".to_string(),
         }
     }
 }
@@ -295,6 +313,13 @@ impl ModsPage {
                     } else if ui.button(lang.mods_check_updates()).clicked() {
                         self.update_check_requested = true;
                     }
+                    if !self.update_offers.is_empty() && ui.button(lang.mods_update_all()).clicked()
+                    {
+                        self.update_all_requested = true;
+                    }
+                    if self.rollback_available && ui.button(lang.mods_rollback()).clicked() {
+                        self.rollback_requested = true;
+                    }
                 });
 
                 ui.add_space(8.0);
@@ -399,25 +424,45 @@ impl ModsPage {
                     // One-click update when the checker found a newer build.
                     if let Some(offer) = self.update_offers.get(&m.name).cloned() {
                         child.add_space(8.0);
+                        let pinned = self.pinned_keys.contains(&offer.slug);
                         if child
                             .button(
-                                egui::RichText::new(lang.mods_update_available()).color(RUBY_LIGHT),
+                                egui::RichText::new(if pinned { "📍" } else { "📌" })
+                                    .color(if pinned { RUBY_LIGHT } else { TEXT_MUTED }),
                             )
+                            .on_hover_text(if pinned {
+                                lang.mods_unpin()
+                            } else {
+                                lang.mods_pin()
+                            })
                             .clicked()
                         {
-                            *update_install = Some((
-                                ModSearchResult {
-                                    source: ModSource::Modrinth,
-                                    id: offer.slug.clone(),
-                                    title: offer.title.clone(),
-                                    author: String::new(),
-                                    downloads: 0,
-                                    description: String::new(),
-                                    icon_url: None,
-                                    category: ModCategory::Mod,
-                                },
-                                offer.old_filename.clone(),
-                            ));
+                            self.pin_toggle = Some(offer.slug.clone());
+                        }
+                        if !pinned {
+                            if child
+                                .button(
+                                    egui::RichText::new(lang.mods_update_available())
+                                        .color(RUBY_LIGHT),
+                                )
+                                .clicked()
+                            {
+                                *update_install = Some((
+                                    ModSearchResult {
+                                        source: ModSource::Modrinth,
+                                        id: offer.slug.clone(),
+                                        title: offer.title.clone(),
+                                        author: String::new(),
+                                        downloads: 0,
+                                        description: String::new(),
+                                        icon_url: None,
+                                        category: ModCategory::Mod,
+                                        game_versions: Vec::new(),
+                                        loaders: Vec::new(),
+                                    },
+                                    offer.old_filename.clone(),
+                                ));
+                            }
                         }
                     }
                 }
@@ -666,6 +711,32 @@ impl ModsPage {
                             )
                             .truncate(),
                         );
+                        // Compat hint (CONCEPT P4): known-good builds get a
+                        // check against the selected instance; unknown
+                        // metadata stays silent instead of guessing.
+                        if !item.game_versions.is_empty() {
+                            let mut versions = item.game_versions.join(" ");
+                            if versions.chars().count() > 42 {
+                                versions =
+                                    format!("{}…", versions.chars().take(42).collect::<String>());
+                            }
+                            let fits = self
+                                .compat_mc
+                                .as_deref()
+                                .is_some_and(|mc| item.fits(mc, &self.compat_loader));
+                            let mut hint = versions;
+                            if !item.loaders.is_empty() {
+                                hint.push_str(&format!(" • {}", item.loaders.join(" ")));
+                            }
+                            if fits {
+                                hint = format!("✓ {hint}");
+                            }
+                            ui.label(
+                                egui::RichText::new(hint)
+                                    .font(egui::FontId::proportional(10.0))
+                                    .color(if fits { SUCCESS } else { TEXT_MUTED }),
+                            );
+                        }
                     });
 
                     // Install button or Installed status
