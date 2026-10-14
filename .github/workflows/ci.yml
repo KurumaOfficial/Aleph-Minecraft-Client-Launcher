@@ -45,6 +45,9 @@ jobs:
       - name: Build Debug (dev builds only, see docs/ROADMAP-1.0.ru.md P0)
         run: cargo build --workspace --locked
 
+      - name: CLI smoke (P14)
+        run: ./target/debug/amc.exe --help
+
       - name: Upload Binary Artifact
         uses: actions/upload-artifact@v4
         with:
