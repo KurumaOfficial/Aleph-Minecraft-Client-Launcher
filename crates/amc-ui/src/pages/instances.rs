@@ -101,6 +101,8 @@ pub struct InstancesPage {
     pub show_clone_modal: bool,
     pub clone_instance_id: Option<Uuid>,
     pub clone_with_saves: bool,
+    /// Desktop shortcut request for the app shell (CONCEPT P11/P14).
+    pub shortcut_request: Option<Uuid>,
 }
 
 impl Default for InstancesPage {
@@ -152,6 +154,7 @@ impl Default for InstancesPage {
             show_clone_modal: false,
             clone_instance_id: None,
             clone_with_saves: true,
+            shortcut_request: None,
         }
     }
 }
@@ -841,6 +844,13 @@ impl InstancesPage {
                     page.clone_instance_id = Some(inst_id);
                     page.clone_with_saves = true;
                     page.show_clone_modal = true;
+                }
+                if ui
+                    .button(egui::RichText::new("🔗").color(TEXT_PRIMARY))
+                    .on_hover_text(lang.inst_btn_shortcut())
+                    .clicked()
+                {
+                    page.shortcut_request = Some(inst_id);
                 }
                 if ui
                     .button(egui::RichText::new("🛠").color(TEXT_PRIMARY))

@@ -3659,6 +3659,33 @@ impl App for LauncherApp {
                                 );
                             }
                         }
+                        // Desktop shortcut for direct instance launch
+                        // (`amc --launch <id>`, CONCEPT P11/P14).
+                        if let Some(id) = self.instances_page.shortcut_request.take() {
+                            if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
+                                let note = match std::env::current_exe() {
+                                    Ok(exe) => {
+                                        let shortcut = amc_core::InstanceShortcut::new(
+                                            &inst.name,
+                                            &inst.id.to_string(),
+                                            exe,
+                                            self.paths.root_dir.clone(),
+                                        );
+                                        match shortcut.create() {
+                                            Ok(path) => path.to_string_lossy().to_string(),
+                                            Err(e) => format!("Shortcut failed: {e}"),
+                                        }
+                                    }
+                                    Err(e) => format!("Shortcut failed: {e}"),
+                                };
+                                push_toast(
+                                    &mut self.toasts,
+                                    &self.config.notifications,
+                                    ToastKind::Launcher,
+                                    note,
+                                );
+                            }
+                        }
                     }
                     NavTab::Mods => {
                         let base_dir = if let Some(id) = self.selected_instance {

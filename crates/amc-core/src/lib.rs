@@ -8,6 +8,7 @@ pub mod logging;
 pub mod paths;
 
 pub mod settings_bundle;
+pub mod shortcuts;
 pub mod trash;
 pub mod types;
 pub mod worlds;
@@ -22,6 +23,9 @@ pub use i18n::Language;
 pub use logging::init_logging;
 pub use paths::looks_like_minecraft;
 pub use paths::LauncherPaths;
+pub use shortcuts::{
+    linux_desktop_entry, sanitize_file_stem, windows_lnk_script, InstanceShortcut,
+};
 pub use trash::{
     copy_dir, list_trash, purge_trash_all, purge_trash_entry, restore_instance, trash_instance,
     TrashedInstance,

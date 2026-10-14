@@ -3263,6 +3263,14 @@ impl Language {
         }
     }
 
+    pub fn inst_btn_shortcut(&self) -> &'static str {
+        match self {
+            Self::English => "Desktop shortcut (direct launch)",
+            Self::Russian => "Ярлык на рабочий стол (прямой запуск)",
+            Self::Ukrainian => "Ярлик на робочий стіл (прямий запуск)",
+        }
+    }
+
     pub fn mods_cat_mods(&self) -> &'static str {
         match self {
             Self::English => "Mods",
@@ -3605,6 +3613,7 @@ mod tests {
             assert!(!lang.loader_pin_reset().is_empty());
             assert!(!lang.clone_title().is_empty());
             assert!(!lang.clone_saves().is_empty());
+            assert!(!lang.inst_btn_shortcut().is_empty());
             assert!(!lang.server_create().is_empty());
             assert!(!lang.server_stop().is_empty());
             assert!(!lang.server_running(25565).is_empty());
