@@ -9,7 +9,7 @@ pub mod skins;
 pub use home::{HomeContext, HomePage};
 pub use instance_manage::InstanceManage;
 pub use instances::{InstanceAction, InstancesContext, InstancesPage};
-pub use mods::{ModsPage, UpdateOffer};
+pub use mods::{icon_key, ModsPage, UpdateOffer};
 pub use profile::{ProfileAction, ProfilePage};
 pub use settings::SettingsPage;
 pub use skins::SkinsPage;

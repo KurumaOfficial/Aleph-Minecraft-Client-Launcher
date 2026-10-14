@@ -56,6 +56,17 @@ pub fn changelog_preview(version: &str, changelog: &Option<String>) -> String {
     format!("→ {version}\n{short}{tail}")
 }
 
+/// Cache key for a marketplace artwork texture: source-scoped so equal
+/// numeric ids from Modrinth and CurseForge never collide.
+pub fn icon_key(source: &ModSource, id: &str) -> String {
+    let tag = match source {
+        ModSource::Modrinth => "mr",
+        ModSource::CurseForge => "cf",
+        ModSource::Local => "local",
+    };
+    format!("{tag}:{id}")
+}
+
 pub struct ModsPage {
     pub sub_tab: ModsSubTab,
     pub search_provider: ModSource,
@@ -84,6 +95,11 @@ pub struct ModsPage {
     /// Compat context for per-row hints, set by the app each frame.
     pub compat_mc: Option<String>,
     pub compat_loader: String,
+    /// Marketplace artwork cache (CONCEPT P10 previews): live textures
+    /// plus in-flight/failed keys so each icon fetches at most once.
+    pub icon_textures: HashMap<String, egui::TextureHandle>,
+    pub icon_pending: HashSet<String>,
+    pub icon_failed: HashSet<String>,
 }
 
 impl Default for ModsPage {
@@ -112,6 +128,9 @@ impl Default for ModsPage {
             rollback_requested: false,
             compat_mc: None,
             compat_loader: "minecraft".to_string(),
+            icon_textures: HashMap::new(),
+            icon_pending: HashSet::new(),
+            icon_failed: HashSet::new(),
         }
     }
 }
@@ -724,15 +743,28 @@ impl ModsPage {
                     );
                     child.add_space(14.0);
 
-                    // Icon placeholder
-                    let icon_glyph = match item.source {
-                        ModSource::Modrinth => "🌐",
-                        ModSource::CurseForge => "🔥",
-                        ModSource::Local => "🧩",
-                    };
-                    child.label(
-                        egui::RichText::new(icon_glyph).font(egui::FontId::proportional(22.0)),
-                    );
+                    // Marketplace artwork (CONCEPT P10 previews): cached
+                    // texture when fetched, source glyph otherwise.
+                    let key = icon_key(&item.source, &item.id);
+                    if let Some(tex) = self.icon_textures.get(&key) {
+                        let (irect, _) =
+                            child.allocate_exact_size(vec2(36.0, 36.0), Sense::hover());
+                        child.painter().image(
+                            tex.id(),
+                            irect,
+                            egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                            egui::Color32::WHITE,
+                        );
+                    } else {
+                        let icon_glyph = match item.source {
+                            ModSource::Modrinth => "🌐",
+                            ModSource::CurseForge => "🔥",
+                            ModSource::Local => "🧩",
+                        };
+                        child.label(
+                            egui::RichText::new(icon_glyph).font(egui::FontId::proportional(22.0)),
+                        );
+                    }
                     child.add_space(12.0);
 
                     // Title & Description with truncation
@@ -914,6 +946,18 @@ impl ModsPage {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_icon_key_scopes_sources() {
+        assert_eq!(
+            icon_key(&ModSource::Modrinth, "42"),
+            icon_key(&ModSource::Modrinth, "42")
+        );
+        assert_ne!(
+            icon_key(&ModSource::Modrinth, "42"),
+            icon_key(&ModSource::CurseForge, "42")
+        );
+    }
 
     #[test]
     fn test_changelog_preview() {

@@ -24,7 +24,7 @@ use crate::modals::{
     OverlayAction, PickerAction, ScreensAction, ScreensModal, WizardAction, WizardFlow,
 };
 use crate::pages::{
-    HomeContext, HomePage, InstanceAction, InstancesContext, InstancesPage, ModsPage,
+    icon_key, HomeContext, HomePage, InstanceAction, InstancesContext, InstancesPage, ModsPage,
     ProfileAction, ProfilePage, SettingsPage, SkinsPage,
 };
 use crate::theme::{apply_aleph_theme, BG};
@@ -78,6 +78,8 @@ pub struct LauncherApp {
     versions_rx: Option<mpsc::Receiver<Vec<GameVersion>>>,
     server_ping_rx: Option<mpsc::Receiver<amc_minecraft::ServerStatus>>,
     mod_search_rx: Option<mpsc::Receiver<Vec<ModSearchResult>>>,
+    mod_icon_rx: Option<mpsc::Receiver<(String, Vec<u8>)>>,
+    mod_icon_tx: Option<mpsc::Sender<(String, Vec<u8>)>>,
     mod_install_rx: Option<mpsc::Receiver<Result<InstallReport, String>>>,
     wishlist_snapshot: Vec<String>,
     favorites_snapshot: Vec<amc_minecraft::FavoriteServerEntry>,
@@ -209,6 +211,8 @@ impl LauncherApp {
             versions_rx: None,
             server_ping_rx: None,
             mod_search_rx: None,
+            mod_icon_rx: None,
+            mod_icon_tx: None,
             mod_install_rx: None,
             wishlist_snapshot,
             favorites_snapshot: favorites.clone(),
@@ -2473,6 +2477,48 @@ impl App for LauncherApp {
             }
         }
 
+        // Receive marketplace artwork bytes, decode to gallery textures.
+        if let Some(rx) = &mut self.mod_icon_rx {
+            while let Ok((key, bytes)) = rx.try_recv() {
+                self.mods_page.icon_pending.remove(&key);
+                if bytes.is_empty() || bytes.len() > 1_048_576 {
+                    self.mods_page.icon_failed.insert(key);
+                    continue;
+                }
+                match image::load_from_memory(&bytes) {
+                    Ok(img) => {
+                        let small = img.thumbnail(96, 96);
+                        let rgba = small.to_rgba8();
+                        let (w, h) = (rgba.width() as usize, rgba.height() as usize);
+                        if w == 0 || h == 0 {
+                            self.mods_page.icon_failed.insert(key);
+                            continue;
+                        }
+                        let pixels: Vec<egui::Color32> = rgba
+                            .pixels()
+                            .map(|p| egui::Color32::from_rgb(p[0], p[1], p[2]))
+                            .collect();
+                        let tex = ctx.load_texture(
+                            format!("modicon-{key}"),
+                            egui::ColorImage {
+                                size: [w, h],
+                                pixels,
+                            },
+                            egui::TextureOptions::LINEAR,
+                        );
+                        // Session-bounded cache: beyond the cap new icons
+                        // fall back to the source glyph.
+                        if self.mods_page.icon_textures.len() < 400 {
+                            self.mods_page.icon_textures.insert(key, tex);
+                        }
+                    }
+                    Err(_) => {
+                        self.mods_page.icon_failed.insert(key);
+                    }
+                }
+            }
+        }
+
         // Receive Mod installation result
         if let Some(rx) = &mut self.mod_install_rx {
             if let Ok(res) = rx.try_recv() {
@@ -3421,6 +3467,45 @@ impl App for LauncherApp {
                         self.mods_page.compat_mc = compat_mc.clone();
                         self.mods_page.compat_loader = compat_loader.clone();
                         self.mods_page.pinned_keys = self.config.pinned_mods.clone();
+
+                        // Marketplace artwork (CONCEPT P10 previews): queue
+                        // one fetch per unseen icon, capped in flight.
+                        if self.mod_icon_tx.is_none() {
+                            let (tx, rx) = mpsc::channel(32);
+                            self.mod_icon_tx = Some(tx);
+                            self.mod_icon_rx = Some(rx);
+                        }
+                        if let Some(tx) = self.mod_icon_tx.clone() {
+                            for item in &self.mods_page.search_results {
+                                let Some(url) = item.icon_url.clone() else {
+                                    continue;
+                                };
+                                let key = icon_key(&item.source, &item.id);
+                                if self.mods_page.icon_textures.contains_key(&key)
+                                    || self.mods_page.icon_pending.contains(&key)
+                                    || self.mods_page.icon_failed.contains(&key)
+                                    || self.mods_page.icon_pending.len() >= 12
+                                {
+                                    continue;
+                                }
+                                self.mods_page.icon_pending.insert(key.clone());
+                                let tx = tx.clone();
+                                tokio::spawn(async move {
+                                    let bytes = match reqwest::Client::new().get(&url).send().await
+                                    {
+                                        Ok(res) => res
+                                            .bytes()
+                                            .await
+                                            .map(|b| b.to_vec())
+                                            .unwrap_or_default(),
+                                        Err(_) => Vec::new(),
+                                    };
+                                    // Always answered: empty bytes retire
+                                    // the pending slot as failed.
+                                    let _ = tx.send((key, bytes)).await;
+                                });
+                            }
+                        }
 
                         let mut update_install = None;
                         self.mods_page.show(
