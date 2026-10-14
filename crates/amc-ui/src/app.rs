@@ -2589,6 +2589,10 @@ impl App for LauncherApp {
                 NavTab::Profile,
                 NavTab::Settings,
             ];
+            let use_alt = matches!(
+                self.config.tab_hotkey_mod,
+                amc_core::config::TabHotkeyMod::Alt
+            );
             for (i, tab) in tabs.iter().enumerate() {
                 let digit = match i {
                     0 => egui::Key::Num1,
@@ -2598,7 +2602,15 @@ impl App for LauncherApp {
                     4 => egui::Key::Num5,
                     _ => egui::Key::Num6,
                 };
-                if ctx.input(|inp| inp.modifiers.ctrl && inp.key_pressed(digit)) {
+                let pressed = ctx.input(|inp| {
+                    let mod_down = if use_alt {
+                        inp.modifiers.alt
+                    } else {
+                        inp.modifiers.ctrl
+                    };
+                    mod_down && inp.key_pressed(digit)
+                });
+                if pressed {
                     self.current_tab = *tab;
                 }
             }

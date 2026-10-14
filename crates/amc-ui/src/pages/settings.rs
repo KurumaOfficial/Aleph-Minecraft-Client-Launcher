@@ -446,6 +446,27 @@ impl SettingsPage {
                         }
                     });
             });
+            ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new(lang.hotkey_tabs()).color(TEXT_PRIMARY));
+                egui::ComboBox::from_id_salt("hotkey_tabs_select")
+                    .selected_text(config.tab_hotkey_mod.label())
+                    .show_ui(ui, |ui| {
+                        for key in amc_core::config::TabHotkeyMod::ALL {
+                            if ui
+                                .selectable_label(config.tab_hotkey_mod == key, key.label())
+                                .clicked()
+                            {
+                                config.tab_hotkey_mod = key;
+                            }
+                        }
+                    });
+                ui.label(
+                    egui::RichText::new("+ 1…6")
+                        .font(egui::FontId::proportional(11.0))
+                        .color(TEXT_MUTED),
+                );
+            });
         });
 
         ui.add_space(14.0);

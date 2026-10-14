@@ -156,6 +156,9 @@ pub struct LauncherConfig {
     /// Quick-launch hotkey (CONCEPT "Горячие клавиши", P10).
     #[serde(default)]
     pub launch_hotkey: LaunchHotkey,
+    /// Modifier for Ctrl/Alt+1..6 tab switching.
+    #[serde(default)]
+    pub tab_hotkey_mod: TabHotkeyMod,
     /// Shared Java/RAM groups, referenced by instance `group` name
     /// (CONCEPT P2 "группы сборок").
     #[serde(default)]
@@ -189,6 +192,26 @@ impl LaunchHotkey {
             Self::F7 => "F7",
             Self::F8 => "F8",
             Self::F9 => "F9",
+        }
+    }
+}
+
+/// Modifier for tab-switch hotkeys (CONCEPT "Горячие клавиши", P10).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum TabHotkeyMod {
+    /// Ctrl+1..6 (default).
+    #[default]
+    Ctrl,
+    Alt,
+}
+
+impl TabHotkeyMod {
+    pub const ALL: [Self; 2] = [Self::Ctrl, Self::Alt];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Ctrl => "Ctrl",
+            Self::Alt => "Alt",
         }
     }
 }
@@ -234,6 +257,7 @@ impl Default for LauncherConfig {
             wishlist: Vec::new(),
             pinned_mods: Vec::new(),
             launch_hotkey: LaunchHotkey::default(),
+            tab_hotkey_mod: TabHotkeyMod::default(),
             instance_groups: HashMap::new(),
         }
     }
@@ -342,6 +366,7 @@ mod tests {
         assert!(fresh.pinned_mods.is_empty());
         assert!(fresh.instance_groups.is_empty());
         assert_eq!(fresh.launch_hotkey, LaunchHotkey::F5);
+        assert_eq!(fresh.tab_hotkey_mod, TabHotkeyMod::Ctrl);
         assert!(!fresh.ask_identity_each_launch);
         // Legacy file without any new keys still parses.
         let legacy: LauncherConfig =
@@ -376,6 +401,7 @@ mod tests {
             serde_json::from_str(r#"{"ui":{"theme":"x","ui_scale":1.0,"show_snapshots":false,"show_betas":false,"show_alphas":false,"show_old":false,"language":"en"},"default_launch_options":{"memory_min_mb":1024,"memory_max_mb":4096,"java_path":null,"custom_jvm_args":[],"custom_game_args":[],"window_width":854,"window_height":480,"fullscreen":false,"quick_play_server":null,"quick_play_port":null},"custom_game_dir":null,"selected_version":null,"selected_instance":null}"#)
                 .unwrap();
         assert_eq!(legacy.launch_hotkey, LaunchHotkey::F5);
+        assert_eq!(legacy.tab_hotkey_mod, TabHotkeyMod::Ctrl);
     }
 
     #[test]
