@@ -60,6 +60,11 @@ pub struct InstancesPage {
     pub edit_instance_pinned: bool,
     pub edit_instance_account: Option<Uuid>,
     pub edit_instance_group: String,
+    pub edit_use_custom_size: bool,
+    pub edit_window_w: u32,
+    pub edit_window_h: u32,
+    /// None = launcher default, Some(false) = windowed, Some(true) = fullscreen.
+    pub edit_fullscreen: Option<bool>,
     pub edit_instance_notes: String,
     pub edit_instance_pre: String,
     pub edit_instance_post: String,
@@ -112,6 +117,10 @@ impl Default for InstancesPage {
             edit_instance_pinned: false,
             edit_instance_account: None,
             edit_instance_group: String::new(),
+            edit_use_custom_size: false,
+            edit_window_w: 1280,
+            edit_window_h: 720,
+            edit_fullscreen: None,
             edit_instance_notes: String::new(),
             edit_instance_pre: String::new(),
             edit_instance_post: String::new(),
@@ -802,6 +811,10 @@ impl InstancesPage {
                     page.edit_instance_pinned = inst.pinned;
                     page.edit_instance_account = inst.default_account;
                     page.edit_instance_group = inst.group.clone().unwrap_or_default();
+                    page.edit_use_custom_size = inst.window_size.is_some();
+                    page.edit_window_w = inst.window_size.map(|(w, _)| w).unwrap_or(1280);
+                    page.edit_window_h = inst.window_size.map(|(_, h)| h).unwrap_or(720);
+                    page.edit_fullscreen = inst.fullscreen;
                     page.edit_instance_notes = inst.notes.clone();
                     page.edit_instance_pre = inst.pre_launch_cmd.clone();
                     page.edit_instance_post = inst.post_exit_cmd.clone();
@@ -1256,6 +1269,66 @@ impl InstancesPage {
                     }
 
                     ui.add_space(10.0);
+                    ui.checkbox(&mut self.edit_use_custom_size, lang.inst_res_custom());
+                    if self.edit_use_custom_size {
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                egui::RichText::new(format!("W: {}", self.edit_window_w))
+                                    .color(TEXT_PRIMARY),
+                            );
+                            ui.add(
+                                egui::Slider::new(&mut self.edit_window_w, 640..=3840)
+                                    .step_by(10.0),
+                            );
+                            ui.label(
+                                egui::RichText::new(format!("H: {}", self.edit_window_h))
+                                    .color(TEXT_PRIMARY),
+                            );
+                            ui.add(
+                                egui::Slider::new(&mut self.edit_window_h, 480..=2160)
+                                    .step_by(10.0),
+                            );
+                        });
+                    }
+                    ui.add_space(4.0);
+                    ui.label(egui::RichText::new(lang.inst_res_mode()).color(TEXT_PRIMARY));
+                    egui::ComboBox::from_id_salt("edit_display_mode_select")
+                        .selected_text(match self.edit_fullscreen {
+                            None => lang.inst_res_default(),
+                            Some(false) => lang.inst_res_windowed(),
+                            Some(true) => lang.inst_res_fullscreen(),
+                        })
+                        .show_ui(ui, |ui| {
+                            if ui
+                                .selectable_label(
+                                    self.edit_fullscreen.is_none(),
+                                    lang.inst_res_default(),
+                                )
+                                .clicked()
+                            {
+                                self.edit_fullscreen = None;
+                            }
+                            if ui
+                                .selectable_label(
+                                    self.edit_fullscreen == Some(false),
+                                    lang.inst_res_windowed(),
+                                )
+                                .clicked()
+                            {
+                                self.edit_fullscreen = Some(false);
+                            }
+                            if ui
+                                .selectable_label(
+                                    self.edit_fullscreen == Some(true),
+                                    lang.inst_res_fullscreen(),
+                                )
+                                .clicked()
+                            {
+                                self.edit_fullscreen = Some(true);
+                            }
+                        });
+
+                    ui.add_space(10.0);
                     ui.label(egui::RichText::new(lang.inst_notes_label()).color(TEXT_PRIMARY));
                     ui.add(
                         TextEdit::singleline(&mut self.edit_instance_notes)
@@ -1322,6 +1395,12 @@ impl InstancesPage {
                         } else {
                             Some(group_name)
                         };
+                        inst.window_size = if self.edit_use_custom_size {
+                            Some((self.edit_window_w, self.edit_window_h))
+                        } else {
+                            None
+                        };
+                        inst.fullscreen = self.edit_fullscreen;
                         inst.notes = self.edit_instance_notes.clone();
                         inst.pre_launch_cmd = self.edit_instance_pre.trim().to_string();
                         inst.post_exit_cmd = self.edit_instance_post.trim().to_string();

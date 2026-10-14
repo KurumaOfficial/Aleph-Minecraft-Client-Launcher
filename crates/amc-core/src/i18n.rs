@@ -2884,6 +2884,46 @@ impl Language {
         }
     }
 
+    pub fn inst_res_custom(&self) -> &'static str {
+        match self {
+            Self::English => "Custom resolution for this instance",
+            Self::Russian => "Своё разрешение для этой сборки",
+            Self::Ukrainian => "Своя роздільна здатність для цієї збірки",
+        }
+    }
+
+    pub fn inst_res_mode(&self) -> &'static str {
+        match self {
+            Self::English => "Display mode",
+            Self::Russian => "Режим экрана",
+            Self::Ukrainian => "Режим екрана",
+        }
+    }
+
+    pub fn inst_res_default(&self) -> &'static str {
+        match self {
+            Self::English => "Launcher default",
+            Self::Russian => "Как в лаунчере",
+            Self::Ukrainian => "Як у лаунчері",
+        }
+    }
+
+    pub fn inst_res_windowed(&self) -> &'static str {
+        match self {
+            Self::English => "Windowed",
+            Self::Russian => "Оконный",
+            Self::Ukrainian => "Віконний",
+        }
+    }
+
+    pub fn inst_res_fullscreen(&self) -> &'static str {
+        match self {
+            Self::English => "Fullscreen",
+            Self::Russian => "Полный экран",
+            Self::Ukrainian => "Повний екран",
+        }
+    }
+
     pub fn inst_pin_label(&self) -> &'static str {
         match self {
             Self::English => "Pin to top",
@@ -3486,6 +3526,11 @@ mod tests {
             assert!(!lang.editor_matches(2).is_empty());
             assert!(!lang.inst_group_label().is_empty());
             assert!(!lang.inst_group_hint().is_empty());
+            assert!(!lang.inst_res_custom().is_empty());
+            assert!(!lang.inst_res_mode().is_empty());
+            assert!(!lang.inst_res_default().is_empty());
+            assert!(!lang.inst_res_windowed().is_empty());
+            assert!(!lang.inst_res_fullscreen().is_empty());
             assert!(!lang.group_title().is_empty());
             assert!(!lang.group_desc().is_empty());
             assert!(!lang.group_empty().is_empty());

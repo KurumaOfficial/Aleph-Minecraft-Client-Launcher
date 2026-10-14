@@ -1732,6 +1732,7 @@ impl LauncherApp {
         }
         // P2 instance groups: shared Java/RAM wins where the group
         // defines a value; the instance RAM fills RAM gaps.
+        // Display overrides apply independently of any group.
         if let Some(selected) = self.selected_instance {
             if let Some(inst) = self.instances.iter().find(|i| i.id == selected) {
                 let (group_ram, group_java) =
@@ -1742,6 +1743,7 @@ impl LauncherApp {
                 if let Some(java) = group_java {
                     options.java_path = Some(java);
                 }
+                inst.apply_display(&mut options);
             }
         }
         if let Some((srv, port)) = self.pending_direct_connect.take() {

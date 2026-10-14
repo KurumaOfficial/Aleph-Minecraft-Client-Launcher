@@ -120,6 +120,13 @@ pub struct Instance {
     /// Unknown names resolve to no group — never an error.
     #[serde(default)]
     pub group: Option<String>,
+    /// Per-instance window size override, `None` = launcher default
+    /// (CONCEPT "разрешение отдельно для каждой сборки").
+    #[serde(default)]
+    pub window_size: Option<(u32, u32)>,
+    /// Per-instance fullscreen override, `None` = launcher default.
+    #[serde(default)]
+    pub fullscreen: Option<bool>,
 }
 
 /// Shared Java/RAM settings for a named instance group (CONCEPT P2).
@@ -225,6 +232,8 @@ impl Instance {
             post_exit_cmd: String::new(),
             installed_by_launcher: Vec::new(),
             group: None,
+            window_size: None,
+            fullscreen: None,
         }
     }
 
@@ -274,8 +283,22 @@ impl Instance {
         }
     }
 
-    /// Port the instance to another Minecraft version (CONCEPT P4
-    /// "Портирование сборки"). Only the version pin moves — mods,
+    /// Apply per-instance display overrides onto launch options
+    /// (CONCEPT "разрешение отдельно для каждой сборки").
+    /// Unset fields keep the launcher default.
+    pub fn apply_display(&self, options: &mut LaunchOptions) {
+        if let Some((w, h)) = self.window_size {
+            if w > 0 && h > 0 {
+                options.window_width = w;
+                options.window_height = h;
+            }
+        }
+        if let Some(fullscreen) = self.fullscreen {
+            options.fullscreen = fullscreen;
+        }
+    }
+
+    /// Port the instance to another Minecraft version (CONCEPT P4    /// "Портирование сборки"). Only the version pin moves — mods,
     /// stats and settings stay; the loader profile re-resolves at the
     /// next launch and the update checker re-resolves mods. Returns
     /// true when the version actually changed.
@@ -551,6 +574,25 @@ mod tests {
     }
 
     #[test]
+    fn test_apply_display_overrides() {
+        let mut inst = Instance::new("Pack", "1.20.1", LoaderType::Fabric);
+        let mut options = LaunchOptions::default();
+        // Unset fields keep the launcher default.
+        inst.apply_display(&mut options);
+        assert_eq!((options.window_width, options.window_height), (1280, 720));
+        assert!(!options.fullscreen);
+        inst.window_size = Some((1600, 900));
+        inst.fullscreen = Some(true);
+        inst.apply_display(&mut options);
+        assert_eq!((options.window_width, options.window_height), (1600, 900));
+        assert!(options.fullscreen);
+        // Zero sizes never blank the window.
+        inst.window_size = Some((0, 0));
+        inst.apply_display(&mut options);
+        assert_eq!((options.window_width, options.window_height), (1600, 900));
+    }
+
+    #[test]
     fn test_legacy_instance_without_p2_fields_uses_defaults() {
         let legacy = r#"{
             "id": "123e4567-e89b-12d3-a456-426614174000",
@@ -575,6 +617,8 @@ mod tests {
         assert!(inst.installed_by_launcher.is_empty());
         assert_eq!(inst.sessions, 0);
         assert_eq!(inst.group, None);
+        assert_eq!(inst.window_size, None);
+        assert_eq!(inst.fullscreen, None);
     }
 
     #[test]
