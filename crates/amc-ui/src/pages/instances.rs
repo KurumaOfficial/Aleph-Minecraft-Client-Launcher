@@ -25,7 +25,8 @@ pub enum InstanceAction {
     TrashPurged(Uuid),
     TrashEmptied,
     Selected(Uuid),
-    Cloned(Uuid),
+    /// Duplicate with an optional worlds copy (CONCEPT P2).
+    Cloned(Uuid, bool),
     Launch(Uuid),
 }
 
@@ -96,6 +97,10 @@ pub struct InstancesPage {
     /// Version port notice for the app shell: (instance id, old, new).
     /// The app toasts it and re-runs the mod update check (CONCEPT P4).
     pub port_notice: Option<(Uuid, String, String)>,
+    // Clone options modal (CONCEPT P2 worlds choice).
+    pub show_clone_modal: bool,
+    pub clone_instance_id: Option<Uuid>,
+    pub clone_with_saves: bool,
 }
 
 impl Default for InstancesPage {
@@ -144,6 +149,9 @@ impl Default for InstancesPage {
             discover_requested: false,
             discover_install: None,
             port_notice: None,
+            show_clone_modal: false,
+            clone_instance_id: None,
+            clone_with_saves: true,
         }
     }
 }
@@ -830,7 +838,9 @@ impl InstancesPage {
                     .on_hover_text(lang.inst_btn_clone())
                     .clicked()
                 {
-                    *action = InstanceAction::Cloned(inst_id);
+                    page.clone_instance_id = Some(inst_id);
+                    page.clone_with_saves = true;
+                    page.show_clone_modal = true;
                 }
                 if ui
                     .button(egui::RichText::new("🛠").color(TEXT_PRIMARY))
@@ -1057,6 +1067,40 @@ impl InstancesPage {
 
                         if ui.button(lang.inst_modal_btn_cancel()).clicked() {
                             self.show_create_modal = false;
+                        }
+                    });
+                });
+        }
+
+        // Clone Instance Modal Dialog: duplicate with an optional
+        // worlds/saves copy (CONCEPT P2).
+        if self.show_clone_modal {
+            egui::Window::new(lang.clone_title())
+                .collapsible(false)
+                .resizable(false)
+                .anchor(egui::Align2::CENTER_CENTER, vec2(0.0, 0.0))
+                .min_width(360.0)
+                .show(ui.ctx(), |ui| {
+                    ui.add_space(8.0);
+                    ui.checkbox(&mut self.clone_with_saves, lang.clone_saves());
+                    ui.add_space(14.0);
+                    ui.horizontal(|ui| {
+                        if ui
+                            .button(
+                                egui::RichText::new(lang.inst_btn_clone())
+                                    .strong()
+                                    .color(Color32::WHITE),
+                            )
+                            .clicked()
+                        {
+                            if let Some(id) = self.clone_instance_id {
+                                action = InstanceAction::Cloned(id, self.clone_with_saves);
+                            }
+                            self.show_clone_modal = false;
+                        }
+
+                        if ui.button(lang.inst_modal_btn_cancel()).clicked() {
+                            self.show_clone_modal = false;
                         }
                     });
                 });

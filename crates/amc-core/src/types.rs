@@ -298,7 +298,8 @@ impl Instance {
         }
     }
 
-    /// Port the instance to another Minecraft version (CONCEPT P4    /// "Портирование сборки"). Only the version pin moves — mods,
+    /// Port the instance to another Minecraft version (CONCEPT P4
+    /// "Портирование сборки"). Only the version pin moves — mods,
     /// stats and settings stay; the loader profile re-resolves at the
     /// next launch and the update checker re-resolves mods. Returns
     /// true when the version actually changed.
@@ -341,10 +342,14 @@ impl Instance {
         total
     }
 
+    /// Duplicate an instance (CONCEPT P2 "Клонирование"). Mods, configs,
+    /// resource/shader packs always copy; worlds (`saves/`) only when
+    /// `copy_saves` is set. Stats never carry over.
     pub fn clone_instance(
         &self,
         new_name: &str,
         base_instances_dir: &std::path::Path,
+        copy_saves: bool,
     ) -> Result<Self> {
         let mut cloned = self.clone();
         cloned.id = Uuid::new_v4();
@@ -360,7 +365,11 @@ impl Instance {
 
         if src_dir.is_dir() {
             let _ = std::fs::create_dir_all(&dst_dir);
-            for sub in &["config", "mods", "resourcepacks", "shaderpacks"] {
+            let mut subs = vec!["config", "mods", "resourcepacks", "shaderpacks"];
+            if copy_saves {
+                subs.push("saves");
+            }
+            for sub in subs {
                 let src_sub = src_dir.join(sub);
                 let dst_sub = dst_dir.join(sub);
                 if src_sub.is_dir() {
@@ -502,12 +511,38 @@ mod tests {
         let _ = original.ensure_directories(&temp_dir);
 
         let cloned = original
-            .clone_instance("Test Pack (Copy)", &temp_dir)
+            .clone_instance("Test Pack (Copy)", &temp_dir, true)
             .unwrap();
         assert_ne!(original.id, cloned.id);
         assert_eq!(cloned.name, "Test Pack (Copy)");
         assert_eq!(cloned.game_version, "1.20.1");
         assert_eq!(cloned.loader, LoaderType::Fabric);
+
+        let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_clone_saves_choice() {
+        let temp_dir = std::env::temp_dir().join(format!("amc_clone_{}", Uuid::new_v4()));
+        let original = Instance::new("Pack", "1.20.1", LoaderType::Fabric);
+        let src = original.get_game_dir(&temp_dir);
+        std::fs::create_dir_all(src.join("saves").join("world")).unwrap();
+        std::fs::write(src.join("saves").join("world").join("level.dat"), b"fake").unwrap();
+        std::fs::create_dir_all(src.join("mods")).unwrap();
+        std::fs::write(src.join("mods").join("m.jar"), b"fake").unwrap();
+
+        let with_saves = original
+            .clone_instance("Copy Saves", &temp_dir, true)
+            .unwrap();
+        assert!(with_saves
+            .get_game_dir(&temp_dir)
+            .join("saves/world/level.dat")
+            .is_file());
+        let bare = original
+            .clone_instance("Copy Bare", &temp_dir, false)
+            .unwrap();
+        assert!(!bare.get_game_dir(&temp_dir).join("saves").exists());
+        assert!(bare.get_game_dir(&temp_dir).join("mods/m.jar").is_file());
 
         let _ = std::fs::remove_dir_all(&temp_dir);
     }

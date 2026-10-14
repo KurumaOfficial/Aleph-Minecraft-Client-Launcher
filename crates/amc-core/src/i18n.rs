@@ -1571,6 +1571,23 @@ impl Language {
         }
     }
 
+    // ---- Clone options (CONCEPT P2 worlds choice) ----
+    pub fn clone_title(&self) -> &'static str {
+        match self {
+            Self::English => "Duplicate instance",
+            Self::Russian => "Дублировать сборку",
+            Self::Ukrainian => "Дублювати збірку",
+        }
+    }
+
+    pub fn clone_saves(&self) -> &'static str {
+        match self {
+            Self::English => "Copy worlds (saves)",
+            Self::Russian => "Копировать миры (saves)",
+            Self::Ukrainian => "Копіювати світи (saves)",
+        }
+    }
+
     // ---- Local dedicated server (CONCEPT Steam section, P13) ----
     pub fn server_title(&self) -> &'static str {
         match self {
@@ -3586,6 +3603,8 @@ mod tests {
             assert!(!lang.hotkey_tabs().is_empty());
             assert!(!lang.loader_pinned("0.15.11").is_empty());
             assert!(!lang.loader_pin_reset().is_empty());
+            assert!(!lang.clone_title().is_empty());
+            assert!(!lang.clone_saves().is_empty());
             assert!(!lang.server_create().is_empty());
             assert!(!lang.server_stop().is_empty());
             assert!(!lang.server_running(25565).is_empty());

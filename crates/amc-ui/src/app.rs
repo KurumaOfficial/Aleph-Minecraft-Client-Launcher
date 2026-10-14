@@ -3516,7 +3516,7 @@ impl App for LauncherApp {
                                     &self.instances,
                                 );
                             }
-                            InstanceAction::Cloned(id) => {
+                            InstanceAction::Cloned(id, copy_saves) => {
                                 if let Some(inst) =
                                     self.instances.iter().find(|i| i.id == id).cloned()
                                 {
@@ -3531,9 +3531,11 @@ impl App for LauncherApp {
                                             format!("{} (Копія)", inst.name)
                                         }
                                     };
-                                    if let Ok(cloned) =
-                                        inst.clone_instance(&copy_name, &self.paths.instances_dir())
-                                    {
+                                    if let Ok(cloned) = inst.clone_instance(
+                                        &copy_name,
+                                        &self.paths.instances_dir(),
+                                        copy_saves,
+                                    ) {
                                         let new_id = cloned.id;
                                         self.instances.push(cloned);
                                         self.selected_instance = Some(new_id);
