@@ -59,7 +59,10 @@ impl NeoForgeLoader {
     }
 
     /// Full one-time setup, mirroring [`ForgeLoader::resolve`]: official
-    /// installer run headlessly, produced version json cached. UNMERGED.
+    /// installer run headlessly, produced version json cached. Returns
+    /// UNMERGED details plus the resolved NeoForge version for pinning
+    /// (`None` on a cache hit or a caller-supplied pin). A stored pin
+    /// wins verbatim (reproducible, offline-friendly).
     pub async fn resolve(
         client: &Client,
         engine: &DownloadEngine,
@@ -67,8 +70,12 @@ impl NeoForgeLoader {
         java_bin: &Path,
         paths: &LauncherPaths,
         status: mpsc::Sender<String>,
-    ) -> Result<VersionDetails> {
-        let neoforge_version = Self::get_latest_version(client, mc_version).await?;
+        pinned: Option<String>,
+    ) -> Result<(VersionDetails, Option<String>)> {
+        let neoforge_version = match pinned.filter(|v| !v.trim().is_empty()) {
+            Some(v) => v,
+            None => Self::get_latest_version(client, mc_version).await?,
+        };
         let version_id = Self::version_id(mc_version, &neoforge_version);
         // Id format drifted across NeoForge lines (`{mc}-neoforge-{v}`
         // vs `neoforge-{v}`): probe every known shape before downloading.
@@ -85,7 +92,7 @@ impl NeoForgeLoader {
             if cached.is_file() {
                 if let Ok(text) = tokio::fs::read_to_string(&cached).await {
                     if let Ok(details) = VersionDetails::parse(&text) {
-                        return Ok(details);
+                        return Ok((details, None));
                     }
                 }
             }
@@ -163,7 +170,7 @@ impl NeoForgeLoader {
             let _ = tokio::fs::write(cache_dir.join(format!("{}.json", details.id)), &text).await;
         }
         let _ = tokio::fs::remove_dir_all(&staging).await; // best-effort cleanup
-        Ok(details)
+        Ok((details, Some(neoforge_version)))
     }
 }
 
@@ -309,10 +316,15 @@ mod tests {
                 eprintln!("[installer] {line}");
             }
         });
-        let details =
-            NeoForgeLoader::resolve(&client, &engine, "1.21.4", &java_bin, &paths, status_tx)
-                .await
-                .expect("NeoForge 1.21.4 resolves end to end");
+        let (details, persist_ver) = NeoForgeLoader::resolve(
+            &client, &engine, "1.21.4", &java_bin, &paths, status_tx, None,
+        )
+        .await
+        .expect("NeoForge 1.21.4 resolves end to end");
+        assert!(
+            persist_ver.as_deref().is_some_and(|v| v.starts_with("21.")),
+            "fresh resolve reports its version for pinning"
+        );
         assert!(
             details.id.contains("neoforge"),
             "unexpected version id: {}",

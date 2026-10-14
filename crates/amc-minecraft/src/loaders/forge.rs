@@ -60,9 +60,12 @@ impl ForgeLoader {
     }
 
     /// Full one-time setup: download the official installer, run it
-    /// headlessly, cache the produced version json. Returns UNMERGED details —
-    /// the caller merges the vanilla parent. A cached json makes relaunches
-    /// instant (installer versions are immutable).
+    /// headlessly, cache the produced version json. Returns the UNMERGED
+    /// details plus the resolved Forge version for pinning (`None` on a
+    /// cache hit or a caller-supplied pin) — the caller merges the
+    /// vanilla parent. A cached json makes relaunches instant (installer
+    /// versions are immutable). A stored pin wins verbatim (reproducible,
+    /// offline-friendly); latest is looked up only when unpinned.
     pub async fn resolve(
         client: &Client,
         engine: &DownloadEngine,
@@ -70,8 +73,12 @@ impl ForgeLoader {
         java_bin: &Path,
         paths: &LauncherPaths,
         status: mpsc::Sender<String>,
-    ) -> Result<VersionDetails> {
-        let forge_version = Self::get_latest_version(client, mc_version).await?;
+        pinned: Option<String>,
+    ) -> Result<(VersionDetails, Option<String>)> {
+        let forge_version = match pinned.filter(|v| !v.trim().is_empty()) {
+            Some(v) => v,
+            None => Self::get_latest_version(client, mc_version).await?,
+        };
         let version_id = Self::version_id(mc_version, &forge_version);
 
         let cached = paths
@@ -81,7 +88,7 @@ impl ForgeLoader {
         if cached.is_file() {
             if let Ok(text) = tokio::fs::read_to_string(&cached).await {
                 if let Ok(details) = VersionDetails::parse(&text) {
-                    return Ok(details);
+                    return Ok((details, None));
                 }
             }
         }
@@ -158,7 +165,7 @@ impl ForgeLoader {
             let _ = tokio::fs::write(cache_dir.join(format!("{}.json", details.id)), &text).await;
         }
         let _ = tokio::fs::remove_dir_all(&staging).await; // best-effort cleanup
-        Ok(details)
+        Ok((details, Some(forge_version)))
     }
 }
 
@@ -270,10 +277,15 @@ mod tests {
                 eprintln!("[installer] {line}");
             }
         });
-        let details =
-            ForgeLoader::resolve(&client, &engine, "1.20.1", &java_bin, &paths, status_tx)
-                .await
-                .expect("Forge 1.20.1 resolves end to end");
+        let (details, persist_ver) = ForgeLoader::resolve(
+            &client, &engine, "1.20.1", &java_bin, &paths, status_tx, None,
+        )
+        .await
+        .expect("Forge 1.20.1 resolves end to end");
+        assert!(
+            persist_ver.as_deref().is_some_and(|v| v.contains('.')),
+            "fresh resolve reports its version for pinning"
+        );
         assert!(
             details.id.contains("forge"),
             "unexpected version id: {}",

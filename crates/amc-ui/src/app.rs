@@ -2105,10 +2105,18 @@ impl LauncherApp {
                         &java_bin,
                         &paths,
                         status_tx.clone(),
+                        pinned_loader_ver.clone(),
                     )
                     .await
                     {
-                        Ok(forge_details) => {
+                        Ok((forge_details, persist_ver)) => {
+                            // Fresh unpinned resolve pins the version for
+                            // reproducible, offline-friendly relaunches.
+                            if let Some(ver) = persist_ver {
+                                if let Some(id) = pin_instance_id {
+                                    Self::persist_loader_pin(&paths, id, &ver);
+                                }
+                            }
                             // The produced version declares its own vanilla
                             // parent (a picked NeoForge/Forge line may target
                             // a newer MC than requested): merge with that.
@@ -2184,10 +2192,18 @@ impl LauncherApp {
                         &java_bin,
                         &paths,
                         status_tx.clone(),
+                        pinned_loader_ver.clone(),
                     )
                     .await
                     {
-                        Ok(neoforge_details) => {
+                        Ok((neoforge_details, persist_ver)) => {
+                            // Fresh unpinned resolve pins the version for
+                            // reproducible, offline-friendly relaunches.
+                            if let Some(ver) = persist_ver {
+                                if let Some(id) = pin_instance_id {
+                                    Self::persist_loader_pin(&paths, id, &ver);
+                                }
+                            }
                             // The produced version declares its own vanilla
                             // parent (a picked line may target a newer MC
                             // than requested): merge with that.
