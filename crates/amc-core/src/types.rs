@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt;
 use std::path::PathBuf;
 use uuid::Uuid;
@@ -115,6 +116,55 @@ pub struct Instance {
     /// local-mod badge; anything else counts as local).
     #[serde(default)]
     pub installed_by_launcher: Vec<String>,
+    /// Shared Java/RAM group name (CONCEPT P2 "группы сборок").
+    /// Unknown names resolve to no group — never an error.
+    #[serde(default)]
+    pub group: Option<String>,
+}
+
+/// Shared Java/RAM settings for a named instance group (CONCEPT P2).
+/// One edit applies to every member instance at once. Unset fields
+/// fall back to the instance value (RAM) or the launcher default (Java).
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct InstanceGroup {
+    #[serde(default)]
+    pub ram_mb: Option<u32>,
+    #[serde(default)]
+    pub java_path: Option<PathBuf>,
+}
+
+impl InstanceGroup {
+    /// Resolve effective (RAM, Java) for an instance: the named group
+    /// wins where it defines a value, the instance RAM fills RAM gaps.
+    /// Unknown or missing group names resolve to instance-only values.
+    pub fn resolve(
+        groups: &HashMap<String, InstanceGroup>,
+        inst: &Instance,
+    ) -> (Option<u32>, Option<PathBuf>) {
+        let group = inst.group.as_deref().and_then(|name| groups.get(name));
+        match group {
+            Some(g) => (g.ram_mb.or(inst.ram_mb), g.java_path.clone()),
+            None => (inst.ram_mb, None),
+        }
+    }
+
+    /// Group names from instances plus defined groups, sorted, deduped.
+    /// Powers the edit-modal hint of existing names.
+    pub fn known_names(
+        groups: &HashMap<String, InstanceGroup>,
+        instances: &[Instance],
+    ) -> Vec<String> {
+        let mut names: Vec<String> = groups.keys().cloned().collect();
+        names.extend(
+            instances
+                .iter()
+                .filter_map(|i| i.group.clone())
+                .filter(|n| !n.trim().is_empty()),
+        );
+        names.sort();
+        names.dedup();
+        names
+    }
 }
 
 /// Preset instance icons (key, glyph). AMC-team set; custom art goes
@@ -174,6 +224,7 @@ impl Instance {
             pre_launch_cmd: String::new(),
             post_exit_cmd: String::new(),
             installed_by_launcher: Vec::new(),
+            group: None,
         }
     }
 
@@ -452,6 +503,54 @@ mod tests {
     }
 
     #[test]
+    fn test_group_resolve_precedence() {
+        let mut groups = HashMap::new();
+        groups.insert(
+            "heavy".to_string(),
+            InstanceGroup {
+                ram_mb: Some(8192),
+                java_path: Some(PathBuf::from("/opt/java17/bin/java")),
+            },
+        );
+        let mut inst = Instance::new("Pack", "1.20.1", LoaderType::Fabric);
+        inst.ram_mb = Some(4096);
+        inst.group = Some("heavy".to_string());
+        // Group RAM wins over the instance value.
+        let (ram, java) = InstanceGroup::resolve(&groups, &inst);
+        assert_eq!(ram, Some(8192));
+        assert_eq!(java, Some(PathBuf::from("/opt/java17/bin/java")));
+        // Instance RAM fills group gaps.
+        groups.insert("light".to_string(), InstanceGroup::default());
+        inst.group = Some("light".to_string());
+        let (ram, java) = InstanceGroup::resolve(&groups, &inst);
+        assert_eq!(ram, Some(4096));
+        assert_eq!(java, None);
+        // Unknown groups degrade to instance-only values, never an error.
+        inst.group = Some("ghost".to_string());
+        let (ram, java) = InstanceGroup::resolve(&groups, &inst);
+        assert_eq!(ram, Some(4096));
+        assert_eq!(java, None);
+        inst.group = None;
+        let (ram, java) = InstanceGroup::resolve(&groups, &inst);
+        assert_eq!(ram, Some(4096));
+        assert_eq!(java, None);
+    }
+
+    #[test]
+    fn test_group_known_names() {
+        let mut groups = HashMap::new();
+        groups.insert("b-group".to_string(), InstanceGroup::default());
+        let mut a = Instance::new("A", "1.20.1", LoaderType::Fabric);
+        a.group = Some("a-group".to_string());
+        let mut b = Instance::new("B", "1.20.1", LoaderType::Fabric);
+        b.group = Some("  ".to_string());
+        assert_eq!(
+            InstanceGroup::known_names(&groups, &[a, b]),
+            vec!["a-group".to_string(), "b-group".to_string()]
+        );
+    }
+
+    #[test]
     fn test_legacy_instance_without_p2_fields_uses_defaults() {
         let legacy = r#"{
             "id": "123e4567-e89b-12d3-a456-426614174000",
@@ -475,6 +574,7 @@ mod tests {
         assert!(inst.post_exit_cmd.is_empty());
         assert!(inst.installed_by_launcher.is_empty());
         assert_eq!(inst.sessions, 0);
+        assert_eq!(inst.group, None);
     }
 
     #[test]

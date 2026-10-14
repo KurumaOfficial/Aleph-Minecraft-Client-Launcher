@@ -36,6 +36,8 @@ pub struct InstancesContext<'a> {
     pub trash_dir: &'a Path,
     pub backups_root: &'a Path,
     pub accounts: &'a [Account],
+    /// Defined + used group names for the edit-modal hint (CONCEPT P2).
+    pub group_names: Vec<String>,
 }
 
 pub struct InstancesPage {
@@ -57,6 +59,7 @@ pub struct InstancesPage {
     pub edit_instance_tags: String,
     pub edit_instance_pinned: bool,
     pub edit_instance_account: Option<Uuid>,
+    pub edit_instance_group: String,
     pub edit_instance_notes: String,
     pub edit_instance_pre: String,
     pub edit_instance_post: String,
@@ -108,6 +111,7 @@ impl Default for InstancesPage {
             edit_instance_tags: String::new(),
             edit_instance_pinned: false,
             edit_instance_account: None,
+            edit_instance_group: String::new(),
             edit_instance_notes: String::new(),
             edit_instance_pre: String::new(),
             edit_instance_post: String::new(),
@@ -797,6 +801,7 @@ impl InstancesPage {
                     page.edit_instance_tags = inst.tags.join(", ");
                     page.edit_instance_pinned = inst.pinned;
                     page.edit_instance_account = inst.default_account;
+                    page.edit_instance_group = inst.group.clone().unwrap_or_default();
                     page.edit_instance_notes = inst.notes.clone();
                     page.edit_instance_pre = inst.pre_launch_cmd.clone();
                     page.edit_instance_post = inst.post_exit_cmd.clone();
@@ -1236,6 +1241,21 @@ impl InstancesPage {
                         });
 
                     ui.add_space(10.0);
+                    ui.label(egui::RichText::new(lang.inst_group_label()).color(TEXT_PRIMARY));
+                    ui.add(
+                        TextEdit::singleline(&mut self.edit_instance_group)
+                            .hint_text(lang.inst_group_hint())
+                            .desired_width(400.0),
+                    );
+                    if !ctx.group_names.is_empty() {
+                        ui.label(
+                            egui::RichText::new(ctx.group_names.join(" • "))
+                                .font(egui::FontId::proportional(11.0))
+                                .color(TEXT_MUTED),
+                        );
+                    }
+
+                    ui.add_space(10.0);
                     ui.label(egui::RichText::new(lang.inst_notes_label()).color(TEXT_PRIMARY));
                     ui.add(
                         TextEdit::singleline(&mut self.edit_instance_notes)
@@ -1296,6 +1316,12 @@ impl InstancesPage {
                         inst.tags = parse_tags(&self.edit_instance_tags);
                         inst.pinned = self.edit_instance_pinned;
                         inst.default_account = self.edit_instance_account;
+                        let group_name = self.edit_instance_group.trim().to_string();
+                        inst.group = if group_name.is_empty() {
+                            None
+                        } else {
+                            Some(group_name)
+                        };
                         inst.notes = self.edit_instance_notes.clone();
                         inst.pre_launch_cmd = self.edit_instance_pre.trim().to_string();
                         inst.post_exit_cmd = self.edit_instance_post.trim().to_string();

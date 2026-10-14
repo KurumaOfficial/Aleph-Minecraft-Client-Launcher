@@ -1464,6 +1464,71 @@ impl Language {
         }
     }
 
+    // ---- Shared Java/RAM groups (CONCEPT P2) ----
+    pub fn group_title(&self) -> &'static str {
+        match self {
+            Self::English => "Instance groups",
+            Self::Russian => "Группы сборок",
+            Self::Ukrainian => "Групи збірок",
+        }
+    }
+
+    pub fn group_desc(&self) -> &'static str {
+        match self {
+            Self::English => "One edit applies to every member instance at launch.",
+            Self::Russian => "Одно изменение применяется ко всем сборкам группы при запуске.",
+            Self::Ukrainian => "Одна зміна застосовується до всіх збірок групи під час запуску.",
+        }
+    }
+
+    pub fn group_empty(&self) -> &'static str {
+        match self {
+            Self::English => "No groups yet — instances use their own settings.",
+            Self::Russian => "Групп пока нет — сборки используют свои настройки.",
+            Self::Ukrainian => "Груп поки немає — збірки використовують свої налаштування.",
+        }
+    }
+
+    pub fn group_ram(&self) -> &'static str {
+        match self {
+            Self::English => "Group RAM limit",
+            Self::Russian => "Лимит RAM группы",
+            Self::Ukrainian => "Ліміт RAM групи",
+        }
+    }
+
+    pub fn group_java_auto(&self) -> &'static str {
+        match self {
+            Self::English => "Java: auto",
+            Self::Russian => "Java: авто",
+            Self::Ukrainian => "Java: авто",
+        }
+    }
+
+    pub fn group_java_select(&self) -> &'static str {
+        match self {
+            Self::English => "Select Java…",
+            Self::Russian => "Выбрать Java…",
+            Self::Ukrainian => "Вибрати Java…",
+        }
+    }
+
+    pub fn group_name_hint(&self) -> &'static str {
+        match self {
+            Self::English => "New group name…",
+            Self::Russian => "Название новой группы…",
+            Self::Ukrainian => "Назва нової групи…",
+        }
+    }
+
+    pub fn group_add(&self) -> &'static str {
+        match self {
+            Self::English => "Add group",
+            Self::Russian => "Добавить группу",
+            Self::Ukrainian => "Додати групу",
+        }
+    }
+
     // ---- Local dedicated server (CONCEPT Steam section, P13) ----
     pub fn server_title(&self) -> &'static str {
         match self {
@@ -2803,6 +2868,22 @@ impl Language {
         }
     }
 
+    pub fn inst_group_label(&self) -> &'static str {
+        match self {
+            Self::English => "Java/RAM group",
+            Self::Russian => "Группа Java/RAM",
+            Self::Ukrainian => "Група Java/RAM",
+        }
+    }
+
+    pub fn inst_group_hint(&self) -> &'static str {
+        match self {
+            Self::English => "Empty = own settings",
+            Self::Russian => "Пусто = свои настройки",
+            Self::Ukrainian => "Порожньо = свої налаштування",
+        }
+    }
+
     pub fn inst_pin_label(&self) -> &'static str {
         match self {
             Self::English => "Pin to top",
@@ -3403,6 +3484,16 @@ mod tests {
             assert!(!lang.editor_filter_hint().is_empty());
             assert!(!lang.editor_find_hint().is_empty());
             assert!(!lang.editor_matches(2).is_empty());
+            assert!(!lang.inst_group_label().is_empty());
+            assert!(!lang.inst_group_hint().is_empty());
+            assert!(!lang.group_title().is_empty());
+            assert!(!lang.group_desc().is_empty());
+            assert!(!lang.group_empty().is_empty());
+            assert!(!lang.group_ram().is_empty());
+            assert!(!lang.group_java_auto().is_empty());
+            assert!(!lang.group_java_select().is_empty());
+            assert!(!lang.group_name_hint().is_empty());
+            assert!(!lang.group_add().is_empty());
             assert!(!lang.server_create().is_empty());
             assert!(!lang.server_stop().is_empty());
             assert!(!lang.server_running(25565).is_empty());

@@ -2,7 +2,7 @@ use amc_auth::{Account, AccountManager, DeviceCodeResponse, MicrosoftAuthFlow};
 use amc_core::config::LauncherConfig;
 use amc_core::error::LauncherError;
 use amc_core::paths::LauncherPaths;
-use amc_core::types::{GameVersion, Instance, LaunchOptions, LoaderType};
+use amc_core::types::{GameVersion, Instance, InstanceGroup, LaunchOptions, LoaderType};
 use amc_core::HardwareReport;
 use amc_downloader::{AdoptiumInstaller, DownloadCancel, DownloadEngine, DownloadProgress};
 use amc_minecraft::{
@@ -1730,6 +1730,20 @@ impl LauncherApp {
         if let Some(ram) = ram_override {
             options.memory_max_mb = ram;
         }
+        // P2 instance groups: shared Java/RAM wins where the group
+        // defines a value; the instance RAM fills RAM gaps.
+        if let Some(selected) = self.selected_instance {
+            if let Some(inst) = self.instances.iter().find(|i| i.id == selected) {
+                let (group_ram, group_java) =
+                    InstanceGroup::resolve(&self.config.instance_groups, inst);
+                if let Some(ram) = group_ram {
+                    options.memory_max_mb = ram;
+                }
+                if let Some(java) = group_java {
+                    options.java_path = Some(java);
+                }
+            }
+        }
         if let Some((srv, port)) = self.pending_direct_connect.take() {
             options.quick_play_server = Some(srv);
             options.quick_play_port = Some(port);
@@ -3292,6 +3306,10 @@ impl App for LauncherApp {
                             trash_dir: &self.paths.trash_dir(),
                             backups_root: &self.world_backups_root(),
                             accounts: self.account_mgr.accounts(),
+                            group_names: amc_core::types::InstanceGroup::known_names(
+                                &self.config.instance_groups,
+                                &self.instances,
+                            ),
                         };
                         let action = self.instances_page.show(
                             &mut content_ui,

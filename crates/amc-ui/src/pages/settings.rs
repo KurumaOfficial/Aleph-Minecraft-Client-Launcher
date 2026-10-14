@@ -29,6 +29,7 @@ pub struct SettingsPage {
     pub transfer_export_requested: bool,
     pub transfer_import_requested: bool,
     pub transfer_note: Option<String>,
+    pub new_group_name: String,
     pub update_note: Option<String>,
     pub server_start_requested: bool,
     pub server_stop_requested: bool,
@@ -49,6 +50,7 @@ impl Default for SettingsPage {
             transfer_export_requested: false,
             transfer_import_requested: false,
             transfer_note: None,
+            new_group_name: String::new(),
             update_note: None,
             server_start_requested: false,
             server_stop_requested: false,
@@ -605,6 +607,116 @@ impl SettingsPage {
                 if config.default_launch_options.java_path.is_some() {
                     if ui.button(lang.settings_btn_reset_java()).clicked() {
                         config.default_launch_options.java_path = None;
+                    }
+                }
+            });
+        });
+
+        ui.add_space(14.0);
+
+        // Shared Java/RAM groups (CONCEPT P2): one edit applies to every
+        // member instance at launch. Instances join by name in their card.
+        ui.group(|ui| {
+            ui.label(
+                egui::RichText::new(lang.group_title())
+                    .font(egui::FontId::proportional(16.0))
+                    .strong()
+                    .color(TEXT_HEADING),
+            );
+            ui.add_space(4.0);
+            ui.label(
+                egui::RichText::new(lang.group_desc())
+                    .font(egui::FontId::proportional(12.0))
+                    .color(TEXT_MUTED),
+            );
+            ui.add_space(8.0);
+
+            if config.instance_groups.is_empty() {
+                ui.label(
+                    egui::RichText::new(lang.group_empty())
+                        .font(egui::FontId::proportional(12.0))
+                        .color(TEXT_MUTED),
+                );
+                ui.add_space(4.0);
+            }
+            let mut delete_group = None;
+            let mut names: Vec<String> = config.instance_groups.keys().cloned().collect();
+            names.sort();
+            for name in names {
+                let Some(group) = config.instance_groups.get_mut(&name) else {
+                    continue;
+                };
+                ui.horizontal(|ui| {
+                    ui.label(
+                        egui::RichText::new(&name)
+                            .font(egui::FontId::proportional(13.0))
+                            .strong()
+                            .color(TEXT_PRIMARY),
+                    );
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui
+                            .button(egui::RichText::new("🗑").color(TEXT_MUTED))
+                            .clicked()
+                        {
+                            delete_group = Some(name.clone());
+                        }
+                    });
+                });
+                let mut has_ram = group.ram_mb.is_some();
+                ui.horizontal(|ui| {
+                    ui.checkbox(&mut has_ram, lang.group_ram());
+                    if has_ram {
+                        let ram = group.ram_mb.get_or_insert(4096);
+                        ui.add(egui::Slider::new(ram, 1024..=32768).step_by(512.0));
+                    }
+                });
+                if !has_ram {
+                    group.ram_mb = None;
+                }
+                let java_display = group
+                    .java_path
+                    .as_ref()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|| lang.group_java_auto().to_string());
+                ui.horizontal(|ui| {
+                    ui.label(
+                        egui::RichText::new(java_display)
+                            .font(egui::FontId::proportional(11.0))
+                            .color(TEXT_MUTED),
+                    );
+                    if ui.button(lang.group_java_select()).clicked() {
+                        let ext_filter: &[&str] = if cfg!(windows) { &["exe"] } else { &["*"] };
+                        if let Some(path) = rfd::FileDialog::new()
+                            .add_filter("Java Executable", ext_filter)
+                            .pick_file()
+                        {
+                            group.java_path = Some(path);
+                        }
+                    }
+                    if group.java_path.is_some()
+                        && ui.button(lang.settings_btn_reset_java()).clicked()
+                    {
+                        group.java_path = None;
+                    }
+                });
+                ui.add_space(8.0);
+            }
+            if let Some(name) = delete_group {
+                config.instance_groups.remove(&name);
+            }
+            ui.horizontal(|ui| {
+                ui.add(
+                    TextEdit::singleline(&mut self.new_group_name)
+                        .hint_text(lang.group_name_hint())
+                        .desired_width(220.0),
+                );
+                if ui.button(lang.group_add()).clicked() {
+                    let name = self.new_group_name.trim().to_string();
+                    if !name.is_empty() && !config.instance_groups.contains_key(&name) {
+                        config
+                            .instance_groups
+                            .insert(name, amc_core::types::InstanceGroup::default());
+                        self.new_group_name.clear();
                     }
                 }
             });

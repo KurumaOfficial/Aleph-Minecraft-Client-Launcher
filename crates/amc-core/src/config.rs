@@ -1,6 +1,7 @@
 use crate::error::{LauncherError, Result};
-use crate::types::LaunchOptions;
+use crate::types::{InstanceGroup, LaunchOptions};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -152,6 +153,10 @@ pub struct LauncherConfig {
     /// Pinned mod slugs (Modrinth): skipped by update checks.
     #[serde(default)]
     pub pinned_mods: Vec<String>,
+    /// Shared Java/RAM groups, referenced by instance `group` name
+    /// (CONCEPT P2 "группы сборок").
+    #[serde(default)]
+    pub instance_groups: HashMap<String, InstanceGroup>,
 }
 
 fn default_true() -> bool {
@@ -198,6 +203,7 @@ impl Default for LauncherConfig {
             mc_reuse_done: false,
             wishlist: Vec::new(),
             pinned_mods: Vec::new(),
+            instance_groups: HashMap::new(),
         }
     }
 }
@@ -303,6 +309,7 @@ mod tests {
         assert_eq!(fresh.world_backup_days, 0);
         assert!(fresh.wishlist.is_empty());
         assert!(fresh.pinned_mods.is_empty());
+        assert!(fresh.instance_groups.is_empty());
         assert!(!fresh.ask_identity_each_launch);
         // Legacy file without any new keys still parses.
         let legacy: LauncherConfig =

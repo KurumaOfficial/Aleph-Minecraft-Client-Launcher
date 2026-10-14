@@ -24,7 +24,7 @@ pub use trash::{
     copy_dir, list_trash, purge_trash_all, purge_trash_entry, restore_instance, trash_instance,
     TrashedInstance,
 };
-pub use types::{GameVersion, Instance, LaunchOptions, LoaderType, ReleaseType};
+pub use types::{GameVersion, Instance, InstanceGroup, LaunchOptions, LoaderType, ReleaseType};
 pub use worlds::{
     backup_world, delete_backup, list_backups, list_saves, needs_auto_backup, newest_backup_mtime,
     restore_world,
