@@ -20,8 +20,9 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
 
 use crate::modals::{
-    ConsoleModal, DownloadOverlay, HwNoticeAction, IdentityPicker, LoginModal, LoginMode,
-    OverlayAction, PickerAction, ScreensAction, ScreensModal, WizardAction, WizardFlow,
+    ConsoleModal, DownloadManager, DownloadOverlay, HwNoticeAction, IdentityPicker, LoginModal,
+    LoginMode, ManagerAction, OverlayAction, PickerAction, ScreensAction, ScreensModal,
+    WizardAction, WizardFlow,
 };
 use crate::pages::{
     icon_key, HomeContext, HomePage, InstanceAction, InstancesContext, InstancesPage, ModsPage,
@@ -45,6 +46,9 @@ pub struct LauncherApp {
     versions: Vec<GameVersion>,
     instances: Vec<Instance>,
     is_launching: bool,
+    /// One-shot mod update check shortly after startup (CONCEPT P4
+    /// "лаунчер уведомляет"): offers arrive as usual, no extra UI.
+    startup_update_checked: bool,
     launch_status_text: String,
 
     // Pages
@@ -58,6 +62,7 @@ pub struct LauncherApp {
     login_modal: LoginModal,
     console_modal: ConsoleModal,
     screens_modal: ScreensModal,
+    download_manager: DownloadManager,
 
     // First-run wizard (ROADMAP P1) and the one-time hardware notice.
     wizard: Option<WizardFlow>,
@@ -192,6 +197,7 @@ impl LauncherApp {
             versions: Vec::new(),
             instances,
             is_launching: false,
+            startup_update_checked: false,
             launch_status_text: lang.status_preparing().to_string(),
             home_page: HomePage::default(),
             instances_page: InstancesPage::default(),
@@ -201,6 +207,7 @@ impl LauncherApp {
             login_modal: LoginModal::default(),
             console_modal: ConsoleModal::default(),
             screens_modal: ScreensModal::default(),
+            download_manager: DownloadManager::default(),
             wizard,
             hw_notice: None,
             mcreuse_path: None,
@@ -2842,7 +2849,15 @@ impl App for LauncherApp {
             }
         }
 
-        // Trigger + receive mod update checks.
+        // Trigger + receive mod update checks. Once per session an
+        // automatic check runs for the selected instance (CONCEPT P4
+        // notifications); the manual button reuses the same flag.
+        if !self.startup_update_checked {
+            self.startup_update_checked = true;
+            if self.selected_instance.is_some() {
+                self.mods_page.update_check_requested = true;
+            }
+        }
         if self.mods_page.update_check_requested {
             self.mods_page.update_check_requested = false;
             self.check_mod_updates();
@@ -3360,6 +3375,9 @@ impl App for LauncherApp {
                 }
                 if tb_resp.gallery_clicked {
                     self.screens_modal.open = !self.screens_modal.open;
+                }
+                if tb_resp.downloads_clicked {
+                    self.download_manager.open = !self.download_manager.open;
                 }
             });
 
@@ -3980,6 +3998,13 @@ impl App for LauncherApp {
                 );
             }
             ScreensAction::None => {}
+        }
+
+        // Download manager (CONCEPT P3): finished-download history.
+        let history = self.download_engine.history();
+        match self.download_manager.show(ctx, &history, lang) {
+            ManagerAction::Clear => self.download_engine.clear_history(),
+            ManagerAction::None => {}
         }
     }
 }

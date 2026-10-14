@@ -1,4 +1,5 @@
 pub mod console;
+pub mod download_manager;
 pub mod download_overlay;
 pub mod identity;
 pub mod login;
@@ -6,6 +7,7 @@ pub mod screens;
 pub mod wizard;
 
 pub use console::ConsoleModal;
+pub use download_manager::{DownloadManager, ManagerAction};
 pub use download_overlay::{DownloadOverlay, OverlayAction};
 pub use identity::{account_tag, IdentityPicker, PickerAction};
 pub use login::{LoginModal, LoginMode};

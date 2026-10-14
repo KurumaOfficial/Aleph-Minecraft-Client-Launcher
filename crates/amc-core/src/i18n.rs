@@ -1563,6 +1563,31 @@ impl Language {
         }
     }
 
+    // ---- Download manager history (CONCEPT P3) ----
+    pub fn dlman_title(&self) -> &'static str {
+        match self {
+            Self::English => "Downloads",
+            Self::Russian => "Загрузки",
+            Self::Ukrainian => "Завантаження",
+        }
+    }
+
+    pub fn dlman_empty(&self) -> &'static str {
+        match self {
+            Self::English => "Nothing downloaded yet this session",
+            Self::Russian => "В этой сессии пока ничего не скачано",
+            Self::Ukrainian => "У цій сесії поки нічого не завантажено",
+        }
+    }
+
+    pub fn dlman_clear(&self) -> &'static str {
+        match self {
+            Self::English => "Clear history",
+            Self::Russian => "Очистить историю",
+            Self::Ukrainian => "Очистити історію",
+        }
+    }
+
     pub fn loader_pin_reset(&self) -> &'static str {
         match self {
             Self::English => "Use latest",
@@ -3627,6 +3652,9 @@ mod tests {
             assert!(!lang.hotkey_tabs().is_empty());
             assert!(!lang.loader_pinned("0.15.11").is_empty());
             assert!(!lang.loader_pin_reset().is_empty());
+            assert!(!lang.dlman_title().is_empty());
+            assert!(!lang.dlman_empty().is_empty());
+            assert!(!lang.dlman_clear().is_empty());
             assert!(!lang.clone_title().is_empty());
             assert!(!lang.clone_saves().is_empty());
             assert!(!lang.inst_btn_shortcut().is_empty());

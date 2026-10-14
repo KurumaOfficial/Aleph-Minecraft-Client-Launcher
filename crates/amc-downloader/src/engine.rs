@@ -210,7 +210,25 @@ pub struct DownloadEngine {
     client: Client,
     max_concurrency: usize,
     throttle: Arc<SpeedLimiter>,
+    /// Completed download history, newest last, bounded (CONCEPT P3
+    /// download manager). Shared across the per-item engine clones in
+    /// batch downloads. Plain mutex: only held for push/snapshot,
+    /// never across awaits.
+    history: Arc<std::sync::Mutex<std::collections::VecDeque<DownloadRecord>>>,
 }
+
+/// One finished download for the manager history (CONCEPT P3).
+#[derive(Debug, Clone)]
+pub struct DownloadRecord {
+    pub filename: String,
+    pub bytes: u64,
+    pub ok: bool,
+    /// Wall time of the whole attempt sequence in milliseconds.
+    pub millis: u64,
+}
+
+/// History depth: enough for a launch session, bounded for memory.
+pub const HISTORY_LIMIT: usize = 100;
 
 impl Default for DownloadEngine {
     fn default() -> Self {
@@ -230,6 +248,7 @@ impl DownloadEngine {
             client,
             max_concurrency: max_concurrency.max(1),
             throttle: Arc::new(SpeedLimiter::new()),
+            history: Arc::new(std::sync::Mutex::new(std::collections::VecDeque::new())),
         }
     }
 
@@ -241,7 +260,58 @@ impl DownloadEngine {
             .set_limit_bps(kbps.map(|k| k.saturating_mul(1024)));
     }
 
+    /// Download one file, recording the outcome in the manager
+    /// history (CONCEPT P3). All batch paths funnel through here.
     pub async fn download_one(
+        &self,
+        item: &DownloadItem,
+        tracker: Option<&ProgressTracker>,
+        cancel: DownloadCancel,
+    ) -> Result<()> {
+        let started = std::time::Instant::now();
+        let out = self.download_one_inner(item, tracker, cancel).await;
+        let bytes = tokio::fs::metadata(&item.destination)
+            .await
+            .map(|m| m.len())
+            .unwrap_or(0);
+        self.record(DownloadRecord {
+            filename: item
+                .destination
+                .file_name()
+                .map(|f| f.to_string_lossy().to_string())
+                .unwrap_or_else(|| "download".to_string()),
+            bytes,
+            ok: out.is_ok(),
+            millis: started.elapsed().as_millis() as u64,
+        });
+        out
+    }
+
+    /// Newest-last snapshot of finished downloads for the manager UI.
+    pub fn history(&self) -> Vec<DownloadRecord> {
+        self.history
+            .lock()
+            .map(|guard| guard.iter().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    /// Drop the manager history (user action from the manager modal).
+    pub fn clear_history(&self) {
+        if let Ok(mut guard) = self.history.lock() {
+            guard.clear();
+        }
+    }
+
+    fn record(&self, entry: DownloadRecord) {
+        if let Ok(mut guard) = self.history.lock() {
+            guard.push_back(entry);
+            while guard.len() > HISTORY_LIMIT {
+                guard.pop_front();
+            }
+        }
+    }
+
+    async fn download_one_inner(
         &self,
         item: &DownloadItem,
         tracker: Option<&ProgressTracker>,
@@ -484,6 +554,7 @@ impl DownloadEngine {
                 client,
                 max_concurrency: self.max_concurrency,
                 throttle: self.throttle.clone(),
+                history: self.history.clone(),
             };
 
             handles.push(tokio::spawn(async move {
@@ -583,6 +654,43 @@ mod tests {
         );
         let err = engine.download_one(&item, None, cancel).await.unwrap_err();
         assert!(matches!(err, LauncherError::Paused));
+    }
+
+    #[tokio::test]
+    async fn test_history_records_and_caps() {
+        let engine = DownloadEngine::new(1);
+        assert!(engine.history().is_empty());
+        // Failed outcomes land in history too (no network touched:
+        // the pre-set flag aborts before any request).
+        let cancel = DownloadCancel::new();
+        cancel.cancel();
+        let item = DownloadItem::new(
+            "http://127.0.0.1:1/amc-hist-probe.jar",
+            std::env::temp_dir().join("amc-hist-probe.jar"),
+        );
+        let _ = engine.download_one(&item, None, cancel).await;
+        let hist = engine.history();
+        assert_eq!(hist.len(), 1);
+        assert_eq!(hist[0].filename, "amc-hist-probe.jar");
+        assert!(!hist[0].ok);
+        engine.clear_history();
+        assert!(engine.history().is_empty());
+        // Direct pushes respect the bound, newest last.
+        for i in 0..(HISTORY_LIMIT + 5) {
+            engine.record(DownloadRecord {
+                filename: format!("f{i}.jar"),
+                bytes: i as u64,
+                ok: true,
+                millis: 1,
+            });
+        }
+        let hist = engine.history();
+        assert_eq!(hist.len(), HISTORY_LIMIT);
+        assert_eq!(hist[0].filename, "f5.jar");
+        assert_eq!(
+            hist[HISTORY_LIMIT - 1].filename,
+            format!("f{}.jar", HISTORY_LIMIT + 4)
+        );
     }
 
     #[test]
