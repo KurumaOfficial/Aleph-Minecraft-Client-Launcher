@@ -1,4 +1,4 @@
-﻿use crate::types::{ModCategory, ModDownloadFile, ModSearchResult, ModSource};
+﻿use crate::types::{ModCategory, ModDownloadFile, ModSearchResult, ModSource, SearchSort};
 use amc_core::error::{LauncherError, Result};
 use reqwest::Client;
 use serde::Deserialize;
@@ -133,6 +133,7 @@ impl ModrinthClient {
         mc_version: Option<&str>,
         category: ModCategory,
         limit: usize,
+        sort: SearchSort,
     ) -> Result<Vec<ModSearchResult>> {
         Self::search_sorted(
             &self.client,
@@ -141,7 +142,7 @@ impl ModrinthClient {
             mc_version,
             category,
             limit,
-            "relevance",
+            sort.modrinth_index(),
         )
         .await
     }

@@ -426,6 +426,14 @@ impl Language {
         }
     }
 
+    pub fn inst_sessions_label(&self, count: u64) -> String {
+        match self {
+            Self::English => format!("{count} sessions"),
+            Self::Russian => format!("{count} сессий"),
+            Self::Ukrainian => format!("{count} сесій"),
+        }
+    }
+
     pub fn inst_btn_play(&self) -> &'static str {
         match self {
             Self::English => "▶ Play",
@@ -3067,6 +3075,22 @@ impl Language {
         }
     }
 
+    pub fn mods_sort_relevance(&self) -> &'static str {
+        match self {
+            Self::English => "Relevance",
+            Self::Russian => "По релевантности",
+            Self::Ukrainian => "За релевантністю",
+        }
+    }
+
+    pub fn mods_sort_downloads(&self) -> &'static str {
+        match self {
+            Self::English => "Popular",
+            Self::Russian => "Популярные",
+            Self::Ukrainian => "Популярні",
+        }
+    }
+
     pub fn home_direct_play(&self) -> &'static str {
         match self {
             Self::English => "Direct Connect",
@@ -3370,6 +3394,8 @@ mod tests {
             assert!(!lang.mods_rollback().is_empty());
             assert!(!lang.mods_pin().is_empty());
             assert!(!lang.mods_unpin().is_empty());
+            assert!(!lang.mods_sort_relevance().is_empty());
+            assert!(!lang.mods_sort_downloads().is_empty());
             assert!(!lang.nav_profile().is_empty());
             assert!(!lang.tour_home_title().is_empty());
             assert!(!lang.tour_home_body().is_empty());

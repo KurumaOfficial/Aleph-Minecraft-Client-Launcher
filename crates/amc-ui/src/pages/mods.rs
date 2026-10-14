@@ -3,7 +3,7 @@ use crate::theme::{
     TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
 use amc_core::Language;
-use amc_mods::types::{LocalMod, ModCategory, ModSearchResult, ModSource};
+use amc_mods::types::{LocalMod, ModCategory, ModSearchResult, ModSource, SearchSort};
 use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -60,6 +60,7 @@ pub struct ModsPage {
     pub sub_tab: ModsSubTab,
     pub search_provider: ModSource,
     pub search_category: ModCategory,
+    pub search_sort: SearchSort,
     pub search_query: String,
     pub is_searching: bool,
     pub search_results: Vec<ModSearchResult>,
@@ -91,6 +92,7 @@ impl Default for ModsPage {
             sub_tab: ModsSubTab::Local,
             search_provider: ModSource::Modrinth,
             search_category: ModCategory::Mod,
+            search_sort: SearchSort::Relevance,
             search_query: String::new(),
             is_searching: false,
             search_results: Vec::new(),
@@ -122,7 +124,7 @@ impl ModsPage {
         lang: Language,
         wishlist: &mut Vec<String>,
         update_install: &mut Option<(ModSearchResult, String)>,
-        on_search: impl FnOnce(String, ModSource, ModCategory),
+        on_search: impl FnOnce(String, ModSource, ModCategory, SearchSort),
         on_install: impl FnOnce(ModSearchResult),
     ) {
         ui.add_space(20.0);
@@ -518,7 +520,7 @@ impl ModsPage {
         ui: &mut Ui,
         lang: Language,
         wishlist: &mut Vec<String>,
-        on_search: impl FnOnce(String, ModSource, ModCategory),
+        on_search: impl FnOnce(String, ModSource, ModCategory, SearchSort),
         on_install: impl FnOnce(ModSearchResult),
     ) {
         ui.horizontal(|ui| {
@@ -595,6 +597,7 @@ impl ModsPage {
                         self.search_query.clone(),
                         self.search_provider,
                         self.search_category,
+                        self.search_sort,
                     );
                 }
             }
@@ -607,48 +610,80 @@ impl ModsPage {
                 {
                     self.search_query.clear();
                     if let Some(f) = on_search.take() {
-                        f(String::new(), self.search_provider, self.search_category);
+                        f(
+                            String::new(),
+                            self.search_provider,
+                            self.search_category,
+                            self.search_sort,
+                        );
                     }
                 }
             }
         });
 
-        // Category selection row for Modrinth
-        if self.search_provider == ModSource::Modrinth {
+        // Category selection row (Modrinth) + result ordering (both
+        // providers: Modrinth sorts server-side, CurseForge client-side).
+        {
             ui.add_space(8.0);
             ui.horizontal(|ui| {
-                let cat_mod = self.search_category == ModCategory::Mod;
-                let cat_rp = self.search_category == ModCategory::ResourcePack;
-                let cat_sh = self.search_category == ModCategory::Shader;
+                if self.search_provider == ModSource::Modrinth {
+                    let cat_mod = self.search_category == ModCategory::Mod;
+                    let cat_rp = self.search_category == ModCategory::ResourcePack;
+                    let cat_sh = self.search_category == ModCategory::Shader;
 
-                let b_mod = egui::Button::new(
-                    egui::RichText::new(format!("🧩 {}", lang.mods_cat_mods()))
-                        .font(egui::FontId::proportional(11.0))
-                        .color(if cat_mod { Color32::WHITE } else { TEXT_MUTED }),
-                )
-                .fill(if cat_mod { RUBY } else { BG_ELEVATED });
-                if ui.add(b_mod).clicked() {
-                    self.search_category = ModCategory::Mod;
+                    let b_mod = egui::Button::new(
+                        egui::RichText::new(format!("🧩 {}", lang.mods_cat_mods()))
+                            .font(egui::FontId::proportional(11.0))
+                            .color(if cat_mod { Color32::WHITE } else { TEXT_MUTED }),
+                    )
+                    .fill(if cat_mod { RUBY } else { BG_ELEVATED });
+                    if ui.add(b_mod).clicked() {
+                        self.search_category = ModCategory::Mod;
+                    }
+
+                    let b_rp = egui::Button::new(
+                        egui::RichText::new(format!("🎨 {}", lang.mods_cat_resourcepacks()))
+                            .font(egui::FontId::proportional(11.0))
+                            .color(if cat_rp { Color32::WHITE } else { TEXT_MUTED }),
+                    )
+                    .fill(if cat_rp { RUBY } else { BG_ELEVATED });
+                    if ui.add(b_rp).clicked() {
+                        self.search_category = ModCategory::ResourcePack;
+                    }
+
+                    let b_sh = egui::Button::new(
+                        egui::RichText::new(format!("☀️ {}", lang.mods_cat_shaders()))
+                            .font(egui::FontId::proportional(11.0))
+                            .color(if cat_sh { Color32::WHITE } else { TEXT_MUTED }),
+                    )
+                    .fill(if cat_sh { RUBY } else { BG_ELEVATED });
+                    if ui.add(b_sh).clicked() {
+                        self.search_category = ModCategory::Shader;
+                    }
                 }
 
-                let b_rp = egui::Button::new(
-                    egui::RichText::new(format!("🎨 {}", lang.mods_cat_resourcepacks()))
+                // Result ordering (CONCEPT P4 "фильтр по популярности"):
+                // Modrinth sorts server-side, CurseForge client-side.
+                ui.add_space(12.0);
+                let sort_rel = self.search_sort == SearchSort::Relevance;
+                let sort_dl = self.search_sort == SearchSort::Downloads;
+                let b_rel = egui::Button::new(
+                    egui::RichText::new(format!("≡ {}", lang.mods_sort_relevance()))
                         .font(egui::FontId::proportional(11.0))
-                        .color(if cat_rp { Color32::WHITE } else { TEXT_MUTED }),
+                        .color(if sort_rel { Color32::WHITE } else { TEXT_MUTED }),
                 )
-                .fill(if cat_rp { RUBY } else { BG_ELEVATED });
-                if ui.add(b_rp).clicked() {
-                    self.search_category = ModCategory::ResourcePack;
+                .fill(if sort_rel { RUBY } else { BG_ELEVATED });
+                if ui.add(b_rel).clicked() {
+                    self.search_sort = SearchSort::Relevance;
                 }
-
-                let b_sh = egui::Button::new(
-                    egui::RichText::new(format!("☀️ {}", lang.mods_cat_shaders()))
+                let b_dl = egui::Button::new(
+                    egui::RichText::new(format!("⬇ {}", lang.mods_sort_downloads()))
                         .font(egui::FontId::proportional(11.0))
-                        .color(if cat_sh { Color32::WHITE } else { TEXT_MUTED }),
+                        .color(if sort_dl { Color32::WHITE } else { TEXT_MUTED }),
                 )
-                .fill(if cat_sh { RUBY } else { BG_ELEVATED });
-                if ui.add(b_sh).clicked() {
-                    self.search_category = ModCategory::Shader;
+                .fill(if sort_dl { RUBY } else { BG_ELEVATED });
+                if ui.add(b_dl).clicked() {
+                    self.search_sort = SearchSort::Downloads;
                 }
             });
         }

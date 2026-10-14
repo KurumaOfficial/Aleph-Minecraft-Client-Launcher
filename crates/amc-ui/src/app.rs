@@ -11,7 +11,7 @@ use amc_minecraft::{
 };
 use amc_mods::{
     CurseForgeClient, LocalModManager, ModCategory, ModDownloadFile, ModSearchResult, ModSource,
-    ModrinthClient,
+    ModrinthClient, SearchSort,
 };
 use eframe::App;
 use egui::{CentralPanel, Context, SidePanel, TopBottomPanel, ViewportCommand};
@@ -428,7 +428,17 @@ impl LauncherApp {
             let mut offers = Vec::new();
             for (name, version, old_filename) in local {
                 let slug_guess = name.to_lowercase().replace(' ', "-");
-                let hits = match client.search(&name, None, None, ModCategory::Mod, 3).await {
+                let hits = match client
+                    .search(
+                        &name,
+                        None,
+                        None,
+                        ModCategory::Mod,
+                        3,
+                        SearchSort::Relevance,
+                    )
+                    .await
+                {
                     Ok(h) => h,
                     Err(_) => continue,
                 };
@@ -804,6 +814,7 @@ impl LauncherApp {
         category: ModCategory,
         loader: Option<String>,
         mc_version: Option<String>,
+        sort: SearchSort,
     ) {
         self.mods_page.is_searching = true;
         let (tx, rx) = mpsc::channel(1);
@@ -817,7 +828,12 @@ impl LauncherApp {
                         .search(&query, loader.as_deref(), mc_version.as_deref(), 30)
                         .await
                     {
-                        Ok(results) => {
+                        Ok(mut results) => {
+                            // CurseTools has no popularity index: order
+                            // client-side when requested.
+                            if sort == SearchSort::Downloads {
+                                results.sort_by(|a, b| b.downloads.cmp(&a.downloads));
+                            }
                             let _ = tx.send(results).await;
                         }
                         Err(e) => {
@@ -847,6 +863,7 @@ impl LauncherApp {
                                 mc_version.as_deref(),
                                 category,
                                 30,
+                                sort,
                             )
                             .await
                     };
@@ -3398,8 +3415,8 @@ impl App for LauncherApp {
                             lang,
                             &mut self.config.wishlist,
                             &mut update_install,
-                            |query, provider, category| {
-                                search_req = Some((query, provider, category));
+                            |query, provider, category, sort| {
+                                search_req = Some((query, provider, category, sort));
                             },
                             |result| {
                                 mod_to_install = Some(result);
@@ -3460,13 +3477,13 @@ impl App for LauncherApp {
                             let _ = self.config.save_to_path(&self.paths.config_file());
                         }
 
-                        if let Some((q, prov, cat)) = search_req {
+                        if let Some((q, prov, cat, sort)) = search_req {
                             // Server-side pre-filter (CONCEPT P4): the
                             // marketplace only returns builds for this
                             // MC version/loader; row hints still show why.
                             let filter_loader =
                                 ModrinthClient::search_loader_filter(&compat_loader);
-                            self.search_mods(q, prov, cat, filter_loader, compat_mc.clone());
+                            self.search_mods(q, prov, cat, filter_loader, compat_mc.clone(), sort);
                         }
                         if let Some(item) = mod_to_install {
                             self.install_mod(item, None);

@@ -16,6 +16,26 @@ pub enum ModCategory {
     Shader,
 }
 
+/// Marketplace result ordering (CONCEPT P4 "фильтр по популярности").
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SearchSort {
+    /// Provider default (Modrinth `relevance`).
+    #[default]
+    Relevance,
+    /// Most downloaded first.
+    Downloads,
+}
+
+impl SearchSort {
+    /// Modrinth `search` index name for this ordering.
+    pub fn modrinth_index(self) -> &'static str {
+        match self {
+            Self::Relevance => "relevance",
+            Self::Downloads => "downloads",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModSearchResult {
     pub source: ModSource,
@@ -129,5 +149,12 @@ mod tests {
         }))
         .expect("old payloads keep parsing");
         assert_eq!(v.rating, 0);
+    }
+
+    #[test]
+    fn test_search_sort_index() {
+        assert_eq!(SearchSort::default(), SearchSort::Relevance);
+        assert_eq!(SearchSort::Relevance.modrinth_index(), "relevance");
+        assert_eq!(SearchSort::Downloads.modrinth_index(), "downloads");
     }
 }
