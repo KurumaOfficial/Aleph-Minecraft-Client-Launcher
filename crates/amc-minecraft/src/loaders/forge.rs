@@ -239,4 +239,111 @@ mod tests {
             "1.20.1-forge-47.2.0"
         );
     }
+
+    /// LIVE end-to-end verification (manual only — needs network and a
+    /// Java 17+ binary; never runs in CI):
+    /// `cargo test -p amc-minecraft -- --ignored live_forge_installer`
+    /// Downloads the real installer, runs it headlessly into a temp
+    /// root, and asserts a parseable version json with libraries and a
+    /// main class comes out.
+    #[tokio::test]
+    #[ignore]
+    async fn live_forge_installer() {
+        let java_bin = find_java_17_plus();
+        let tmp = std::env::temp_dir().join(format!(
+            "amc_live_forge_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = std::fs::remove_dir_all(&tmp);
+        let paths = LauncherPaths::custom(&tmp).expect("temp launcher root");
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(60))
+            .build()
+            .expect("reqwest client");
+        let engine = DownloadEngine::new(4);
+        let (status_tx, mut status_rx) = mpsc::channel::<String>(64);
+        tokio::spawn(async move {
+            while let Some(line) = status_rx.recv().await {
+                eprintln!("[installer] {line}");
+            }
+        });
+        let details =
+            ForgeLoader::resolve(&client, &engine, "1.20.1", &java_bin, &paths, status_tx)
+                .await
+                .expect("Forge 1.20.1 resolves end to end");
+        assert!(
+            details.id.contains("forge"),
+            "unexpected version id: {}",
+            details.id
+        );
+        assert!(
+            !details.libraries.is_empty(),
+            "produced version has no libraries"
+        );
+        assert!(
+            !details.main_class.is_empty(),
+            "produced version has no main class"
+        );
+        let cached = paths
+            .versions_dir()
+            .join(&details.id)
+            .join(format!("{}.json", details.id));
+        assert!(cached.is_file(), "resolved json is cached for relaunches");
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    /// System Java for the live test: `JAVA_HOME` first, else PATH.
+    /// Forge 1.20.1 needs Java 17+.
+    fn find_java_17_plus() -> std::path::PathBuf {
+        let candidate = std::env::var_os("JAVA_HOME")
+            .map(|home| {
+                let mut p = std::path::PathBuf::from(home);
+                p.push("bin");
+                #[cfg(target_os = "windows")]
+                p.push("java.exe");
+                #[cfg(not(target_os = "windows"))]
+                p.push("java");
+                p
+            })
+            .filter(|p| p.is_file())
+            .unwrap_or_else(|| std::path::PathBuf::from("java"));
+        let probe = std::process::Command::new(&candidate)
+            .arg("-version")
+            .output()
+            .expect("a Java binary is required for the live installer test");
+        let text = format!(
+            "{}{}",
+            String::from_utf8_lossy(&probe.stdout),
+            String::from_utf8_lossy(&probe.stderr)
+        );
+        let major: u32 = text
+            .lines()
+            .find_map(|line| {
+                let q1 = line.find('"')? + 1;
+                let rest = &line[q1..];
+                let end = rest.find(['"', ' ', '.'])?;
+                rest[..end].parse::<u32>().ok()
+            })
+            .unwrap_or(0);
+        let minor: u32 = text
+            .lines()
+            .find_map(|line| {
+                let q1 = line.find('"')? + 1;
+                let rest = &line[q1..];
+                let mut parts = rest.split(['"', ' ', '.', '_']);
+                let _one: u32 = parts.next()?.parse().ok()?;
+                parts.next()?.parse().ok()
+            })
+            .unwrap_or(0);
+        let effective = if major == 1 { minor } else { major };
+        assert!(
+            effective >= 17,
+            "live Forge 1.20.1 test needs Java 17+, got: {}",
+            text.lines().next().unwrap_or("?")
+        );
+        candidate
+    }
 }
