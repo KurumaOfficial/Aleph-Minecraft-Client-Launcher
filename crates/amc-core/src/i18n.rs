@@ -434,6 +434,14 @@ impl Language {
         }
     }
 
+    pub fn inst_ported(&self, old: &str, new: &str) -> String {
+        match self {
+            Self::English => format!("Ported {old} → {new}: re-checking mods"),
+            Self::Russian => format!("Сборка перенесена {old} → {new}: проверяю моды"),
+            Self::Ukrainian => format!("Збірку перенесено {old} → {new}: перевіряю моди"),
+        }
+    }
+
     pub fn inst_btn_play(&self) -> &'static str {
         match self {
             Self::English => "▶ Play",

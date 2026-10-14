@@ -223,6 +223,20 @@ impl Instance {
         }
     }
 
+    /// Port the instance to another Minecraft version (CONCEPT P4
+    /// "Портирование сборки"). Only the version pin moves — mods,
+    /// stats and settings stay; the loader profile re-resolves at the
+    /// next launch and the update checker re-resolves mods. Returns
+    /// true when the version actually changed.
+    pub fn port_to_version(&mut self, new_version: &str) -> bool {
+        let trimmed = new_version.trim();
+        if trimmed.is_empty() || trimmed == self.game_version {
+            return false;
+        }
+        self.game_version = trimmed.to_string();
+        true
+    }
+
     /// Total bytes under the instance game directory (CONCEPT "Место на диске").
     /// Missing directories count as 0, unreadable entries are skipped and
     /// symlinks are never followed — measurement never fails.
@@ -422,6 +436,19 @@ mod tests {
         assert_eq!(cloned.loader, LoaderType::Fabric);
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_port_to_version() {
+        let mut inst = Instance::new("Pack", "1.20.1", LoaderType::Fabric);
+        assert!(inst.port_to_version("1.21"));
+        assert_eq!(inst.game_version, "1.21");
+        assert_eq!(inst.loader, LoaderType::Fabric);
+        assert_eq!(inst.name, "Pack");
+        assert!(!inst.port_to_version("1.21"));
+        assert!(!inst.port_to_version("  "));
+        assert!(!inst.port_to_version(""));
+        assert_eq!(inst.game_version, "1.21");
     }
 
     #[test]

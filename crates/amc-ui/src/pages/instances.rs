@@ -83,6 +83,9 @@ pub struct InstancesPage {
     pub discover_loading: bool,
     pub discover_requested: bool,
     pub discover_install: Option<String>,
+    /// Version port notice for the app shell: (instance id, old, new).
+    /// The app toasts it and re-runs the mod update check (CONCEPT P4).
+    pub port_notice: Option<(Uuid, String, String)>,
 }
 
 impl Default for InstancesPage {
@@ -123,6 +126,7 @@ impl Default for InstancesPage {
             discover_loading: false,
             discover_requested: false,
             discover_install: None,
+            port_notice: None,
         }
     }
 }
@@ -1278,7 +1282,14 @@ impl InstancesPage {
                 if let Some(target_id) = self.edit_instance_id {
                     if let Some(inst) = instances.iter_mut().find(|i| i.id == target_id) {
                         inst.name = self.edit_instance_name.clone();
-                        inst.game_version = self.edit_instance_version.clone();
+                        // Porting (CONCEPT P4): a version change moves the
+                        // pin and raises a notice; the app re-checks mods.
+                        let old_version = inst.game_version.clone();
+                        let new_version = self.edit_instance_version.clone();
+                        if inst.port_to_version(&new_version) {
+                            self.port_notice =
+                                Some((target_id, old_version, inst.game_version.clone()));
+                        }
                         inst.loader = self.edit_instance_loader;
                         inst.ram_mb = Some(self.edit_instance_ram);
                         inst.icon = self.edit_instance_icon.clone();

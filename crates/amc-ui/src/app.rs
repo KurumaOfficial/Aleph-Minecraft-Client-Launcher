@@ -3378,6 +3378,20 @@ impl App for LauncherApp {
                         if let Some(slug) = self.instances_page.discover_install.take() {
                             self.install_discover_pack(slug);
                         }
+                        // Version port (CONCEPT P4): toast and re-check
+                        // installed mods against the new version.
+                        if let Some((id, old, new)) = self.instances_page.port_notice.take() {
+                            let lang = self.config.ui.language();
+                            push_toast(
+                                &mut self.toasts,
+                                &self.config.notifications,
+                                ToastKind::Updates,
+                                lang.inst_ported(&old, &new),
+                            );
+                            if self.selected_instance == Some(id) {
+                                self.mods_page.update_check_requested = true;
+                            }
+                        }
                     }
                     NavTab::Mods => {
                         let base_dir = if let Some(id) = self.selected_instance {
