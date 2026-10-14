@@ -21,7 +21,7 @@ use tokio::sync::{mpsc, watch};
 
 use crate::modals::{
     ConsoleModal, DownloadOverlay, HwNoticeAction, IdentityPicker, LoginModal, LoginMode,
-    OverlayAction, PickerAction, ScreensModal, WizardAction, WizardFlow,
+    OverlayAction, PickerAction, ScreensAction, ScreensModal, WizardAction, WizardFlow,
 };
 use crate::pages::{
     HomeContext, HomePage, InstanceAction, InstancesContext, InstancesPage, ModsPage,
@@ -3535,6 +3535,20 @@ impl App for LauncherApp {
 
         // Screenshot gallery (CONCEPT "Скриншоты", P10).
         let instances_dir = self.paths.instances_dir();
-        self.screens_modal.show(ctx, &instances_dir, lang);
+        match self.screens_modal.show(ctx, &instances_dir, lang) {
+            ScreensAction::Deleted(path) => {
+                let name = path
+                    .file_name()
+                    .map(|n| n.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                push_toast(
+                    &mut self.toasts,
+                    &self.config.notifications,
+                    ToastKind::Launcher,
+                    name,
+                );
+            }
+            ScreensAction::None => {}
+        }
     }
 }

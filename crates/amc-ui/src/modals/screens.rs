@@ -5,12 +5,21 @@ use std::path::{Path, PathBuf};
 use crate::theme::{BG_CARD, BORDER_DEFAULT, TEXT_MUTED};
 
 /// Screenshot gallery modal (CONCEPT "Скриншоты", P10): thumbnails from
-/// every instance's `screenshots/` folder, click opens externally.
-/// Textures are cached per path and capped so huge galleries stay light.
+/// every instance's `screenshots/` folder, click opens externally,
+/// trash button deletes the file. Textures are cached per path and
+/// capped so huge galleries stay light.
 pub struct ScreensModal {
     pub open: bool,
     thumbs: HashMap<PathBuf, egui::TextureHandle>,
     failed: std::collections::HashSet<PathBuf>,
+}
+
+/// Gallery outcome for the app shell (toast on delete).
+#[derive(Debug, Default)]
+pub enum ScreensAction {
+    #[default]
+    None,
+    Deleted(PathBuf),
 }
 
 impl Default for ScreensModal {
@@ -54,11 +63,17 @@ fn list_shots(instances_dir: &Path) -> Vec<PathBuf> {
 }
 
 impl ScreensModal {
-    pub fn show(&mut self, ctx: &egui::Context, instances_dir: &Path, lang: amc_core::Language) {
+    pub fn show(
+        &mut self,
+        ctx: &egui::Context,
+        instances_dir: &Path,
+        lang: amc_core::Language,
+    ) -> ScreensAction {
         if !self.open {
-            return;
+            return ScreensAction::None;
         }
         let mut close = false;
+        let mut action = ScreensAction::None;
         egui::Window::new(lang.screens_title())
             .collapsible(false)
             .resizable(true)
@@ -76,33 +91,71 @@ impl ScreensModal {
                         ui.horizontal_wrapped(|ui| {
                             ui.spacing_mut().item_spacing = vec2(10.0, 10.0);
                             for path in &shots {
-                                let tex = self.thumb(ui.ctx(), path);
-                                let (rect, resp) =
-                                    ui.allocate_exact_size(vec2(200.0, 120.0), Sense::click());
-                                ui.painter().rect_filled(rect, Rounding::ZERO, BG_CARD);
-                                ui.painter().rect_stroke(
-                                    rect,
-                                    Rounding::ZERO,
-                                    Stroke::new(1.0_f32, BORDER_DEFAULT),
-                                );
-                                if let Some(t) = tex {
-                                    let inner = rect.shrink(4.0);
-                                    ui.painter().image(
-                                        t.id(),
-                                        inner,
-                                        egui::Rect::from_min_max(
-                                            egui::pos2(0.0, 0.0),
-                                            egui::pos2(1.0, 1.0),
-                                        ),
-                                        Color32::WHITE,
+                                ui.vertical(|ui| {
+                                    ui.set_max_width(200.0);
+                                    let tex = self.thumb(ui.ctx(), path);
+                                    let (rect, resp) =
+                                        ui.allocate_exact_size(vec2(200.0, 120.0), Sense::click());
+                                    ui.painter().rect_filled(rect, Rounding::ZERO, BG_CARD);
+                                    ui.painter().rect_stroke(
+                                        rect,
+                                        Rounding::ZERO,
+                                        Stroke::new(1.0_f32, BORDER_DEFAULT),
                                     );
-                                }
-                                if resp.clicked() {
-                                    let _ = open::that(path);
-                                }
-                                if resp.hovered() {
-                                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                                }
+                                    if let Some(t) = tex {
+                                        let inner = rect.shrink(4.0);
+                                        ui.painter().image(
+                                            t.id(),
+                                            inner,
+                                            egui::Rect::from_min_max(
+                                                egui::pos2(0.0, 0.0),
+                                                egui::pos2(1.0, 1.0),
+                                            ),
+                                            Color32::WHITE,
+                                        );
+                                    }
+                                    if resp.clicked() {
+                                        let _ = open::that(path);
+                                    }
+                                    if resp.hovered() {
+                                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                    }
+                                    ui.horizontal(|ui| {
+                                        let mut name = path
+                                            .file_name()
+                                            .map(|n| n.to_string_lossy().to_string())
+                                            .unwrap_or_default();
+                                        if name.chars().count() > 22 {
+                                            name = format!(
+                                                "{}…",
+                                                name.chars().take(22).collect::<String>()
+                                            );
+                                        }
+                                        ui.label(
+                                            egui::RichText::new(name)
+                                                .font(egui::FontId::proportional(10.0))
+                                                .color(TEXT_MUTED),
+                                        );
+                                        ui.with_layout(
+                                            egui::Layout::right_to_left(egui::Align::Center),
+                                            |ui| {
+                                                if ui
+                                                    .button(
+                                                        egui::RichText::new("🗑").color(TEXT_MUTED),
+                                                    )
+                                                    .clicked()
+                                                {
+                                                    if std::fs::remove_file(path).is_ok() {
+                                                        self.thumbs.remove(path);
+                                                        self.failed.remove(path);
+                                                        action =
+                                                            ScreensAction::Deleted(path.clone());
+                                                    }
+                                                }
+                                            },
+                                        );
+                                    });
+                                });
                             }
                         });
                     });
@@ -117,6 +170,7 @@ impl ScreensModal {
         if close {
             self.open = false;
         }
+        action
     }
 
     fn thumb(&mut self, ctx: &egui::Context, path: &Path) -> Option<egui::TextureHandle> {
@@ -150,5 +204,48 @@ impl ScreensModal {
         );
         self.thumbs.insert(path.to_path_buf(), tex.clone());
         Some(tex)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_instances(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "amc_shots_test_{tag}_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("inst").join("screenshots")).unwrap();
+        dir
+    }
+
+    #[test]
+    fn test_list_shots_filters_extensions() {
+        let root = temp_instances("ext");
+        let shots = root.join("inst").join("screenshots");
+        std::fs::write(shots.join("a.png"), b"fake").unwrap();
+        std::fs::write(shots.join("b.jpg"), b"fake").unwrap();
+        std::fs::write(shots.join("c.txt"), b"fake").unwrap();
+        std::fs::write(shots.join("noext"), b"fake").unwrap();
+        let listed = list_shots(&root);
+        assert_eq!(listed.len(), 2);
+        assert!(listed.iter().all(|p| {
+            p.extension()
+                .map(|e| e == "png" || e == "jpg")
+                .unwrap_or(false)
+        }));
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn test_list_shots_missing_dir_is_empty() {
+        let missing = std::env::temp_dir().join("amc_shots_test_missing_dir_xyz");
+        let _ = std::fs::remove_dir_all(&missing);
+        assert!(list_shots(&missing).is_empty());
     }
 }
