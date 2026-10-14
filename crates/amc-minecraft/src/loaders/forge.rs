@@ -1,4 +1,6 @@
-use super::installer::{run_client_installer, INSTALLER_TIMEOUT};
+use super::installer::{
+    find_new_version_json, run_client_installer, snapshot_versions, INSTALLER_TIMEOUT,
+};
 use crate::version::VersionDetails;
 use amc_core::error::{LauncherError, Result};
 use amc_core::paths::LauncherPaths;
@@ -120,6 +122,12 @@ impl ForgeLoader {
             .cache_dir()
             .join("installers")
             .join(format!("forge-{version_id}-work"));
+        // Start from a clean staging dir so the product diff below is
+        // exact (a previous failed run must not look like output).
+        let _ = tokio::fs::remove_dir_all(&staging).await;
+        // Like NeoForge, the installer downloads vanilla files next to
+        // its own output: find the product by directory diff.
+        let before = snapshot_versions(&staging.join("versions"));
         let produced = run_client_installer(
             java_bin,
             &installer_path,
@@ -128,7 +136,12 @@ impl ForgeLoader {
             &status,
             INSTALLER_TIMEOUT,
         )
-        .await?;
+        .await
+        .or_else(|_| {
+            find_new_version_json(&staging.join("versions"), &before, Some(&version_id)).map_err(
+                |e| LauncherError::Launch(format!("Forge installer product not found: {e}")),
+            )
+        })?;
 
         let text = tokio::fs::read_to_string(&produced)
             .await
@@ -138,10 +151,12 @@ impl ForgeLoader {
             })?;
         let details = VersionDetails::parse(&text)?;
 
-        if let Some(parent) = cached.parent() {
-            let _ = tokio::fs::create_dir_all(parent).await;
+        // Cache under the produced id (the truth after any format
+        // drift), so relaunches hit the fast path above.
+        let cache_dir = paths.versions_dir().join(&details.id);
+        if tokio::fs::create_dir_all(&cache_dir).await.is_ok() {
+            let _ = tokio::fs::write(cache_dir.join(format!("{}.json", details.id)), &text).await;
         }
-        let _ = tokio::fs::write(&cached, &text).await;
         let _ = tokio::fs::remove_dir_all(&staging).await; // best-effort cleanup
         Ok(details)
     }

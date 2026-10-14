@@ -2108,9 +2108,43 @@ impl LauncherApp {
                     )
                     .await
                     {
-                        Ok(mut forge_details) => {
-                            forge_details.merge_parent(vanilla);
-                            forge_details
+                        Ok(forge_details) => {
+                            // The produced version declares its own vanilla
+                            // parent (a picked NeoForge/Forge line may target
+                            // a newer MC than requested): merge with that.
+                            let parent_ver = forge_details
+                                .inherits_from
+                                .clone()
+                                .unwrap_or_else(|| ver_id.clone());
+                            if parent_ver == ver_id {
+                                let mut details = forge_details;
+                                details.merge_parent(vanilla);
+                                details
+                            } else {
+                                match VersionDetails::fetch_or_load(
+                                    &client,
+                                    &parent_ver,
+                                    None,
+                                    &paths.versions_dir(),
+                                )
+                                .await
+                                {
+                                    Ok(parent) => {
+                                        let mut details = forge_details;
+                                        details.merge_parent(parent);
+                                        details
+                                    }
+                                    Err(e) => {
+                                        let _ = game_tx
+                                            .send(GameEvent::Crashed {
+                                                message: lang
+                                                    .err_loader_failed("Forge", &e.to_string()),
+                                            })
+                                            .await;
+                                        return;
+                                    }
+                                }
+                            }
                         }
                         Err(e) => {
                             let _ = game_tx
@@ -2153,9 +2187,43 @@ impl LauncherApp {
                     )
                     .await
                     {
-                        Ok(mut neoforge_details) => {
-                            neoforge_details.merge_parent(vanilla);
-                            neoforge_details
+                        Ok(neoforge_details) => {
+                            // The produced version declares its own vanilla
+                            // parent (a picked line may target a newer MC
+                            // than requested): merge with that.
+                            let parent_ver = neoforge_details
+                                .inherits_from
+                                .clone()
+                                .unwrap_or_else(|| ver_id.clone());
+                            if parent_ver == ver_id {
+                                let mut details = neoforge_details;
+                                details.merge_parent(vanilla);
+                                details
+                            } else {
+                                match VersionDetails::fetch_or_load(
+                                    &client,
+                                    &parent_ver,
+                                    None,
+                                    &paths.versions_dir(),
+                                )
+                                .await
+                                {
+                                    Ok(parent) => {
+                                        let mut details = neoforge_details;
+                                        details.merge_parent(parent);
+                                        details
+                                    }
+                                    Err(e) => {
+                                        let _ = game_tx
+                                            .send(GameEvent::Crashed {
+                                                message: lang
+                                                    .err_loader_failed("NeoForge", &e.to_string()),
+                                            })
+                                            .await;
+                                        return;
+                                    }
+                                }
+                            }
                         }
                         Err(e) => {
                             let _ = game_tx

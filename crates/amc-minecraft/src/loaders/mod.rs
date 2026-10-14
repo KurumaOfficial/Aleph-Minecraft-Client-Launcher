@@ -7,7 +7,10 @@ pub mod quilt;
 
 pub use fabric::FabricLoader;
 pub use forge::ForgeLoader;
-pub use installer::{find_installed_json, run_client_installer, INSTALLER_TIMEOUT};
+pub use installer::{
+    find_installed_json, find_new_version_json, run_client_installer, snapshot_versions,
+    INSTALLER_TIMEOUT,
+};
 pub use neoforge::NeoForgeLoader;
 pub use optifine::OptiFineLoader;
 pub use quilt::QuiltLoader;

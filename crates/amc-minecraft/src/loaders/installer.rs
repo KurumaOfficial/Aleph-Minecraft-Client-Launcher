@@ -33,6 +33,21 @@ pub async fn run_client_installer(
             source: e,
         })?;
 
+    // NeoForge (and some Forge lines) refuse an empty target:
+    // "no minecraft launcher profile ... run the launcher first".
+    // Seed a minimal profile so headless installs proceed; the
+    // installer fills in its own entries.
+    let profiles = target_dir.join("launcher_profiles.json");
+    if !profiles.is_file() {
+        let seed = r#"{"profiles": {}, "selectedProfile": "(Default)", "authenticationDatabase": {}, "launcherVersion": {}}"#;
+        tokio::fs::write(&profiles, seed)
+            .await
+            .map_err(|e| LauncherError::Io {
+                path: profiles.clone(),
+                source: e,
+            })?;
+    }
+
     let mut child = tokio::process::Command::new(java_bin)
         .arg("-jar")
         .arg(installer_jar)
@@ -158,6 +173,73 @@ pub fn find_installed_json(
     }
 }
 
+/// Snapshot of version directory names, taken before an installer runs.
+/// The installer also downloads vanilla files next to its own output,
+/// so "exactly one version" is unreliable — diffing is not.
+pub fn snapshot_versions(versions_dir: &Path) -> std::collections::HashSet<String> {
+    std::fs::read_dir(versions_dir)
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter(|e| e.path().is_dir())
+                .map(|e| e.file_name().to_string_lossy().to_string())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Locate the version json an installer produced, robust to id format
+/// drift (NeoForge emits `neoforge-<v>`, older lines `{mc}-neoforge-<v>`;
+/// vanilla files land next to the product):
+/// exact expected id first, else the single NEW directory whose json
+/// declares `inheritsFrom` (loader products always do, vanilla never).
+pub fn find_new_version_json(
+    versions_dir: &Path,
+    before: &std::collections::HashSet<String>,
+    expected_version_id: Option<&str>,
+) -> Result<PathBuf> {
+    if let Some(id) = expected_version_id {
+        let exact = versions_dir.join(id).join(format!("{id}.json"));
+        if exact.is_file() {
+            return Ok(exact);
+        }
+    }
+
+    let fresh: Vec<String> = std::fs::read_dir(versions_dir)
+        .map_err(|e| LauncherError::Io {
+            path: versions_dir.to_path_buf(),
+            source: e,
+        })?
+        .flatten()
+        .filter(|e| e.path().is_dir())
+        .map(|e| e.file_name().to_string_lossy().to_string())
+        .filter(|name| !before.contains(name))
+        .collect();
+    let mut loader_made = Vec::new();
+    for name in &fresh {
+        let candidate = versions_dir.join(name).join(format!("{name}.json"));
+        let inherits = std::fs::read_to_string(&candidate)
+            .ok()
+            .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
+            .and_then(|json| {
+                json.get("inheritsFrom")
+                    .and_then(|v| v.as_str())
+                    .map(str::to_string)
+            });
+        if inherits.is_some() {
+            loader_made.push(candidate);
+        }
+    }
+    match loader_made.len() {
+        1 => Ok(loader_made.remove(0)),
+        _ => Err(LauncherError::Launch(format!(
+            "Installer produced {} loader versions (new dirs: {}), expected exactly one",
+            loader_made.len(),
+            fresh.join(", ")
+        ))),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -178,13 +260,13 @@ mod tests {
     }
 
     fn write_json(dir: &Path, version_id: &str) {
+        write_json_body(dir, version_id, r#"{"id":"x"}"#);
+    }
+
+    fn write_json_body(dir: &Path, version_id: &str, body: &str) {
         let version_dir = dir.join(version_id);
         std::fs::create_dir_all(&version_dir).unwrap();
-        std::fs::write(
-            version_dir.join(format!("{version_id}.json")),
-            r#"{"id":"x"}"#,
-        )
-        .unwrap();
+        std::fs::write(version_dir.join(format!("{version_id}.json")), body).unwrap();
     }
 
     #[test]
@@ -206,6 +288,41 @@ mod tests {
         let found = find_installed_json(&versions, None).unwrap();
         assert!(found.ends_with(Path::new("whatever/whatever.json")));
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn test_find_new_version_json_by_diff() {
+        use std::collections::HashSet;
+        let root = unique_dir("diff");
+        let versions = root.join("versions");
+        // Vanilla downloaded next to the product must not confuse it:
+        // only loader products declare inheritsFrom.
+        write_json(&versions, "1.21.11");
+        let before = snapshot_versions(&versions);
+        // NeoForge drifted id format: no MC prefix.
+        write_json_body(
+            &versions,
+            "neoforge-21.11.45",
+            r#"{"id":"neoforge-21.11.45","inheritsFrom":"1.21.11"}"#,
+        );
+        let found =
+            find_new_version_json(&versions, &before, Some("1.21.4-neoforge-21.11.45")).unwrap();
+        assert!(found.ends_with(Path::new("neoforge-21.11.45/neoforge-21.11.45.json")));
+        // Exact expected id still wins when present.
+        write_json(&versions, "1.21.4-neoforge-21.11.45");
+        let found =
+            find_new_version_json(&versions, &before, Some("1.21.4-neoforge-21.11.45")).unwrap();
+        assert!(found.ends_with(Path::new(
+            "1.21.4-neoforge-21.11.45/1.21.4-neoforge-21.11.45.json"
+        )));
+        // Nothing new, nothing exact: error, not a guess.
+        let empty_before: HashSet<String> = ["1.21.11".to_string()].into_iter().collect();
+        let root2 = unique_dir("diff_none");
+        let versions2 = root2.join("versions");
+        write_json(&versions2, "1.21.11");
+        assert!(find_new_version_json(&versions2, &empty_before, Some("nope")).is_err());
+        let _ = std::fs::remove_dir_all(&root);
+        let _ = std::fs::remove_dir_all(&root2);
     }
 
     #[test]
