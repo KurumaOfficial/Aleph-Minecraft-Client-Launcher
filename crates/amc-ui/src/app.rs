@@ -801,9 +801,10 @@ impl LauncherApp {
         });
     }
 
-    /// Drag-and-drop entry: `.mrpack` imports a pack, `.jar` installs a mod
-    /// file into the selected instance, a folder with `level.dat` imports
-    /// a world. Everything else is ignored with a toast.
+    /// Drag-and-drop entry: `.mrpack` imports a Modrinth pack, `.zip`
+    /// imports a CurseForge pack, `.jar` installs a mod file into the
+    /// selected instance, a folder with `level.dat` imports a world.
+    /// Everything else is ignored with a toast.
     fn handle_dropped_files(&mut self, files: Vec<std::path::PathBuf>) {
         for path in files {
             if path.is_dir() {
@@ -814,6 +815,7 @@ impl LauncherApp {
             }
             match path.extension().and_then(|e| e.to_str()) {
                 Some(ext) if ext.eq_ignore_ascii_case("mrpack") => self.import_mrpack(path),
+                Some(ext) if ext.eq_ignore_ascii_case("zip") => self.import_cursepack(path),
                 Some(ext) if ext.eq_ignore_ascii_case("jar") => self.install_loose_jar(path),
                 _ => {}
             }
@@ -978,6 +980,100 @@ impl LauncherApp {
                 }))
                 .await;
             let _ = ok_count;
+        });
+    }
+
+    /// Import a CurseForge pack `.zip`: resolve each pinned
+    /// `(projectID, fileID)` through the CurseForge API, download into
+    /// `mods/`, extract the overrides tree. Optional (`required: false`)
+    /// files install too — no per-file picker in v1.0.
+    fn import_cursepack(&mut self, pack_path: std::path::PathBuf) {
+        let base_dir = self.content_base_dir();
+        let engine = self.download_engine.clone();
+        let (tx, rx) = mpsc::channel(1);
+        self.mod_install_rx = Some(rx);
+        tokio::spawn(async move {
+            let manifest = match amc_mods::parse_curse_manifest(&pack_path) {
+                Ok(manifest) => manifest,
+                Err(e) => {
+                    let _ = tx.send(Err(format!("Bad CurseForge pack: {e}"))).await;
+                    return;
+                }
+            };
+            let client = amc_mods::CurseForgeClient::default();
+            let mods_dir = base_dir.join("mods");
+            let _ = tokio::fs::create_dir_all(&mods_dir).await;
+            let mut ok_count = 0usize;
+            let mut fail_count = 0usize;
+            for entry in &manifest.files {
+                let resolved = match client.get_pack_file(entry.project_id, entry.file_id).await {
+                    Ok(file) => file,
+                    Err(e) => {
+                        tracing::warn!(
+                            "Curse pack file {}/{} skipped: {e}",
+                            entry.project_id,
+                            entry.file_id
+                        );
+                        fail_count += 1;
+                        continue;
+                    }
+                };
+                let dest = mods_dir.join(&resolved.filename);
+                let item = amc_downloader::DownloadItem::new(&resolved.url, &dest);
+                if engine
+                    .download_one(&item, None, DownloadCancel::default())
+                    .await
+                    .is_ok()
+                {
+                    ok_count += 1;
+                } else {
+                    fail_count += 1;
+                }
+            }
+            // Overrides tree (configs, resourcepacks, …).
+            let prefix = format!("{}/", manifest.overrides_dir());
+            let overrides_done = (|| {
+                let zip_file = std::fs::File::open(&pack_path).ok()?;
+                let mut archive = zip::ZipArchive::new(zip_file).ok()?;
+                for i in 0..archive.len() {
+                    let mut entry = archive.by_index(i).ok()?;
+                    let name = entry.name().to_string();
+                    let Some(rest) = name.strip_prefix(&prefix) else {
+                        continue;
+                    };
+                    let Some(rel) = amc_mods::MrpackIndex::sanitize_path(rest) else {
+                        continue;
+                    };
+                    if name.ends_with('/') {
+                        continue;
+                    }
+                    let dest = base_dir.join(&rel);
+                    if let Some(parent) = dest.parent() {
+                        std::fs::create_dir_all(parent).ok()?;
+                    }
+                    let mut out = std::fs::File::create(&dest).ok()?;
+                    std::io::copy(&mut entry, &mut out).ok()?;
+                }
+                Some(())
+            })();
+            let _ = overrides_done;
+            tracing::info!(
+                "CurseForge pack '{}' imported: {ok_count} mods ok, {fail_count} failed",
+                manifest.name
+            );
+            let _ = tx
+                .send(Ok(InstallReport {
+                    mod_id: format!("cursepack:{}", manifest.name),
+                    title: manifest.name.clone(),
+                    extra: Vec::new(),
+                    filenames: Vec::new(),
+                    replaced_olds: Vec::new(),
+                    instance_id: None,
+                    target_dir: base_dir.join("mods"),
+                    mc_version: manifest.minecraft.map(|mc| mc.version),
+                    loader_name: "minecraft".to_string(),
+                }))
+                .await;
         });
     }
 
@@ -2175,7 +2271,7 @@ impl App for LauncherApp {
             }
         }
 
-        // Drag-and-drop install (CONCEPT P4): .mrpack pack, .jar mod,
+        // Drag-and-drop install (CONCEPT P4): .mrpack/.zip pack, .jar mod,
         // or a world folder (contains level.dat) into the window.
         if !self.pending_identity_pick && self.wizard.is_none() {
             let dropped: Vec<std::path::PathBuf> = ctx.input(|inp| {
