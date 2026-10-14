@@ -319,4 +319,19 @@ mod tests {
             .expect("pack file found by id");
         assert_eq!(file.file_name, "sodium.jar");
     }
+
+    /// LIVE marketplace smoke (manual only — needs network; never in CI):
+    /// `cargo test -p amc-mods -- --ignored live_curseforge_search`
+    /// Guards against CurseTools proxy drift breaking search.
+    #[tokio::test]
+    #[ignore]
+    async fn live_curseforge_search() {
+        let client = CurseForgeClient::default();
+        let hits = client
+            .search("jei", Some("forge"), Some("1.20.1"), 5)
+            .await
+            .expect("CurseForge search works");
+        assert!(!hits.is_empty(), "jei search returns hits");
+        assert!(!hits[0].id.is_empty() && !hits[0].title.is_empty());
+    }
 }

@@ -475,4 +475,26 @@ mod tests {
         .expect("old hits keep parsing");
         assert_eq!(legacy.follows, 0);
     }
+
+    /// LIVE marketplace smoke (manual only — needs network; never in CI):
+    /// `cargo test -p amc-mods -- --ignored live_modrinth_search`
+    /// Guards against Modrinth API shape drift breaking search.
+    #[tokio::test]
+    #[ignore]
+    async fn live_modrinth_search() {
+        let client = ModrinthClient::default();
+        let hits = client
+            .search(
+                "sodium",
+                Some("fabric"),
+                Some("1.20.1"),
+                ModCategory::Mod,
+                3,
+                SearchSort::Relevance,
+            )
+            .await
+            .expect("Modrinth search works");
+        assert!(!hits.is_empty(), "sodium search returns hits");
+        assert!(!hits[0].id.is_empty() && !hits[0].title.is_empty());
+    }
 }

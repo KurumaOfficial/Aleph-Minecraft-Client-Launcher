@@ -240,4 +240,22 @@ mod tests {
         let game = &modern.arguments.unwrap().game;
         assert!(game.len() == 2);
     }
+
+    /// LIVE OptiFine smoke (manual only — needs network; never in CI):
+    /// `cargo test -p amc-minecraft -- --ignored live_optifine_resolve`
+    /// Guards against BMCLAPI drift breaking the lookup. Jar download
+    /// itself flows through the standard downloader at launch.
+    #[tokio::test]
+    #[ignore]
+    async fn live_optifine_resolve() {
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(60))
+            .build()
+            .expect("reqwest client");
+        let details = OptiFineLoader::resolve(&client, "1.20.1")
+            .await
+            .expect("OptiFine 1.20.1 resolves");
+        assert_eq!(details.inherits_from.as_deref(), Some("1.20.1"));
+        assert!(!details.libraries.is_empty());
+    }
 }

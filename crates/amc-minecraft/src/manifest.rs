@@ -115,3 +115,35 @@ impl VersionManifest {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// LIVE Mojang smoke (manual only — needs network; never in CI):
+    /// `cargo test -p amc-minecraft -- --ignored live_mojang_manifest`
+    /// Guards against piston-meta drift breaking version listing.
+    /// No cache dir: asserts the pure network path.
+    #[tokio::test]
+    #[ignore]
+    async fn live_mojang_manifest() {
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(60))
+            .build()
+            .expect("reqwest client");
+        let manifest = VersionManifest::fetch(&client, None)
+            .await
+            .expect("Mojang manifest fetches");
+        assert!(
+            !manifest.latest.release.is_empty(),
+            "manifest names a latest release"
+        );
+        let versions = manifest.to_game_versions();
+        assert!(
+            versions
+                .iter()
+                .any(|v| v.release_type == ReleaseType::Release),
+            "manifest lists releases"
+        );
+    }
+}
