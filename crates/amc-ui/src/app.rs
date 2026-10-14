@@ -519,6 +519,68 @@ impl LauncherApp {
         });
     }
 
+    /// Export the settings bundle via save dialog (CONCEPT P10 manual
+    /// path for moving to another PC): config + accounts + instances +
+    /// favorites in one `.zip`. Worlds, mods and runtimes stay behind.
+    fn export_settings_bundle(&mut self) {
+        let stamp = chrono::Utc::now().format("%Y%m%d").to_string();
+        let dialog = rfd::FileDialog::new()
+            .add_filter("AMC settings", &["zip"])
+            .set_file_name(format!("amc-settings-{stamp}.zip"));
+        let Some(dest) = dialog.save_file() else {
+            return;
+        };
+        match amc_core::settings_bundle::export_bundle(&self.paths.root_dir, &dest) {
+            Ok(()) => {
+                self.settings_page.transfer_note = Some(dest.to_string_lossy().to_string());
+            }
+            Err(e) => {
+                self.settings_page.transfer_note = Some(format!("Export failed: {e}"));
+            }
+        }
+    }
+
+    /// Import a settings bundle and reload in-memory state from the
+    /// restored documents (CONCEPT P10). A stored `root_override` takes
+    /// effect on the next startup, like a hand-edited config.
+    fn import_settings_bundle(&mut self) {
+        let dialog = rfd::FileDialog::new().add_filter("AMC settings", &["zip"]);
+        let Some(pack) = dialog.pick_file() else {
+            return;
+        };
+        let root = self.paths.root_dir.clone();
+        match amc_core::settings_bundle::import_bundle(&root, &pack) {
+            Ok(restored) => {
+                self.config =
+                    LauncherConfig::load_from_path(&self.paths.config_file()).unwrap_or_default();
+                self.instances =
+                    Instance::load_all(&self.paths.instances_file()).unwrap_or_default();
+                if !self
+                    .instances
+                    .iter()
+                    .any(|i| Some(i.id) == self.selected_instance)
+                {
+                    self.selected_instance = self.instances.first().map(|i| i.id);
+                }
+                self.account_mgr = Self::load_accounts(&self.paths);
+                self.favorites = amc_minecraft::load_favorites(&self.paths.root_dir);
+                self.favorites_snapshot = self.favorites.clone();
+                self.wishlist_snapshot = self.config.wishlist.clone();
+                self.current_tab =
+                    if self.config.app_mode == amc_core::config::AppMode::Professional {
+                        NavTab::Modpacks
+                    } else {
+                        NavTab::Home
+                    };
+                self.settings_page.transfer_note =
+                    Some(format!("{}: {}", restored.len(), restored.join(", ")));
+            }
+            Err(e) => {
+                self.settings_page.transfer_note = Some(format!("Import failed: {e}"));
+            }
+        }
+    }
+
     /// Export logs + config + instances as a support bundle (P12).
     /// Runs inline: small text files only.
     fn export_diagnostics(&mut self) {
@@ -2435,6 +2497,16 @@ impl App for LauncherApp {
         if self.settings_page.crash_export_requested {
             self.settings_page.crash_export_requested = false;
             self.export_diagnostics();
+        }
+
+        // Manual settings transfer for another PC (CONCEPT, P10).
+        if self.settings_page.transfer_export_requested {
+            self.settings_page.transfer_export_requested = false;
+            self.export_settings_bundle();
+        }
+        if self.settings_page.transfer_import_requested {
+            self.settings_page.transfer_import_requested = false;
+            self.import_settings_bundle();
         }
 
         // Local dedicated server (P13): start/stop requests, prep-task

@@ -26,6 +26,9 @@ pub struct SettingsPage {
     managed_runtimes: Option<Vec<String>>,
     pub update_check_requested: bool,
     pub crash_export_requested: bool,
+    pub transfer_export_requested: bool,
+    pub transfer_import_requested: bool,
+    pub transfer_note: Option<String>,
     pub update_note: Option<String>,
     pub server_start_requested: bool,
     pub server_stop_requested: bool,
@@ -43,6 +46,9 @@ impl Default for SettingsPage {
             managed_runtimes: None,
             update_check_requested: false,
             crash_export_requested: false,
+            transfer_export_requested: false,
+            transfer_import_requested: false,
+            transfer_note: None,
             update_note: None,
             server_start_requested: false,
             server_stop_requested: false,
@@ -444,6 +450,37 @@ impl SettingsPage {
             if ui.button(lang.crash_export()).clicked() {
                 self.crash_export_requested = true;
             }
+        });
+
+        ui.add_space(14.0);
+
+        // Manual settings transfer for moving to another PC
+        // (CONCEPT "Облачная синхронизация", P10 — no cloud in v1.0).
+        ui.group(|ui| {
+            ui.label(
+                egui::RichText::new(lang.transfer_title())
+                    .font(egui::FontId::proportional(16.0))
+                    .strong()
+                    .color(TEXT_HEADING),
+            );
+            ui.add_space(4.0);
+            ui.label(
+                egui::RichText::new(lang.transfer_desc())
+                    .font(egui::FontId::proportional(12.0))
+                    .color(TEXT_MUTED),
+            );
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                if ui.button(lang.transfer_export()).clicked() {
+                    self.transfer_export_requested = true;
+                }
+                if ui.button(lang.transfer_import()).clicked() {
+                    self.transfer_import_requested = true;
+                }
+                if let Some(note) = &self.transfer_note {
+                    ui.label(egui::RichText::new(note).color(TEXT_MUTED));
+                }
+            });
         });
 
         ui.add_space(14.0);

@@ -6,6 +6,8 @@ pub mod health;
 pub mod i18n;
 pub mod logging;
 pub mod paths;
+
+pub mod settings_bundle;
 pub mod trash;
 pub mod types;
 pub mod worlds;

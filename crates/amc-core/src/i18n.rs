@@ -1391,6 +1391,39 @@ impl Language {
         }
     }
 
+    // ---- Settings transfer for moving to another PC (CONCEPT, P10) ----
+    pub fn transfer_title(&self) -> &'static str {
+        match self {
+            Self::English => "Move to another PC",
+            Self::Russian => "Переезд на другой ПК",
+            Self::Ukrainian => "Переїзд на інший ПК",
+        }
+    }
+
+    pub fn transfer_desc(&self) -> &'static str {
+        match self {
+            Self::English => "Settings, accounts, instances and favorites in one file.",
+            Self::Russian => "Настройки, аккаунты, сборки и избранное в одном файле.",
+            Self::Ukrainian => "Налаштування, акаунти, збірки та обране в одному файлі.",
+        }
+    }
+
+    pub fn transfer_export(&self) -> &'static str {
+        match self {
+            Self::English => "Export settings file",
+            Self::Russian => "Экспорт файла настроек",
+            Self::Ukrainian => "Експорт файла налаштувань",
+        }
+    }
+
+    pub fn transfer_import(&self) -> &'static str {
+        match self {
+            Self::English => "Import settings file",
+            Self::Russian => "Импорт файла настроек",
+            Self::Ukrainian => "Імпорт файла налаштувань",
+        }
+    }
+
     // ---- Local dedicated server (CONCEPT Steam section, P13) ----
     pub fn server_title(&self) -> &'static str {
         match self {
@@ -3307,6 +3340,10 @@ mod tests {
             assert!(!lang.crash_title().is_empty());
             assert!(!lang.crash_enable().is_empty());
             assert!(!lang.crash_export().is_empty());
+            assert!(!lang.transfer_title().is_empty());
+            assert!(!lang.transfer_desc().is_empty());
+            assert!(!lang.transfer_export().is_empty());
+            assert!(!lang.transfer_import().is_empty());
             assert!(!lang.server_create().is_empty());
             assert!(!lang.server_stop().is_empty());
             assert!(!lang.server_running(25565).is_empty());
