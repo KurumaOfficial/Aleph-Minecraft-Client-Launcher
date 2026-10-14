@@ -137,6 +137,7 @@ impl CurseForgeClient {
                     .map(|a| a.name.clone())
                     .unwrap_or_else(|| "Unknown".into()),
                 downloads: item.downloads,
+                rating: 0, // CurseTools search carries no rating; UI stays silent.
                 description: item.summary,
                 icon_url: item.logo.map(|l| l.url),
                 category: ModCategory::Mod,

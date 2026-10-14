@@ -503,6 +503,13 @@ impl InstancesPage {
                             .font(egui::FontId::proportional(11.0))
                             .color(TEXT_MUTED),
                     );
+                    if pack.rating > 0 {
+                        ui.label(
+                            egui::RichText::new(format!("★ {}", pack.rating))
+                                .font(egui::FontId::proportional(11.0))
+                                .color(TEXT_MUTED),
+                        );
+                    }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui.button(lang.discover_install()).clicked() {
                             self.discover_install = Some(pack.id.clone());

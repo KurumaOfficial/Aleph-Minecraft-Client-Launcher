@@ -454,6 +454,7 @@ impl ModsPage {
                                         title: offer.title.clone(),
                                         author: String::new(),
                                         downloads: 0,
+                                        rating: 0,
                                         description: String::new(),
                                         icon_url: None,
                                         category: ModCategory::Mod,
@@ -701,6 +702,15 @@ impl ModsPage {
                                     .font(egui::FontId::proportional(10.0))
                                     .color(TEXT_MUTED),
                             );
+                            // Rating from the marketplace (Modrinth follows);
+                            // unknown (0) stays silent instead of guessing.
+                            if item.rating > 0 {
+                                ui.label(
+                                    egui::RichText::new(format!("★ {}", item.rating))
+                                        .font(egui::FontId::proportional(10.0))
+                                        .color(TEXT_MUTED),
+                                );
+                            }
                         });
 
                         ui.add(

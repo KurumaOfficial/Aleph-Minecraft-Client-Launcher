@@ -18,6 +18,8 @@ struct SearchHit {
     author: String,
     downloads: u64,
     #[serde(default)]
+    follows: u64,
+    #[serde(default)]
     description: String,
     #[serde(default)]
     icon_url: Option<String>,
@@ -209,6 +211,7 @@ impl ModrinthClient {
                 title: h.title,
                 author: h.author,
                 downloads: h.downloads,
+                rating: h.follows,
                 description: h.description,
                 icon_url: h.icon_url,
                 category,
@@ -380,5 +383,20 @@ mod tests {
     fn test_select_compatible_none() {
         let versions = fixture();
         assert!(ModrinthClient::select_compatible(&versions, "1.18.2", "fabric").is_none());
+    }
+
+    #[test]
+    fn test_search_hit_follows_parsing() {
+        let hit: SearchHit = serde_json::from_str(
+            r#"{"slug":"sodium","title":"Sodium","author":"JellySquid",
+                "downloads":100,"follows":42,"description":"","versions":[],"categories":[]}"#,
+        )
+        .expect("Modrinth hit parses");
+        assert_eq!(hit.follows, 42);
+        let legacy: SearchHit = serde_json::from_str(
+            r#"{"slug":"x","title":"X","author":"A","downloads":1,"description":""}"#,
+        )
+        .expect("old hits keep parsing");
+        assert_eq!(legacy.follows, 0);
     }
 }

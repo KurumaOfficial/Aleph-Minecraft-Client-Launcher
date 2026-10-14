@@ -26,6 +26,10 @@ pub struct ModSearchResult {
     pub description: String,
     pub icon_url: Option<String>,
     pub category: ModCategory,
+    /// Rating proxy from the marketplace (Modrinth `follows`).
+    /// Zero means unknown — the UI stays silent instead of guessing.
+    #[serde(default)]
+    pub rating: u64,
     /// Game versions from the search hit (empty = unknown).
     #[serde(default)]
     pub game_versions: Vec<String>,
@@ -85,6 +89,7 @@ mod tests {
             title: "Sodium".to_string(),
             author: "JellySquid".to_string(),
             downloads: 1,
+            rating: 42,
             description: String::new(),
             icon_url: None,
             category: ModCategory::Mod,
@@ -108,5 +113,21 @@ mod tests {
         r.game_versions.clear();
         r.loaders.clear();
         assert!(!r.fits("1.20.1", "fabric"));
+    }
+
+    #[test]
+    fn test_rating_defaults_to_unknown() {
+        let v: ModSearchResult = serde_json::from_value(serde_json::json!({
+            "source": "Modrinth",
+            "id": "x",
+            "title": "X",
+            "author": "A",
+            "downloads": 5,
+            "description": "",
+            "icon_url": null,
+            "category": "Mod",
+        }))
+        .expect("old payloads keep parsing");
+        assert_eq!(v.rating, 0);
     }
 }
