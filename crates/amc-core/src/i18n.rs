@@ -1529,6 +1529,23 @@ impl Language {
         }
     }
 
+    // ---- Rebindable hotkeys (CONCEPT, P10) ----
+    pub fn hotkey_title(&self) -> &'static str {
+        match self {
+            Self::English => "Hotkeys",
+            Self::Russian => "Горячие клавиши",
+            Self::Ukrainian => "Гарячі клавіші",
+        }
+    }
+
+    pub fn hotkey_launch(&self) -> &'static str {
+        match self {
+            Self::English => "Quick launch",
+            Self::Russian => "Быстрый запуск",
+            Self::Ukrainian => "Швидкий запуск",
+        }
+    }
+
     // ---- Local dedicated server (CONCEPT Steam section, P13) ----
     pub fn server_title(&self) -> &'static str {
         match self {
@@ -3539,6 +3556,8 @@ mod tests {
             assert!(!lang.group_java_select().is_empty());
             assert!(!lang.group_name_hint().is_empty());
             assert!(!lang.group_add().is_empty());
+            assert!(!lang.hotkey_title().is_empty());
+            assert!(!lang.hotkey_launch().is_empty());
             assert!(!lang.server_create().is_empty());
             assert!(!lang.server_stop().is_empty());
             assert!(!lang.server_running(25565).is_empty());

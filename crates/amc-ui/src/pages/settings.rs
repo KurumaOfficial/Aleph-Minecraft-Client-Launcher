@@ -422,6 +422,34 @@ impl SettingsPage {
 
         ui.add_space(14.0);
 
+        // Rebindable hotkeys (CONCEPT "Горячие клавиши", P10).
+        ui.group(|ui| {
+            ui.label(
+                egui::RichText::new(lang.hotkey_title())
+                    .font(egui::FontId::proportional(16.0))
+                    .strong()
+                    .color(TEXT_HEADING),
+            );
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new(lang.hotkey_launch()).color(TEXT_PRIMARY));
+                egui::ComboBox::from_id_salt("hotkey_launch_select")
+                    .selected_text(config.launch_hotkey.label())
+                    .show_ui(ui, |ui| {
+                        for key in amc_core::config::LaunchHotkey::ALL {
+                            if ui
+                                .selectable_label(config.launch_hotkey == key, key.label())
+                                .clicked()
+                            {
+                                config.launch_hotkey = key;
+                            }
+                        }
+                    });
+            });
+        });
+
+        ui.add_space(14.0);
+
         // Launcher updates, crash reports, diagnostics export.
         ui.group(|ui| {
             ui.label(

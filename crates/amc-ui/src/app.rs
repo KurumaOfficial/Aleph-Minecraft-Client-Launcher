@@ -2429,8 +2429,9 @@ async fn resolve_java_for_install(
 
 impl App for LauncherApp {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
-        // In-app hotkeys (CONCEPT, P10): Ctrl+1..6 switch tabs, F5 plays.
-        // Skipped while typing or when a modal grabs input.
+        // In-app hotkeys (CONCEPT, P10): Ctrl+1..6 switch tabs, the
+        // configured key plays. Skipped while typing or when a modal
+        // grabs input.
         if !ctx.wants_keyboard_input() && !self.login_modal.is_open {
             let tabs = [
                 NavTab::Home,
@@ -2453,7 +2454,14 @@ impl App for LauncherApp {
                     self.current_tab = *tab;
                 }
             }
-            if ctx.input(|inp| inp.key_pressed(egui::Key::F5)) {
+            let launch_key = match self.config.launch_hotkey {
+                amc_core::config::LaunchHotkey::F5 => egui::Key::F5,
+                amc_core::config::LaunchHotkey::F6 => egui::Key::F6,
+                amc_core::config::LaunchHotkey::F7 => egui::Key::F7,
+                amc_core::config::LaunchHotkey::F8 => egui::Key::F8,
+                amc_core::config::LaunchHotkey::F9 => egui::Key::F9,
+            };
+            if ctx.input(|inp| inp.key_pressed(launch_key)) {
                 self.handle_launch();
             }
         }

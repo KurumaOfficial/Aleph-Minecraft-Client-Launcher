@@ -153,6 +153,9 @@ pub struct LauncherConfig {
     /// Pinned mod slugs (Modrinth): skipped by update checks.
     #[serde(default)]
     pub pinned_mods: Vec<String>,
+    /// Quick-launch hotkey (CONCEPT "Горячие клавиши", P10).
+    #[serde(default)]
+    pub launch_hotkey: LaunchHotkey,
     /// Shared Java/RAM groups, referenced by instance `group` name
     /// (CONCEPT P2 "группы сборок").
     #[serde(default)]
@@ -161,6 +164,33 @@ pub struct LauncherConfig {
 
 fn default_true() -> bool {
     true
+}
+
+/// Rebindable quick-launch key (CONCEPT "Горячие клавиши", P10).
+/// Own enum on purpose: no egui dependency in `amc-core`, the mapping
+/// to `egui::Key` lives at the single use site in `amc-ui`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum LaunchHotkey {
+    #[default]
+    F5,
+    F6,
+    F7,
+    F8,
+    F9,
+}
+
+impl LaunchHotkey {
+    pub const ALL: [Self; 5] = [Self::F5, Self::F6, Self::F7, Self::F8, Self::F9];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::F5 => "F5",
+            Self::F6 => "F6",
+            Self::F7 => "F7",
+            Self::F8 => "F8",
+            Self::F9 => "F9",
+        }
+    }
 }
 
 /// Per-type notification switches; everything on by default.
@@ -203,6 +233,7 @@ impl Default for LauncherConfig {
             mc_reuse_done: false,
             wishlist: Vec::new(),
             pinned_mods: Vec::new(),
+            launch_hotkey: LaunchHotkey::default(),
             instance_groups: HashMap::new(),
         }
     }
@@ -310,6 +341,7 @@ mod tests {
         assert!(fresh.wishlist.is_empty());
         assert!(fresh.pinned_mods.is_empty());
         assert!(fresh.instance_groups.is_empty());
+        assert_eq!(fresh.launch_hotkey, LaunchHotkey::F5);
         assert!(!fresh.ask_identity_each_launch);
         // Legacy file without any new keys still parses.
         let legacy: LauncherConfig =
@@ -331,6 +363,19 @@ mod tests {
         );
         assert_eq!(AppMode::Simple.toggle(), AppMode::Professional);
         assert_eq!(AppMode::Professional.toggle(), AppMode::Simple);
+    }
+
+    #[test]
+    fn test_launch_hotkey_labels_and_legacy_default() {
+        assert_eq!(LaunchHotkey::ALL.len(), 5);
+        assert_eq!(LaunchHotkey::F7.label(), "F7");
+        let parsed: LaunchHotkey = serde_json::from_str("\"F9\"").unwrap();
+        assert_eq!(parsed, LaunchHotkey::F9);
+        // Configs written before hotkeys miss the key entirely.
+        let legacy: LauncherConfig =
+            serde_json::from_str(r#"{"ui":{"theme":"x","ui_scale":1.0,"show_snapshots":false,"show_betas":false,"show_alphas":false,"show_old":false,"language":"en"},"default_launch_options":{"memory_min_mb":1024,"memory_max_mb":4096,"java_path":null,"custom_jvm_args":[],"custom_game_args":[],"window_width":854,"window_height":480,"fullscreen":false,"quick_play_server":null,"quick_play_port":null},"custom_game_dir":null,"selected_version":null,"selected_instance":null}"#)
+                .unwrap();
+        assert_eq!(legacy.launch_hotkey, LaunchHotkey::F5);
     }
 
     #[test]

@@ -12,7 +12,7 @@ pub mod trash;
 pub mod types;
 pub mod worlds;
 
-pub use config::{AfterLaunch, AppMode, LauncherConfig, NotifSettings, UiSettings};
+pub use config::{AfterLaunch, AppMode, LaunchHotkey, LauncherConfig, NotifSettings, UiSettings};
 pub use error::{LauncherError, Result};
 pub use hardware::{free_disk_mb, HardwareReport};
 pub use health::{HealthCheck, HealthReport};
