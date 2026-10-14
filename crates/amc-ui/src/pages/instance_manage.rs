@@ -27,6 +27,8 @@ pub struct InstanceManage {
     // Config editor state.
     cfg_selected: Option<PathBuf>,
     cfg_text: String,
+    cfg_filter: String,
+    cfg_find: String,
     // Health state.
     health: Option<HealthReport>,
 }
@@ -285,6 +287,25 @@ impl InstanceManage {
             );
             return;
         }
+        // File filter (CONCEPT P2 config editor search).
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new("🔍").color(TEXT_MUTED));
+            ui.add(
+                TextEdit::singleline(&mut self.cfg_filter)
+                    .hint_text(lang.editor_filter_hint())
+                    .desired_width(200.0),
+            );
+        });
+        ui.add_space(4.0);
+        let needle = self.cfg_filter.trim().to_lowercase();
+        let visible: Vec<PathBuf> = if needle.is_empty() {
+            files
+        } else {
+            files
+                .into_iter()
+                .filter(|rel| rel.to_string_lossy().to_lowercase().contains(&needle))
+                .collect()
+        };
         ui.horizontal(|ui| {
             // File list.
             ScrollArea::vertical()
@@ -293,7 +314,7 @@ impl InstanceManage {
                 .max_height(320.0)
                 .show(ui, |ui| {
                     ui.set_min_width(180.0);
-                    for rel in &files {
+                    for rel in &visible {
                         let selected = self.cfg_selected.as_ref() == Some(rel);
                         let label = rel.to_string_lossy().to_string();
                         let text = if selected {
@@ -317,6 +338,25 @@ impl InstanceManage {
                             .font(egui::FontId::monospace(11.0))
                             .color(TEXT_MUTED),
                     );
+                    // In-content search: match counter, no cursor jumps —
+                    // egui multiline has no search API in v1.0 scope.
+                    ui.horizontal(|ui| {
+                        ui.label(egui::RichText::new("⌕").color(TEXT_MUTED));
+                        ui.add(
+                            TextEdit::singleline(&mut self.cfg_find)
+                                .hint_text(lang.editor_find_hint())
+                                .desired_width(160.0),
+                        );
+                        let find = self.cfg_find.trim().to_lowercase();
+                        if !find.is_empty() {
+                            let hits = self.cfg_text.to_lowercase().matches(&find).count();
+                            ui.label(
+                                egui::RichText::new(lang.editor_matches(hits))
+                                    .font(egui::FontId::proportional(11.0))
+                                    .color(TEXT_MUTED),
+                            );
+                        }
+                    });
                     ScrollArea::vertical()
                         .id_salt("cfg_edit")
                         .auto_shrink([false, false])

@@ -1056,6 +1056,30 @@ impl Language {
         }
     }
 
+    pub fn editor_filter_hint(&self) -> &'static str {
+        match self {
+            Self::English => "Filter files…",
+            Self::Russian => "Фильтр файлов…",
+            Self::Ukrainian => "Фільтр файлів…",
+        }
+    }
+
+    pub fn editor_find_hint(&self) -> &'static str {
+        match self {
+            Self::English => "Find in file…",
+            Self::Russian => "Найти в файле…",
+            Self::Ukrainian => "Знайти у файлі…",
+        }
+    }
+
+    pub fn editor_matches(&self, count: usize) -> String {
+        match self {
+            Self::English => format!("{count} matches"),
+            Self::Russian => format!("Совпадений: {count}"),
+            Self::Ukrainian => format!("Збігів: {count}"),
+        }
+    }
+
     // ---- Health verify/repair + trash (CONCEPT, P2) ----
     pub fn health_title(&self) -> &'static str {
         match self {
@@ -3368,6 +3392,9 @@ mod tests {
             assert!(!lang.transfer_desc().is_empty());
             assert!(!lang.transfer_export().is_empty());
             assert!(!lang.transfer_import().is_empty());
+            assert!(!lang.editor_filter_hint().is_empty());
+            assert!(!lang.editor_find_hint().is_empty());
+            assert!(!lang.editor_matches(2).is_empty());
             assert!(!lang.server_create().is_empty());
             assert!(!lang.server_stop().is_empty());
             assert!(!lang.server_running(25565).is_empty());
