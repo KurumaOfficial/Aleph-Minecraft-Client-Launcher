@@ -1,5 +1,6 @@
 pub mod args;
 pub mod assets;
+pub mod hooks;
 pub mod launch;
 pub mod loaders;
 pub mod manifest;
@@ -11,6 +12,7 @@ pub mod version;
 
 pub use args::ArgumentBuilder;
 pub use assets::AssetIndex;
+pub use hooks::run_hook_script;
 pub use launch::{GameEvent, MinecraftLauncher};
 pub use loaders::{FabricLoader, ForgeLoader, NeoForgeLoader, OptiFineLoader, QuiltLoader};
 pub use manifest::{VersionManifest, VersionManifestEntry};

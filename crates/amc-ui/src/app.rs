@@ -1630,6 +1630,17 @@ impl LauncherApp {
         self.launched_instance_id = self.selected_instance;
 
         let paths = self.paths.clone();
+        // P2: pre-launch/post-exit user scripts travel into the launch
+        // task; a failing pre-hook aborts before anything is downloaded.
+        let (pre_hook, post_hook) = if let Some(inst_id) = self.selected_instance {
+            self.instances
+                .iter()
+                .find(|i| i.id == inst_id)
+                .map(|inst| (inst.pre_launch_cmd.clone(), inst.post_exit_cmd.clone()))
+                .unwrap_or_default()
+        } else {
+            (String::new(), String::new())
+        };
         // P9: scheduled world backups run inside the launch task below.
         let backup_days = self.config.world_backup_days;
         let backups_root = self.world_backups_root();
@@ -1714,6 +1725,46 @@ impl LauncherApp {
 
         tokio::spawn(async move {
             let client = reqwest::Client::new();
+
+            // 0. Pre-launch hook (CONCEPT, P2): the user command runs in
+            // the instance dir before anything else. Failure aborts the
+            // launch with a crash message — no downloads, no playtime.
+            if !pre_hook.trim().is_empty() {
+                let _ = status_tx.send(format!("$ {pre_hook}")).await;
+                let hook_dir = game_dir.clone();
+                let hook_cmd = pre_hook.clone();
+                let hook_result = tokio::task::spawn_blocking(move || {
+                    amc_minecraft::run_hook_script(&hook_cmd, &hook_dir)
+                })
+                .await;
+                match hook_result {
+                    Ok(Ok(output)) => {
+                        for line in output.lines() {
+                            if !line.trim().is_empty() {
+                                let _ = game_tx
+                                    .send(GameEvent::LogLine(format!("[hook] {line}")))
+                                    .await;
+                            }
+                        }
+                    }
+                    Ok(Err(e)) => {
+                        let _ = game_tx
+                            .send(GameEvent::Crashed {
+                                message: format!("Pre-launch script failed: {e}"),
+                            })
+                            .await;
+                        return;
+                    }
+                    Err(e) => {
+                        let _ = game_tx
+                            .send(GameEvent::Crashed {
+                                message: format!("Pre-launch script failed: {e}"),
+                            })
+                            .await;
+                        return;
+                    }
+                }
+            }
 
             // 0. Scheduled world backups (CONCEPT, P9): due worlds are
             // copied before anything is downloaded or started.
@@ -2223,6 +2274,42 @@ impl LauncherApp {
                 Ok(mut rx) => {
                     while let Some(event) = rx.recv().await {
                         let _ = game_tx.send(event).await;
+                    }
+                    // 7. Post-exit hook (CONCEPT, P2): best effort after the
+                    // game is gone. Output lands in the console; a failure
+                    // never rewrites the session that just ended.
+                    if !post_hook.trim().is_empty() {
+                        let hook_dir = game_dir.clone();
+                        let hook_cmd = post_hook.clone();
+                        match tokio::task::spawn_blocking(move || {
+                            amc_minecraft::run_hook_script(&hook_cmd, &hook_dir)
+                        })
+                        .await
+                        {
+                            Ok(Ok(output)) => {
+                                for line in output.lines() {
+                                    if !line.trim().is_empty() {
+                                        let _ = game_tx
+                                            .send(GameEvent::LogLine(format!("[hook] {line}")))
+                                            .await;
+                                    }
+                                }
+                            }
+                            Ok(Err(e)) => {
+                                let _ = game_tx
+                                    .send(GameEvent::LogLine(format!(
+                                        "[hook] Post-exit script failed: {e}"
+                                    )))
+                                    .await;
+                            }
+                            Err(e) => {
+                                let _ = game_tx
+                                    .send(GameEvent::LogLine(format!(
+                                        "[hook] Post-exit script failed: {e}"
+                                    )))
+                                    .await;
+                            }
+                        }
                     }
                 }
                 Err(e) => {
