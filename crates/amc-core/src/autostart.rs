@@ -69,7 +69,7 @@ mod platform {
             let exe =
                 super::launcher_exe().ok_or_else(|| "Current exe path unknown".to_string())?;
             let value = format!("\"{}\"", exe.display());
-            let data: Vec<u16> = value.encode_utf16().chain(std::iter::once(0)).collect();
+            let wide_value: Vec<u16> = value.encode_utf16().chain(std::iter::once(0)).collect();
             let mut key: HKEY = std::ptr::null_mut();
             if RegOpenKeyExW(
                 HKEY_CURRENT_USER,
@@ -86,8 +86,8 @@ mod platform {
                 wide(APP_ID).as_ptr(),
                 0,
                 REG_SZ,
-                data.as_ptr() as *const u8,
-                (data.len() * 2) as u32,
+                wide_value.as_ptr() as *const u8,
+                (wide_value.len() * 2) as u32,
             );
             RegCloseKey(key);
             if status != 0 {

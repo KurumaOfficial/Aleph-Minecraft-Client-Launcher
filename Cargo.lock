@@ -56,7 +56,6 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "tokio",
  "uuid",
 ]
 
@@ -69,7 +68,6 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
- "tracing",
  "tracing-subscriber",
  "uuid",
  "windows-sys 0.59.0",
@@ -85,11 +83,8 @@ dependencies = [
  "futures-util",
  "parking_lot",
  "reqwest",
- "serde",
- "serde_json",
  "sha1",
  "tar",
- "thiserror 1.0.69",
  "tokio",
  "tracing",
  "zip",

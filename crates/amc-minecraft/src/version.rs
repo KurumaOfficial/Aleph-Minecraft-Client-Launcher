@@ -55,10 +55,14 @@ pub struct Library {
 }
 
 impl Library {
+    /// Rule-gated inclusion for the current OS/features.
+    #[must_use]
     pub fn is_allowed(&self, features: &HashMap<String, bool>) -> bool {
         allows(self.rules.as_deref(), features)
     }
 
+    /// Download item for this library, if a URL can be resolved.
+    #[must_use]
     pub fn to_download_item(&self, libraries_dir: &Path) -> Option<DownloadItem> {
         // 1. Check direct artifact in downloads
         if let Some(downloads) = &self.downloads {
@@ -126,6 +130,9 @@ impl Library {
         None
     }
 
+    /// `group:artifact:version[:classifier]` to relative jar path.
+    /// Unknown shapes pass through unchanged.
+    #[must_use]
     pub fn maven_to_path(name: &str) -> String {
         let parts: Vec<&str> = name.split(':').collect();
         if parts.len() < 3 {
@@ -188,10 +195,13 @@ pub struct VersionDetails {
 }
 
 impl VersionDetails {
+    /// Parse a Mojang version JSON document.
     pub fn parse(json_content: &str) -> Result<Self> {
         serde_json::from_str(json_content).map_err(LauncherError::Json)
     }
 
+    /// Required Java major (defaults to 8 for legacy versions).
+    #[must_use]
     pub fn required_java_major(&self) -> u32 {
         if let Some(java) = &self.java_version {
             return java.major_version;
@@ -413,5 +423,39 @@ mod tests {
     fn test_parse_rejects_garbage() {
         assert!(VersionDetails::parse("not json").is_err());
         assert!(VersionDetails::parse(r#"{"id":"x"}"#).is_err());
+    }
+
+    #[test]
+    fn test_maven_to_path() {
+        assert_eq!(
+            Library::maven_to_path("com.mojang:logging:1.0.0"),
+            "com/mojang/logging/1.0.0/logging-1.0.0.jar"
+        );
+        assert_eq!(
+            Library::maven_to_path("net.fabricmc:tiny-mappings-parser:0.3.0:merge"),
+            "net/fabricmc/tiny-mappings-parser/0.3.0/tiny-mappings-parser-0.3.0-merge.jar"
+        );
+        // Unknown shapes pass through.
+        assert_eq!(Library::maven_to_path("a:b"), "a:b");
+        assert_eq!(Library::maven_to_path("single"), "single");
+    }
+
+    #[test]
+    fn test_merge_parent_fills_missing_only() {
+        let parent_json = r#"{
+            "id": "parent",
+            "libraries": [],
+            "mainClass": "parent.Main",
+            "minecraftArguments": "--parent",
+            "javaVersion": {"component": "jre", "majorVersion": 17}
+        }"#;
+        let parent = VersionDetails::parse(parent_json).unwrap();
+        let mut child = VersionDetails::parse(MINIMAL).unwrap();
+        child.minecraft_arguments = Some("--child".to_string());
+        child.merge_parent(parent);
+        // Child keeps its own args, inherits the rest.
+        assert_eq!(child.minecraft_arguments.as_deref(), Some("--child"));
+        assert_eq!(child.required_java_major(), 17);
+        assert_eq!(child.main_class, "net.minecraft.client.main.Main");
     }
 }

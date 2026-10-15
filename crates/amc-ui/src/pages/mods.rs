@@ -126,6 +126,14 @@ pub struct ModsPage {
     pub icon_textures: HashMap<String, egui::TextureHandle>,
     pub icon_pending: HashSet<String>,
     pub icon_failed: HashSet<String>,
+    /// Lowercased local mod names for O(1) installed checks without
+    /// per-row `to_lowercase` (rebuilt when `local_mods` changes).
+    pub(crate) local_lower: HashSet<String>,
+    pub(crate) local_lower_rev: u64,
+    /// Lowercased search titles parallel to `search_results` (rebuilt
+    /// when the result set changes).
+    pub(crate) search_lower: Vec<String>,
+    pub(crate) search_rev: (usize, String, String),
 }
 
 impl Default for ModsPage {
@@ -158,6 +166,10 @@ impl Default for ModsPage {
             icon_textures: HashMap::new(),
             icon_pending: HashSet::new(),
             icon_failed: HashSet::new(),
+            local_lower: HashSet::new(),
+            local_lower_rev: 0,
+            search_lower: Vec::new(),
+            search_rev: (0, String::new(), String::new()),
         }
     }
 }
@@ -764,6 +776,50 @@ impl ModsPage {
             return;
         }
 
+        // Rebuild lowercased helpers only when inputs change (no per-row
+        // `to_lowercase` per frame).
+        {
+            use std::collections::hash_map::DefaultHasher;
+            use std::hash::{Hash, Hasher};
+            let mut hasher = DefaultHasher::new();
+            self.local_mods.len().hash(&mut hasher);
+            for lm in &self.local_mods {
+                lm.name.hash(&mut hasher);
+            }
+            let rev = hasher.finish();
+            if rev != self.local_lower_rev {
+                self.local_lower = self
+                    .local_mods
+                    .iter()
+                    .map(|lm| lm.name.to_lowercase())
+                    .collect();
+                self.local_lower_rev = rev;
+            }
+            let first = self
+                .search_results
+                .first()
+                .map(|r| r.id.as_str())
+                .unwrap_or("");
+            let last = self
+                .search_results
+                .last()
+                .map(|r| r.id.as_str())
+                .unwrap_or("");
+            let srev = (
+                self.search_results.len(),
+                first.to_string(),
+                last.to_string(),
+            );
+            if srev != self.search_rev {
+                self.search_lower = self
+                    .search_results
+                    .iter()
+                    .map(|r| r.title.to_lowercase())
+                    .collect();
+                self.search_rev = srev;
+            }
+        }
+
         ScrollArea::vertical()
             .auto_shrink([false, false])
             .show(ui, |ui| {
@@ -771,7 +827,7 @@ impl ModsPage {
 
                 let mut to_install = None;
 
-                for item in &self.search_results {
+                for (idx, item) in self.search_results.iter().enumerate() {
                     let (rect, resp) =
                         ui.allocate_exact_size(vec2(ui.available_width(), 70.0), Sense::click());
                     let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
@@ -923,12 +979,27 @@ impl ModsPage {
                         }
                         child.add_space(6.0);
                     }
-                    let is_installed = self.installed_titles.contains(&item.title.to_lowercase())
-                        || self.local_mods.iter().any(|lm| {
-                            let lm_lower = lm.name.to_lowercase();
-                            let it_lower = item.title.to_lowercase();
-                            lm_lower == it_lower || lm_lower.contains(&it_lower)
-                        });
+                    let is_installed = {
+                        // `search_lower` is rebuilt above in lockstep with
+                        // `search_results`; indexing avoids per-row allocs.
+                        let title_lower = self
+                            .search_lower
+                            .get(idx)
+                            .map(String::as_str)
+                            .unwrap_or(item.title.as_str());
+                        // Fallback path lowercases once (only on cache skew).
+                        let owned;
+                        let title_lower = if self.search_lower.get(idx).is_some() {
+                            title_lower
+                        } else {
+                            owned = item.title.to_lowercase();
+                            owned.as_str()
+                        };
+                        self.installed_titles.contains(title_lower)
+                            || self.local_lower.iter().any(|lm_lower| {
+                                lm_lower == title_lower || lm_lower.contains(title_lower)
+                            })
+                    };
 
                     let btn_width = 120.0;
                     let avail = child.available_width() - btn_width - 16.0;

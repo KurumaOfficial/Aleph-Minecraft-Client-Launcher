@@ -45,9 +45,10 @@ pub struct HomePage {
     installed_for: usize,
     /// Memoized version filter (the full Mojang list is ~1000 entries):
     /// recomputed only when the query, tab, order or list changes —
-    /// never per frame.
+    /// never per frame. First/last ids guard against same-length
+    /// manifest swaps that a bare `len` key would miss.
     filter_cache: Vec<GameVersion>,
-    filter_key: Option<(String, FilterTab, SortOrder, usize)>,
+    filter_key: Option<(String, FilterTab, SortOrder, usize, String, String)>,
     // Server favorites (CONCEPT, P8): no shared browser, but the player's
     // own servers persist here and are injected into every instance.
     // Ping results are transient (keyed by address); the list itself is
@@ -206,12 +207,16 @@ impl HomePage {
 
         // Filter and sort version list (memoized: the full list is big,
         // recompute only when inputs change; cache hit is zero-alloc).
+        let first_id = versions.first().map(|v| v.id.as_str()).unwrap_or("");
+        let last_id = versions.last().map(|v| v.id.as_str()).unwrap_or("");
         let cache_valid = match &self.filter_key {
-            Some((q, f, s, len)) => {
+            Some((q, f, s, len, first, last)) => {
                 *q == self.search_query
                     && *f == self.active_filter
                     && *s == self.sort_order
                     && *len == versions.len()
+                    && first.as_str() == first_id
+                    && last.as_str() == last_id
             }
             None => false,
         };
@@ -251,6 +256,8 @@ impl HomePage {
                 self.active_filter,
                 self.sort_order,
                 versions.len(),
+                first_id.to_string(),
+                last_id.to_string(),
             ));
         }
         let filtered = &self.filter_cache;
@@ -541,7 +548,7 @@ impl HomePage {
             }
         });
 
-        if let Some(err) = self.fav_error.clone() {
+        if let Some(err) = self.fav_error.as_ref() {
             ui.add_space(4.0);
             ui.label(egui::RichText::new(err).color(Color32::from_rgb(0xE8, 0x55, 0x70)));
         }
@@ -608,8 +615,13 @@ impl HomePage {
         }
 
         // First paint (or list change) triggers one ping pass.
-        let current: Vec<String> = favorites.iter().map(|f| f.address.clone()).collect();
-        if !self.fav_pinging && current != self.fav_pinged_for && !favorites.is_empty() {
+        // Allocation-free change check: length + ordered addresses.
+        let fav_changed = favorites.len() != self.fav_pinged_for.len()
+            || favorites
+                .iter()
+                .zip(self.fav_pinged_for.iter())
+                .any(|(fav, pinged)| &fav.address != pinged);
+        if !self.fav_pinging && fav_changed && !favorites.is_empty() {
             self.request_fav_ping(favorites);
         }
     }

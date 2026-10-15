@@ -155,4 +155,19 @@ mod tests {
         assert_eq!(mgr.db.accounts.len(), 2);
         let _ = std::fs::remove_file(&path);
     }
+
+    #[test]
+    fn test_legacy_account_without_new_fields_uses_defaults() {
+        // Pre-P2 accounts had no `active`/`skin_url` yet.
+        let legacy = r#"{
+            "id": "00000000-0000-0000-0000-000000000000",
+            "account_type": "offline",
+            "username": "Steve",
+            "uuid": "00000000-0000-0000-0000-000000000000"
+        }"#;
+        let acc: Account = serde_json::from_str(legacy).unwrap();
+        assert_eq!(acc.username, "Steve");
+        assert!(acc.active);
+        assert_eq!(acc.access_token, None);
+    }
 }

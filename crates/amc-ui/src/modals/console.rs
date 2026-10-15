@@ -28,6 +28,11 @@ pub struct ConsoleModal {
     pub filter: String,
     pub autoscroll: bool,
     pub manual_diagnosis: Option<CrashDiagnosis>,
+    lower_logs: Vec<String>,
+    diag_cache: Option<CrashDiagnosis>,
+    diag_key: Option<(usize, Language)>,
+    filter_cache: Vec<usize>,
+    filter_key: Option<(String, usize)>,
 }
 
 impl Default for ConsoleModal {
@@ -38,6 +43,11 @@ impl Default for ConsoleModal {
             filter: String::new(),
             autoscroll: true,
             manual_diagnosis: None,
+            lower_logs: Vec::new(),
+            diag_cache: None,
+            diag_key: None,
+            filter_cache: Vec::new(),
+            filter_key: None,
         }
     }
 }
@@ -46,16 +56,33 @@ impl ConsoleModal {
     pub fn push_line(&mut self, line: String) {
         if self.logs.len() >= 5000 {
             self.logs.remove(0);
+            self.lower_logs.remove(0);
         }
+        self.lower_logs.push(line.to_lowercase());
         self.logs.push(line);
+        // New output may change the diagnosis; recomputed lazily in `show`.
+        self.diag_key = None;
+    }
+
+    pub fn clear(&mut self) {
+        self.logs.clear();
+        self.lower_logs.clear();
+        self.manual_diagnosis = None;
+        self.diag_cache = None;
+        self.diag_key = None;
+        self.filter_cache.clear();
+        self.filter_key = None;
     }
 
     pub fn set_crash_message(&mut self, msg: String, lang: Language) {
         self.is_open = true;
-        self.logs.push(format!("[AMC CRASH] {msg}"));
+        self.push_line(format!("[AMC CRASH] {msg}"));
         if let Some(diag) = self.analyze_crash(lang) {
             self.manual_diagnosis = Some(diag);
         }
+        // Manual diagnosis wins; drop the auto cache so `show` prefers it.
+        self.diag_cache = None;
+        self.diag_key = None;
     }
 
     pub fn analyze_crash(&self, lang: Language) -> Option<CrashDiagnosis> {
@@ -124,10 +151,16 @@ impl ConsoleModal {
         }
 
         let mut is_open = self.is_open;
+        // Auto diagnosis memoized by (logs_len, lang); manual wins.
+        let diag_key = (self.logs.len(), lang);
+        if self.diag_key != Some(diag_key) {
+            self.diag_cache = self.analyze_crash(lang);
+            self.diag_key = Some(diag_key);
+        }
         let diagnosis = self
             .manual_diagnosis
             .clone()
-            .or_else(|| self.analyze_crash(lang));
+            .or_else(|| self.diag_cache.clone());
 
         egui::Window::new(lang.console_title())
             .open(&mut is_open)
@@ -206,8 +239,7 @@ impl ConsoleModal {
                     );
 
                     if cl_resp.clicked() {
-                        self.logs.clear();
-                        self.manual_diagnosis = None;
+                        self.clear();
                     }
 
                     // Export Button
@@ -298,25 +330,34 @@ impl ConsoleModal {
                 ui.add_space(4.0);
 
                 // Logs list inside dark console box (virtualized rows;
-                // the filter vec builds only while filtering, otherwise
-                // the buffer is indexed directly — no per-frame alloc).
+                // filter memoized by (query, logs_len) over pre-lowercased
+                // lines — no per-line `to_lowercase` per frame).
                 let filter_query = self.filter.trim().to_lowercase();
-                let filtered: Option<Vec<&String>> = if filter_query.is_empty() {
-                    None
-                } else {
-                    Some(
-                        self.logs
+                let filter_key = (filter_query.clone(), self.logs.len());
+                if self.filter_key.as_ref() != Some(&filter_key) {
+                    if filter_query.is_empty() {
+                        self.filter_cache.clear();
+                    } else {
+                        self.filter_cache = self
+                            .lower_logs
                             .iter()
-                            .filter(|l| l.to_lowercase().contains(&filter_query))
-                            .collect(),
-                    )
-                };
+                            .enumerate()
+                            .filter(|(_, lower)| lower.contains(&filter_query))
+                            .map(|(idx, _)| idx)
+                            .collect();
+                    }
+                    self.filter_key = Some(filter_key);
+                }
+                let use_filter = !self.filter.trim().is_empty();
 
                 let row_height = 18.0;
-                let num_rows = match &filtered {
-                    Some(list) => list.len(),
-                    None => self.logs.len(),
+                let num_rows = if use_filter {
+                    self.filter_cache.len()
+                } else {
+                    self.logs.len()
                 };
+                let logs = &self.logs;
+                let indices = &self.filter_cache;
 
                 ScrollArea::vertical()
                     .stick_to_bottom(self.autoscroll)
@@ -325,9 +366,10 @@ impl ConsoleModal {
                         ui.spacing_mut().item_spacing = vec2(0.0, 2.0);
 
                         for i in row_range {
-                            let line: &String = match &filtered {
-                                Some(list) => list[i],
-                                None => &self.logs[i],
+                            let line: &String = if use_filter {
+                                &logs[indices[i]]
+                            } else {
+                                &logs[i]
                             };
                             let color = if line.contains("[ERROR]")
                                 || line.contains("Exception")

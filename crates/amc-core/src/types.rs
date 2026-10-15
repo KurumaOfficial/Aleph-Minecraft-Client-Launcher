@@ -132,7 +132,7 @@ pub struct Instance {
 /// Shared Java/RAM settings for a named instance group (CONCEPT P2).
 /// One edit applies to every member instance at once. Unset fields
 /// fall back to the instance value (RAM) or the launcher default (Java).
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub struct InstanceGroup {
     #[serde(default)]
     pub ram_mb: Option<u32>,
@@ -412,7 +412,7 @@ fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::
     Ok(())
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LaunchOptions {
     pub memory_min_mb: u32,
     pub memory_max_mb: u32,

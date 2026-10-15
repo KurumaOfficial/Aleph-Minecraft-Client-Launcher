@@ -39,6 +39,7 @@ pub struct MrpackIndex {
 
 impl MrpackIndex {
     /// Reject path traversal (`../`, absolute paths) in entry paths.
+    #[must_use]
     pub fn sanitize_path(raw: &str) -> Option<String> {
         let normalized = raw.replace('\\', "/");
         let parts: Vec<&str> = normalized.split('/').collect();

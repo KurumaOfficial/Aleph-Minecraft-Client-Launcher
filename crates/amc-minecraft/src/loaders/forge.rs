@@ -257,15 +257,15 @@ mod tests {
     #[ignore]
     async fn live_forge_installer() {
         let java_bin = find_java_17_plus();
-        let tmp = std::env::temp_dir().join(format!(
+        let temp_root = std::env::temp_dir().join(format!(
             "amc_live_forge_{}",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_nanos())
                 .unwrap_or(0)
         ));
-        let _ = std::fs::remove_dir_all(&tmp);
-        let paths = LauncherPaths::custom(&tmp).expect("temp launcher root");
+        let _ = std::fs::remove_dir_all(&temp_root);
+        let paths = LauncherPaths::custom(&temp_root).expect("temp launcher root");
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(60))
             .build()
@@ -304,7 +304,7 @@ mod tests {
             .join(&details.id)
             .join(format!("{}.json", details.id));
         assert!(cached.is_file(), "resolved json is cached for relaunches");
-        let _ = std::fs::remove_dir_all(&tmp);
+        let _ = std::fs::remove_dir_all(&temp_root);
     }
 
     /// System Java for the live test: `JAVA_HOME` first, else PATH.

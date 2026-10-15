@@ -31,13 +31,19 @@ pub struct InstanceManage {
     cfg_text: String,
     cfg_filter: String,
     cfg_find: String,
+    cfg_visible: Vec<PathBuf>,
+    cfg_visible_key: Option<(String, usize)>,
+    cfg_hits: usize,
+    cfg_hits_key: Option<(String, usize)>,
     // Cached directory listings (CONCEPT P10 60fps budget): directory
     // walks never run per frame, at most every few seconds or after a
     // mutation performed here.
     cfg_files: Vec<PathBuf>,
+    cfg_lower: Vec<String>,
     saves_cache: Vec<String>,
     backups_cache: HashMap<String, Vec<PathBuf>>,
     archives_cache: Vec<PathBuf>,
+    archives_sizes: HashMap<PathBuf, u64>,
     lists_at: Option<std::time::Instant>,
     lists_dirty: bool,
     // Health state.
@@ -174,7 +180,7 @@ impl InstanceManage {
                         self.show_archive(ui, &inst, &game_dir, backups_root, lang)
                     }
                 }
-                if let Some(msg) = self.status.clone() {
+                if let Some(msg) = self.status.as_ref() {
                     ui.add_space(6.0);
                     ui.label(
                         egui::RichText::new(msg)
@@ -316,6 +322,13 @@ impl InstanceManage {
     /// Re-scan configs, saves, backups and archives in one pass.
     fn refresh_lists(&mut self, game_dir: &Path, backups_root: &Path, inst_name: &str) {
         self.cfg_files = Self::list_configs(game_dir);
+        self.cfg_lower = self
+            .cfg_files
+            .iter()
+            .map(|p| p.to_string_lossy().to_lowercase())
+            .collect();
+        self.cfg_visible_key = None;
+        self.cfg_hits_key = None;
         // Keep the selected file only if it still exists.
         if let Some(selected) = self.cfg_selected.clone() {
             if !self.cfg_files.contains(&selected) {
@@ -335,6 +348,16 @@ impl InstanceManage {
             })
             .collect();
         self.archives_cache = list_archives(backups_root, inst_name);
+        self.archives_sizes = self
+            .archives_cache
+            .iter()
+            .map(|p| {
+                (
+                    p.clone(),
+                    std::fs::metadata(p).map(|m| m.len()).unwrap_or(0),
+                )
+            })
+            .collect();
         self.lists_at = Some(std::time::Instant::now());
         self.lists_dirty = false;
     }
@@ -358,16 +381,25 @@ impl InstanceManage {
             );
         });
         ui.add_space(4.0);
+        // Memoized file filter over pre-lowercased names (no per-file
+        // `to_string_lossy().to_lowercase()` per frame).
         let needle = self.cfg_filter.trim().to_lowercase();
-        let visible: Vec<PathBuf> = if needle.is_empty() {
-            self.cfg_files.clone()
-        } else {
-            self.cfg_files
-                .iter()
-                .filter(|rel| rel.to_string_lossy().to_lowercase().contains(&needle))
-                .cloned()
-                .collect()
-        };
+        let vis_key = (needle.clone(), self.cfg_files.len());
+        if self.cfg_visible_key.as_ref() != Some(&vis_key) {
+            if needle.is_empty() {
+                self.cfg_visible = self.cfg_files.clone();
+            } else {
+                self.cfg_visible = self
+                    .cfg_files
+                    .iter()
+                    .zip(self.cfg_lower.iter())
+                    .filter(|(_, lower)| lower.contains(&needle))
+                    .map(|(rel, _)| rel.clone())
+                    .collect();
+            }
+            self.cfg_visible_key = Some(vis_key);
+        }
+        let visible = self.cfg_visible.clone();
         ui.horizontal(|ui| {
             // File list.
             ScrollArea::vertical()
@@ -402,6 +434,8 @@ impl InstanceManage {
                     );
                     // In-content search: match counter, no cursor jumps —
                     // egui multiline has no search API in v1.0 scope.
+                    // Hits memoized by (find, text_len); the full
+                    // `to_lowercase` over up to 256KB runs only on change.
                     ui.horizontal(|ui| {
                         ui.label(egui::RichText::new("⌕").color(TEXT_MUTED));
                         ui.add(
@@ -411,7 +445,12 @@ impl InstanceManage {
                         );
                         let find = self.cfg_find.trim().to_lowercase();
                         if !find.is_empty() {
-                            let hits = self.cfg_text.to_lowercase().matches(&find).count();
+                            let hits_key = (find.clone(), self.cfg_text.len());
+                            if self.cfg_hits_key.as_ref() != Some(&hits_key) {
+                                self.cfg_hits = self.cfg_text.to_lowercase().matches(&find).count();
+                                self.cfg_hits_key = Some(hits_key);
+                            }
+                            let hits = self.cfg_hits;
                             ui.label(
                                 egui::RichText::new(lang.editor_matches(hits))
                                     .font(egui::FontId::proportional(11.0))
@@ -476,10 +515,9 @@ impl InstanceManage {
         }
         ui.add_space(8.0);
         let mut delete: Option<PathBuf> = None;
-        let archives = self.archives_cache.clone();
-        for archive in &archives {
+        for archive in &self.archives_cache.clone() {
             let label = archive.file_name().and_then(|n| n.to_str()).unwrap_or("?");
-            let size = archive.metadata().map(|m| m.len()).unwrap_or(0);
+            let size = self.archives_sizes.get(archive).copied().unwrap_or(0);
             ui.horizontal(|ui| {
                 ui.label(
                     egui::RichText::new(format!("{label} ({})", lang.disk_size(size)))

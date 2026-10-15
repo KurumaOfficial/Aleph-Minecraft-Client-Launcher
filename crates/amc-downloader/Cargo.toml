@@ -12,12 +12,9 @@ amc-core = { workspace = true }
 tokio = { workspace = true }
 reqwest = { workspace = true }
 futures-util = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
 sha1 = { workspace = true }
 zip = { workspace = true }
 tar = { workspace = true }
 flate2 = { workspace = true }
-thiserror = { workspace = true }
 tracing = { workspace = true }
 parking_lot = { workspace = true }

@@ -5,6 +5,8 @@ use std::path::Path;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 
+/// Hex SHA-1 of `bytes` (lowercase, 40 chars).
+#[must_use]
 pub fn sha1_hex(bytes: &[u8]) -> String {
     let mut hasher = Sha1::new();
     hasher.update(bytes);
@@ -16,6 +18,7 @@ pub fn sha1_hex(bytes: &[u8]) -> String {
     out
 }
 
+/// Streaming SHA-1 of a file.
 pub async fn file_sha1(path: &Path) -> Result<String> {
     let mut file = File::open(path).await.map_err(|e| LauncherError::Io {
         path: path.to_path_buf(),
@@ -47,6 +50,8 @@ pub async fn file_sha1(path: &Path) -> Result<String> {
     Ok(out)
 }
 
+/// `true` when `path` exists and matches `expected_sha1` (case-insensitive).
+/// Missing/unreadable files report `false` instead of erroring.
 pub async fn verify_file_sha1(path: &Path, expected_sha1: &str) -> Result<bool> {
     if !path.is_file() {
         return Ok(false);

@@ -187,14 +187,14 @@ mod tests {
 
     #[test]
     fn test_launch_args() {
-        let s = InstanceShortcut::new(
+        let shortcut = InstanceShortcut::new(
             "Pack",
             "123e4567-e89b-12d3-a456-426614174000",
             PathBuf::from("C:/x/amc.exe"),
             PathBuf::from("C:/x"),
         );
         assert_eq!(
-            s.launch_args(),
+            shortcut.launch_args(),
             "--launch 123e4567-e89b-12d3-a456-426614174000"
         );
     }

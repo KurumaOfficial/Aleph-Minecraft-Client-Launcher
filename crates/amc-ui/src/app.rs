@@ -89,6 +89,7 @@ pub struct LauncherApp {
     mod_search_rx: Option<mpsc::Receiver<Vec<ModSearchResult>>>,
     mod_icon_rx: Option<mpsc::Receiver<(String, Vec<u8>)>>,
     mod_icon_tx: Option<mpsc::Sender<(String, Vec<u8>)>>,
+    icon_prefetch_rev: (usize, String, String),
     mod_install_rx: Option<mpsc::Receiver<Result<InstallReport, String>>>,
     wishlist_snapshot: Vec<String>,
     favorites_snapshot: Vec<amc_minecraft::FavoriteServerEntry>,
@@ -118,6 +119,9 @@ pub struct LauncherApp {
     session_summary: Option<(String, u64)>,
     ms_code_rx: Option<mpsc::Receiver<Result<DeviceCodeResponse, String>>>,
     ms_poll_rx: Option<mpsc::Receiver<Result<Account, String>>>,
+    /// Last autosaved config for the Settings tab (avoids per-frame FS
+    /// writes; persists only on actual change).
+    settings_saved_config: Option<LauncherConfig>,
 }
 
 /// Outcome of a mod installation batch (CONCEPT P4): downloaded files plus
@@ -139,6 +143,13 @@ struct InstallReport {
 /// Files resolved by a batch install plus per-root provenance:
 /// downloaded files with replaced olds, and (id, title) mates.
 type InstallOutcome = Result<(Vec<(ModDownloadFile, String)>, Vec<(String, String)>), String>;
+
+/// Marketplace icon budget: decode at most this many bytes, keep at most
+/// this many live textures per session (glyph fallback beyond).
+const MAX_ICON_BYTES: usize = 1_048_576;
+const MAX_ICON_TEXTURES: usize = 400;
+/// Icons decoded per frame (the rest wait in the channel).
+const ICONS_PER_FRAME: u8 = 4;
 
 impl LauncherApp {
     pub fn new(cc: &eframe::CreationContext<'_>, paths: LauncherPaths) -> Self {
@@ -239,6 +250,7 @@ impl LauncherApp {
             mod_search_rx: None,
             mod_icon_rx: None,
             mod_icon_tx: None,
+            icon_prefetch_rev: (0, String::new(), String::new()),
             mod_install_rx: None,
             wishlist_snapshot,
             favorites_snapshot: favorites.clone(),
@@ -265,6 +277,7 @@ impl LauncherApp {
             session_summary: None,
             ms_code_rx: None,
             ms_poll_rx: None,
+            settings_saved_config: None,
             pending_direct_connect: None,
         }
     }
@@ -2908,10 +2921,13 @@ impl App for LauncherApp {
         }
 
         // Receive marketplace artwork bytes, decode to gallery textures.
+        // Budgeted to 4 icons/frame so a burst of downloads cannot jank
+        // one frame; the rest wait in the channel for the next updates.
         if let Some(rx) = &mut self.mod_icon_rx {
+            let mut decoded = 0u8;
             while let Ok((key, bytes)) = rx.try_recv() {
                 self.mods_page.icon_pending.remove(&key);
-                if bytes.is_empty() || bytes.len() > 1_048_576 {
+                if bytes.is_empty() || bytes.len() > MAX_ICON_BYTES {
                     self.mods_page.icon_failed.insert(key);
                     continue;
                 }
@@ -2938,13 +2954,20 @@ impl App for LauncherApp {
                         );
                         // Session-bounded cache: beyond the cap new icons
                         // fall back to the source glyph.
-                        if self.mods_page.icon_textures.len() < 400 {
+                        if self.mods_page.icon_textures.len() < MAX_ICON_TEXTURES {
                             self.mods_page.icon_textures.insert(key, tex);
                         }
                     }
                     Err(_) => {
                         self.mods_page.icon_failed.insert(key);
                     }
+                }
+                decoded += 1;
+                if decoded >= ICONS_PER_FRAME {
+                    // Leave the rest for the next frame; request a repaint
+                    // so the queue keeps draining without user input.
+                    ctx.request_repaint();
+                    break;
                 }
             }
         }
@@ -3972,74 +3995,113 @@ impl App for LauncherApp {
                         let mut mod_to_install = None;
 
                         // Compat context for per-row hints (no signature change).
-                        let (compat_mc, compat_loader) = match self
-                            .selected_instance
-                            .and_then(|id| self.instances.iter().find(|i| i.id == id))
-                        {
-                            Some(inst) => (
-                                Some(inst.game_version.clone()),
-                                inst.loader.as_str().to_string(),
-                            ),
-                            None => (None, "minecraft".to_string()),
-                        };
-                        self.mods_page.compat_mc = compat_mc.clone();
-                        self.mods_page.compat_loader = compat_loader.clone();
-                        self.mods_page.pinned_keys = self.config.pinned_mods.clone();
+                        // Assigned only on change — no per-frame `clone()`.
+                        if let Some(id) = self.selected_instance {
+                            if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
+                                if self.mods_page.compat_mc.as_deref()
+                                    != Some(inst.game_version.as_str())
+                                {
+                                    self.mods_page.compat_mc = Some(inst.game_version.clone());
+                                }
+                                if self.mods_page.compat_loader != inst.loader.as_str() {
+                                    self.mods_page.compat_loader = inst.loader.as_str().to_string();
+                                }
+                            }
+                        } else {
+                            if self.mods_page.compat_mc.is_some() {
+                                self.mods_page.compat_mc = None;
+                            }
+                            if self.mods_page.compat_loader != "minecraft" {
+                                self.mods_page.compat_loader = "minecraft".to_string();
+                            }
+                        }
+                        if self.mods_page.pinned_keys != self.config.pinned_mods {
+                            self.mods_page.pinned_keys = self.config.pinned_mods.clone();
+                        }
 
                         // Marketplace artwork (CONCEPT P10 previews): queue
                         // one fetch per unseen icon, capped in flight.
-                        if self.mod_icon_tx.is_none() {
-                            let (tx, rx) = mpsc::channel(32);
-                            self.mod_icon_tx = Some(tx);
-                            self.mod_icon_rx = Some(rx);
-                        }
-                        if let Some(tx) = self.mod_icon_tx.clone() {
-                            for item in &self.mods_page.search_results {
-                                let Some(url) = item.icon_url.clone() else {
-                                    continue;
-                                };
-                                let key = icon_key(&item.source, &item.id);
-                                if self.mods_page.icon_textures.contains_key(&key)
-                                    || self.mods_page.icon_pending.contains(&key)
-                                    || self.mods_page.icon_failed.contains(&key)
-                                    || self.mods_page.icon_pending.len() >= 12
-                                {
-                                    continue;
-                                }
-                                self.mods_page.icon_pending.insert(key.clone());
-                                let tx = tx.clone();
-                                let icon_file = self
-                                    .paths
-                                    .cache_dir()
-                                    .join("mod-icons")
-                                    .join(icon_cache_file(&key));
-                                tokio::spawn(async move {
-                                    // Disk cache first (offline-friendly),
-                                    // network second, then store back.
-                                    let mut bytes =
-                                        tokio::fs::read(&icon_file).await.unwrap_or_default();
-                                    if bytes.is_empty() || bytes.len() > 1_048_576 {
-                                        bytes = match reqwest::Client::new().get(&url).send().await
-                                        {
-                                            Ok(res) => res
-                                                .bytes()
-                                                .await
-                                                .map(|b| b.to_vec())
-                                                .unwrap_or_default(),
-                                            Err(_) => Vec::new(),
-                                        };
-                                        if !bytes.is_empty() && bytes.len() <= 1_048_576 {
-                                            if let Some(parent) = icon_file.parent() {
-                                                let _ = tokio::fs::create_dir_all(parent).await;
-                                            }
-                                            let _ = tokio::fs::write(&icon_file, &bytes).await;
-                                            prune_icon_cache(icon_file.parent(), 400);
-                                        }
+                        // Runs only when the result set changes — never
+                        // per frame (avoids per-item `icon_url.clone()`).
+                        let first_icon = self
+                            .mods_page
+                            .search_results
+                            .first()
+                            .map(|r| r.id.as_str())
+                            .unwrap_or("");
+                        let last_icon = self
+                            .mods_page
+                            .search_results
+                            .last()
+                            .map(|r| r.id.as_str())
+                            .unwrap_or("");
+                        let icon_rev = (
+                            self.mods_page.search_results.len(),
+                            first_icon.to_string(),
+                            last_icon.to_string(),
+                        );
+                        // Requeue when the set changes or slots freed up.
+                        let slots_free = self.mods_page.icon_pending.len() < 12;
+                        if icon_rev != self.icon_prefetch_rev || slots_free {
+                            self.icon_prefetch_rev = icon_rev;
+                            if self.mod_icon_tx.is_none() {
+                                let (tx, rx) = mpsc::channel(32);
+                                self.mod_icon_tx = Some(tx);
+                                self.mod_icon_rx = Some(rx);
+                            }
+                            if let Some(tx) = self.mod_icon_tx.clone() {
+                                for item in &self.mods_page.search_results {
+                                    let Some(url) = item.icon_url.as_ref() else {
+                                        continue;
+                                    };
+                                    let key = icon_key(&item.source, &item.id);
+                                    if self.mods_page.icon_textures.contains_key(&key)
+                                        || self.mods_page.icon_pending.contains(&key)
+                                        || self.mods_page.icon_failed.contains(&key)
+                                        || self.mods_page.icon_pending.len() >= 12
+                                    {
+                                        continue;
                                     }
-                                    // Always answered: empty bytes retire
-                                    // the pending slot as failed.
-                                    let _ = tx.send((key, bytes)).await;
-                                });
+                                    self.mods_page.icon_pending.insert(key.clone());
+                                    let tx = tx.clone();
+                                    let url = url.clone();
+                                    let icon_file = self
+                                        .paths
+                                        .cache_dir()
+                                        .join("mod-icons")
+                                        .join(icon_cache_file(&key));
+                                    tokio::spawn(async move {
+                                        // Disk cache first (offline-friendly),
+                                        // network second, then store back.
+                                        let mut bytes =
+                                            tokio::fs::read(&icon_file).await.unwrap_or_default();
+                                        if bytes.is_empty() || bytes.len() > MAX_ICON_BYTES {
+                                            bytes =
+                                                match reqwest::Client::new().get(&url).send().await
+                                                {
+                                                    Ok(res) => res
+                                                        .bytes()
+                                                        .await
+                                                        .map(|b| b.to_vec())
+                                                        .unwrap_or_default(),
+                                                    Err(_) => Vec::new(),
+                                                };
+                                            if !bytes.is_empty() && bytes.len() <= MAX_ICON_BYTES {
+                                                if let Some(parent) = icon_file.parent() {
+                                                    let _ = tokio::fs::create_dir_all(parent).await;
+                                                }
+                                                let _ = tokio::fs::write(&icon_file, &bytes).await;
+                                                prune_icon_cache(
+                                                    icon_file.parent(),
+                                                    MAX_ICON_TEXTURES,
+                                                );
+                                            }
+                                        }
+                                        // Always answered: empty bytes retire
+                                        // the pending slot as failed.
+                                        let _ = tx.send((key, bytes)).await;
+                                    });
+                                }
                             }
                         }
 
@@ -4139,9 +4201,17 @@ impl App for LauncherApp {
                             // Server-side pre-filter (CONCEPT P4): the
                             // marketplace only returns builds for this
                             // MC version/loader; row hints still show why.
-                            let filter_loader =
-                                ModrinthClient::search_loader_filter(&compat_loader);
-                            self.search_mods(q, prov, cat, filter_loader, compat_mc.clone(), sort);
+                            let filter_loader = ModrinthClient::search_loader_filter(
+                                &self.mods_page.compat_loader.clone(),
+                            );
+                            self.search_mods(
+                                q,
+                                prov,
+                                cat,
+                                filter_loader,
+                                self.mods_page.compat_mc.clone(),
+                                sort,
+                            );
                         }
                         if let Some(item) = mod_to_install {
                             self.install_mod(item, None);
@@ -4178,9 +4248,18 @@ impl App for LauncherApp {
                             server_running,
                             &self.server_status,
                         );
-                        // Auto-save configuration changes
-                        if let Err(e) = self.config.save_to_path(&self.paths.config_file()) {
-                            tracing::warn!("config save failed: {e}");
+                        // Auto-save configuration changes, but only on
+                        // actual change — never a per-frame FS write.
+                        let changed = self
+                            .settings_saved_config
+                            .as_ref()
+                            .is_none_or(|saved| *saved != self.config);
+                        if changed {
+                            if let Err(e) = self.config.save_to_path(&self.paths.config_file()) {
+                                tracing::warn!("config save failed: {e}");
+                            } else {
+                                self.settings_saved_config = Some(self.config.clone());
+                            }
                         }
                     }
                 }

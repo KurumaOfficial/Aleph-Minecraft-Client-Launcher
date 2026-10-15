@@ -16,6 +16,8 @@ pub struct DownloadProgress {
 }
 
 impl DownloadProgress {
+    /// 0.0..=1.0 completion by bytes, falling back to files.
+    #[must_use]
     pub fn ratio(&self) -> f32 {
         if self.total_bytes > 0 {
             (self.downloaded_bytes as f32 / self.total_bytes as f32).clamp(0.0, 1.0)
@@ -26,14 +28,20 @@ impl DownloadProgress {
         }
     }
 
+    /// Percentage (0..=100) for progress bars.
+    #[must_use]
     pub fn percent(&self) -> f32 {
         self.ratio() * 100.0
     }
 
+    /// Localized speed (`2.0 MB/s` / `2,0 МБ/с`).
+    #[must_use]
     pub fn formatted_speed(&self, lang: &Language) -> String {
         lang.speed_value(self.speed_bytes_per_sec)
     }
 
+    /// Localized `downloaded / total`.
+    #[must_use]
     pub fn formatted_bytes(&self, lang: &Language) -> String {
         if self.total_bytes > 0 {
             format!(
@@ -46,6 +54,8 @@ impl DownloadProgress {
         }
     }
 
+    /// Localized ETA (`--` when unknown).
+    #[must_use]
     pub fn formatted_eta(&self, lang: &Language) -> String {
         match self.eta_seconds {
             Some(secs) => lang.eta_text(secs),
@@ -66,6 +76,7 @@ pub struct ProgressTracker {
 }
 
 impl ProgressTracker {
+    /// Channel-backed tracker; send side is cheap to clone via `Arc`.
     pub fn new(
         total_files: usize,
         total_bytes: u64,
@@ -97,10 +108,12 @@ impl ProgressTracker {
         (tracker, receiver)
     }
 
+    /// Grow the total when the manifest size was unknown up front.
     pub fn add_total_bytes(&self, bytes: u64) {
         self.total_bytes.fetch_add(bytes, Ordering::Relaxed);
     }
 
+    /// Record `bytes` for `current_file`; emits speed/ETA throttled.
     pub fn on_bytes(&self, bytes: u64, current_file: &str) {
         let downloaded = self.downloaded_bytes.fetch_add(bytes, Ordering::Relaxed) + bytes;
         let total = self.total_bytes.load(Ordering::Relaxed);
@@ -149,6 +162,7 @@ impl ProgressTracker {
         let _ = self.sender.send(progress);
     }
 
+    /// Mark one file done (drives file-count fallback progress).
     pub fn on_file_completed(&self) {
         let completed = self.completed_files.fetch_add(1, Ordering::Relaxed) + 1;
         self.sender.send_modify(|p| {
@@ -194,5 +208,19 @@ mod tests {
         assert_eq!(p.formatted_eta(&en), "1 min 30 sec");
         assert_eq!(p.formatted_eta(&ru), "1 мин 30 сек");
         assert_eq!(progress(0, 0, 512.0, None).formatted_eta(&en), "--");
+    }
+
+    #[test]
+    fn test_tracker_mutators() {
+        let (tracker, rx) = ProgressTracker::new(2, 100);
+        tracker.add_total_bytes(100);
+        tracker.on_bytes(50, "a.jar");
+        tracker.on_file_completed();
+        let snap = rx.borrow().clone();
+        assert_eq!(snap.total_bytes, 200);
+        assert_eq!(snap.downloaded_bytes, 50);
+        assert_eq!(snap.completed_files, 1);
+        assert_eq!(snap.total_files, 2);
+        assert_eq!(snap.current_file, "a.jar");
     }
 }

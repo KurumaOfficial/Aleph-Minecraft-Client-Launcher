@@ -69,6 +69,7 @@ pub fn inject_favorites(game_dir: &Path, servers: &[FavoriteServerEntry]) -> Res
 }
 
 /// Parse `host[:port]` user input into a normalized `(host, port)` pair.
+#[must_use]
 pub fn parse_server_address(raw: &str) -> Option<(String, u16)> {
     let text = raw.trim().trim_start_matches("mc://");
     if text.is_empty() || text.contains(char::is_whitespace) {
@@ -224,6 +225,28 @@ mod tests {
             address: "h:1".to_string(),
         }];
         save_favorites(&dir, &servers).unwrap();
+        assert_eq!(load_favorites(&dir), servers);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_favorites_accepts_legacy_bare_list() {
+        let dir = std::env::temp_dir().join(format!(
+            "amc_fav_legacy_{}_{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let servers = vec![FavoriteServerEntry {
+            name: "Legacy".to_string(),
+            address: "legacy.example.com:25565".to_string(),
+        }];
+        let bare = serde_json::to_string_pretty(&servers).unwrap();
+        std::fs::write(favorites_file(&dir), bare).unwrap();
         assert_eq!(load_favorites(&dir), servers);
         let _ = std::fs::remove_dir_all(&dir);
     }

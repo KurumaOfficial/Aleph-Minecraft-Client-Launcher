@@ -40,12 +40,12 @@ impl NeoForgeLoader {
             )));
         }
 
-        let data: NeoForgeVersions = res
+        let versions: NeoForgeVersions = res
             .json()
             .await
             .map_err(|e| LauncherError::Network(format!("NeoForge json error: {e}")))?;
 
-        select_neoforge_version(&data.versions, mc_version).ok_or_else(|| {
+        select_neoforge_version(&versions.versions, mc_version).ok_or_else(|| {
             LauncherError::Loader(format!("No NeoForge version found for MC {mc_version}"))
         })
     }
@@ -296,15 +296,15 @@ mod tests {
     #[ignore]
     async fn live_neoforge_installer() {
         let java_bin = find_java_21_plus();
-        let tmp = std::env::temp_dir().join(format!(
+        let temp_root = std::env::temp_dir().join(format!(
             "amc_live_neoforge_{}",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_nanos())
                 .unwrap_or(0)
         ));
-        let _ = std::fs::remove_dir_all(&tmp);
-        let paths = LauncherPaths::custom(&tmp).expect("temp launcher root");
+        let _ = std::fs::remove_dir_all(&temp_root);
+        let paths = LauncherPaths::custom(&temp_root).expect("temp launcher root");
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(60))
             .build()
@@ -343,7 +343,7 @@ mod tests {
             .join(&details.id)
             .join(format!("{}.json", details.id));
         assert!(cached.is_file(), "resolved json is cached for relaunches");
-        let _ = std::fs::remove_dir_all(&tmp);
+        let _ = std::fs::remove_dir_all(&temp_root);
     }
 
     /// System Java for the live test: `JAVA_HOME` first, else PATH.

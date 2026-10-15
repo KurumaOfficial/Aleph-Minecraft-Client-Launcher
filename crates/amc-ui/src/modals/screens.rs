@@ -20,6 +20,10 @@ pub struct ScreensModal {
 
 /// Minimum interval between gallery rescans while open.
 const SHOTS_REFRESH: std::time::Duration = std::time::Duration::from_secs(3);
+/// Gallery thumbnail bounds and decode cap (avoids OOM on huge PNGs).
+const SHOT_THUMB_W: u32 = 320;
+const SHOT_THUMB_H: u32 = 200;
+const MAX_SHOT_BYTES: usize = 8_388_608;
 
 /// Gallery outcome for the app shell (toast on delete).
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -192,9 +196,13 @@ impl ScreensModal {
             return None;
         }
         let bytes = std::fs::read(path).ok()?;
+        if bytes.is_empty() || bytes.len() > MAX_SHOT_BYTES {
+            self.failed.insert(path.to_path_buf());
+            return None;
+        }
         let img = image::load_from_memory(&bytes).ok()?;
         // Downscale for a light gallery; aspect preserved.
-        let small = img.thumbnail(320, 200);
+        let small = img.thumbnail(SHOT_THUMB_W, SHOT_THUMB_H);
         let rgba = small.to_rgba8();
         let (w, h) = (rgba.width() as usize, rgba.height() as usize);
         if w == 0 || h == 0 {

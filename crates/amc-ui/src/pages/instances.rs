@@ -85,6 +85,14 @@ pub struct InstancesPage {
     pub sort_mode: InstanceSort,
     icon_textures: HashMap<Uuid, egui::TextureHandle>,
     icon_failed: std::collections::HashSet<Uuid>,
+    /// Memoized filter+sort (per-frame `to_lowercase`/`sort` avoided):
+    /// recomputed only when query/tag/sort or instance revision changes.
+    filter_cache: Vec<usize>,
+    filter_key: Option<(String, Option<String>, InstanceSort, u64)>,
+    tags_cache: Vec<String>,
+    tags_rev: u64,
+    trash_cache: Vec<amc_core::TrashedInstance>,
+    trash_at: Option<std::time::Instant>,
 
     // Per-instance management (worlds / configs / health modal).
     manage: InstanceManage,
@@ -146,6 +154,12 @@ impl Default for InstancesPage {
             sort_mode: InstanceSort::default(),
             icon_textures: HashMap::new(),
             icon_failed: std::collections::HashSet::new(),
+            filter_cache: Vec::new(),
+            filter_key: None,
+            tags_cache: Vec::new(),
+            tags_rev: 0,
+            trash_cache: Vec::new(),
+            trash_at: None,
             manage: InstanceManage::default(),
             discover_open: true,
             discover: Vec::new(),
@@ -252,6 +266,28 @@ fn compare_instances(a: &Instance, b: &Instance, mode: InstanceSort) -> std::cmp
         InstanceSort::Created => b.created_at.cmp(&a.created_at),
         InstanceSort::Playtime => b.total_played_minutes.cmp(&a.total_played_minutes),
     }
+}
+
+/// Cheap revision of the instance list for cache invalidation (no alloc).
+/// Any rename/version/loader/pin/play/tag change flips the revision.
+fn instances_rev(instances: &[Instance]) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    instances.len().hash(&mut hasher);
+    for inst in instances {
+        inst.id.hash(&mut hasher);
+        inst.pinned.hash(&mut hasher);
+        inst.name.hash(&mut hasher);
+        inst.game_version.hash(&mut hasher);
+        inst.loader.as_str().hash(&mut hasher);
+        inst.total_played_minutes.hash(&mut hasher);
+        inst.tags.len().hash(&mut hasher);
+        for tag in &inst.tags {
+            tag.hash(&mut hasher);
+        }
+    }
+    hasher.finish()
 }
 
 /// Split a tags field (`"a, b,,c"`) into clean values, order kept.
@@ -367,6 +403,9 @@ impl InstancesPage {
     /// Force disk + badge rescan (call after mods change on disk).
     pub fn refresh_scans(&mut self) {
         self.disk_scanned_for.clear();
+        self.filter_key = None;
+        self.tags_rev = 0;
+        self.trash_at = None;
     }
 
     /// Fill the create dialog from a quick-start template (ROADMAP P2).
@@ -441,33 +480,44 @@ impl InstancesPage {
 
         ui.add_space(14.0);
 
-        // Tag filter chips + sort selector.
-        let mut all_tags: Vec<String> = Vec::new();
-        for inst in instances.iter() {
-            for t in &inst.tags {
-                if !all_tags.contains(t) {
-                    all_tags.push(t.clone());
+        // Tag filter chips + sort selector (memoized: O(T) hash check,
+        // rebuild only when the instance set changes).
+        let rev = instances_rev(instances);
+        if rev != self.tags_rev {
+            let mut seen = std::collections::HashSet::new();
+            let mut tags: Vec<String> = Vec::new();
+            for inst in instances.iter() {
+                for t in &inst.tags {
+                    if seen.insert(t.clone()) {
+                        tags.push(t.clone());
+                    }
                 }
             }
+            tags.sort();
+            self.tags_cache = tags;
+            self.tags_rev = rev;
         }
-        all_tags.sort();
         if let Some(active) = self.active_tag.clone() {
-            if !all_tags.contains(&active) {
+            if !self.tags_cache.contains(&active) {
                 self.active_tag = None;
             }
         }
+        let mut tag_pick: Option<Option<String>> = None;
         ui.horizontal_wrapped(|ui| {
             ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
             if tag(ui, lang.inst_tag_all(), self.active_tag.is_none()).clicked() {
-                self.active_tag = None;
+                tag_pick = Some(None);
             }
-            for t in &all_tags {
+            for t in &self.tags_cache {
                 let is_active = self.active_tag.as_deref() == Some(t.as_str());
                 if tag(ui, t, is_active).clicked() {
-                    self.active_tag = if is_active { None } else { Some(t.clone()) };
+                    tag_pick = Some(if is_active { None } else { Some(t.clone()) });
                 }
             }
         });
+        if let Some(pick) = tag_pick {
+            self.active_tag = pick;
+        }
 
         ui.add_space(8.0);
 
@@ -559,17 +609,38 @@ impl InstancesPage {
             ui.add_space(8.0);
         }
 
-        // Filter + sort instances (pinned float on top).
-        let query = self.search_query.trim().to_lowercase();
-        let mut filtered_indices: Vec<usize> = instances
-            .iter()
-            .enumerate()
-            .filter(|(_, inst)| matches_filter(inst, &query, self.active_tag.as_deref()))
-            .map(|(idx, _)| idx)
-            .collect();
-        let sort_mode = self.sort_mode;
-        filtered_indices
-            .sort_by(|&a, &b| compare_instances(&instances[a], &instances[b], sort_mode));
+        // Filter + sort instances (memoized: per-frame `to_lowercase`/`sort`
+        // avoided, recompute only when query/tag/sort/revision changes).
+        let cache_valid = match &self.filter_key {
+            Some((q, t, s, r)) => {
+                *q == self.search_query
+                    && *t == self.active_tag
+                    && *s == self.sort_mode
+                    && *r == rev
+            }
+            None => false,
+        };
+        if !cache_valid {
+            let query = self.search_query.trim().to_lowercase();
+            let mut indices: Vec<usize> = instances
+                .iter()
+                .enumerate()
+                .filter(|(_, inst)| matches_filter(inst, &query, self.active_tag.as_deref()))
+                .map(|(idx, _)| idx)
+                .collect();
+            let sort_mode = self.sort_mode;
+            indices.sort_by(|&a, &b| compare_instances(&instances[a], &instances[b], sort_mode));
+            self.filter_cache = indices;
+            self.filter_key = Some((
+                self.search_query.clone(),
+                self.active_tag.clone(),
+                self.sort_mode,
+                rev,
+            ));
+        }
+        // Small index vec clone per frame (tens of ids max); the expensive
+        // filter+sort+lowercase above runs only on miss.
+        let filtered_indices = self.filter_cache.clone();
 
         // Instances list
         ScrollArea::vertical()
@@ -910,8 +981,17 @@ impl InstancesPage {
         }
 
         // Trash (CONCEPT "Корзина", P2): soft-deleted instances wait here
-        // for restore or permanent deletion.
-        let trashed = amc_core::list_trash(ctx.trash_dir);
+        // for restore or permanent deletion. FS scan throttled to 2s —
+        // never per frame.
+        let trash_stale = match self.trash_at {
+            Some(at) => at.elapsed() > std::time::Duration::from_secs(2),
+            None => true,
+        };
+        if trash_stale {
+            self.trash_cache = amc_core::list_trash(ctx.trash_dir);
+            self.trash_at = Some(std::time::Instant::now());
+        }
+        let trashed = self.trash_cache.clone();
         ui.add_space(16.0);
         ui.horizontal(|ui| {
             ui.label(
@@ -1510,6 +1590,17 @@ impl InstancesPage {
             ctx.backups_root,
             lang,
         );
+
+        // Trash mutations need an immediate rescan, not the 2s throttle.
+        if matches!(
+            action,
+            InstanceAction::Trashed(_)
+                | InstanceAction::Restored(_)
+                | InstanceAction::TrashPurged(_)
+                | InstanceAction::TrashEmptied
+        ) {
+            self.trash_at = None;
+        }
 
         action
     }

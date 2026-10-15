@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct UiSettings {
     pub theme: String,
     pub ui_scale: f32,
@@ -101,7 +101,7 @@ impl AppMode {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct LauncherConfig {
     pub ui: UiSettings,
     pub default_launch_options: LaunchOptions,
@@ -217,7 +217,7 @@ impl TabHotkeyMod {
 }
 
 /// Per-type notification switches; everything on by default.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NotifSettings {
     pub updates: bool,
     pub downloads: bool,

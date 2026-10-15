@@ -8,6 +8,7 @@ use uuid::Uuid;
 /// snapshot of the `Instance` record, so removal is always undoable.
 /// Instances with a `custom_dir` outside the launcher root are never moved
 /// (that may be user data elsewhere) — only their list record is dropped.
+#[derive(Debug, Clone)]
 pub struct TrashedInstance {
     pub instance: Instance,
     pub dir: PathBuf,

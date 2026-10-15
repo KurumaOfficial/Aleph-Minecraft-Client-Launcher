@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 pub struct ArgumentBuilder;
 
 impl ArgumentBuilder {
+    /// JVM args for `java ...` (memory, natives, classpath, version rules).
+    #[must_use]
     pub fn build_jvm_args(
         options: &LaunchOptions,
         natives_dir: &Path,
@@ -29,11 +31,13 @@ impl ArgumentBuilder {
         args.push("-Dstderr.encoding=UTF-8".to_string());
 
         // Custom JVM arguments from options
-        for custom_arg in &options.custom_jvm_args {
-            if !custom_arg.trim().is_empty() {
-                args.push(custom_arg.clone());
-            }
-        }
+        args.extend(
+            options
+                .custom_jvm_args
+                .iter()
+                .filter(|s| !s.trim().is_empty())
+                .cloned(),
+        );
 
         // Version-specific JVM arguments (from modern arguments.jvm array)
         if let Some(version_args) = &details.arguments {
@@ -89,6 +93,8 @@ impl ArgumentBuilder {
             .replace("${classpath_separator}", cp_sep)
     }
 
+    /// Game args (`--username`, `--version`, resolution, quick-play).
+    #[must_use]
     pub fn build_game_args(
         options: &LaunchOptions,
         game_dir: &Path,
@@ -193,6 +199,9 @@ impl ArgumentBuilder {
         result
     }
 
+    /// `libraries:* + client.jar` joined by the OS separator.
+    /// Missing files are skipped; the client jar is always last.
+    #[must_use]
     pub fn build_classpath(libraries: &[PathBuf], client_jar: &Path) -> String {
         let separator = if cfg!(target_os = "windows") {
             ";"
