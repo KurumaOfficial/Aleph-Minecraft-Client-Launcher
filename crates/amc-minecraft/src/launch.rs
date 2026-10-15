@@ -32,6 +32,19 @@ pub enum GameEvent {
 
 pub struct MinecraftLauncher;
 
+/// Extra creation flags for the game process. Windows-only for now,
+/// see the call site for the Unix story.
+#[cfg(windows)]
+pub fn game_creation_flags() -> u32 {
+    // ABOVE_NORMAL_PRIORITY_CLASS.
+    0x0000_8000
+}
+
+#[cfg(not(windows))]
+pub fn game_creation_flags() -> u32 {
+    0
+}
+
 impl MinecraftLauncher {
     pub async fn launch(
         java_bin: &Path,
@@ -70,9 +83,15 @@ impl MinecraftLauncher {
         cmd.stdout(Stdio::piped());
         cmd.stderr(Stdio::piped());
 
+        // CONCEPT "автоматически повышает приоритет процесса игры":
+        // above-normal on Windows (HIGH would starve the launcher and
+        // input on 2-core machines). Unix elevation needs a design of
+        // its own (setpriority/nice differ per distro) — tracked openly,
+        // the game simply launches at normal priority there for now.
         #[cfg(windows)]
         {
-            // Creation flags on Windows: 0x08000000 = CREATE_NO_WINDOW if desired, or default
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(game_creation_flags());
         }
 
         tracing::info!(
@@ -142,5 +161,20 @@ impl MinecraftLauncher {
         });
 
         Ok(rx)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_game_creation_flags() {
+        // Above-normal on Windows so the game wins CPU contention;
+        // zero (no override) anywhere else by explicit design.
+        #[cfg(windows)]
+        assert_eq!(game_creation_flags(), 0x0000_8000);
+        #[cfg(not(windows))]
+        assert_eq!(game_creation_flags(), 0);
     }
 }
