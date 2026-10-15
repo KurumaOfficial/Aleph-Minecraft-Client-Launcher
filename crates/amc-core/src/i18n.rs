@@ -1826,6 +1826,14 @@ impl Language {
         }
     }
 
+    pub fn mods_updates_found(&self, count: usize) -> String {
+        match self {
+            Self::English => format!("Mods with updates: {count}"),
+            Self::Russian => format!("Моды с обновлениями: {count}"),
+            Self::Ukrainian => format!("Моди з оновленнями: {count}"),
+        }
+    }
+
     pub fn mods_update_all(&self) -> &'static str {
         match self {
             Self::English => "Update all",

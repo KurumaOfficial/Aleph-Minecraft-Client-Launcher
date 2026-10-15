@@ -2917,7 +2917,7 @@ impl App for LauncherApp {
                         &mut self.toasts,
                         &self.config.notifications,
                         ToastKind::Updates,
-                        format!("Моды с обновлениями: {n}"),
+                        self.config.ui.language().mods_updates_found(n),
                     );
                 }
                 self.mod_update_rx = None;
