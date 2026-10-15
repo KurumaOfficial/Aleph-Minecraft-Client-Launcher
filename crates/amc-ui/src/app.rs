@@ -25,8 +25,9 @@ use crate::modals::{
     WizardAction, WizardFlow,
 };
 use crate::pages::{
-    icon_key, HomeContext, HomePage, InstanceAction, InstancesContext, InstancesPage,
-    ModUpdateResult, ModsActions, ModsPage, ProfileAction, ProfilePage, SettingsPage, SkinsPage,
+    icon_cache_file, icon_key, HomeContext, HomePage, InstanceAction, InstancesContext,
+    InstancesPage, ModUpdateResult, ModsActions, ModsPage, ProfileAction, ProfilePage,
+    SettingsPage, SkinsPage,
 };
 use crate::theme::{apply_aleph_theme, BG};
 use crate::widgets::{
@@ -2661,6 +2662,35 @@ fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::
     Ok(())
 }
 
+/// Drop oldest cached marketplace icons beyond `keep` entries.
+/// Best-effort and rare (only when the cap trips): failures are silent.
+fn prune_icon_cache(dir: Option<&std::path::Path>, keep: usize) {
+    let Some(dir) = dir else {
+        return;
+    };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    let mut files: Vec<(std::time::SystemTime, std::path::PathBuf)> = entries
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            if !path.is_file() {
+                return None;
+            }
+            let modified = entry.metadata().and_then(|m| m.modified()).ok()?;
+            Some((modified, path))
+        })
+        .collect();
+    if files.len() <= keep {
+        return;
+    }
+    files.sort_by_key(|(modified, _)| *modified);
+    for (_, path) in files.iter().take(files.len().saturating_sub(keep)) {
+        let _ = std::fs::remove_file(path);
+    }
+}
+
 /// Fetch the vanilla parent for a loader branch, reporting a crash event.
 /// New loader arms share it instead of duplicating the boilerplate.
 async fn fetch_vanilla_details(
@@ -3878,16 +3908,34 @@ impl App for LauncherApp {
                                 }
                                 self.mods_page.icon_pending.insert(key.clone());
                                 let tx = tx.clone();
+                                let icon_file = self
+                                    .paths
+                                    .cache_dir()
+                                    .join("mod-icons")
+                                    .join(icon_cache_file(&key));
                                 tokio::spawn(async move {
-                                    let bytes = match reqwest::Client::new().get(&url).send().await
-                                    {
-                                        Ok(res) => res
-                                            .bytes()
-                                            .await
-                                            .map(|b| b.to_vec())
-                                            .unwrap_or_default(),
-                                        Err(_) => Vec::new(),
-                                    };
+                                    // Disk cache first (offline-friendly),
+                                    // network second, then store back.
+                                    let mut bytes =
+                                        tokio::fs::read(&icon_file).await.unwrap_or_default();
+                                    if bytes.is_empty() || bytes.len() > 1_048_576 {
+                                        bytes = match reqwest::Client::new().get(&url).send().await
+                                        {
+                                            Ok(res) => res
+                                                .bytes()
+                                                .await
+                                                .map(|b| b.to_vec())
+                                                .unwrap_or_default(),
+                                            Err(_) => Vec::new(),
+                                        };
+                                        if !bytes.is_empty() && bytes.len() <= 1_048_576 {
+                                            if let Some(parent) = icon_file.parent() {
+                                                let _ = tokio::fs::create_dir_all(parent).await;
+                                            }
+                                            let _ = tokio::fs::write(&icon_file, &bytes).await;
+                                            prune_icon_cache(icon_file.parent(), 400);
+                                        }
+                                    }
                                     // Always answered: empty bytes retire
                                     // the pending slot as failed.
                                     let _ = tx.send((key, bytes)).await;
@@ -4080,5 +4128,42 @@ impl App for LauncherApp {
             ManagerAction::Clear => self.download_engine.clear_history(),
             ManagerAction::None => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_prune_icon_cache_keeps_newest() {
+        let dir = std::env::temp_dir().join(format!(
+            "amc_prune_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        for name in ["a.bin", "b.bin", "c.bin", "d.bin", "e.bin"] {
+            std::fs::write(dir.join(name), b"x").unwrap();
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        prune_icon_cache(Some(dir.as_path()), 3);
+        let left: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().to_string())
+            .collect();
+        assert_eq!(left.len(), 3);
+        assert!(left.contains(&"c.bin".to_string()));
+        assert!(left.contains(&"d.bin".to_string()));
+        assert!(left.contains(&"e.bin".to_string()));
+        // Missing dir and generous caps never fail.
+        prune_icon_cache(None, 3);
+        prune_icon_cache(Some(dir.as_path()), 99);
+        assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 3);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

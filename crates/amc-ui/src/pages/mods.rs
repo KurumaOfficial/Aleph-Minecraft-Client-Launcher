@@ -76,6 +76,20 @@ pub fn icon_key(source: &ModSource, id: &str) -> String {
     format!("{tag}:{id}")
 }
 
+/// Disk filename for a cached icon: the key with filesystem-hostile
+/// characters flattened (notably `:` on Windows).
+pub fn icon_cache_file(key: &str) -> String {
+    key.chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.') {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
 pub struct ModsPage {
     pub sub_tab: ModsSubTab,
     pub search_provider: ModSource,
@@ -992,6 +1006,12 @@ mod tests {
             icon_key(&ModSource::Modrinth, "42"),
             icon_key(&ModSource::CurseForge, "42")
         );
+    }
+
+    #[test]
+    fn test_icon_cache_file_flattens() {
+        assert_eq!(icon_cache_file("mr:sodium"), "mr_sodium");
+        assert_eq!(icon_cache_file("cf:123"), "cf_123");
     }
 
     #[test]
