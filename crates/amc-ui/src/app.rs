@@ -153,9 +153,13 @@ impl LauncherApp {
         // Load persisted instances
         let instances = Instance::load_all(&paths.instances_file()).unwrap_or_default();
         let selected_instance = instances.first().map(|i| i.id);
-        let selected_version = instances
-            .first()
-            .map(|i| i.game_version.clone())
+        // Quick start defaults to the last played version (CONCEPT,
+        // Simple mode), then the first instance, then a hardcoded fallback.
+        let selected_version = config
+            .selected_version
+            .clone()
+            .filter(|v| !v.trim().is_empty())
+            .or_else(|| instances.first().map(|i| i.game_version.clone()))
             .or_else(|| Some("1.20.1".to_string()));
 
         let lang = config.ui.language();
@@ -1847,6 +1851,14 @@ impl LauncherApp {
         let lang = self.config.ui.language();
         self.is_launching = true;
         self.launch_status_text = lang.status_preparing_version(&ver_id);
+
+        // Remember the launched version for the next quick start
+        // (CONCEPT Simple mode: last played, not newest).
+        self.selected_version = Some(ver_id.clone());
+        if self.config.selected_version.as_deref() != Some(ver_id.as_str()) {
+            self.config.selected_version = Some(ver_id.clone());
+            let _ = self.config.save_to_path(&self.paths.config_file());
+        }
 
         let engine = self.download_engine.clone();
         engine.set_speed_limit_kbps(self.config.download_speed_limit_kbps);
