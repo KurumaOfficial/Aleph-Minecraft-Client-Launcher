@@ -43,6 +43,11 @@ pub struct HomePage {
     hero_failed: bool,
     installed_cache: HashSet<String>,
     installed_for: usize,
+    /// Memoized version filter (the full Mojang list is ~1000 entries):
+    /// recomputed only when the query, tab, order or list changes —
+    /// never per frame.
+    filter_cache: Vec<GameVersion>,
+    filter_key: Option<(String, FilterTab, SortOrder, usize)>,
     // Server favorites (CONCEPT, P8): no shared browser, but the player's
     // own servers persist here and are injected into every instance.
     // Ping results are transient (keyed by address); the list itself is
@@ -73,6 +78,8 @@ impl Default for HomePage {
             hero_failed: false,
             installed_cache: HashSet::new(),
             installed_for: usize::MAX,
+            filter_cache: Vec::new(),
+            filter_key: None,
             fav_name_input: String::new(),
             fav_addr_input: String::new(),
             fav_error: None,
@@ -197,35 +204,56 @@ impl HomePage {
 
         ui.add_space(10.0);
 
-        // Filter and sort version list
-        let mut filtered: Vec<&GameVersion> = versions
-            .iter()
-            .filter(|v| {
-                let matches_filter = match self.active_filter {
-                    FilterTab::All => true,
-                    FilterTab::Releases => v.release_type == ReleaseType::Release,
-                    FilterTab::Snapshots => v.release_type == ReleaseType::Snapshot,
-                    FilterTab::Betas => v.release_type == ReleaseType::Beta,
-                    FilterTab::Alphas => v.release_type == ReleaseType::Alpha,
-                    FilterTab::Old => v.release_type == ReleaseType::Old,
-                };
+        // Filter and sort version list (memoized: the full list is big,
+        // recompute only when inputs change; cache hit is zero-alloc).
+        let cache_valid = match &self.filter_key {
+            Some((q, f, s, len)) => {
+                *q == self.search_query
+                    && *f == self.active_filter
+                    && *s == self.sort_order
+                    && *len == versions.len()
+            }
+            None => false,
+        };
+        if !cache_valid {
+            let query = self.search_query.trim().to_lowercase();
+            let mut filtered: Vec<GameVersion> = versions
+                .iter()
+                .filter(|v| {
+                    let matches_filter = match self.active_filter {
+                        FilterTab::All => true,
+                        FilterTab::Releases => v.release_type == ReleaseType::Release,
+                        FilterTab::Snapshots => v.release_type == ReleaseType::Snapshot,
+                        FilterTab::Betas => v.release_type == ReleaseType::Beta,
+                        FilterTab::Alphas => v.release_type == ReleaseType::Alpha,
+                        FilterTab::Old => v.release_type == ReleaseType::Old,
+                    };
 
-                let matches_search = if self.search_query.trim().is_empty() {
-                    true
-                } else {
-                    v.id.to_lowercase()
-                        .contains(&self.search_query.to_lowercase())
-                };
+                    let matches_search = if query.is_empty() {
+                        true
+                    } else {
+                        v.id.to_lowercase().contains(&query)
+                    };
 
-                matches_filter && matches_search
-            })
-            .collect();
+                    matches_filter && matches_search
+                })
+                .cloned()
+                .collect();
 
-        if self.sort_order == SortOrder::Oldest {
-            filtered.sort_by_key(|v| v.release_time);
-        } else {
-            filtered.sort_by_key(|v| std::cmp::Reverse(v.release_time));
+            if self.sort_order == SortOrder::Oldest {
+                filtered.sort_by_key(|v| v.release_time);
+            } else {
+                filtered.sort_by_key(|v| std::cmp::Reverse(v.release_time));
+            }
+            self.filter_cache = filtered;
+            self.filter_key = Some((
+                self.search_query.clone(),
+                self.active_filter,
+                self.sort_order,
+                versions.len(),
+            ));
         }
+        let filtered = &self.filter_cache;
 
         if filtered.is_empty() {
             ui.add_space(50.0);
@@ -233,13 +261,8 @@ impl HomePage {
                 if versions.is_empty() {
                     ui.spinner();
                     ui.add_space(8.0);
-                    let loading_msg = match lang {
-                        amc_core::Language::English => "Fetching Minecraft versions from Mojang...",
-                        amc_core::Language::Russian => "Загрузка списка версий от Mojang...",
-                        amc_core::Language::Ukrainian => "Завантаження списку версій від Mojang...",
-                    };
                     ui.label(
-                        egui::RichText::new(loading_msg)
+                        egui::RichText::new(lang.home_loading_versions())
                             .font(egui::FontId::proportional(15.0))
                             .color(TEXT_MUTED),
                     );
@@ -258,13 +281,14 @@ impl HomePage {
         let row_height = 56.0;
         let num_rows = filtered.len();
 
+        let mut drawer_id: Option<String> = None;
         ScrollArea::vertical()
             .auto_shrink([false, false])
             .show_rows(ui, row_height, num_rows, |ui, row_range| {
                 ui.spacing_mut().item_spacing = vec2(0.0, 6.0);
 
                 for idx in row_range {
-                    let v = filtered[idx];
+                    let v = &filtered[idx];
                     let is_selected = selected_version.as_deref() == Some(&v.id);
 
                     let (rect, resp) =
@@ -357,10 +381,14 @@ impl HomePage {
 
                     if resp.clicked() {
                         *selected_version = Some(v.id.clone());
-                        self.open_drawer(Some(v.id.clone()));
+                        drawer_id = Some(v.id.clone());
                     }
                 }
             });
+
+        if let Some(id) = drawer_id {
+            self.open_drawer(Some(id));
+        }
 
         self.show_drawer(ui, versions, selected_version, lang);
     }

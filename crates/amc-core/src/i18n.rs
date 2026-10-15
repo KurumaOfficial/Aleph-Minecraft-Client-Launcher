@@ -327,6 +327,14 @@ impl Language {
         }
     }
 
+    pub fn home_loading_versions(&self) -> &'static str {
+        match self {
+            Self::English => "Fetching Minecraft versions from Mojang...",
+            Self::Russian => "Загрузка списка версий от Mojang...",
+            Self::Ukrainian => "Завантаження списку версій від Mojang...",
+        }
+    }
+
     // ==========================================
     // Instances Page
     // ==========================================
