@@ -2660,6 +2660,14 @@ impl Language {
         }
     }
 
+    pub fn err_version_missing(&self, ver: &str) -> String {
+        match self {
+            Self::English => format!("Version {ver} not found in manifest"),
+            Self::Russian => format!("Версия {ver} не найдена в манифесте"),
+            Self::Ukrainian => format!("Версія {ver} не знайдена в маніфесті"),
+        }
+    }
+
     /// Human-readable byte count (CONCEPT "Место на диске").
     pub fn disk_size(&self, bytes: u64) -> String {
         const MB: f64 = 1024.0 * 1024.0;
@@ -3796,6 +3804,7 @@ mod tests {
             assert!(!lang.err_components_failed("x").is_empty());
             assert!(!lang.err_launch_failed("x").is_empty());
             assert!(!lang.err_mod_file_failed("m.jar", "x").is_empty());
+            assert!(!lang.err_version_missing("1.20.1").is_empty());
             assert!(!lang.clone_title().is_empty());
             assert!(!lang.clone_saves().is_empty());
             assert!(!lang.inst_btn_shortcut().is_empty());

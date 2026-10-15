@@ -199,3 +199,24 @@ impl AdoptiumInstaller {
         Ok(bin)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_platform_names_are_known() {
+        assert!(["windows", "mac", "linux"].contains(&AdoptiumInstaller::os_name()));
+        assert!(["x64", "aarch64", "x86"].contains(&AdoptiumInstaller::arch_name()));
+    }
+
+    #[test]
+    fn test_java_executable_layout() {
+        let exe = AdoptiumInstaller::java_executable(Path::new("/rt"));
+        assert_eq!(exe.parent().and_then(|p| p.file_name()).unwrap(), "bin");
+        #[cfg(windows)]
+        assert_eq!(exe.extension().and_then(|e| e.to_str()), Some("exe"));
+        #[cfg(not(windows))]
+        assert_eq!(exe.extension(), None);
+    }
+}

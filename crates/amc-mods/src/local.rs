@@ -236,3 +236,57 @@ impl LocalModManager {
         Ok(destination)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    fn fixture_jar(dir: &Path, name: &str) {
+        let file = File::create(dir.join(name)).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        zip.start_file("fabric.mod.json", zip::write::SimpleFileOptions::default())
+            .unwrap();
+        zip.write_all(
+            br#"{"schemaVersion":1,"id":"sodium","name":"Sodium","version":"0.5.8","description":"Fast rendering"}"#,
+        )
+        .unwrap();
+        zip.finish().unwrap();
+    }
+
+    fn temp_dir(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "amc_local_test_{tag}_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn test_scan_reads_fabric_manifest() {
+        let dir = temp_dir("fabric");
+        fixture_jar(&dir, "sodium.jar");
+        std::fs::write(dir.join("notes.txt"), b"ignored").unwrap();
+        let mods = LocalModManager::scan_mods(&dir).unwrap();
+        assert_eq!(mods.len(), 1);
+        assert_eq!(mods[0].name, "Sodium");
+        assert_eq!(mods[0].version, "0.5.8");
+        assert!(mods[0].enabled);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_scan_empty_and_missing_dir() {
+        let dir = temp_dir("empty");
+        assert!(LocalModManager::scan_mods(&dir).unwrap().is_empty());
+        assert!(LocalModManager::scan_mods(&dir.join("nope"))
+            .unwrap()
+            .is_empty());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}

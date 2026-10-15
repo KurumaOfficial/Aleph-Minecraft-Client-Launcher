@@ -81,3 +81,45 @@ pub fn allows(rules: Option<&[Rule]>, features: &HashMap<String, bool>) -> bool 
     }
     allow
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rule(action: &str, os: Option<&str>) -> Rule {
+        Rule {
+            action: action.to_string(),
+            os: os.map(|name| OsRule {
+                name: Some(name.to_string()),
+                arch: None,
+                version: None,
+            }),
+            features: None,
+        }
+    }
+
+    #[test]
+    fn test_allows_matrix() {
+        let empty: HashMap<String, bool> = HashMap::new();
+        // No rules at all: allowed.
+        assert!(allows(None, &empty));
+        assert!(allows(Some(&[]), &empty));
+        // Matching allow wins; last matching rule decides.
+        let rules = vec![rule("allow", None)];
+        assert!(allows(Some(&rules), &empty));
+        let rules = vec![rule("allow", None), rule("disallow", None)];
+        assert!(!allows(Some(&rules), &empty));
+        // OS-gated rules only fire on their platform (no match = deny).
+        let other = if current_os() == "windows" {
+            "linux"
+        } else {
+            "windows"
+        };
+        let rules = vec![rule("disallow", Some(other))];
+        assert!(!allows(Some(&rules), &empty));
+        let rules = vec![rule("disallow", Some(current_os()))];
+        assert!(!allows(Some(&rules), &empty));
+        let rules = vec![rule("allow", Some(current_os()))];
+        assert!(allows(Some(&rules), &empty));
+    }
+}

@@ -236,7 +236,9 @@ impl VersionDetails {
                 .into_iter()
                 .find(|v| v.id == version_id)
                 .ok_or_else(|| {
-                    LauncherError::Version(format!("Версия {version_id} не найдена в манифесте"))
+                    LauncherError::Version(
+                        amc_core::Language::English.err_version_missing(version_id),
+                    )
                 })?;
             entry.url
         };
@@ -367,5 +369,46 @@ impl VersionDetails {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MINIMAL: &str = r#"{
+        "id": "1.20.1",
+        "libraries": [],
+        "mainClass": "net.minecraft.client.main.Main"
+    }"#;
+
+    #[test]
+    fn test_parse_minimal_and_java_heuristics() {
+        let details = VersionDetails::parse(MINIMAL).expect("minimal version parses");
+        assert_eq!(details.id, "1.20.1");
+        assert!(details.libraries.is_empty());
+        assert_eq!(details.inherits_from, None);
+        assert_eq!(details.required_java_major(), 21);
+
+        let mut old = details.clone();
+        old.id = "1.19.2".to_string();
+        assert_eq!(old.required_java_major(), 17);
+        old.id = "1.16.5".to_string();
+        assert_eq!(old.required_java_major(), 8);
+
+        let declared = r#"{
+            "id": "1.21",
+            "libraries": [],
+            "mainClass": "x",
+            "javaVersion": {"component": "java-runtime-gamma", "majorVersion": 21}
+        }"#;
+        let details = VersionDetails::parse(declared).expect("javaVersion parses");
+        assert_eq!(details.required_java_major(), 21);
+    }
+
+    #[test]
+    fn test_parse_rejects_garbage() {
+        assert!(VersionDetails::parse("not json").is_err());
+        assert!(VersionDetails::parse(r#"{"id":"x"}"#).is_err());
     }
 }
