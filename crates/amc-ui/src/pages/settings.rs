@@ -653,10 +653,10 @@ impl SettingsPage {
                     }
                 }
 
-                if config.default_launch_options.java_path.is_some() {
-                    if ui.button(lang.settings_btn_reset_java()).clicked() {
-                        config.default_launch_options.java_path = None;
-                    }
+                if config.default_launch_options.java_path.is_some()
+                    && ui.button(lang.settings_btn_reset_java()).clicked()
+                {
+                    config.default_launch_options.java_path = None;
                 }
             });
         });

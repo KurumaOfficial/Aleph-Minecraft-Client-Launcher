@@ -163,9 +163,11 @@ impl SkinsPage {
             child
                 .painter()
                 .rect_filled(img_rect, Rounding::ZERO, BG_HOVER);
-            child
-                .painter()
-                .rect_stroke(img_rect, Rounding::ZERO, Stroke::new(1.0_f32, BORDER_STRONG));
+            child.painter().rect_stroke(
+                img_rect,
+                Rounding::ZERO,
+                Stroke::new(1.0_f32, BORDER_STRONG),
+            );
             child.painter().image(
                 tex.id(),
                 img_rect,
@@ -244,7 +246,7 @@ impl SkinsPage {
             ui.painter().text(
                 rs_rect.center(),
                 egui::Align2::CENTER_CENTER,
-                &reset_label,
+                reset_label,
                 egui::FontId::proportional(11.0),
                 rs_text,
             );

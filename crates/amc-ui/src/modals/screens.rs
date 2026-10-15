@@ -8,6 +8,7 @@ use crate::theme::{BG_CARD, BORDER_DEFAULT, TEXT_MUTED};
 /// every instance's `screenshots/` folder, click opens externally,
 /// trash button deletes the file. Textures are cached per path and
 /// capped so huge galleries stay light.
+#[derive(Default)]
 pub struct ScreensModal {
     pub open: bool,
     thumbs: HashMap<PathBuf, egui::TextureHandle>,
@@ -20,16 +21,6 @@ pub enum ScreensAction {
     #[default]
     None,
     Deleted(PathBuf),
-}
-
-impl Default for ScreensModal {
-    fn default() -> Self {
-        Self {
-            open: false,
-            thumbs: HashMap::new(),
-            failed: std::collections::HashSet::new(),
-        }
-    }
 }
 
 fn list_shots(instances_dir: &Path) -> Vec<PathBuf> {
@@ -144,13 +135,11 @@ impl ScreensModal {
                                                         egui::RichText::new("🗑").color(TEXT_MUTED),
                                                     )
                                                     .clicked()
+                                                    && std::fs::remove_file(path).is_ok()
                                                 {
-                                                    if std::fs::remove_file(path).is_ok() {
-                                                        self.thumbs.remove(path);
-                                                        self.failed.remove(path);
-                                                        action =
-                                                            ScreensAction::Deleted(path.clone());
-                                                    }
+                                                    self.thumbs.remove(path);
+                                                    self.failed.remove(path);
+                                                    action = ScreensAction::Deleted(path.clone());
                                                 }
                                             },
                                         );

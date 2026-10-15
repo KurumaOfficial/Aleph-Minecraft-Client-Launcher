@@ -382,7 +382,7 @@ impl InstancesPage {
     pub fn show(
         &mut self,
         ui: &mut Ui,
-        instances: &mut Vec<Instance>,
+        instances: &mut [Instance],
         selected_instance: &mut Option<Uuid>,
         ctx: &InstancesContext,
         lang: Language,
@@ -1542,8 +1542,10 @@ mod tests {
     #[test]
     fn test_apply_template_fills_form() {
         let lang = Language::English;
-        let mut page = InstancesPage::default();
-        page.new_instance_name = String::new();
+        let mut page = InstancesPage {
+            new_instance_name: String::new(),
+            ..InstancesPage::default()
+        };
         page.apply_template(InstanceTemplate::OPTIMIZED, lang);
         assert_eq!(page.new_instance_loader, LoaderType::Fabric);
         assert_eq!(page.new_instance_ram, 6144);
@@ -1553,8 +1555,10 @@ mod tests {
     #[test]
     fn test_apply_template_keeps_custom_name() {
         let lang = Language::English;
-        let mut page = InstancesPage::default();
-        page.new_instance_name = "My Pack".to_string();
+        let mut page = InstancesPage {
+            new_instance_name: "My Pack".to_string(),
+            ..InstancesPage::default()
+        };
         page.apply_template(InstanceTemplate::EMPTY, lang);
         assert_eq!(page.new_instance_loader, LoaderType::Vanilla);
         assert_eq!(page.new_instance_ram, 2048);

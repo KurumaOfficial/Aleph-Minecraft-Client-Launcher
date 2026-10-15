@@ -243,8 +243,10 @@ mod tests {
 
     #[test]
     fn test_custom_game_args_appended_last() {
-        let mut options = LaunchOptions::default();
-        options.custom_game_args = vec!["--foo".to_string(), "bar".to_string()];
+        let options = LaunchOptions {
+            custom_game_args: vec!["--foo".to_string(), "bar".to_string()],
+            ..LaunchOptions::default()
+        };
         let args = ArgumentBuilder::build_game_args(
             &options,
             std::path::Path::new("/game"),

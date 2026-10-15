@@ -32,6 +32,20 @@ pub enum GameEvent {
 
 pub struct MinecraftLauncher;
 
+/// Everything [`MinecraftLauncher::launch`] needs, bundled so the
+/// argument-count lint stays quiet and call sites read as one unit.
+pub struct LaunchParams<'a> {
+    pub java_bin: &'a Path,
+    pub game_dir: &'a Path,
+    pub assets_dir: &'a Path,
+    pub natives_dir: &'a Path,
+    pub libraries: &'a [PathBuf],
+    pub client_jar: &'a Path,
+    pub details: &'a VersionDetails,
+    pub session: &'a AuthSession,
+    pub options: &'a LaunchOptions,
+}
+
 /// Extra creation flags for the game process. Windows-only for now,
 /// see the call site for the Unix story.
 #[cfg(windows)]
@@ -46,17 +60,18 @@ pub fn game_creation_flags() -> u32 {
 }
 
 impl MinecraftLauncher {
-    pub async fn launch(
-        java_bin: &Path,
-        game_dir: &Path,
-        assets_dir: &Path,
-        natives_dir: &Path,
-        libraries: &[PathBuf],
-        client_jar: &Path,
-        details: &VersionDetails,
-        session: &AuthSession,
-        options: &LaunchOptions,
-    ) -> Result<mpsc::Receiver<GameEvent>> {
+    pub async fn launch(params: LaunchParams<'_>) -> Result<mpsc::Receiver<GameEvent>> {
+        let LaunchParams {
+            java_bin,
+            game_dir,
+            assets_dir,
+            natives_dir,
+            libraries,
+            client_jar,
+            details,
+            session,
+            options,
+        } = params;
         if !java_bin.is_file() {
             return Err(LauncherError::Java(format!(
                 "Java binary not found at {}",

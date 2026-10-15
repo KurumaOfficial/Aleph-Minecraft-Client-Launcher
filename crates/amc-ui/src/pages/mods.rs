@@ -148,17 +148,25 @@ impl Default for ModsPage {
     }
 }
 
+/// Arguments for [`ModsPage::show`], bundled for the argument-count lint.
+pub struct ModsActions<'a, S, I> {
+    pub wishlist: &'a mut Vec<String>,
+    pub update_install: &'a mut Option<(ModSearchResult, String)>,
+    pub on_search: S,
+    pub on_install: I,
+}
+
 impl ModsPage {
-    pub fn show(
+    pub fn show<S, I>(
         &mut self,
         ui: &mut Ui,
         mods_dir: &Path,
         lang: Language,
-        wishlist: &mut Vec<String>,
-        update_install: &mut Option<(ModSearchResult, String)>,
-        on_search: impl FnOnce(String, ModSource, ModCategory, SearchSort),
-        on_install: impl FnOnce(ModSearchResult),
-    ) {
+        actions: ModsActions<'_, S, I>,
+    ) where
+        S: FnOnce(String, ModSource, ModCategory, SearchSort),
+        I: FnOnce(ModSearchResult),
+    {
         ui.add_space(20.0);
 
         // Header
@@ -260,7 +268,7 @@ impl ModsPage {
             ui.painter().text(
                 sea_rect.center(),
                 egui::Align2::CENTER_CENTER,
-                &search_label,
+                search_label,
                 egui::FontId::proportional(12.0),
                 sea_text,
             );
@@ -280,8 +288,14 @@ impl ModsPage {
         ui.add_space(14.0);
 
         match self.sub_tab {
-            ModsSubTab::Local => self.show_local_mods(ui, lang, update_install),
-            ModsSubTab::Search => self.show_search(ui, lang, wishlist, on_search, on_install),
+            ModsSubTab::Local => self.show_local_mods(ui, lang, actions.update_install),
+            ModsSubTab::Search => self.show_search(
+                ui,
+                lang,
+                actions.wishlist,
+                actions.on_search,
+                actions.on_install,
+            ),
         }
     }
 
@@ -400,8 +414,11 @@ impl ModsPage {
                     let stroke_col = lerp_color(BORDER_DEFAULT, RUBY, hover_t);
 
                     ui.painter().rect_filled(rect, Rounding::ZERO, bg);
-                    ui.painter()
-                        .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0_f32, stroke_col));
+                    ui.painter().rect_stroke(
+                        rect,
+                        Rounding::ZERO,
+                        Stroke::new(1.0_f32, stroke_col),
+                    );
 
                     let mut child = ui.new_child(
                         egui::UiBuilder::new()
@@ -504,32 +521,31 @@ impl ModsPage {
                         {
                             self.pin_toggle = Some(offer.slug.clone());
                         }
-                        if !pinned {
-                            if child
+                        if !pinned
+                            && child
                                 .button(
                                     egui::RichText::new(lang.mods_update_available())
                                         .color(RUBY_LIGHT),
                                 )
                                 .on_hover_text(changelog_preview(&offer.version, &offer.changelog))
                                 .clicked()
-                            {
-                                *update_install = Some((
-                                    ModSearchResult {
-                                        source: ModSource::Modrinth,
-                                        id: offer.slug.clone(),
-                                        title: offer.title.clone(),
-                                        author: String::new(),
-                                        downloads: 0,
-                                        rating: 0,
-                                        description: String::new(),
-                                        icon_url: None,
-                                        category: ModCategory::Mod,
-                                        game_versions: Vec::new(),
-                                        loaders: Vec::new(),
-                                    },
-                                    offer.old_filename.clone(),
-                                ));
-                            }
+                        {
+                            *update_install = Some((
+                                ModSearchResult {
+                                    source: ModSource::Modrinth,
+                                    id: offer.slug.clone(),
+                                    title: offer.title.clone(),
+                                    author: String::new(),
+                                    downloads: 0,
+                                    rating: 0,
+                                    description: String::new(),
+                                    icon_url: None,
+                                    category: ModCategory::Mod,
+                                    game_versions: Vec::new(),
+                                    loaders: Vec::new(),
+                                },
+                                offer.old_filename.clone(),
+                            ));
                         }
                     }
                 }
@@ -749,8 +765,11 @@ impl ModsPage {
                     let stroke_col = lerp_color(BORDER_DEFAULT, RUBY, hover_t);
 
                     ui.painter().rect_filled(rect, Rounding::ZERO, bg);
-                    ui.painter()
-                        .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0_f32, stroke_col));
+                    ui.painter().rect_stroke(
+                        rect,
+                        Rounding::ZERO,
+                        Stroke::new(1.0_f32, stroke_col),
+                    );
 
                     let mut child = ui.new_child(
                         egui::UiBuilder::new()

@@ -163,8 +163,11 @@ impl ConsoleModal {
                     let cp_text = lerp_color(TEXT_PRIMARY, Color32::WHITE, cp_hover);
 
                     ui.painter().rect_filled(cp_rect, Rounding::ZERO, cp_bg);
-                    ui.painter()
-                        .rect_stroke(cp_rect, Rounding::ZERO, Stroke::new(1.0_f32, cp_stroke));
+                    ui.painter().rect_stroke(
+                        cp_rect,
+                        Rounding::ZERO,
+                        Stroke::new(1.0_f32, cp_stroke),
+                    );
                     ui.painter().text(
                         cp_rect.center(),
                         egui::Align2::CENTER_CENTER,
@@ -189,8 +192,11 @@ impl ConsoleModal {
                     let cl_text = lerp_color(TEXT_MUTED, TEXT_PRIMARY, cl_hover);
 
                     ui.painter().rect_filled(cl_rect, Rounding::ZERO, cl_bg);
-                    ui.painter()
-                        .rect_stroke(cl_rect, Rounding::ZERO, Stroke::new(1.0_f32, cl_stroke));
+                    ui.painter().rect_stroke(
+                        cl_rect,
+                        Rounding::ZERO,
+                        Stroke::new(1.0_f32, cl_stroke),
+                    );
                     ui.painter().text(
                         cl_rect.center(),
                         egui::Align2::CENTER_CENTER,
@@ -215,8 +221,11 @@ impl ConsoleModal {
                     let ex_text = lerp_color(RUBY_LIGHT, Color32::WHITE, ex_hover);
 
                     ui.painter().rect_filled(ex_rect, Rounding::ZERO, ex_bg);
-                    ui.painter()
-                        .rect_stroke(ex_rect, Rounding::ZERO, Stroke::new(1.0_f32, ex_stroke));
+                    ui.painter().rect_stroke(
+                        ex_rect,
+                        Rounding::ZERO,
+                        Stroke::new(1.0_f32, ex_stroke),
+                    );
                     ui.painter().text(
                         ex_rect.center(),
                         egui::Align2::CENTER_CENTER,

@@ -462,9 +462,11 @@ mod tests {
         let dir = unique_dir("atomic");
         let path = dir.join("nested").join("config.json");
 
-        let mut config = LauncherConfig::default();
-        config.app_mode = AppMode::Professional;
-        config.first_run = true;
+        let config = LauncherConfig {
+            app_mode: AppMode::Professional,
+            first_run: true,
+            ..LauncherConfig::default()
+        };
         config.save_to_path(&path).unwrap();
 
         // No temp file may linger next to the config.

@@ -36,8 +36,8 @@ jobs:
       - name: Check Workspace
         run: cargo check --workspace --locked
 
-      - name: Clippy (warn-only until lint cleanup, see ROADMAP P0)
-        run: cargo clippy --workspace --all-targets --locked
+      - name: Clippy (strict: zero warnings, see ROADMAP P0)
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
       - name: Run Tests
         run: cargo test --workspace --locked

@@ -6,6 +6,7 @@ use egui::{vec2, ScrollArea};
 /// the engine (newest first) with a clear button. Active transfers keep
 /// living in the download overlay and the bottom progress bar — this
 /// window answers "what already happened".
+#[derive(Default)]
 pub struct DownloadManager {
     pub open: bool,
 }
@@ -16,12 +17,6 @@ pub enum ManagerAction {
     #[default]
     None,
     Clear,
-}
-
-impl Default for DownloadManager {
-    fn default() -> Self {
-        Self { open: false }
-    }
 }
 
 impl DownloadManager {

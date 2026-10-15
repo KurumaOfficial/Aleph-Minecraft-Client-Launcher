@@ -132,9 +132,11 @@ impl BottomBar {
         left_ui
             .painter()
             .rect_filled(login_rect, Rounding::ZERO, login_bg);
-        left_ui
-            .painter()
-            .rect_stroke(login_rect, Rounding::ZERO, Stroke::new(1.0_f32, login_stroke));
+        left_ui.painter().rect_stroke(
+            login_rect,
+            Rounding::ZERO,
+            Stroke::new(1.0_f32, login_stroke),
+        );
         left_ui.painter().text(
             login_rect.center(),
             egui::Align2::CENTER_CENTER,

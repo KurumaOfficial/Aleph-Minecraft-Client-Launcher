@@ -178,17 +178,17 @@ async fn run_launch(
         .join(&ver_id)
         .join(format!("{ver_id}.jar"));
 
-    match MinecraftLauncher::launch(
-        &java_bin,
-        &game_dir,
-        &paths.assets_dir(),
-        &natives_dir,
-        &classpath,
-        &client_jar,
-        &details,
-        &session,
-        &options,
-    )
+    match MinecraftLauncher::launch(amc_minecraft::LaunchParams {
+        java_bin: &java_bin,
+        game_dir: &game_dir,
+        assets_dir: &paths.assets_dir(),
+        natives_dir: &natives_dir,
+        libraries: &classpath,
+        client_jar: &client_jar,
+        details: &details,
+        session: &session,
+        options: &options,
+    })
     .await
     {
         Ok(mut rx) => {

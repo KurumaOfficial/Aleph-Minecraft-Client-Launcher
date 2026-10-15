@@ -13,7 +13,7 @@ pub mod version;
 pub use args::ArgumentBuilder;
 pub use assets::AssetIndex;
 pub use hooks::run_hook_script;
-pub use launch::{game_creation_flags, GameEvent, MinecraftLauncher};
+pub use launch::{game_creation_flags, GameEvent, LaunchParams, MinecraftLauncher};
 pub use loaders::{
     pin_candidates, FabricLoader, ForgeLoader, NeoForgeLoader, OptiFineLoader, QuiltLoader,
 };

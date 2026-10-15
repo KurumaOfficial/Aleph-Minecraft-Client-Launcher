@@ -26,7 +26,7 @@ use crate::modals::{
 };
 use crate::pages::{
     icon_key, HomeContext, HomePage, InstanceAction, InstancesContext, InstancesPage,
-    ModUpdateResult, ModsPage, ProfileAction, ProfilePage, SettingsPage, SkinsPage,
+    ModUpdateResult, ModsActions, ModsPage, ProfileAction, ProfilePage, SettingsPage, SkinsPage,
 };
 use crate::theme::{apply_aleph_theme, BG};
 use crate::widgets::{
@@ -135,6 +135,10 @@ struct InstallReport {
     loader_name: String,
 }
 
+/// Files resolved by a batch install plus per-root provenance:
+/// downloaded files with replaced olds, and (id, title) mates.
+type InstallOutcome = Result<(Vec<(ModDownloadFile, String)>, Vec<(String, String)>), String>;
+
 impl LauncherApp {
     pub fn new(cc: &eframe::CreationContext<'_>, paths: LauncherPaths) -> Self {
         apply_aleph_theme(&cc.egui_ctx);
@@ -147,8 +151,10 @@ impl LauncherApp {
         // Pre-scan local mods
         let mods_dir = paths.root_dir.join("mods");
         let local_mods = LocalModManager::scan_mods(&mods_dir).unwrap_or_default();
-        let mut mods_page = ModsPage::default();
-        mods_page.local_mods = local_mods;
+        let mut mods_page = ModsPage {
+            local_mods,
+            ..ModsPage::default()
+        };
 
         // Load persisted instances
         let instances = Instance::load_all(&paths.instances_file()).unwrap_or_default();
@@ -905,7 +911,7 @@ impl LauncherApp {
                             // CurseTools has no popularity index: order
                             // client-side when requested.
                             if sort == SearchSort::Downloads {
-                                results.sort_by(|a, b| b.downloads.cmp(&a.downloads));
+                                results.sort_by_key(|m| std::cmp::Reverse(m.downloads));
                             }
                             let _ = tx.send(results).await;
                         }
@@ -1389,42 +1395,39 @@ impl LauncherApp {
         let lang = self.config.ui.language();
 
         tokio::spawn(async move {
-            let outcome: Result<(Vec<(ModDownloadFile, String)>, Vec<(String, String)>), String> =
-                async {
-                    let mut queue: Vec<(String, ModSource, ModCategory, Option<String>)> =
-                        Vec::new();
-                    let mut meta: Vec<(String, String)> = Vec::new();
-                    for (item, old) in items {
-                        meta.push((item.id.clone(), item.title.clone()));
-                        queue.push((item.id, item.source, item.category, old));
-                    }
-                    let mut installed: Vec<(ModDownloadFile, String)> = Vec::new();
-                    let mut seen: std::collections::HashSet<String> =
-                        std::collections::HashSet::new();
-                    // Depth-1 autodeps: the root mod plus what it strictly requires.
-                    while let Some((slug, source, category, old_file)) = queue.pop() {
-                        if !seen.insert(format!("{slug:?}{source:?}")) {
-                            continue;
-                        }
-                        let (file, deps) =
-                            resolve_mod_file(&slug, source, category, &mc_version, &loader_name)
-                                .await?;
-                        if installed.len() >= 8 {
-                            break;
-                        }
-                        installed.push((file, old_file.unwrap_or_default()));
-                        if installed.len() == 1 {
-                            for dep in deps.into_iter().take(4) {
-                                queue.push((dep, ModSource::Modrinth, ModCategory::Mod, None));
-                            }
-                        }
-                    }
-                    if installed.is_empty() {
-                        return Err("Nothing to install".to_string());
-                    }
-                    Ok((installed, meta))
+            let outcome: InstallOutcome = async {
+                let mut queue: Vec<(String, ModSource, ModCategory, Option<String>)> = Vec::new();
+                let mut meta: Vec<(String, String)> = Vec::new();
+                for (item, old) in items {
+                    meta.push((item.id.clone(), item.title.clone()));
+                    queue.push((item.id, item.source, item.category, old));
                 }
-                .await;
+                let mut installed: Vec<(ModDownloadFile, String)> = Vec::new();
+                let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+                // Depth-1 autodeps: the root mod plus what it strictly requires.
+                while let Some((slug, source, category, old_file)) = queue.pop() {
+                    if !seen.insert(format!("{slug:?}{source:?}")) {
+                        continue;
+                    }
+                    let (file, deps) =
+                        resolve_mod_file(&slug, source, category, &mc_version, &loader_name)
+                            .await?;
+                    if installed.len() >= 8 {
+                        break;
+                    }
+                    installed.push((file, old_file.unwrap_or_default()));
+                    if installed.len() == 1 {
+                        for dep in deps.into_iter().take(4) {
+                            queue.push((dep, ModSource::Modrinth, ModCategory::Mod, None));
+                        }
+                    }
+                }
+                if installed.is_empty() {
+                    return Err("Nothing to install".to_string());
+                }
+                Ok((installed, meta))
+            }
+            .await;
 
             match outcome {
                 Ok((files, meta)) => {
@@ -2576,17 +2579,17 @@ impl LauncherApp {
             let _ = status_tx.send(lang.status_launching().to_string()).await;
             let assets_dir = paths.assets_dir();
 
-            match MinecraftLauncher::launch(
-                &java_bin,
-                &game_dir,
-                &assets_dir,
-                &natives_dir,
-                &classpath_libs,
-                &client_jar,
-                &details,
-                &session,
-                &options,
-            )
+            match MinecraftLauncher::launch(amc_minecraft::LaunchParams {
+                java_bin: &java_bin,
+                game_dir: &game_dir,
+                assets_dir: &assets_dir,
+                natives_dir: &natives_dir,
+                libraries: &classpath_libs,
+                client_jar: &client_jar,
+                details: &details,
+                session: &session,
+                options: &options,
+            })
             .await
             {
                 Ok(mut rx) => {
@@ -3897,13 +3900,15 @@ impl App for LauncherApp {
                             &mut content_ui,
                             &mods_dir,
                             lang,
-                            &mut self.config.wishlist,
-                            &mut update_install,
-                            |query, provider, category, sort| {
-                                search_req = Some((query, provider, category, sort));
-                            },
-                            |result| {
-                                mod_to_install = Some(result);
+                            ModsActions {
+                                wishlist: &mut self.config.wishlist,
+                                update_install: &mut update_install,
+                                on_search: |query, provider, category, sort| {
+                                    search_req = Some((query, provider, category, sort));
+                                },
+                                on_install: |result| {
+                                    mod_to_install = Some(result);
+                                },
                             },
                         );
 
