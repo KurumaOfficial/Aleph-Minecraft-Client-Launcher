@@ -46,7 +46,9 @@ pub struct ServerStatus {
 pub struct ServerPinger;
 
 impl ServerPinger {
-    pub async fn ping(host: &str, port: u16) -> Result<ServerStatus> {
+    /// Server List Ping with a caller-supplied offline MOTD (localized
+    /// by the UI layer): unreachability is common, the text is common UI.
+    pub async fn ping(host: &str, port: u16, offline_motd: String) -> Result<ServerStatus> {
         let addr = format!("{host}:{port}");
         let start = Instant::now();
 
@@ -154,7 +156,7 @@ impl ServerPinger {
             _ => Ok(ServerStatus {
                 host: host.to_string(),
                 port,
-                motd: "Сервер недоступен".to_string(),
+                motd: offline_motd,
                 version: "--".to_string(),
                 online_players: 0,
                 max_players: 0,
@@ -224,4 +226,56 @@ fn strip_minecraft_color_codes(text: &str) -> String {
         out.push(c);
     }
     out.trim().to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_write_varint() {
+        let mut buf = Vec::new();
+        write_varint(&mut buf, 0);
+        write_varint(&mut buf, 127);
+        write_varint(&mut buf, 128);
+        write_varint(&mut buf, 25565);
+        assert_eq!(buf, vec![0x00, 0x7F, 0x80, 0x01, 0xDD, 0xC7, 0x01]);
+    }
+
+    #[test]
+    fn test_write_string() {
+        let mut buf = Vec::new();
+        write_string(&mut buf, "mc.hypixel.net");
+        assert_eq!(buf[0] as usize, "mc.hypixel.net".len());
+        assert_eq!(&buf[1..], b"mc.hypixel.net");
+    }
+
+    #[test]
+    fn test_strip_color_codes() {
+        assert_eq!(
+            strip_minecraft_color_codes("§aHello §rWorld"),
+            "Hello World"
+        );
+        assert_eq!(strip_minecraft_color_codes("&cRed &lBold"), "Red Bold");
+        assert_eq!(strip_minecraft_color_codes("plain"), "plain");
+        // A bare section sign without a code char survives.
+        assert_eq!(strip_minecraft_color_codes("100§"), "100§");
+    }
+
+    #[test]
+    fn test_status_raw_shapes() {
+        let text: ServerStatusRaw =
+            serde_json::from_str(r#"{"description":"A server","players":{"max":20,"online":5}}"#)
+                .expect("text MOTD parses");
+        assert!(matches!(text.description, Some(ServerDescription::Text(_))));
+        let klein: ServerStatusRaw =
+            serde_json::from_str(r#"{"description":{"text":"Hi"},"version":{"name":"1.20.1"}}"#)
+                .expect("object MOTD parses");
+        assert!(matches!(
+            klein.description,
+            Some(ServerDescription::Object { .. })
+        ));
+        let bare: ServerStatusRaw = serde_json::from_str(r#"{}"#).expect("empty parses");
+        assert!(bare.version.is_none());
+    }
 }

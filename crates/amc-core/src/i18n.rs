@@ -1242,6 +1242,14 @@ impl Language {
         }
     }
 
+    pub fn server_offline(&self) -> &'static str {
+        match self {
+            Self::English => "Server unreachable",
+            Self::Russian => "Сервер недоступен",
+            Self::Ukrainian => "Сервер недоступний",
+        }
+    }
+
     // ---- Worlds backup/restore (CONCEPT, P9) ----
     pub fn worlds_title(&self) -> &'static str {
         match self {
@@ -3798,6 +3806,7 @@ mod tests {
             assert!(!lang.dlman_clear().is_empty());
             assert!(!lang.speed_value(1024.0).is_empty());
             assert!(!lang.eta_text(90).is_empty());
+            assert!(!lang.server_offline().is_empty());
             assert!(!lang.status_loader_profile("Fabric", "0.15.11").is_empty());
             assert!(!lang.err_version_failed("1.20.1", "x").is_empty());
             assert!(!lang.err_java_failed("17", "x").is_empty());

@@ -410,9 +410,12 @@ impl LauncherApp {
         self.home_page.is_pinging = true;
         let (tx, rx) = mpsc::channel(1);
         self.server_ping_rx = Some(rx);
+        let offline_motd = self.config.ui.language().server_offline().to_string();
 
         tokio::spawn(async move {
-            if let Ok(status) = amc_minecraft::ServerPinger::ping("mc.hypixel.net", 25565).await {
+            if let Ok(status) =
+                amc_minecraft::ServerPinger::ping("mc.hypixel.net", 25565, offline_motd).await
+            {
                 let _ = tx.send(status).await;
             }
         });
@@ -3044,10 +3047,12 @@ impl App for LauncherApp {
                 .collect();
             let (tx, rx) = mpsc::channel(1);
             self.fav_ping_rx = Some(rx);
+            let offline_motd = self.config.ui.language().server_offline().to_string();
             tokio::spawn(async move {
                 let mut out = Vec::new();
                 for (addr, host, port) in targets {
-                    match amc_minecraft::ServerPinger::ping(&host, port).await {
+                    match amc_minecraft::ServerPinger::ping(&host, port, offline_motd.clone()).await
+                    {
                         Ok(status) => out.push((addr, status)),
                         Err(e) => tracing::warn!("Favorite ping failed: {e}"),
                     }
