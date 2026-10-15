@@ -90,7 +90,6 @@ impl MinecraftLauncher {
         // the game simply launches at normal priority there for now.
         #[cfg(windows)]
         {
-            use std::os::windows::process::CommandExt;
             cmd.creation_flags(game_creation_flags());
         }
 
