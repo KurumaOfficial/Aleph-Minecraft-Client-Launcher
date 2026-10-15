@@ -66,7 +66,9 @@ impl AssetIndex {
             .map_err(|e| LauncherError::Network(format!("Asset index text error: {e}")))?;
 
         let index: Self = serde_json::from_str(&text).map_err(LauncherError::Json)?;
-        let _ = fs::write(&index_file, &text).await;
+        if let Err(e) = fs::write(&index_file, &text).await {
+            tracing::warn!("asset index cache write failed: {e}");
+        }
 
         Ok(index)
     }

@@ -47,7 +47,13 @@ fn resolve_paths() -> LauncherPaths {
         }
         return default;
     }
-    LauncherPaths::custom("./AlephLauncher").expect("unwritable fallback root")
+    match LauncherPaths::custom("./AlephLauncher") {
+        Ok(paths) => paths,
+        Err(e) => {
+            eprintln!("AMC: fallback storage unavailable: {e}");
+            std::process::exit(1);
+        }
+    }
 }
 
 #[tokio::main]

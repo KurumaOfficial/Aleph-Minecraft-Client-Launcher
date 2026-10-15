@@ -3,11 +3,12 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum AccountType {
     Microsoft,
     WetId,
+    #[default]
     Offline,
 }
 
@@ -28,16 +29,45 @@ impl fmt::Display for AccountType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
 pub struct Account {
     pub id: Uuid,
+    #[serde(default)]
     pub account_type: AccountType,
+    #[serde(default)]
     pub username: String,
+    #[serde(default)]
     pub uuid: String,
+    #[serde(default)]
     pub access_token: Option<String>,
+    #[serde(default)]
     pub refresh_token: Option<String>,
+    #[serde(default)]
     pub expires_at: Option<DateTime<Utc>>,
+    #[serde(default)]
     pub skin_url: Option<String>,
+    #[serde(default = "default_active")]
     pub active: bool,
+}
+
+fn default_active() -> bool {
+    true
+}
+
+impl Default for Account {
+    fn default() -> Self {
+        Self {
+            id: Uuid::nil(),
+            account_type: AccountType::Offline,
+            username: String::new(),
+            uuid: String::new(),
+            access_token: None,
+            refresh_token: None,
+            expires_at: None,
+            skin_url: None,
+            active: true,
+        }
+    }
 }
 
 impl Account {

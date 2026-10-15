@@ -25,7 +25,13 @@ impl AccountManager {
                 path: db_path.clone(),
                 source: e,
             })?;
-            serde_json::from_str(&content).unwrap_or_default()
+            match serde_json::from_str(&content) {
+                Ok(db) => db,
+                Err(_) => {
+                    let _ = amc_core::backup_corrupt_file(&db_path);
+                    AccountDatabase::default()
+                }
+            }
         } else {
             AccountDatabase::default()
         };
@@ -45,18 +51,8 @@ impl AccountManager {
     }
 
     pub fn save(&self) -> Result<()> {
-        if let Some(parent) = self.db_path.parent() {
-            fs::create_dir_all(parent).map_err(|e| LauncherError::Io {
-                path: parent.to_path_buf(),
-                source: e,
-            })?;
-        }
-
         let json = serde_json::to_string_pretty(&self.db).map_err(LauncherError::Json)?;
-        fs::write(&self.db_path, json).map_err(|e| LauncherError::Io {
-            path: self.db_path.clone(),
-            source: e,
-        })?;
+        amc_core::write_atomic(&self.db_path, json.as_bytes())?;
         Ok(())
     }
 

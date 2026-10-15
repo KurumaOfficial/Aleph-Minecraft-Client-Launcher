@@ -245,18 +245,15 @@ impl Instance {
             path: path.to_path_buf(),
             source: e,
         })?;
-        serde_json::from_str(&content).map_err(LauncherError::Json)
+        serde_json::from_str(&content).map_err(|e| {
+            let _ = crate::fs::backup_corrupt_file(path);
+            LauncherError::Json(e)
+        })
     }
 
     pub fn save_all(path: &std::path::Path, instances: &[Self]) -> Result<()> {
-        if let Some(parent) = path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
         let content = serde_json::to_string_pretty(instances).map_err(LauncherError::Json)?;
-        std::fs::write(path, content).map_err(|e| LauncherError::Io {
-            path: path.to_path_buf(),
-            source: e,
-        })
+        crate::fs::write_atomic(path, content.as_bytes())
     }
 
     pub fn get_game_dir(&self, base_instances_dir: &std::path::Path) -> PathBuf {

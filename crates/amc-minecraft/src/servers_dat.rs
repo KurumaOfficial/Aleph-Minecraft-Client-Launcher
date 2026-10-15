@@ -60,9 +60,10 @@ pub fn inject_favorites(game_dir: &Path, servers: &[FavoriteServerEntry]) -> Res
         })?;
     }
     let blob = encode_servers_dat(servers);
-    std::fs::write(&target, blob).map_err(|e| LauncherError::Io {
-        path: target.clone(),
-        source: e,
+    let path = target.clone();
+    amc_core::write_atomic(&path, &blob).map_err(|e| match e {
+        LauncherError::Io { source, .. } => LauncherError::Io { path, source },
+        other => other,
     })?;
     Ok(true)
 }
@@ -96,19 +97,31 @@ pub fn load_favorites(root_dir: &Path) -> Vec<FavoriteServerEntry> {
     let Ok(text) = std::fs::read_to_string(&path) else {
         return Vec::new();
     };
-    serde_json::from_str::<HashMap<String, Vec<FavoriteServerEntry>>>(&text)
-        .ok()
-        .and_then(|mut map| map.remove("servers"))
-        .unwrap_or_default()
+    // Accept both the current `{"servers": [...]}` map and the legacy
+    // bare `[...]` list so old profiles keep working.
+    if let Ok(list) = serde_json::from_str::<Vec<FavoriteServerEntry>>(&text) {
+        return list;
+    }
+    match serde_json::from_str::<HashMap<String, Vec<FavoriteServerEntry>>>(&text) {
+        Ok(mut map) => map.remove("servers").unwrap_or_default(),
+        Err(_) => {
+            let _ = amc_core::backup_corrupt_file(&path);
+            Vec::new()
+        }
+    }
 }
 
 pub fn save_favorites(root_dir: &Path, servers: &[FavoriteServerEntry]) -> Result<()> {
     let mut map = HashMap::new();
     map.insert("servers".to_string(), servers.to_vec());
     let text = serde_json::to_string_pretty(&map).map_err(LauncherError::Json)?;
-    std::fs::write(favorites_file(root_dir), text).map_err(|e| LauncherError::Io {
-        path: favorites_file(root_dir),
-        source: e,
+    let path = favorites_file(root_dir);
+    amc_core::write_atomic(&path, text.as_bytes()).map_err(|e| match e {
+        LauncherError::Io { source, .. } => LauncherError::Io {
+            path: favorites_file(root_dir),
+            source,
+        },
+        other => other,
     })?;
     Ok(())
 }

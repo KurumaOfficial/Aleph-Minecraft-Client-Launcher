@@ -146,18 +146,59 @@ impl AdoptiumInstaller {
                     {
                         let mut entry = entry_res
                             .map_err(|e| LauncherError::Java(format!("Tar entry error: {e}")))?;
+                        // Reject symlinks/hardlinks: they could point outside `dest_dir`.
+                        if entry.header().entry_type().is_symlink()
+                            || entry.header().entry_type().is_hard_link()
+                        {
+                            continue;
+                        }
                         let path = entry
                             .path()
                             .map_err(|e| LauncherError::Java(format!("Tar path error: {e}")))?;
 
+                        // Reject absolute paths and `..` before joining.
+                        if path.is_absolute()
+                            || path.components().any(|c| {
+                                matches!(
+                                    c,
+                                    std::path::Component::ParentDir
+                                        | std::path::Component::RootDir
+                                        | std::path::Component::Prefix(_)
+                                )
+                            })
+                        {
+                            continue;
+                        }
                         let mut components = path.components();
                         components.next();
                         let relative: PathBuf = components.collect();
                         if relative.as_os_str().is_empty() {
                             continue;
                         }
+                        // Reject `..` that survived stripping the top-level dir.
+                        if relative.components().any(|c| {
+                            matches!(
+                                c,
+                                std::path::Component::ParentDir
+                                    | std::path::Component::RootDir
+                                    | std::path::Component::Prefix(_)
+                            )
+                        }) {
+                            continue;
+                        }
 
-                        let out = dest_dir.join(relative);
+                        let out = dest_dir.join(&relative);
+                        // Final containment check after join.
+                        if !out.starts_with(&dest_dir) {
+                            continue;
+                        }
+                        if entry.header().entry_type().is_dir() {
+                            fs::create_dir_all(&out).map_err(|e| LauncherError::Io {
+                                path: out.clone(),
+                                source: e,
+                            })?;
+                            continue;
+                        }
                         if let Some(parent) = out.parent() {
                             fs::create_dir_all(parent).map_err(|e| LauncherError::Io {
                                 path: parent.to_path_buf(),

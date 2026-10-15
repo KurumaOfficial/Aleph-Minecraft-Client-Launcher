@@ -1,6 +1,7 @@
 pub mod autostart;
 pub mod config;
 pub mod error;
+pub mod fs;
 pub mod hardware;
 pub mod health;
 pub mod i18n;
@@ -17,6 +18,7 @@ pub use config::{
     AfterLaunch, AppMode, LaunchHotkey, LauncherConfig, NotifSettings, TabHotkeyMod, UiSettings,
 };
 pub use error::{LauncherError, Result};
+pub use fs::{backup_corrupt_file, sanitize_remote_filename, write_atomic};
 pub use hardware::{free_disk_mb, HardwareReport};
 pub use health::{HealthCheck, HealthReport};
 pub use i18n::Language;

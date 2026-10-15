@@ -282,32 +282,17 @@ impl LauncherConfig {
             source: e,
         })?;
 
-        let config = serde_json::from_str(&content).map_err(LauncherError::Json)?;
+        let config = serde_json::from_str(&content).map_err(|e| {
+            let _ = crate::fs::backup_corrupt_file(path);
+            LauncherError::Json(e)
+        })?;
         Ok(config)
     }
 
     pub fn save_to_path(&self, path: &Path) -> Result<()> {
-        if let Some(parent) = path.parent() {
-            if !parent.as_os_str().is_empty() {
-                fs::create_dir_all(parent).map_err(|e| LauncherError::Io {
-                    path: parent.to_path_buf(),
-                    source: e,
-                })?;
-            }
-        }
-
         let content = serde_json::to_string_pretty(self).map_err(LauncherError::Json)?;
         // Atomic write: a crash mid-save must never leave a truncated config.
-        // `tmp` lives next to `path`, so `rename` stays on one filesystem.
-        let tmp_path = path.with_extension("tmp");
-        fs::write(&tmp_path, &content).map_err(|e| LauncherError::Io {
-            path: tmp_path.clone(),
-            source: e,
-        })?;
-        fs::rename(&tmp_path, path).map_err(|e| LauncherError::Io {
-            path: path.to_path_buf(),
-            source: e,
-        })?;
+        crate::fs::write_atomic(path, content.as_bytes())?;
         Ok(())
     }
 }

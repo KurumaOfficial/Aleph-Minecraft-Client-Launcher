@@ -98,10 +98,7 @@ pub fn import_bundle(root: &Path, pack: &Path) -> Result<Vec<String>> {
     let mut restored = Vec::new();
     for (name, bytes) in staged {
         let dest = root.join(&name);
-        std::fs::write(&dest, &bytes).map_err(|e| LauncherError::Io {
-            path: dest,
-            source: e,
-        })?;
+        crate::fs::write_atomic(&dest, &bytes)?;
         restored.push(name);
     }
     Ok(restored)

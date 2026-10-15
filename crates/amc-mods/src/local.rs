@@ -99,11 +99,17 @@ impl LocalModManager {
     fn read_jar_metadata(path: &Path) -> Option<(String, String, String, String)> {
         let file = File::open(path).ok()?;
         let mut archive = ZipArchive::new(file).ok()?;
+        // Bound metadata reads so a hostile jar cannot OOM the scanner.
+        const MAX_META_BYTES: u64 = 256 * 1024;
 
         // 1. Try fabric.mod.json
-        if let Ok(mut entry) = archive.by_name("fabric.mod.json") {
+        if let Ok(entry) = archive.by_name("fabric.mod.json") {
             let mut content = String::new();
-            if entry.read_to_string(&mut content).is_ok() {
+            if entry
+                .take(MAX_META_BYTES)
+                .read_to_string(&mut content)
+                .is_ok()
+            {
                 if let Ok(meta) = serde_json::from_str::<FabricModMetadata>(&content) {
                     let name = meta.name.unwrap_or_else(|| meta.id.clone());
                     let ver = meta.version.unwrap_or_else(|| "1.0.0".into());
@@ -114,9 +120,13 @@ impl LocalModManager {
         }
 
         // 2. Try META-INF/mods.toml (Forge / NeoForge)
-        if let Ok(mut entry) = archive.by_name("META-INF/mods.toml") {
+        if let Ok(entry) = archive.by_name("META-INF/mods.toml") {
             let mut content = String::new();
-            if entry.read_to_string(&mut content).is_ok() {
+            if entry
+                .take(MAX_META_BYTES)
+                .read_to_string(&mut content)
+                .is_ok()
+            {
                 // Simple regex-free key extraction
                 let mut mod_id = String::new();
                 let mut display_name = String::new();
@@ -169,9 +179,13 @@ impl LocalModManager {
         }
 
         // 3. Try mcmod.info (Legacy Forge)
-        if let Ok(mut entry) = archive.by_name("mcmod.info") {
+        if let Ok(entry) = archive.by_name("mcmod.info") {
             let mut content = String::new();
-            if entry.read_to_string(&mut content).is_ok() {
+            if entry
+                .take(MAX_META_BYTES)
+                .read_to_string(&mut content)
+                .is_ok()
+            {
                 if let Ok(list) = serde_json::from_str::<Vec<McModInfoEntry>>(&content) {
                     if let Some(m) = list.first() {
                         let name = m.name.clone().unwrap_or_else(|| m.modid.clone());

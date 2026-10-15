@@ -263,8 +263,11 @@ impl VersionDetails {
             .map_err(|e| LauncherError::Network(format!("Ошибка чтения тела версии: {e}")))?;
         let details = Self::parse(&text)?;
 
-        let _ = tokio::fs::create_dir_all(&version_dir).await;
-        let _ = tokio::fs::write(&version_json_path, &text).await;
+        if let Err(e) = tokio::fs::create_dir_all(&version_dir).await {
+            tracing::warn!("version cache dir failed: {e}");
+        } else if let Err(e) = tokio::fs::write(&version_json_path, &text).await {
+            tracing::warn!("version cache write failed: {e}");
+        }
 
         Ok(details)
     }

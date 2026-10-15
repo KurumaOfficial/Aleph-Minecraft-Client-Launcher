@@ -304,7 +304,9 @@ impl LauncherApp {
             applied = true;
         }
         if applied {
-            let _ = Instance::save_all(&instances_file, &disk);
+            if let Err(e) = Instance::save_all(&instances_file, &disk) {
+                tracing::warn!("instances save failed: {e}");
+            }
         }
         if let Some(inst) = instances.iter_mut().find(|i| i.id == inst_id) {
             if applied {
@@ -317,7 +319,9 @@ impl LauncherApp {
                 inst.total_played_minutes += mins;
                 inst.sessions += 1;
                 inst.last_played = Some(now);
-                let _ = Instance::save_all(&instances_file, instances);
+                if let Err(e) = Instance::save_all(&instances_file, instances) {
+                    tracing::warn!("instances save failed: {e}");
+                }
             }
         }
     }
@@ -330,7 +334,9 @@ impl LauncherApp {
         let mut disk = Instance::load_all(&file).unwrap_or_default();
         if let Some(inst) = disk.iter_mut().find(|i| i.id == inst_id) {
             inst.loader_version = Some(ver.to_string());
-            let _ = Instance::save_all(&file, &disk);
+            if let Err(e) = Instance::save_all(&file, &disk) {
+                tracing::warn!("instances save failed: {e}");
+            }
         }
     }
 
@@ -395,7 +401,9 @@ impl LauncherApp {
             };
         }
         self.config.first_run = false;
-        let _ = self.config.save_to_path(&self.paths.config_file());
+        if let Err(e) = self.config.save_to_path(&self.paths.config_file()) {
+            tracing::warn!("config save failed: {e}");
+        }
         let report = HardwareReport::gather(&self.paths.root_dir);
         if report.is_weak() || report.is_low_disk() {
             self.hw_notice = Some(report);
@@ -408,7 +416,9 @@ impl LauncherApp {
                 self.mcreuse_path = Some(legacy);
             } else {
                 self.config.mc_reuse_done = true;
-                let _ = self.config.save_to_path(&self.paths.config_file());
+                if let Err(e) = self.config.save_to_path(&self.paths.config_file()) {
+                    tracing::warn!("config save failed: {e}");
+                }
             }
         }
     }
@@ -1096,6 +1106,8 @@ impl LauncherApp {
                 }
             }
             // Overrides tree (configs, resourcepacks, …).
+            let mut overrides_ok = 0usize;
+            let mut overrides_fail = 0usize;
             let overrides_done = (|| {
                 let zip_file = std::fs::File::open(&pack_path).ok()?;
                 let mut archive = zip::ZipArchive::new(zip_file).ok()?;
@@ -1106,21 +1118,43 @@ impl LauncherApp {
                         continue;
                     };
                     let Some(rel) = amc_mods::MrpackIndex::sanitize_path(rest) else {
+                        overrides_fail += 1;
                         continue;
                     };
                     if name.ends_with('/') {
                         continue;
                     }
                     let dest = base_dir.join(&rel);
-                    if let Some(parent) = dest.parent() {
-                        std::fs::create_dir_all(parent).ok()?;
+                    if !dest.starts_with(&base_dir) {
+                        overrides_fail += 1;
+                        continue;
                     }
-                    let mut out = std::fs::File::create(&dest).ok()?;
-                    std::io::copy(&mut entry, &mut out).ok()?;
+                    if let Some(parent) = dest.parent() {
+                        if std::fs::create_dir_all(parent).is_err() {
+                            overrides_fail += 1;
+                            continue;
+                        }
+                    }
+                    let mut out = match std::fs::File::create(&dest) {
+                        Ok(out) => out,
+                        Err(_) => {
+                            overrides_fail += 1;
+                            continue;
+                        }
+                    };
+                    if std::io::copy(&mut entry, &mut out).is_err() {
+                        overrides_fail += 1;
+                    } else {
+                        overrides_ok += 1;
+                    }
                 }
                 Some(())
             })();
-            let _ = overrides_done;
+            if overrides_done.is_none() || overrides_fail > 0 {
+                tracing::warn!(
+                    "mrpack overrides partial: {overrides_ok} ok, {overrides_fail} skipped/failed"
+                );
+            }
             let _ = tx
                 .send(Ok(InstallReport {
                     mod_id: format!("mrpack:{}", index.name),
@@ -1134,7 +1168,10 @@ impl LauncherApp {
                     loader_name: "minecraft".to_string(),
                 }))
                 .await;
-            let _ = ok_count;
+            tracing::info!(
+                "mrpack '{}' imported: {ok_count} files ok, overrides {overrides_ok} ok",
+                index.name
+            );
         });
     }
 
@@ -1173,7 +1210,16 @@ impl LauncherApp {
                         continue;
                     }
                 };
-                let dest = mods_dir.join(&resolved.filename);
+                let Some(safe_name) = amc_core::sanitize_remote_filename(&resolved.filename) else {
+                    tracing::warn!(
+                        "Curse pack file {}/{} skipped: unsafe filename",
+                        entry.project_id,
+                        entry.file_id
+                    );
+                    fail_count += 1;
+                    continue;
+                };
+                let dest = mods_dir.join(&safe_name);
                 let item = amc_downloader::DownloadItem::new(&resolved.url, &dest);
                 if engine
                     .download_one(&item, None, DownloadCancel::default())
@@ -1187,6 +1233,7 @@ impl LauncherApp {
             }
             // Overrides tree (configs, resourcepacks, …).
             let prefix = format!("{}/", manifest.overrides_dir());
+            let mut overrides_fail = 0usize;
             let overrides_done = (|| {
                 let zip_file = std::fs::File::open(&pack_path).ok()?;
                 let mut archive = zip::ZipArchive::new(zip_file).ok()?;
@@ -1197,21 +1244,42 @@ impl LauncherApp {
                         continue;
                     };
                     let Some(rel) = amc_mods::MrpackIndex::sanitize_path(rest) else {
+                        overrides_fail += 1;
                         continue;
                     };
                     if name.ends_with('/') {
                         continue;
                     }
                     let dest = base_dir.join(&rel);
-                    if let Some(parent) = dest.parent() {
-                        std::fs::create_dir_all(parent).ok()?;
+                    if !dest.starts_with(&base_dir) {
+                        overrides_fail += 1;
+                        continue;
                     }
-                    let mut out = std::fs::File::create(&dest).ok()?;
-                    std::io::copy(&mut entry, &mut out).ok()?;
+                    if let Some(parent) = dest.parent() {
+                        if std::fs::create_dir_all(parent).is_err() {
+                            overrides_fail += 1;
+                            continue;
+                        }
+                    }
+                    let mut out = match std::fs::File::create(&dest) {
+                        Ok(out) => out,
+                        Err(_) => {
+                            overrides_fail += 1;
+                            continue;
+                        }
+                    };
+                    if std::io::copy(&mut entry, &mut out).is_err() {
+                        overrides_fail += 1;
+                    }
                 }
                 Some(())
             })();
-            let _ = overrides_done;
+            if overrides_done.is_none() || overrides_fail > 0 {
+                tracing::warn!(
+                    "CurseForge pack '{}' overrides partial: {overrides_fail} skipped/failed",
+                    manifest.name
+                );
+            }
             tracing::info!(
                 "CurseForge pack '{}' imported: {ok_count} mods ok, {fail_count} failed",
                 manifest.name
@@ -1253,8 +1321,10 @@ impl LauncherApp {
                     .map_err(|e| e.to_string())?;
                 let selected = OptiFineLoader::select_patch(&versions)
                     .ok_or_else(|| format!("No OptiFine builds published for MC {mc_version}"))?;
-                let url = OptiFineLoader::download_url(&selected.filename);
-                let dest = mods_dir.join(&selected.filename);
+                let safe_name = amc_core::sanitize_remote_filename(&selected.filename)
+                    .ok_or_else(|| "Unsafe OptiFine filename".to_string())?;
+                let url = OptiFineLoader::download_url(&safe_name);
+                let dest = mods_dir.join(&safe_name);
                 if let Some(parent) = dest.parent() {
                     tokio::fs::create_dir_all(parent)
                         .await
@@ -1266,10 +1336,10 @@ impl LauncherApp {
                     .await
                     .map_err(|e| e.to_string())?;
                 Ok(InstallReport {
-                    mod_id: format!("optifine:{}", selected.filename),
+                    mod_id: format!("optifine:{safe_name}"),
                     title: "OptiFine".to_string(),
                     extra: Vec::new(),
-                    filenames: vec![selected.filename.clone()],
+                    filenames: vec![safe_name.clone()],
                     replaced_olds: Vec::new(),
                     instance_id,
                     target_dir: mods_dir.clone(),
@@ -1628,7 +1698,9 @@ impl LauncherApp {
     fn import_legacy_minecraft(&mut self, src: PathBuf) {
         self.mcreuse_path = None;
         self.config.mc_reuse_done = true;
-        let _ = self.config.save_to_path(&self.paths.config_file());
+        if let Err(e) = self.config.save_to_path(&self.paths.config_file()) {
+            tracing::warn!("config save failed: {e}");
+        }
         let (tx, rx) = mpsc::channel(1);
         self.mcreuse_rx = Some(rx);
         let paths = self.paths.clone();
@@ -1872,7 +1944,9 @@ impl LauncherApp {
         self.selected_version = Some(ver_id.clone());
         if self.config.selected_version.as_deref() != Some(ver_id.as_str()) {
             self.config.selected_version = Some(ver_id.clone());
-            let _ = self.config.save_to_path(&self.paths.config_file());
+            if let Err(e) = self.config.save_to_path(&self.paths.config_file()) {
+                tracing::warn!("config save failed: {e}");
+            }
         }
 
         let engine = self.download_engine.clone();
@@ -2910,10 +2984,12 @@ impl App for LauncherApp {
                                         inst.installed_by_launcher.retain(|n| n != old);
                                     }
                                 }
-                                let _ = Instance::save_all(
+                                if let Err(e) = Instance::save_all(
                                     &self.paths.instances_file(),
                                     &self.instances,
-                                );
+                                ) {
+                                    tracing::warn!("instances save failed: {e}");
+                                }
                             }
                         }
                         self.mods_page.local_mods =
@@ -3385,7 +3461,9 @@ impl App for LauncherApp {
                 Some(false) => {
                     self.mcreuse_path = None;
                     self.config.mc_reuse_done = true;
-                    let _ = self.config.save_to_path(&self.paths.config_file());
+                    if let Err(e) = self.config.save_to_path(&self.paths.config_file()) {
+                        tracing::warn!("config save failed: {e}");
+                    }
                 }
                 None => {}
             }
@@ -3422,7 +3500,9 @@ impl App for LauncherApp {
                         ui.add_space(8.0);
                         if ui.button(lang.tour_dismiss()).clicked() {
                             self.config.tour_seen = true;
-                            let _ = self.config.save_to_path(&self.paths.config_file());
+                            if let Err(e) = self.config.save_to_path(&self.paths.config_file()) {
+                                tracing::warn!("config save failed: {e}");
+                            }
                         }
                     });
             }
@@ -3593,7 +3673,10 @@ impl App for LauncherApp {
                             let _ = self.account_mgr.set_active(account_id);
                             if remember {
                                 self.config.remembered_identity = Some(account_id.to_string());
-                                let _ = self.config.save_to_path(&self.paths.config_file());
+                                if let Err(e) = self.config.save_to_path(&self.paths.config_file())
+                                {
+                                    tracing::warn!("config save failed: {e}");
+                                }
                             }
                             self.pending_identity_pick = false;
                             self.handle_launch();
@@ -3683,10 +3766,12 @@ impl App for LauncherApp {
                             InstanceAction::Created(inst) => {
                                 let _ = inst.ensure_directories(&self.paths.instances_dir());
                                 self.instances.push(inst);
-                                let _ = Instance::save_all(
+                                if let Err(e) = Instance::save_all(
                                     &self.paths.instances_file(),
                                     &self.instances,
-                                );
+                                ) {
+                                    tracing::warn!("instances save failed: {e}");
+                                }
                             }
                             InstanceAction::Updated(inst) => {
                                 if let Some(existing) =
@@ -3697,10 +3782,12 @@ impl App for LauncherApp {
                                 if self.selected_instance == Some(inst.id) {
                                     self.selected_version = Some(inst.game_version.clone());
                                 }
-                                let _ = Instance::save_all(
+                                if let Err(e) = Instance::save_all(
                                     &self.paths.instances_file(),
                                     &self.instances,
-                                );
+                                ) {
+                                    tracing::warn!("instances save failed: {e}");
+                                }
                             }
                             InstanceAction::Cloned(id, copy_saves) => {
                                 if let Some(inst) =
@@ -3725,10 +3812,12 @@ impl App for LauncherApp {
                                         let new_id = cloned.id;
                                         self.instances.push(cloned);
                                         self.selected_instance = Some(new_id);
-                                        let _ = Instance::save_all(
+                                        if let Err(e) = Instance::save_all(
                                             &self.paths.instances_file(),
                                             &self.instances,
-                                        );
+                                        ) {
+                                            tracing::warn!("instances save failed: {e}");
+                                        }
                                     }
                                 }
                             }
@@ -3748,10 +3837,12 @@ impl App for LauncherApp {
                                 if self.selected_instance == Some(id) {
                                     self.selected_instance = self.instances.first().map(|i| i.id);
                                 }
-                                let _ = Instance::save_all(
+                                if let Err(e) = Instance::save_all(
                                     &self.paths.instances_file(),
                                     &self.instances,
-                                );
+                                ) {
+                                    tracing::warn!("instances save failed: {e}");
+                                }
                             }
                             InstanceAction::Restored(id) => {
                                 match amc_core::restore_instance(
@@ -3763,10 +3854,12 @@ impl App for LauncherApp {
                                         let new_id = inst.id;
                                         self.instances.push(inst);
                                         self.selected_instance = Some(new_id);
-                                        let _ = Instance::save_all(
+                                        if let Err(e) = Instance::save_all(
                                             &self.paths.instances_file(),
                                             &self.instances,
-                                        );
+                                        ) {
+                                            tracing::warn!("instances save failed: {e}");
+                                        }
                                     }
                                     Err(e) => tracing::error!("Restore failed: {e}"),
                                 }
@@ -3823,10 +3916,12 @@ impl App for LauncherApp {
                         if let Some(id) = self.instances_page.loader_pin_reset.take() {
                             if let Some(inst) = self.instances.iter_mut().find(|i| i.id == id) {
                                 inst.loader_version = None;
-                                let _ = Instance::save_all(
+                                if let Err(e) = Instance::save_all(
                                     &self.paths.instances_file(),
                                     &self.instances,
-                                );
+                                ) {
+                                    tracing::warn!("instances save failed: {e}");
+                                }
                             }
                         }
                         // Desktop shortcut for direct instance launch
@@ -4023,12 +4118,16 @@ impl App for LauncherApp {
                             } else {
                                 self.config.pinned_mods.push(slug);
                             }
-                            let _ = self.config.save_to_path(&self.paths.config_file());
+                            if let Err(e) = self.config.save_to_path(&self.paths.config_file()) {
+                                tracing::warn!("config save failed: {e}");
+                            }
                         }
                         // Persist wishlist hearts.
                         if self.config.wishlist != self.wishlist_snapshot {
                             self.wishlist_snapshot = self.config.wishlist.clone();
-                            let _ = self.config.save_to_path(&self.paths.config_file());
+                            if let Err(e) = self.config.save_to_path(&self.paths.config_file()) {
+                                tracing::warn!("config save failed: {e}");
+                            }
                         }
 
                         if let Some((q, prov, cat, sort)) = search_req {
@@ -4075,7 +4174,9 @@ impl App for LauncherApp {
                             &self.server_status,
                         );
                         // Auto-save configuration changes
-                        let _ = self.config.save_to_path(&self.paths.config_file());
+                        if let Err(e) = self.config.save_to_path(&self.paths.config_file()) {
+                            tracing::warn!("config save failed: {e}");
+                        }
                     }
                 }
             });

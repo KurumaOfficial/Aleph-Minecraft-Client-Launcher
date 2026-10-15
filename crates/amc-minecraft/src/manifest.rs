@@ -60,9 +60,14 @@ impl VersionManifest {
 
             if let Some(cache_path) = &cache_file {
                 if let Some(parent) = cache_path.parent() {
-                    let _ = fs::create_dir_all(parent).await;
+                    if let Err(e) = fs::create_dir_all(parent).await {
+                        tracing::warn!("manifest cache dir failed: {e}");
+                    } else if let Err(e) = fs::write(cache_path, &text).await {
+                        tracing::warn!("manifest cache write failed: {e}");
+                    }
+                } else if let Err(e) = fs::write(cache_path, &text).await {
+                    tracing::warn!("manifest cache write failed: {e}");
                 }
-                let _ = fs::write(cache_path, &text).await;
             }
 
             Ok(manifest)
