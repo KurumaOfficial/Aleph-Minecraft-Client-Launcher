@@ -2,6 +2,7 @@ use crate::theme::{TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY};
 use amc_core::types::Instance;
 use amc_core::{HealthReport, Language};
 use egui::{vec2, Color32, ScrollArea, TextEdit};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
@@ -30,6 +31,15 @@ pub struct InstanceManage {
     cfg_text: String,
     cfg_filter: String,
     cfg_find: String,
+    // Cached directory listings (CONCEPT P10 60fps budget): directory
+    // walks never run per frame, at most every few seconds or after a
+    // mutation performed here.
+    cfg_files: Vec<PathBuf>,
+    saves_cache: Vec<String>,
+    backups_cache: HashMap<String, Vec<PathBuf>>,
+    archives_cache: Vec<PathBuf>,
+    lists_at: Option<std::time::Instant>,
+    lists_dirty: bool,
     // Health state.
     health: Option<HealthReport>,
 }
@@ -117,9 +127,17 @@ impl InstanceManage {
             self.cfg_text.clear();
             self.status = None;
             self.health = None;
+            self.lists_dirty = true;
         }
 
         let game_dir = inst.get_game_dir(instances_dir);
+        // Throttled listing refresh: directory walks never run per frame.
+        let lists_stale = self
+            .lists_at
+            .is_none_or(|at| at.elapsed() >= std::time::Duration::from_secs(3));
+        if self.lists_dirty || lists_stale {
+            self.refresh_lists(&game_dir, backups_root, &inst.name);
+        }
         let mut close = false;
         egui::Window::new(inst.name.clone())
             .collapsible(false)
@@ -184,8 +202,7 @@ impl InstanceManage {
         backups_root: &Path,
         lang: Language,
     ) {
-        let saves = amc_core::list_saves(game_dir);
-        if saves.is_empty() {
+        if self.saves_cache.is_empty() {
             ui.label(
                 egui::RichText::new(lang.world_no_saves())
                     .font(egui::FontId::proportional(13.0))
@@ -200,6 +217,7 @@ impl InstanceManage {
         );
         ui.add_space(6.0);
         let saves_dir = game_dir.join("saves");
+        let saves = self.saves_cache.clone();
         ScrollArea::vertical()
             .auto_shrink([false, false])
             .show(ui, |ui| {
@@ -221,6 +239,7 @@ impl InstanceManage {
                                 ) {
                                     Ok(path) => {
                                         self.status = Some(path.to_string_lossy().to_string());
+                                        self.lists_dirty = true;
                                     }
                                     Err(e) => {
                                         self.status = Some(format!("Backup failed: {e}"));
@@ -230,8 +249,18 @@ impl InstanceManage {
                         });
                     });
 
-                    let backups = amc_core::list_backups(backups_root, &inst.name, world);
-                    if backups.is_empty() {
+                    let no_backups;
+                    let backups: Vec<PathBuf> = match self.backups_cache.get(world) {
+                        Some(cached) => {
+                            no_backups = cached.is_empty();
+                            cached.clone()
+                        }
+                        None => {
+                            no_backups = true;
+                            Vec::new()
+                        }
+                    };
+                    if no_backups {
                         ui.label(
                             egui::RichText::new(format!("  {}", lang.world_no_backups()))
                                 .font(egui::FontId::proportional(11.0))
@@ -265,6 +294,7 @@ impl InstanceManage {
                         match amc_core::delete_backup(&path) {
                             Ok(()) => {
                                 self.status = Some(path.to_string_lossy().to_string());
+                                self.lists_dirty = true;
                             }
                             Err(e) => self.status = Some(format!("Delete failed: {e}")),
                         }
@@ -273,6 +303,7 @@ impl InstanceManage {
                         match amc_core::restore_world(&path, &saves_dir, world) {
                             Ok(()) => {
                                 self.status = Some(format!("{}: {world}", lang.editor_saved()));
+                                self.lists_dirty = true;
                             }
                             Err(e) => self.status = Some(format!("Restore failed: {e}")),
                         }
@@ -282,9 +313,34 @@ impl InstanceManage {
             });
     }
 
+    /// Re-scan configs, saves, backups and archives in one pass.
+    fn refresh_lists(&mut self, game_dir: &Path, backups_root: &Path, inst_name: &str) {
+        self.cfg_files = Self::list_configs(game_dir);
+        // Keep the selected file only if it still exists.
+        if let Some(selected) = self.cfg_selected.clone() {
+            if !self.cfg_files.contains(&selected) {
+                self.cfg_selected = None;
+                self.cfg_text.clear();
+            }
+        }
+        self.saves_cache = amc_core::list_saves(game_dir);
+        self.backups_cache = self
+            .saves_cache
+            .iter()
+            .map(|world| {
+                (
+                    world.clone(),
+                    amc_core::list_backups(backups_root, inst_name, world),
+                )
+            })
+            .collect();
+        self.archives_cache = list_archives(backups_root, inst_name);
+        self.lists_at = Some(std::time::Instant::now());
+        self.lists_dirty = false;
+    }
+
     fn show_configs(&mut self, ui: &mut egui::Ui, game_dir: &Path, lang: Language) {
-        let files = Self::list_configs(game_dir);
-        if files.is_empty() {
+        if self.cfg_files.is_empty() {
             ui.label(
                 egui::RichText::new(lang.editor_empty())
                     .font(egui::FontId::proportional(13.0))
@@ -304,11 +360,12 @@ impl InstanceManage {
         ui.add_space(4.0);
         let needle = self.cfg_filter.trim().to_lowercase();
         let visible: Vec<PathBuf> = if needle.is_empty() {
-            files
+            self.cfg_files.clone()
         } else {
-            files
-                .into_iter()
+            self.cfg_files
+                .iter()
                 .filter(|rel| rel.to_string_lossy().to_lowercase().contains(&needle))
+                .cloned()
                 .collect()
         };
         ui.horizontal(|ui| {
@@ -378,6 +435,7 @@ impl InstanceManage {
                         match std::fs::write(game_dir.join(&rel), &self.cfg_text) {
                             Ok(()) => {
                                 self.status = Some(lang.editor_saved().to_string());
+                                self.lists_dirty = true;
                             }
                             Err(e) => {
                                 self.status = Some(format!("Save failed: {e}"));
@@ -411,13 +469,15 @@ impl InstanceManage {
                         msg.push_str(&format!(" ({skipped} skipped)"));
                     }
                     self.status = Some(msg);
+                    self.lists_dirty = true;
                 }
                 Err(e) => self.status = Some(format!("Archive failed: {e}")),
             }
         }
         ui.add_space(8.0);
         let mut delete: Option<PathBuf> = None;
-        for archive in list_archives(backups_root, &inst.name) {
+        let archives = self.archives_cache.clone();
+        for archive in &archives {
             let label = archive.file_name().and_then(|n| n.to_str()).unwrap_or("?");
             let size = archive.metadata().map(|m| m.len()).unwrap_or(0);
             ui.horizontal(|ui| {
@@ -437,6 +497,7 @@ impl InstanceManage {
             match std::fs::remove_file(&path) {
                 Ok(()) => {
                     self.status = Some(path.to_string_lossy().to_string());
+                    self.lists_dirty = true;
                 }
                 Err(e) => self.status = Some(format!("Delete failed: {e}")),
             }

@@ -525,7 +525,8 @@ impl InstancesPage {
                     ui.spinner();
                 });
             }
-            for pack in self.discover.clone() {
+            let mut install: Option<String> = None;
+            for pack in &self.discover {
                 ui.horizontal(|ui| {
                     ui.label(
                         egui::RichText::new(truncate_name(&pack.title, 34))
@@ -547,10 +548,13 @@ impl InstancesPage {
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui.button(lang.discover_install()).clicked() {
-                            self.discover_install = Some(pack.id.clone());
+                            install = Some(pack.id.clone());
                         }
                     });
                 });
+            }
+            if let Some(slug) = install {
+                self.discover_install = Some(slug);
             }
             ui.add_space(8.0);
         }

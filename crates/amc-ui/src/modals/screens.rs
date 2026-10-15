@@ -7,16 +7,22 @@ use crate::theme::{BG_CARD, BORDER_DEFAULT, TEXT_MUTED};
 /// Screenshot gallery modal (CONCEPT "Скриншоты", P10): thumbnails from
 /// every instance's `screenshots/` folder, click opens externally,
 /// trash button deletes the file. Textures are cached per path and
-/// capped so huge galleries stay light.
+/// capped so huge galleries stay light. The file list itself refreshes
+/// on open, on delete and at most every few seconds — never per frame.
 #[derive(Default)]
 pub struct ScreensModal {
     pub open: bool,
     thumbs: HashMap<PathBuf, egui::TextureHandle>,
     failed: std::collections::HashSet<PathBuf>,
+    shots: Vec<PathBuf>,
+    shots_at: Option<std::time::Instant>,
 }
 
+/// Minimum interval between gallery rescans while open.
+const SHOTS_REFRESH: std::time::Duration = std::time::Duration::from_secs(3);
+
 /// Gallery outcome for the app shell (toast on delete).
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub enum ScreensAction {
     #[default]
     None,
@@ -61,10 +67,19 @@ impl ScreensModal {
         lang: amc_core::Language,
     ) -> ScreensAction {
         if !self.open {
+            // Forget the list while closed so the next open rescans.
+            self.shots_at = None;
             return ScreensAction::None;
+        }
+        // Throttled rescan: directory walks never run per frame.
+        let stale = self.shots_at.is_none_or(|at| at.elapsed() >= SHOTS_REFRESH);
+        if stale {
+            self.shots = list_shots(instances_dir);
+            self.shots_at = Some(std::time::Instant::now());
         }
         let mut close = false;
         let mut action = ScreensAction::None;
+        let mut deleted: Vec<PathBuf> = Vec::new();
         egui::Window::new(lang.screens_title())
             .collapsible(false)
             .resizable(true)
@@ -72,8 +87,7 @@ impl ScreensModal {
             .min_width(640.0)
             .default_size(vec2(680.0, 480.0))
             .show(ctx, |ui| {
-                let shots = list_shots(instances_dir);
-                if shots.is_empty() {
+                if self.shots.is_empty() {
                     ui.label(egui::RichText::new(lang.screens_empty()).color(TEXT_MUTED));
                 }
                 egui::ScrollArea::vertical()
@@ -81,10 +95,11 @@ impl ScreensModal {
                     .show(ui, |ui| {
                         ui.horizontal_wrapped(|ui| {
                             ui.spacing_mut().item_spacing = vec2(10.0, 10.0);
-                            for path in &shots {
+                            for i in 0..self.shots.len() {
+                                let path = self.shots[i].clone();
                                 ui.vertical(|ui| {
                                     ui.set_max_width(200.0);
-                                    let tex = self.thumb(ui.ctx(), path);
+                                    let tex = self.thumb(ui.ctx(), &path);
                                     let (rect, resp) =
                                         ui.allocate_exact_size(vec2(200.0, 120.0), Sense::click());
                                     ui.painter().rect_filled(rect, Rounding::ZERO, BG_CARD);
@@ -106,7 +121,7 @@ impl ScreensModal {
                                         );
                                     }
                                     if resp.clicked() {
-                                        let _ = open::that(path);
+                                        let _ = open::that(&path);
                                     }
                                     if resp.hovered() {
                                         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
@@ -135,11 +150,11 @@ impl ScreensModal {
                                                         egui::RichText::new("🗑").color(TEXT_MUTED),
                                                     )
                                                     .clicked()
-                                                    && std::fs::remove_file(path).is_ok()
+                                                    && std::fs::remove_file(&path).is_ok()
                                                 {
-                                                    self.thumbs.remove(path);
-                                                    self.failed.remove(path);
-                                                    action = ScreensAction::Deleted(path.clone());
+                                                    self.thumbs.remove(&path);
+                                                    self.failed.remove(&path);
+                                                    deleted.push(path);
                                                 }
                                             },
                                         );
@@ -158,6 +173,13 @@ impl ScreensModal {
             });
         if close {
             self.open = false;
+        }
+        // Evict deleted shots from the cached list immediately.
+        for gone in deleted {
+            self.shots.retain(|p| p != &gone);
+            if action == ScreensAction::None {
+                action = ScreensAction::Deleted(gone);
+            }
         }
         action
     }
