@@ -422,12 +422,9 @@ impl InstanceManage {
             let size = archive.metadata().map(|m| m.len()).unwrap_or(0);
             ui.horizontal(|ui| {
                 ui.label(
-                    egui::RichText::new(format!(
-                        "{label} ({})",
-                        crate::modals::format_history_bytes(size)
-                    ))
-                    .font(egui::FontId::monospace(11.0))
-                    .color(TEXT_MUTED),
+                    egui::RichText::new(format!("{label} ({})", lang.disk_size(size)))
+                        .font(egui::FontId::monospace(11.0))
+                        .color(TEXT_MUTED),
                 );
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.small_button(lang.world_delete()).clicked() {

@@ -24,20 +24,6 @@ impl Default for DownloadManager {
     }
 }
 
-/// Human size for one history row. Pure for tests.
-pub fn format_history_bytes(bytes: u64) -> String {
-    const KB: f64 = 1024.0;
-    const MB: f64 = 1024.0 * 1024.0;
-    let b = bytes as f64;
-    if b >= MB {
-        format!("{:.1} MB", b / MB)
-    } else if b >= KB {
-        format!("{:.1} KB", b / KB)
-    } else {
-        format!("{bytes} B")
-    }
-}
-
 impl DownloadManager {
     pub fn show(
         &mut self,
@@ -93,7 +79,7 @@ impl DownloadManager {
                                     egui::Layout::right_to_left(egui::Align::Center),
                                     |ui| {
                                         ui.label(
-                                            egui::RichText::new(format_history_bytes(record.bytes))
+                                            egui::RichText::new(lang.disk_size(record.bytes))
                                                 .font(egui::FontId::proportional(11.0))
                                                 .color(TEXT_MUTED),
                                         );
@@ -124,10 +110,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_format_history_bytes() {
-        assert_eq!(format_history_bytes(0), "0 B");
-        assert_eq!(format_history_bytes(512), "512 B");
-        assert_eq!(format_history_bytes(2048), "2.0 KB");
-        assert_eq!(format_history_bytes(5_242_880), "5.0 MB");
+    fn test_manager_action_default_is_none() {
+        assert!(matches!(ManagerAction::default(), ManagerAction::None));
     }
 }

@@ -74,7 +74,7 @@ impl DownloadOverlay {
                 // Speed, Bytes, ETA in one row
                 ui.horizontal(|ui| {
                     ui.label(
-                        egui::RichText::new(format!("💾 {}", progress.formatted_bytes()))
+                        egui::RichText::new(format!("💾 {}", progress.formatted_bytes(&lang)))
                             .font(egui::FontId::proportional(12.0))
                             .color(TEXT_PRIMARY),
                     );
@@ -82,7 +82,7 @@ impl DownloadOverlay {
                     ui.add_space(16.0);
 
                     ui.label(
-                        egui::RichText::new(format!("⚡ {}", progress.formatted_speed()))
+                        egui::RichText::new(format!("⚡ {}", progress.formatted_speed(&lang)))
                             .font(egui::FontId::proportional(12.0))
                             .color(RUBY_LIGHT),
                     );
@@ -90,7 +90,7 @@ impl DownloadOverlay {
                     ui.add_space(16.0);
 
                     ui.label(
-                        egui::RichText::new(format!("⏳ {}", progress.formatted_eta()))
+                        egui::RichText::new(format!("⏳ {}", progress.formatted_eta(&lang)))
                             .font(egui::FontId::proportional(12.0))
                             .color(TEXT_MUTED),
                     );

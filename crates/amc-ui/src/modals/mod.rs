@@ -7,7 +7,7 @@ pub mod screens;
 pub mod wizard;
 
 pub use console::ConsoleModal;
-pub use download_manager::{format_history_bytes, DownloadManager, ManagerAction};
+pub use download_manager::{DownloadManager, ManagerAction};
 pub use download_overlay::{DownloadOverlay, OverlayAction};
 pub use identity::{account_tag, IdentityPicker, PickerAction};
 pub use login::{LoginModal, LoginMode};

@@ -1,3 +1,4 @@
+use amc_core::Language;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
@@ -29,36 +30,26 @@ impl DownloadProgress {
         self.ratio() * 100.0
     }
 
-    pub fn formatted_speed(&self) -> String {
-        let speed = self.speed_bytes_per_sec;
-        if speed >= 1024.0 * 1024.0 {
-            format!("{:.2} МБ/с", speed / (1024.0 * 1024.0))
-        } else if speed >= 1024.0 {
-            format!("{:.1} КБ/с", speed / 1024.0)
-        } else {
-            format!("{:.0} Б/с", speed)
-        }
+    pub fn formatted_speed(&self, lang: &Language) -> String {
+        lang.speed_value(self.speed_bytes_per_sec)
     }
 
-    pub fn formatted_bytes(&self) -> String {
-        let dl = self.downloaded_bytes as f64 / (1024.0 * 1024.0);
-        let total = self.total_bytes as f64 / (1024.0 * 1024.0);
+    pub fn formatted_bytes(&self, lang: &Language) -> String {
         if self.total_bytes > 0 {
-            format!("{:.1} / {:.1} МБ", dl, total)
+            format!(
+                "{} / {}",
+                lang.disk_size(self.downloaded_bytes),
+                lang.disk_size(self.total_bytes)
+            )
         } else {
-            format!("{:.1} МБ", dl)
+            lang.disk_size(self.downloaded_bytes)
         }
     }
 
-    pub fn formatted_eta(&self) -> String {
-        if let Some(secs) = self.eta_seconds {
-            if secs >= 60 {
-                format!("{} мин {} сек", secs / 60, secs % 60)
-            } else {
-                format!("{} сек", secs)
-            }
-        } else {
-            "--".to_string()
+    pub fn formatted_eta(&self, lang: &Language) -> String {
+        match self.eta_seconds {
+            Some(secs) => lang.eta_text(secs),
+            None => "--".to_string(),
         }
     }
 }
@@ -163,5 +154,45 @@ impl ProgressTracker {
         self.sender.send_modify(|p| {
             p.completed_files = completed;
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn progress(downloaded: u64, total: u64, speed: f64, eta: Option<u64>) -> DownloadProgress {
+        DownloadProgress {
+            total_bytes: total,
+            downloaded_bytes: downloaded,
+            speed_bytes_per_sec: speed,
+            current_file: String::new(),
+            completed_files: 0,
+            total_files: 0,
+            eta_seconds: eta,
+        }
+    }
+
+    #[test]
+    fn test_ratio_and_percent() {
+        let p = progress(25, 100, 0.0, None);
+        assert!((p.ratio() - 0.25).abs() < 1e-6);
+        assert!((p.percent() - 25.0).abs() < 1e-4);
+        assert_eq!(progress(0, 0, 0.0, None).ratio(), 0.0);
+        assert_eq!(progress(200, 100, 0.0, None).ratio(), 1.0);
+    }
+
+    #[test]
+    fn test_formatted_units_follow_language() {
+        let en = Language::English;
+        let ru = Language::Russian;
+        let p = progress(1_048_576, 2_097_152, 2_097_152.0, Some(90));
+        assert_eq!(p.formatted_speed(&en), "2.0 MB/s");
+        assert_eq!(p.formatted_speed(&ru), "2,0 МБ/с");
+        assert_eq!(p.formatted_bytes(&en), "1.0 MB / 2.0 MB");
+        assert_eq!(p.formatted_bytes(&ru), "1,0 МБ / 2,0 МБ");
+        assert_eq!(p.formatted_eta(&en), "1 min 30 sec");
+        assert_eq!(p.formatted_eta(&ru), "1 мин 30 сек");
+        assert_eq!(progress(0, 0, 512.0, None).formatted_eta(&en), "--");
     }
 }

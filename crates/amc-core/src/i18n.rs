@@ -2710,6 +2710,58 @@ impl Language {
         }
     }
 
+    /// Per-second transfer rate (CONCEPT P3 progress display).
+    pub fn speed_value(&self, bytes_per_sec: f64) -> String {
+        const KB: f64 = 1024.0;
+        const MB: f64 = 1024.0 * 1024.0;
+        if bytes_per_sec >= MB {
+            let unit = match self {
+                Self::English => "MB/s",
+                Self::Russian | Self::Ukrainian => "МБ/с",
+            };
+            format!("{} {unit}", Self::one_decimal(bytes_per_sec / MB, self))
+        } else if bytes_per_sec >= KB {
+            let unit = match self {
+                Self::English => "KB/s",
+                Self::Russian | Self::Ukrainian => "КБ/с",
+            };
+            format!("{} {unit}", Self::one_decimal(bytes_per_sec / KB, self))
+        } else {
+            let unit = match self {
+                Self::English => "B/s",
+                Self::Russian | Self::Ukrainian => "Б/с",
+            };
+            format!("{:.0} {unit}", bytes_per_sec)
+        }
+    }
+
+    /// Countdown text for an ETA in seconds.
+    pub fn eta_text(&self, secs: u64) -> String {
+        match self {
+            Self::English => {
+                if secs >= 60 {
+                    format!("{} min {} sec", secs / 60, secs % 60)
+                } else {
+                    format!("{secs} sec")
+                }
+            }
+            Self::Russian => {
+                if secs >= 60 {
+                    format!("{} мин {} сек", secs / 60, secs % 60)
+                } else {
+                    format!("{secs} сек")
+                }
+            }
+            Self::Ukrainian => {
+                if secs >= 60 {
+                    format!("{} хв {} сек", secs / 60, secs % 60)
+                } else {
+                    format!("{secs} сек")
+                }
+            }
+        }
+    }
+
     pub fn status_download_cancelled(&self) -> &'static str {
         match self {
             Self::English => "Download cancelled",
@@ -3736,6 +3788,8 @@ mod tests {
             assert!(!lang.dlman_title().is_empty());
             assert!(!lang.dlman_empty().is_empty());
             assert!(!lang.dlman_clear().is_empty());
+            assert!(!lang.speed_value(1024.0).is_empty());
+            assert!(!lang.eta_text(90).is_empty());
             assert!(!lang.status_loader_profile("Fabric", "0.15.11").is_empty());
             assert!(!lang.err_version_failed("1.20.1", "x").is_empty());
             assert!(!lang.err_java_failed("17", "x").is_empty());
