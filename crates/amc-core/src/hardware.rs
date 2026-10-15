@@ -15,6 +15,24 @@ pub const MIN_RAM_MB: u64 = 4096;
 pub const MIN_CPU_THREADS: u32 = 4;
 /// Free-space warning threshold for the game directory drive.
 pub const MIN_FREE_DISK_MB: u64 = 2048;
+/// Bounds for the hardware-picked default instance RAM (CONCEPT
+/// "RAM подбирается автоматически"): never starve the OS, never
+/// overcommit on small machines.
+pub const AUTO_RAM_MIN_MB: u32 = 1024;
+pub const AUTO_RAM_MAX_MB: u32 = 8192;
+
+/// Default heap for a new instance from total machine RAM: a quarter
+/// of memory clamped to `[AUTO_RAM_MIN_MB, AUTO_RAM_MAX_MB]` and
+/// rounded down to 512 MB steps. Unknown hardware falls back to 4096
+/// (the historical default).
+pub fn suggested_default_ram_mb(total_ram_mb: Option<u64>) -> u32 {
+    let Some(total) = total_ram_mb else {
+        return 4096;
+    };
+    let quarter = total / 4;
+    let clamped = quarter.clamp(AUTO_RAM_MIN_MB as u64, AUTO_RAM_MAX_MB as u64);
+    ((clamped / 512) * 512).max(AUTO_RAM_MIN_MB as u64) as u32
+}
 
 /// Best-effort snapshot of the machine. Fields are `Option` when the OS
 /// refused to answer — callers must treat `None` as "unknown, not weak".
@@ -177,5 +195,16 @@ mod tests {
     fn test_gather_never_panics_and_reports_threads() {
         let report = HardwareReport::gather(&std::env::temp_dir());
         assert!(report.cpu_threads >= 1);
+    }
+
+    #[test]
+    fn test_suggested_default_ram() {
+        assert_eq!(suggested_default_ram_mb(None), 4096);
+        assert_eq!(suggested_default_ram_mb(Some(4096)), 1024);
+        assert_eq!(suggested_default_ram_mb(Some(8192)), 2048);
+        assert_eq!(suggested_default_ram_mb(Some(16384)), 4096);
+        assert_eq!(suggested_default_ram_mb(Some(65536)), 8192);
+        // Steps of 512: 10 GiB -> 2560.
+        assert_eq!(suggested_default_ram_mb(Some(10240)), 2560);
     }
 }

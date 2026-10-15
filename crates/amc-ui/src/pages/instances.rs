@@ -39,6 +39,8 @@ pub struct InstancesContext<'a> {
     pub accounts: &'a [Account],
     /// Defined + used group names for the edit-modal hint (CONCEPT P2).
     pub group_names: Vec<String>,
+    /// Hardware-picked default RAM for the create dialog (CONCEPT P2).
+    pub suggested_ram_mb: u32,
 }
 
 pub struct InstancesPage {
@@ -432,6 +434,7 @@ impl InstancesPage {
             );
 
             if cr_resp.clicked() {
+                self.new_instance_ram = ctx.suggested_ram_mb;
                 self.show_create_modal = true;
             }
         });
@@ -583,6 +586,7 @@ impl InstancesPage {
                             .button(egui::RichText::new(lang.inst_btn_create()).color(RUBY_LIGHT))
                             .clicked()
                         {
+                            self.new_instance_ram = ctx.suggested_ram_mb;
                             self.show_create_modal = true;
                         }
                     });

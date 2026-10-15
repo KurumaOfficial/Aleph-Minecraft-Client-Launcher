@@ -49,6 +49,9 @@ pub struct LauncherApp {
     /// One-shot mod update check shortly after startup (CONCEPT P4
     /// "лаунчер уведомляет"): offers arrive as usual, no extra UI.
     startup_update_checked: bool,
+    /// Hardware-picked default RAM for new instances (CONCEPT P2),
+    /// gathered once at startup.
+    hw_suggested_ram: u32,
     launch_status_text: String,
 
     // Pages
@@ -176,6 +179,10 @@ impl LauncherApp {
         // struct literal moves them.
         let wishlist_snapshot = config.wishlist.clone();
         let favorites = amc_minecraft::load_favorites(&paths.root_dir);
+        // Hardware-picked default RAM for new instances (CONCEPT P2).
+        let hw_suggested_ram = amc_core::hardware::suggested_default_ram_mb(
+            amc_core::HardwareReport::gather(&paths.root_dir).total_ram_mb,
+        );
         // Rollback stash survives restarts (CONCEPT P4): reflect it on the
         // Mods page from the first frame instead of after the first update.
         let backups_root = config
@@ -198,6 +205,7 @@ impl LauncherApp {
             instances,
             is_launching: false,
             startup_update_checked: false,
+            hw_suggested_ram,
             launch_status_text: lang.status_preparing().to_string(),
             home_page: HomePage::default(),
             instances_page: InstancesPage::default(),
@@ -3568,6 +3576,7 @@ impl App for LauncherApp {
                                 &self.config.instance_groups,
                                 &self.instances,
                             ),
+                            suggested_ram_mb: self.hw_suggested_ram,
                         };
                         let action = self.instances_page.show(
                             &mut content_ui,
