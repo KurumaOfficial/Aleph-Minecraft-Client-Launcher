@@ -109,7 +109,7 @@ impl LoginModal {
                         let btn_stroke = lerp_color(RUBY_LIGHT, Color32::WHITE, btn_hover);
 
                         ui.painter().rect_filled(btn_rect, Rounding::ZERO, btn_bg);
-                        ui.painter().rect_stroke(btn_rect, Rounding::ZERO, Stroke::new(1.0, btn_stroke));
+                        ui.painter().rect_stroke(btn_rect, Rounding::ZERO, Stroke::new(1.0_f32, btn_stroke));
                         ui.painter().text(
                             btn_rect.center(),
                             egui::Align2::CENTER_CENTER,
@@ -160,7 +160,7 @@ impl LoginModal {
                                 .color(Color32::WHITE),
                         )
                         .fill(RUBY)
-                        .stroke(Stroke::new(1.0, RUBY_LIGHT))
+                        .stroke(Stroke::new(1.0_f32, RUBY_LIGHT))
                         .min_size(vec2(ui.available_width(), 40.0));
 
                         if ui.add(btn).clicked() {
@@ -188,7 +188,7 @@ impl LoginModal {
                             ui.vertical_centered(|ui| {
                                 let (rect, _) = ui.allocate_exact_size(vec2(260.0, 50.0), egui::Sense::hover());
                                 ui.painter().rect_filled(rect, Rounding::ZERO, BG_HOVER);
-                                ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(2.0, RUBY));
+                                ui.painter().rect_stroke(rect, Rounding::ZERO, Stroke::new(2.0_f32, RUBY));
                                 ui.painter().text(
                                     rect.center(),
                                     egui::Align2::CENTER_CENTER,
@@ -240,7 +240,7 @@ impl LoginModal {
                                     .color(Color32::WHITE),
                             )
                             .fill(RUBY)
-                            .stroke(Stroke::new(1.0, RUBY_LIGHT))
+                            .stroke(Stroke::new(1.0_f32, RUBY_LIGHT))
                             .min_size(vec2(ui.available_width(), 40.0));
 
                             if ui.add(btn).clicked() {
@@ -285,7 +285,7 @@ impl LoginModal {
 
         ui.painter().rect_filled(rect, Rounding::ZERO, bg);
         ui.painter()
-            .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
+            .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0_f32, stroke_col));
         ui.painter().text(
             rect.center(),
             egui::Align2::CENTER_CENTER,

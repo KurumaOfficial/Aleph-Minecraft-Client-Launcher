@@ -26,7 +26,7 @@ impl Sidebar {
         ui.painter().rect_filled(rect, Rounding::ZERO, BG_ELEVATED);
         ui.painter().line_segment(
             [rect.right_top(), rect.right_bottom()],
-            Stroke::new(1.0, BORDER_DEFAULT),
+            Stroke::new(1.0_f32, BORDER_DEFAULT),
         );
 
         ui.vertical(|ui| {
@@ -75,7 +75,7 @@ impl Sidebar {
                     Pos2::new(rect.left(), sep_y),
                     Pos2::new(rect.right(), sep_y),
                 ],
-                Stroke::new(1.0, BORDER_SUBTLE),
+                Stroke::new(1.0_f32, BORDER_SUBTLE),
             );
             ui.add_space(8.0);
 
@@ -102,7 +102,7 @@ impl Sidebar {
         // Subtle bottom border
         ui.painter().line_segment(
             [rect.left_bottom(), rect.right_bottom()],
-            Stroke::new(1.0, BORDER_SUBTLE),
+            Stroke::new(1.0_f32, BORDER_SUBTLE),
         );
 
         let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
@@ -123,7 +123,7 @@ impl Sidebar {
 
         ui.painter().rect_filled(sq_rect, Rounding::ZERO, sq_bg);
         ui.painter()
-            .rect_stroke(sq_rect, Rounding::ZERO, Stroke::new(1.5, sq_stroke));
+            .rect_stroke(sq_rect, Rounding::ZERO, Stroke::new(1.5_f32, sq_stroke));
 
         // Central 'ℵ' glyph
         ui.painter().text(

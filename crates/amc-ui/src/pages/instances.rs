@@ -424,7 +424,7 @@ impl InstancesPage {
 
             ui.painter().rect_filled(cr_rect, Rounding::ZERO, cr_bg);
             ui.painter()
-                .rect_stroke(cr_rect, Rounding::ZERO, Stroke::new(1.0, cr_stroke));
+                .rect_stroke(cr_rect, Rounding::ZERO, Stroke::new(1.0_f32, cr_stroke));
             ui.painter().text(
                 cr_rect.center(),
                 egui::Align2::CENTER_CENTER,
@@ -649,7 +649,7 @@ impl InstancesPage {
 
             let stroke_col =
                 lerp_color(lerp_color(BORDER_DEFAULT, RUBY, hover_t), RUBY_LIGHT, sel_t);
-            let border_width = if is_selected { 1.5 } else { 1.0 };
+            let border_width = if is_selected { 1.5_f32 } else { 1.0_f32 };
 
             ui.painter().rect_filled(rect, Rounding::ZERO, bg);
 
@@ -886,7 +886,7 @@ impl InstancesPage {
 
             card.painter().rect_filled(pb_rect, Rounding::ZERO, pb_bg);
             card.painter()
-                .rect_stroke(pb_rect, Rounding::ZERO, Stroke::new(1.0, pb_stroke));
+                .rect_stroke(pb_rect, Rounding::ZERO, Stroke::new(1.0_f32, pb_stroke));
             card.painter().text(
                 pb_rect.center(),
                 egui::Align2::CENTER_CENTER,

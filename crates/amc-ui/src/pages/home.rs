@@ -165,7 +165,7 @@ impl HomePage {
 
             ui.painter().rect_filled(sort_rect, Rounding::ZERO, sort_bg);
             ui.painter()
-                .rect_stroke(sort_rect, Rounding::ZERO, Stroke::new(1.0, sort_stroke));
+                .rect_stroke(sort_rect, Rounding::ZERO, Stroke::new(1.0_f32, sort_stroke));
             ui.painter().text(
                 sort_rect.center(),
                 egui::Align2::CENTER_CENTER,
@@ -278,7 +278,7 @@ impl HomePage {
 
                     let stroke_col =
                         lerp_color(lerp_color(BORDER_DEFAULT, RUBY, hover_t), RUBY_LIGHT, sel_t);
-                    let border_width = if is_selected { 1.5 } else { 1.0 };
+                    let border_width = if is_selected { 1.5_f32 } else { 1.0_f32 };
 
                     ui.painter().rect_filled(rect, Rounding::ZERO, bg);
                     ui.painter().rect_stroke(
@@ -867,7 +867,7 @@ impl HomePage {
 
         ui.painter().rect_filled(rect, Rounding::ZERO, bg);
         ui.painter()
-            .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
+            .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0_f32, stroke_col));
         ui.painter().text(
             rect.center(),
             egui::Align2::CENTER_CENTER,

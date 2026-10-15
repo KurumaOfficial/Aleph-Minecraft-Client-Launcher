@@ -68,7 +68,7 @@ impl SkinsPage {
 
         ui.painter().rect_filled(rect, Rounding::ZERO, BG_ELEVATED);
         ui.painter()
-            .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, BORDER_DEFAULT));
+            .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0_f32, BORDER_DEFAULT));
 
         let mut child = ui.new_child(
             egui::UiBuilder::new()
@@ -105,7 +105,7 @@ impl SkinsPage {
 
             ui.painter().rect_filled(cb_rect, Rounding::ZERO, cb_bg);
             ui.painter()
-                .rect_stroke(cb_rect, Rounding::ZERO, Stroke::new(1.0, cb_stroke));
+                .rect_stroke(cb_rect, Rounding::ZERO, Stroke::new(1.0_f32, cb_stroke));
             ui.painter().text(
                 cb_rect.center(),
                 egui::Align2::CENTER_CENTER,
@@ -139,7 +139,7 @@ impl SkinsPage {
 
             ui.painter().rect_filled(sb_rect, Rounding::ZERO, sb_bg);
             ui.painter()
-                .rect_stroke(sb_rect, Rounding::ZERO, Stroke::new(1.0, sb_stroke));
+                .rect_stroke(sb_rect, Rounding::ZERO, Stroke::new(1.0_f32, sb_stroke));
             ui.painter().text(
                 sb_rect.center(),
                 egui::Align2::CENTER_CENTER,
@@ -165,7 +165,7 @@ impl SkinsPage {
                 .rect_filled(img_rect, Rounding::ZERO, BG_HOVER);
             child
                 .painter()
-                .rect_stroke(img_rect, Rounding::ZERO, Stroke::new(1.0, BORDER_STRONG));
+                .rect_stroke(img_rect, Rounding::ZERO, Stroke::new(1.0_f32, BORDER_STRONG));
             child.painter().image(
                 tex.id(),
                 img_rect,
@@ -198,7 +198,7 @@ impl SkinsPage {
 
             ui.painter().rect_filled(up_rect, Rounding::ZERO, up_bg);
             ui.painter()
-                .rect_stroke(up_rect, Rounding::ZERO, Stroke::new(1.0, up_stroke));
+                .rect_stroke(up_rect, Rounding::ZERO, Stroke::new(1.0_f32, up_stroke));
             ui.painter().text(
                 up_rect.center(),
                 egui::Align2::CENTER_CENTER,
@@ -240,7 +240,7 @@ impl SkinsPage {
 
             ui.painter().rect_filled(rs_rect, Rounding::ZERO, rs_bg);
             ui.painter()
-                .rect_stroke(rs_rect, Rounding::ZERO, Stroke::new(1.0, rs_stroke));
+                .rect_stroke(rs_rect, Rounding::ZERO, Stroke::new(1.0_f32, rs_stroke));
             ui.painter().text(
                 rs_rect.center(),
                 egui::Align2::CENTER_CENTER,

@@ -22,7 +22,7 @@ impl TitleBar {
         // Draw bottom separator
         ui.painter().line_segment(
             [bar_rect.left_bottom(), bar_rect.right_bottom()],
-            Stroke::new(1.0, BORDER_SUBTLE),
+            Stroke::new(1.0_f32, BORDER_SUBTLE),
         );
 
         // 6 buttons on right: Gallery, Downloads, Console, Minimize, Maximize, Close

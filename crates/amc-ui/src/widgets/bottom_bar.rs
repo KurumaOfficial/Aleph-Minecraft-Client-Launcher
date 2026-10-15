@@ -32,7 +32,7 @@ impl BottomBar {
             .rect_filled(bar_rect, Rounding::ZERO, BG_ELEVATED);
         ui.painter().line_segment(
             [bar_rect.left_top(), bar_rect.right_top()],
-            Stroke::new(1.0, BORDER_DEFAULT),
+            Stroke::new(1.0_f32, BORDER_DEFAULT),
         );
 
         let right_width = 280.0;
@@ -62,7 +62,7 @@ impl BottomBar {
             .rect_filled(av_rect, Rounding::ZERO, RUBY_DIM);
         left_ui
             .painter()
-            .rect_stroke(av_rect, Rounding::ZERO, Stroke::new(2.0, RUBY));
+            .rect_stroke(av_rect, Rounding::ZERO, Stroke::new(2.0_f32, RUBY));
 
         if let Some(tex) = avatar_texture {
             left_ui.painter().image(
@@ -134,7 +134,7 @@ impl BottomBar {
             .rect_filled(login_rect, Rounding::ZERO, login_bg);
         left_ui
             .painter()
-            .rect_stroke(login_rect, Rounding::ZERO, Stroke::new(1.0, login_stroke));
+            .rect_stroke(login_rect, Rounding::ZERO, Stroke::new(1.0_f32, login_stroke));
         left_ui.painter().text(
             login_rect.center(),
             egui::Align2::CENTER_CENTER,
@@ -179,7 +179,7 @@ impl BottomBar {
             .rect_filled(pa_rect, Rounding::ZERO, pa_bg);
         right_ui
             .painter()
-            .rect_stroke(pa_rect, Rounding::ZERO, Stroke::new(1.5, pa_stroke));
+            .rect_stroke(pa_rect, Rounding::ZERO, Stroke::new(1.5_f32, pa_stroke));
         right_ui.painter().text(
             pa_rect.center(),
             egui::Align2::CENTER_CENTER,
@@ -228,7 +228,7 @@ impl BottomBar {
             .rect_filled(pm_rect, Rounding::ZERO, pm_bg);
         right_ui
             .painter()
-            .rect_stroke(pm_rect, Rounding::ZERO, Stroke::new(2.0, stroke_col));
+            .rect_stroke(pm_rect, Rounding::ZERO, Stroke::new(2.0_f32, stroke_col));
 
         // When launching: render sleek animated top scan-line (runs only during launch!)
         if is_launching {

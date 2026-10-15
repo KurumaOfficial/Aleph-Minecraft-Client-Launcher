@@ -84,7 +84,7 @@ impl IdentityPicker {
                             .color(Color32::WHITE),
                     )
                     .fill(RUBY)
-                    .stroke(Stroke::new(1.0, RUBY_LIGHT))
+                    .stroke(Stroke::new(1.0_f32, RUBY_LIGHT))
                     .min_size(vec2(140.0, 36.0));
                     if ui.add(go).clicked() {
                         let nick = offline_nickname.trim().to_string();

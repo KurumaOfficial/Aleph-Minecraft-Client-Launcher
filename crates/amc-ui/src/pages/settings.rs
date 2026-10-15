@@ -117,7 +117,7 @@ impl SettingsPage {
 
         ui.painter().rect_filled(rect, Rounding::ZERO, bg);
         ui.painter()
-            .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
+            .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0_f32, stroke_col));
         ui.painter().text(
             rect.center(),
             egui::Align2::CENTER_CENTER,
@@ -641,7 +641,7 @@ impl SettingsPage {
                         .color(Color32::WHITE),
                 )
                 .fill(RUBY)
-                .stroke(Stroke::new(1.0, RUBY_LIGHT));
+                .stroke(Stroke::new(1.0_f32, RUBY_LIGHT));
 
                 if ui.add(btn).clicked() {
                     let ext_filter: &[&str] = if cfg!(windows) { &["exe"] } else { &["*"] };

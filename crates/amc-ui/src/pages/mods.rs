@@ -211,7 +211,7 @@ impl ModsPage {
 
             ui.painter().rect_filled(loc_rect, Rounding::ZERO, loc_bg);
             ui.painter()
-                .rect_stroke(loc_rect, Rounding::ZERO, Stroke::new(1.0, loc_stroke));
+                .rect_stroke(loc_rect, Rounding::ZERO, Stroke::new(1.0_f32, loc_stroke));
             ui.painter().text(
                 loc_rect.center(),
                 egui::Align2::CENTER_CENTER,
@@ -256,7 +256,7 @@ impl ModsPage {
 
             ui.painter().rect_filled(sea_rect, Rounding::ZERO, sea_bg);
             ui.painter()
-                .rect_stroke(sea_rect, Rounding::ZERO, Stroke::new(1.0, sea_stroke));
+                .rect_stroke(sea_rect, Rounding::ZERO, Stroke::new(1.0_f32, sea_stroke));
             ui.painter().text(
                 sea_rect.center(),
                 egui::Align2::CENTER_CENTER,
@@ -401,7 +401,7 @@ impl ModsPage {
 
                     ui.painter().rect_filled(rect, Rounding::ZERO, bg);
                     ui.painter()
-                        .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
+                        .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0_f32, stroke_col));
 
                     let mut child = ui.new_child(
                         egui::UiBuilder::new()
@@ -750,7 +750,7 @@ impl ModsPage {
 
                     ui.painter().rect_filled(rect, Rounding::ZERO, bg);
                     ui.painter()
-                        .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0, stroke_col));
+                        .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0_f32, stroke_col));
 
                     let mut child = ui.new_child(
                         egui::UiBuilder::new()
@@ -935,7 +935,7 @@ impl ModsPage {
                         child.painter().rect_stroke(
                             ib_rect,
                             Rounding::ZERO,
-                            Stroke::new(1.0, ib_stroke),
+                            Stroke::new(1.0_f32, ib_stroke),
                         );
                         child.painter().text(
                             ib_rect.center(),

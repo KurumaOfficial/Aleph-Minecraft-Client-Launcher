@@ -164,7 +164,7 @@ impl ConsoleModal {
 
                     ui.painter().rect_filled(cp_rect, Rounding::ZERO, cp_bg);
                     ui.painter()
-                        .rect_stroke(cp_rect, Rounding::ZERO, Stroke::new(1.0, cp_stroke));
+                        .rect_stroke(cp_rect, Rounding::ZERO, Stroke::new(1.0_f32, cp_stroke));
                     ui.painter().text(
                         cp_rect.center(),
                         egui::Align2::CENTER_CENTER,
@@ -190,7 +190,7 @@ impl ConsoleModal {
 
                     ui.painter().rect_filled(cl_rect, Rounding::ZERO, cl_bg);
                     ui.painter()
-                        .rect_stroke(cl_rect, Rounding::ZERO, Stroke::new(1.0, cl_stroke));
+                        .rect_stroke(cl_rect, Rounding::ZERO, Stroke::new(1.0_f32, cl_stroke));
                     ui.painter().text(
                         cl_rect.center(),
                         egui::Align2::CENTER_CENTER,
@@ -216,7 +216,7 @@ impl ConsoleModal {
 
                     ui.painter().rect_filled(ex_rect, Rounding::ZERO, ex_bg);
                     ui.painter()
-                        .rect_stroke(ex_rect, Rounding::ZERO, Stroke::new(1.0, ex_stroke));
+                        .rect_stroke(ex_rect, Rounding::ZERO, Stroke::new(1.0_f32, ex_stroke));
                     ui.painter().text(
                         ex_rect.center(),
                         egui::Align2::CENTER_CENTER,
@@ -242,7 +242,7 @@ impl ConsoleModal {
                 if let Some(diag) = &diagnosis {
                     egui::Frame::none()
                         .fill(Color32::from_rgb(26, 12, 16))
-                        .stroke(Stroke::new(1.5, RUBY))
+                        .stroke(Stroke::new(1.5_f32, RUBY))
                         .rounding(Rounding::ZERO)
                         .inner_margin(egui::Margin::same(10.0))
                         .show(ui, |ui| {
