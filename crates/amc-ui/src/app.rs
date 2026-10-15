@@ -25,8 +25,8 @@ use crate::modals::{
     WizardAction, WizardFlow,
 };
 use crate::pages::{
-    icon_key, HomeContext, HomePage, InstanceAction, InstancesContext, InstancesPage, ModsPage,
-    ProfileAction, ProfilePage, SettingsPage, SkinsPage,
+    icon_key, HomeContext, HomePage, InstanceAction, InstancesContext, InstancesPage,
+    ModUpdateResult, ModsPage, ProfileAction, ProfilePage, SettingsPage, SkinsPage,
 };
 use crate::theme::{apply_aleph_theme, BG};
 use crate::widgets::{
@@ -91,7 +91,7 @@ pub struct LauncherApp {
     mod_install_rx: Option<mpsc::Receiver<Result<InstallReport, String>>>,
     wishlist_snapshot: Vec<String>,
     favorites_snapshot: Vec<amc_minecraft::FavoriteServerEntry>,
-    mod_update_rx: Option<mpsc::Receiver<Vec<crate::pages::mods::UpdateOffer>>>,
+    mod_update_rx: Option<mpsc::Receiver<ModUpdateResult>>,
     fav_ping_rx: Option<mpsc::Receiver<Vec<(String, amc_minecraft::ServerStatus)>>>,
     discover_rx: Option<mpsc::Receiver<Vec<ModSearchResult>>>,
     discover_dl_rx: Option<mpsc::Receiver<Result<PathBuf, String>>>,
@@ -452,25 +452,9 @@ impl LauncherApp {
         } else {
             self.paths.root_dir.clone()
         };
-        self.mods_page.local_mods =
-            LocalModManager::scan_mods(&base_dir.join("mods")).unwrap_or_default();
+        let mods_dir = base_dir.join("mods");
         let (tx, rx) = mpsc::channel(1);
         self.mod_update_rx = Some(rx);
-        let local: Vec<(String, String, String)> = self
-            .mods_page
-            .local_mods
-            .iter()
-            .map(|m| {
-                (
-                    m.name.clone(),
-                    m.version.clone(),
-                    m.path
-                        .file_name()
-                        .map(|n| n.to_string_lossy().to_string())
-                        .unwrap_or_default(),
-                )
-            })
-            .collect();
         let (mc_version, loader_name) = if let Some(id) = self.selected_instance {
             if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
                 (
@@ -486,6 +470,25 @@ impl LauncherApp {
         let pins = self.config.pinned_mods.clone();
 
         tokio::spawn(async move {
+            // Blocking jar scan off the UI thread (P10 60fps budget).
+            let scanned = tokio::task::spawn_blocking(move || {
+                LocalModManager::scan_mods(&mods_dir).unwrap_or_default()
+            })
+            .await
+            .unwrap_or_default();
+            let local: Vec<(String, String, String)> = scanned
+                .iter()
+                .map(|m| {
+                    (
+                        m.name.clone(),
+                        m.version.clone(),
+                        m.path
+                            .file_name()
+                            .map(|n| n.to_string_lossy().to_string())
+                            .unwrap_or_default(),
+                    )
+                })
+                .collect();
             let client = ModrinthClient::default();
             let mut offers = Vec::new();
             for (name, version, old_filename) in local {
@@ -553,7 +556,12 @@ impl LauncherApp {
                     changelog: ver.changelog.clone(),
                 });
             }
-            let _ = tx.send(offers).await;
+            let _ = tx
+                .send(ModUpdateResult {
+                    mods: scanned,
+                    offers,
+                })
+                .await;
         });
     }
 
@@ -2915,13 +2923,19 @@ impl App for LauncherApp {
             self.check_mod_updates();
         }
         if let Some(rx) = &mut self.mod_update_rx {
-            if let Ok(offers) = rx.try_recv() {
+            if let Ok(result) = rx.try_recv() {
                 self.mods_page.update_checking = false;
-                let n = offers.len();
+                // Fresh scan from the task replaces the page list: single
+                // source of truth, no extra UI-thread scan.
+                self.mods_page.local_mods = result.mods;
+                let n = result.offers.len();
                 // Row lookup uses the manifest display name, which is what
                 // the heuristic matched on.
-                self.mods_page.update_offers =
-                    offers.into_iter().map(|o| (o.title.clone(), o)).collect();
+                self.mods_page.update_offers = result
+                    .offers
+                    .into_iter()
+                    .map(|o| (o.title.clone(), o))
+                    .collect();
                 if n > 0 {
                     push_toast(
                         &mut self.toasts,

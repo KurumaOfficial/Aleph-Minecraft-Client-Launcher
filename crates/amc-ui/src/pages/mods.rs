@@ -15,6 +15,15 @@ pub enum ModsSubTab {
     Search,
 }
 
+/// Outcome of one update check (CONCEPT P4): the fresh local scan
+/// plus the offers derived from it. The scan runs off the UI thread
+/// (jar manifest parsing), so both travel in one message.
+#[derive(Debug, Clone, Default)]
+pub struct ModUpdateResult {
+    pub mods: Vec<LocalMod>,
+    pub offers: Vec<UpdateOffer>,
+}
+
 /// One-click update offer for an installed mod (CONCEPT P4).
 #[derive(Debug, Clone)]
 pub struct UpdateOffer {
