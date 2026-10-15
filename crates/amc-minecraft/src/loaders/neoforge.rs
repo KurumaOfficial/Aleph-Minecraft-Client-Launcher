@@ -58,7 +58,7 @@ impl NeoForgeLoader {
         format!("{mc_version}-neoforge-{neoforge_version}")
     }
 
-    /// Full one-time setup, mirroring [`ForgeLoader::resolve`]: official
+    /// Full one-time setup, mirroring [`crate::loaders::ForgeLoader::resolve`]: official
     /// installer run headlessly, produced version json cached. Returns
     /// UNMERGED details plus the resolved NeoForge version for pinning
     /// (`None` on a cache hit or a caller-supplied pin). A stored pin
