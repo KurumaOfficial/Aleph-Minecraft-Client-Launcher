@@ -57,7 +57,7 @@ impl WetIdClient {
 
         let res = self
             .client
-            .post(&format!("{}/login", self.api_url))
+            .post(format!("{}/login", self.api_url))
             .json(&req)
             .send()
             .await
@@ -86,7 +86,7 @@ impl WetIdClient {
     pub async fn authenticate_with_token(&self, token: &str) -> Result<Account> {
         let res = self
             .client
-            .get(&format!("{}/verify", self.api_url))
+            .get(format!("{}/verify", self.api_url))
             .bearer_auth(token)
             .send()
             .await

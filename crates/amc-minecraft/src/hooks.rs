@@ -92,6 +92,6 @@ mod tests {
     #[test]
     fn test_missing_work_dir_errors() {
         let missing = Path::new("definitely-not-here-amc-hook-test");
-        assert!(run_hook_script("echo hi", &missing).is_err());
+        assert!(run_hook_script("echo hi", missing).is_err());
     }
 }

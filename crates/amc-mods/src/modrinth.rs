@@ -190,7 +190,7 @@ impl ModrinthClient {
         category: ModCategory,
     ) -> Result<Vec<ModSearchResult>> {
         let res = client
-            .get(&format!("{API_BASE}/search"))
+            .get(format!("{API_BASE}/search"))
             .query(&[
                 ("query", query),
                 (
@@ -198,7 +198,7 @@ impl ModrinthClient {
                     &serde_json::to_string(&facets).unwrap_or_default(),
                 ),
                 ("limit", &limit.to_string()),
-                ("index", &index.to_string()),
+                ("index", index),
             ])
             .send()
             .await

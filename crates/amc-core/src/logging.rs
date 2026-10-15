@@ -16,7 +16,6 @@ pub fn init_logging(log_dir: Option<&Path>) {
         let log_file_path = dir.join("launcher.log");
         if let Ok(file) = OpenOptions::new()
             .create(true)
-            .write(true)
             .append(true)
             .open(&log_file_path)
         {

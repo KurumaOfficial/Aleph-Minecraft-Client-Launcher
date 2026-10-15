@@ -92,7 +92,7 @@ impl LocalModManager {
             });
         }
 
-        mods.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        mods.sort_by_key(|m| m.name.to_lowercase());
         Ok(mods)
     }
 
