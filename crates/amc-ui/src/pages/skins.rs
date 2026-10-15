@@ -21,7 +21,7 @@ impl Default for SkinsPage {
     fn default() -> Self {
         Self {
             is_slim_model: false,
-            active_skin_name: "Steve (По умолчанию)".to_string(),
+            active_skin_name: "Steve".to_string(),
             custom_skin_path: None,
             skin_image: None,
             texture_handle: None,

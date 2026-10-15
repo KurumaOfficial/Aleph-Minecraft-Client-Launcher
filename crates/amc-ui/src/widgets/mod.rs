@@ -7,7 +7,7 @@ pub mod titlebar;
 pub mod toasts;
 pub mod topbar;
 
-pub use badge::{draw_badge, draw_custom_badge};
+pub use badge::draw_custom_badge;
 pub use bottom_bar::BottomBar;
 pub use choice_chip::choice_chip;
 pub use sidebar::{NavTab, Sidebar};
