@@ -3501,6 +3501,54 @@ impl Language {
         }
     }
 
+    pub fn toast_mod_installed(&self, name: &str) -> String {
+        match self {
+            Self::English => format!("Mod \"{name}\" installed!"),
+            Self::Russian => format!("Мод \"{name}\" установлен!"),
+            Self::Ukrainian => format!("Мод \"{name}\" встановлено!"),
+        }
+    }
+
+    pub fn err_mod_copy_failed(&self, name: &str, err: &str) -> String {
+        match self {
+            Self::English => format!("Failed to copy {name}: {err}"),
+            Self::Russian => format!("Не удалось скопировать {name}: {err}"),
+            Self::Ukrainian => format!("Не вдалося скопіювати {name}: {err}"),
+        }
+    }
+
+    pub fn toast_world_imported(&self, name: &str) -> String {
+        match self {
+            Self::English => format!("World \"{name}\" imported!"),
+            Self::Russian => format!("Мир \"{name}\" импортирован!"),
+            Self::Ukrainian => format!("Світ \"{name}\" імпортовано!"),
+        }
+    }
+
+    pub fn err_world_import_failed(&self, err: &str) -> String {
+        match self {
+            Self::English => format!("Failed to import world: {err}"),
+            Self::Russian => format!("Не удалось импортировать мир: {err}"),
+            Self::Ukrainian => format!("Не вдалося імпортувати світ: {err}"),
+        }
+    }
+
+    pub fn err_mod_resolve_failed(&self, err: &str) -> String {
+        match self {
+            Self::English => format!("Failed to resolve mod file: {err}"),
+            Self::Russian => format!("Не удалось получить файл: {err}"),
+            Self::Ukrainian => format!("Не вдалося отримати файл: {err}"),
+        }
+    }
+
+    pub fn console_started(&self, pid: u32) -> String {
+        match self {
+            Self::English => format!("Minecraft started, PID {pid}"),
+            Self::Russian => format!("Minecraft успешно запущен, PID {pid}"),
+            Self::Ukrainian => format!("Minecraft успішно запущено, PID {pid}"),
+        }
+    }
+
     pub fn home_direct_play(&self) -> &'static str {
         match self {
             Self::English => "Direct Connect",
@@ -3850,6 +3898,12 @@ mod tests {
             assert!(!lang.mods_sort_downloads().is_empty());
             assert!(!lang.mods_install_optifine().is_empty());
             assert!(!lang.mods_optifine_need_instance().is_empty());
+            assert!(!lang.toast_mod_installed("x").is_empty());
+            assert!(!lang.err_mod_copy_failed("x", "y").is_empty());
+            assert!(!lang.toast_world_imported("x").is_empty());
+            assert!(!lang.err_world_import_failed("y").is_empty());
+            assert!(!lang.err_mod_resolve_failed("y").is_empty());
+            assert!(!lang.console_started(1).is_empty());
             assert!(!lang.nav_profile().is_empty());
             assert!(!lang.tour_home_title().is_empty());
             assert!(!lang.tour_home_body().is_empty());

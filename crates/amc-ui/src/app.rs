@@ -1005,13 +1005,12 @@ impl LauncherApp {
                     &mut self.toasts,
                     &self.config.notifications,
                     ToastKind::Downloads,
-                    format!("Мод \"{filename}\" установлен!"),
+                    lang.toast_mod_installed(&filename),
                 );
-                let _ = lang;
             }
             Err(e) => {
                 self.mods_page.status_message =
-                    Some((format!("Не удалось скопировать {filename}: {e}"), false));
+                    Some((lang.err_mod_copy_failed(&filename, &e.to_string()), false));
             }
         }
     }
@@ -1037,15 +1036,11 @@ impl LauncherApp {
                 &mut self.toasts,
                 &self.config.notifications,
                 ToastKind::Downloads,
-                format!(
-                    "Мир \"{}\" импортирован!",
-                    dest.file_name().unwrap_or_default().to_string_lossy()
-                ),
+                lang.toast_world_imported(&dest.file_name().unwrap_or_default().to_string_lossy()),
             ),
             Err(e) => {
                 self.mods_page.status_message =
-                    Some((format!("Не удалось импортировать мир: {e}"), false));
-                let _ = lang;
+                    Some((lang.err_world_import_failed(&e.to_string()), false));
             }
         }
     }
@@ -1481,7 +1476,9 @@ impl LauncherApp {
                 }
                 Err(e) => {
                     tracing::error!("Failed to get file info: {e}");
-                    let _ = tx.send(Err(format!("Не удалось получить файл: {e}"))).await;
+                    let _ = tx
+                        .send(Err(lang.err_mod_resolve_failed(&e.to_string())))
+                        .await;
                 }
             }
 
@@ -2894,14 +2891,14 @@ impl App for LauncherApp {
                             None => format!(" • {}", lang.compat_unknown()),
                         };
                         self.mods_page.status_message = Some((
-                            format!("Мод \"{}\" установлен!{compat}", report.title),
+                            format!("{}{compat}", lang.toast_mod_installed(&report.title)),
                             true,
                         ));
                         push_toast(
                             &mut self.toasts,
                             &self.config.notifications,
                             ToastKind::Downloads,
-                            format!("Мод \"{}\" установлен!", report.title),
+                            lang.toast_mod_installed(&report.title),
                         );
                     }
                     Err(err) => {
@@ -3189,7 +3186,7 @@ impl App for LauncherApp {
             while let Ok(event) = rx.try_recv() {
                 match event {
                     GameEvent::Started { pid } => {
-                        let msg = format!("Minecraft успешно запущен с PID {pid}");
+                        let msg = self.config.ui.language().console_started(pid);
                         tracing::info!("{msg}");
                         self.console_modal.push_line(format!("[ALEPH] {msg}"));
                         self.session_start_time = Some(std::time::Instant::now());
