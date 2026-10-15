@@ -15,6 +15,7 @@ enum ManageTab {
     Worlds,
     Configs,
     Health,
+    Archive,
 }
 
 #[derive(Default)]
@@ -132,6 +133,7 @@ impl InstanceManage {
                         (ManageTab::Worlds, lang.worlds_title()),
                         (ManageTab::Configs, lang.editor_title()),
                         (ManageTab::Health, lang.health_title()),
+                        (ManageTab::Archive, lang.archive_title()),
                     ] {
                         let active = self.tab == tab;
                         let text = if active {
@@ -150,6 +152,9 @@ impl InstanceManage {
                     ManageTab::Worlds => self.show_worlds(ui, &inst, &game_dir, backups_root, lang),
                     ManageTab::Configs => self.show_configs(ui, &game_dir, lang),
                     ManageTab::Health => self.show_health(ui, &inst, instances_dir, lang),
+                    ManageTab::Archive => {
+                        self.show_archive(ui, &inst, &game_dir, backups_root, lang)
+                    }
                 }
                 if let Some(msg) = self.status.clone() {
                     ui.add_space(6.0);
@@ -384,6 +389,63 @@ impl InstanceManage {
         });
     }
 
+    fn show_archive(
+        &mut self,
+        ui: &mut egui::Ui,
+        inst: &Instance,
+        game_dir: &Path,
+        backups_root: &Path,
+        lang: Language,
+    ) {
+        ui.label(
+            egui::RichText::new(lang.archive_desc())
+                .font(egui::FontId::proportional(12.0))
+                .color(TEXT_MUTED),
+        );
+        ui.add_space(8.0);
+        if ui.button(lang.archive_create()).clicked() {
+            match archive_instance(game_dir, backups_root, &inst.name) {
+                Ok((path, skipped)) => {
+                    let mut msg = path.to_string_lossy().to_string();
+                    if skipped > 0 {
+                        msg.push_str(&format!(" ({skipped} skipped)"));
+                    }
+                    self.status = Some(msg);
+                }
+                Err(e) => self.status = Some(format!("Archive failed: {e}")),
+            }
+        }
+        ui.add_space(8.0);
+        let mut delete: Option<PathBuf> = None;
+        for archive in list_archives(backups_root, &inst.name) {
+            let label = archive.file_name().and_then(|n| n.to_str()).unwrap_or("?");
+            let size = archive.metadata().map(|m| m.len()).unwrap_or(0);
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new(format!(
+                        "{label} ({})",
+                        crate::modals::format_history_bytes(size)
+                    ))
+                    .font(egui::FontId::monospace(11.0))
+                    .color(TEXT_MUTED),
+                );
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.small_button(lang.world_delete()).clicked() {
+                        delete = Some(archive.clone());
+                    }
+                });
+            });
+        }
+        if let Some(path) = delete {
+            match std::fs::remove_file(&path) {
+                Ok(()) => {
+                    self.status = Some(path.to_string_lossy().to_string());
+                }
+                Err(e) => self.status = Some(format!("Delete failed: {e}")),
+            }
+        }
+    }
+
     fn show_health(
         &mut self,
         ui: &mut egui::Ui,
@@ -467,9 +529,123 @@ impl InstanceManage {
     }
 }
 
+/// Zip a whole instance game dir for personal archiving (CONCEPT
+/// "бэкап сборки на диск", P9): `backups_root/instance-archives/`.
+/// Best-effort per file (a running game may lock files on Windows):
+/// unreadable files are counted as skipped, never fatal.
+/// Returns the zip path plus the skipped count.
+pub fn archive_instance(
+    game_dir: &Path,
+    backups_root: &Path,
+    name: &str,
+) -> Result<(PathBuf, usize), String> {
+    let stem: String = name
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || matches!(c, ' ' | '_' | '-' | '(' | ')') {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let stem = stem.trim();
+    let stem = if stem.is_empty() { "instance" } else { stem };
+    let stamp = chrono::Local::now().format("%Y%m%d-%H%M%S").to_string();
+    let out_dir = backups_root.join("instance-archives");
+    std::fs::create_dir_all(&out_dir).map_err(|e| format!("Backup dir failed: {e}"))?;
+    let dest = out_dir.join(format!("{stem}-{stamp}.zip"));
+
+    let file = std::fs::File::create(&dest).map_err(|e| format!("Zip create failed: {e}"))?;
+    let mut zip = zip::ZipWriter::new(file);
+    let opts = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+    let mut skipped = 0usize;
+    let mut stack = vec![game_dir.to_path_buf()];
+    while let Some(current) = stack.pop() {
+        let entries = match std::fs::read_dir(&current) {
+            Ok(entries) => entries,
+            Err(_) => {
+                skipped += 1;
+                continue;
+            }
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_symlink() {
+                continue;
+            }
+            let rel = match path.strip_prefix(game_dir) {
+                Ok(rel) => rel.to_string_lossy().replace('\\', "/"),
+                Err(_) => {
+                    skipped += 1;
+                    continue;
+                }
+            };
+            if path.is_dir() {
+                if zip.add_directory(rel, opts).is_err() {
+                    skipped += 1;
+                } else {
+                    stack.push(path);
+                }
+            } else if path.is_file() {
+                match std::fs::File::open(&path) {
+                    Ok(mut src) => {
+                        if zip.start_file(rel, opts).is_ok() {
+                            if std::io::copy(&mut src, &mut zip).is_err() {
+                                skipped += 1;
+                            }
+                        } else {
+                            skipped += 1;
+                        }
+                    }
+                    Err(_) => skipped += 1,
+                }
+            }
+        }
+    }
+    zip.finish()
+        .map_err(|e| format!("Zip finish failed: {e}"))?;
+    Ok((dest, skipped))
+}
+
+/// Archives of one instance (name-prefixed zips), newest first.
+pub fn list_archives(backups_root: &Path, name: &str) -> Vec<PathBuf> {
+    let stem: String = name
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || matches!(c, ' ' | '_' | '-' | '(' | ')') {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let prefix = format!("{}-", stem.trim());
+    let dir = backups_root.join("instance-archives");
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return Vec::new();
+    };
+    let mut out: Vec<PathBuf> = entries
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| {
+            p.is_file()
+                && p.extension().map(|e| e == "zip").unwrap_or(false)
+                && p.file_name()
+                    .and_then(|n| n.to_str())
+                    .map(|n| n.starts_with(&prefix))
+                    .unwrap_or(false)
+        })
+        .collect();
+    out.sort();
+    out.reverse();
+    out
+}
+
 #[cfg(test)]
 mod tests {
-    use super::InstanceManage;
+    use super::{archive_instance, list_archives, InstanceManage};
     use std::path::Path;
 
     #[test]
@@ -485,5 +661,42 @@ mod tests {
         ));
         assert!(!InstanceManage::is_editable(Path::new("mods/a.jar"), 100));
         assert!(!InstanceManage::is_editable(Path::new("servers.dat"), 100));
+    }
+
+    #[test]
+    fn test_archive_roundtrip() {
+        let root = std::env::temp_dir().join(format!(
+            "amc_archive_test_{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        let game = root.join("game");
+        std::fs::create_dir_all(game.join("saves/world")).unwrap();
+        std::fs::create_dir_all(game.join("mods")).unwrap();
+        std::fs::write(game.join("saves/world/level.dat"), b"fake").unwrap();
+        std::fs::write(game.join("mods/m.jar"), b"fake").unwrap();
+        let backups = root.join("backups");
+
+        let (zip_path, skipped) = archive_instance(&game, &backups, "My Pack/1").unwrap();
+        assert_eq!(skipped, 0);
+        assert!(zip_path.is_file());
+        // Only this instance's archives list.
+        std::fs::write(backups.join("instance-archives/other-0.zip"), b"x").unwrap();
+        let listed = list_archives(&backups, "My Pack/1");
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0], zip_path);
+        // Zip contents survive.
+        let file = std::fs::File::open(&zip_path).unwrap();
+        let mut archive = zip::ZipArchive::new(file).unwrap();
+        let mut names: Vec<String> = (0..archive.len())
+            .filter_map(|i| archive.by_index(i).ok().map(|e| e.name().to_string()))
+            .collect();
+        names.sort();
+        assert!(names.contains(&"mods/m.jar".to_string()));
+        assert!(names.contains(&"saves/world/level.dat".to_string()));
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

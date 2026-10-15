@@ -1613,6 +1613,31 @@ impl Language {
         }
     }
 
+    // ---- Full instance archive (CONCEPT P9) ----
+    pub fn archive_title(&self) -> &'static str {
+        match self {
+            Self::English => "Full backup",
+            Self::Russian => "Полный бэкап",
+            Self::Ukrainian => "Повний бекап",
+        }
+    }
+
+    pub fn archive_desc(&self) -> &'static str {
+        match self {
+            Self::English => "Zip the whole instance folder for a personal archive.",
+            Self::Russian => "Запаковать всю папку сборки в личный архив.",
+            Self::Ukrainian => "Запакувати всю папку збірки в особистий архів.",
+        }
+    }
+
+    pub fn archive_create(&self) -> &'static str {
+        match self {
+            Self::English => "Create archive",
+            Self::Russian => "Создать архив",
+            Self::Ukrainian => "Створити архів",
+        }
+    }
+
     // ---- Local dedicated server (CONCEPT Steam section, P13) ----
     pub fn server_title(&self) -> &'static str {
         match self {
@@ -3658,6 +3683,9 @@ mod tests {
             assert!(!lang.clone_title().is_empty());
             assert!(!lang.clone_saves().is_empty());
             assert!(!lang.inst_btn_shortcut().is_empty());
+            assert!(!lang.archive_title().is_empty());
+            assert!(!lang.archive_desc().is_empty());
+            assert!(!lang.archive_create().is_empty());
             assert!(!lang.server_create().is_empty());
             assert!(!lang.server_stop().is_empty());
             assert!(!lang.server_running(25565).is_empty());
