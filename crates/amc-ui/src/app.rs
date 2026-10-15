@@ -1380,6 +1380,7 @@ impl LauncherApp {
         let engine = self.download_engine.clone();
         let (tx, rx) = mpsc::channel(1);
         self.mod_install_rx = Some(rx);
+        let lang = self.config.ui.language();
 
         tokio::spawn(async move {
             let outcome: Result<(Vec<(ModDownloadFile, String)>, Vec<(String, String)>), String> =
@@ -1437,7 +1438,9 @@ impl LauncherApp {
                         {
                             tracing::error!("Failed to download {}: {e}", file_info.filename);
                             let _ = tx
-                                .send(Err(format!("Ошибка загрузки {}: {e}", file_info.filename)))
+                                .send(Err(
+                                    lang.err_mod_file_failed(&file_info.filename, &e.to_string())
+                                ))
                                 .await;
                             return;
                         }
@@ -1980,7 +1983,9 @@ impl LauncherApp {
                 .await;
             let details = match loader {
                 LoaderType::Fabric => {
-                    let _ = status_tx.send("Fabric Loader...".to_string()).await;
+                    let _ = status_tx
+                        .send(lang.status_resolving_loader("Fabric", &ver_id))
+                        .await;
                     // Pinned version first (reproducible, offline-friendly);
                     // latest is looked up only when unpinned or stale.
                     let mut candidates = amc_minecraft::pin_candidates(pinned_loader_ver.clone());
@@ -1999,7 +2004,7 @@ impl LauncherApp {
                     let mut fetched: Option<VersionDetails> = None;
                     for (loader_ver, persist) in candidates {
                         let _ = status_tx
-                            .send(format!("Загрузка профиля Fabric {loader_ver}..."))
+                            .send(lang.status_loader_profile("Fabric", &loader_ver))
                             .await;
                         match FabricLoader::fetch_profile_json(&client, &ver_id, &loader_ver).await
                         {
@@ -2027,7 +2032,7 @@ impl LauncherApp {
                             FabricLoader::get_latest_loader_version(&client, &ver_id).await
                         {
                             let _ = status_tx
-                                .send(format!("Загрузка профиля Fabric {latest}..."))
+                                .send(lang.status_loader_profile("Fabric", &latest))
                                 .await;
                             if let Ok(d) =
                                 FabricLoader::fetch_profile_json(&client, &ver_id, &latest).await
@@ -2067,9 +2072,8 @@ impl LauncherApp {
                                 Err(err) => {
                                     let _ = game_tx
                                         .send(GameEvent::Crashed {
-                                            message: format!(
-                                                "Ошибка загрузки версии {ver_id}: {err}"
-                                            ),
+                                            message: lang
+                                                .err_version_failed(&ver_id, &err.to_string()),
                                         })
                                         .await;
                                     return;
@@ -2079,7 +2083,9 @@ impl LauncherApp {
                     }
                 }
                 LoaderType::Quilt => {
-                    let _ = status_tx.send("Поиск Quilt Loader...".to_string()).await;
+                    let _ = status_tx
+                        .send(lang.status_resolving_loader("Quilt", &ver_id))
+                        .await;
                     // Pinned version first (reproducible, offline-friendly);
                     // latest is looked up only when unpinned or stale.
                     let mut candidates = amc_minecraft::pin_candidates(pinned_loader_ver.clone());
@@ -2098,7 +2104,7 @@ impl LauncherApp {
                     let mut fetched: Option<VersionDetails> = None;
                     for (loader_ver, persist) in candidates {
                         let _ = status_tx
-                            .send(format!("Загрузка профиля Quilt {loader_ver}..."))
+                            .send(lang.status_loader_profile("Quilt", &loader_ver))
                             .await;
                         match QuiltLoader::fetch_profile_json(&client, &ver_id, &loader_ver).await {
                             Ok(d) => {
@@ -2125,7 +2131,7 @@ impl LauncherApp {
                             QuiltLoader::get_latest_loader_version(&client, &ver_id).await
                         {
                             let _ = status_tx
-                                .send(format!("Загрузка профиля Quilt {latest}..."))
+                                .send(lang.status_loader_profile("Quilt", &latest))
                                 .await;
                             if let Ok(d) =
                                 QuiltLoader::fetch_profile_json(&client, &ver_id, &latest).await
@@ -2165,9 +2171,8 @@ impl LauncherApp {
                                 Err(err) => {
                                     let _ = game_tx
                                         .send(GameEvent::Crashed {
-                                            message: format!(
-                                                "Ошибка загрузки версии {ver_id}: {err}"
-                                            ),
+                                            message: lang
+                                                .err_version_failed(&ver_id, &err.to_string()),
                                         })
                                         .await;
                                     return;
@@ -2181,7 +2186,8 @@ impl LauncherApp {
                         .send(lang.status_resolving_loader("Forge", &ver_id))
                         .await;
                     let vanilla =
-                        match fetch_vanilla_details(&client, &ver_id, &paths, &game_tx).await {
+                        match fetch_vanilla_details(&client, &ver_id, &paths, &game_tx, lang).await
+                        {
                             Some(v) => v,
                             None => return,
                         };
@@ -2268,7 +2274,8 @@ impl LauncherApp {
                         .send(lang.status_resolving_loader("NeoForge", &ver_id))
                         .await;
                     let vanilla =
-                        match fetch_vanilla_details(&client, &ver_id, &paths, &game_tx).await {
+                        match fetch_vanilla_details(&client, &ver_id, &paths, &game_tx, lang).await
+                        {
                             Some(v) => v,
                             None => return,
                         };
@@ -2355,7 +2362,8 @@ impl LauncherApp {
                         .send(lang.status_resolving_loader("OptiFine", &ver_id))
                         .await;
                     let vanilla =
-                        match fetch_vanilla_details(&client, &ver_id, &paths, &game_tx).await {
+                        match fetch_vanilla_details(&client, &ver_id, &paths, &game_tx, lang).await
+                        {
                             Some(v) => v,
                             None => return,
                         };
@@ -2388,7 +2396,7 @@ impl LauncherApp {
                         Err(err) => {
                             let _ = game_tx
                                 .send(GameEvent::Crashed {
-                                    message: format!("Ошибка загрузки версии {ver_id}: {err}"),
+                                    message: lang.err_version_failed(&ver_id, &err.to_string()),
                                 })
                                 .await;
                             return;
@@ -2423,7 +2431,8 @@ impl LauncherApp {
                         tracing::error!("Java installation failed: {e}");
                         let _ = game_tx
                             .send(GameEvent::Crashed {
-                                message: format!("Ошибка установки Java {req_java}: {e}"),
+                                message: lang
+                                    .err_java_failed(&req_java.to_string(), &e.to_string()),
                             })
                             .await;
                         return;
@@ -2535,7 +2544,7 @@ impl LauncherApp {
                             tracing::error!("Component download failed: {e}");
                             let _ = game_tx
                                 .send(GameEvent::Crashed {
-                                    message: format!("Ошибка скачивания компонентов: {e}"),
+                                    message: lang.err_components_failed(&e.to_string()),
                                 })
                                 .await;
                         }
@@ -2616,7 +2625,7 @@ impl LauncherApp {
                 Err(e) => {
                     let _ = game_tx
                         .send(GameEvent::Crashed {
-                            message: format!("Ошибка запуска: {e}"),
+                            message: lang.err_launch_failed(&e.to_string()),
                         })
                         .await;
                 }
@@ -2648,13 +2657,14 @@ async fn fetch_vanilla_details(
     ver_id: &str,
     paths: &LauncherPaths,
     game_tx: &mpsc::Sender<GameEvent>,
+    lang: amc_core::Language,
 ) -> Option<VersionDetails> {
     match VersionDetails::fetch_or_load(client, ver_id, None, &paths.versions_dir()).await {
         Ok(d) => Some(d),
         Err(err) => {
             let _ = game_tx
                 .send(GameEvent::Crashed {
-                    message: format!("Ошибка загрузки версии {ver_id}: {err}"),
+                    message: lang.err_version_failed(ver_id, &err.to_string()),
                 })
                 .await;
             None

@@ -2612,6 +2612,54 @@ impl Language {
         }
     }
 
+    pub fn status_loader_profile(&self, loader: &str, ver: &str) -> String {
+        match self {
+            Self::English => format!("Loading {loader} profile {ver}..."),
+            Self::Russian => format!("Загрузка профиля {loader} {ver}..."),
+            Self::Ukrainian => format!("Завантаження профілю {loader} {ver}..."),
+        }
+    }
+
+    pub fn err_version_failed(&self, ver: &str, err: &str) -> String {
+        match self {
+            Self::English => format!("Failed to load version {ver}: {err}"),
+            Self::Russian => format!("Ошибка загрузки версии {ver}: {err}"),
+            Self::Ukrainian => format!("Помилка завантаження версії {ver}: {err}"),
+        }
+    }
+
+    pub fn err_java_failed(&self, req: &str, err: &str) -> String {
+        match self {
+            Self::English => format!("Failed to install Java {req}: {err}"),
+            Self::Russian => format!("Ошибка установки Java {req}: {err}"),
+            Self::Ukrainian => format!("Помилка встановлення Java {req}: {err}"),
+        }
+    }
+
+    pub fn err_components_failed(&self, err: &str) -> String {
+        match self {
+            Self::English => format!("Failed to download components: {err}"),
+            Self::Russian => format!("Ошибка скачивания компонентов: {err}"),
+            Self::Ukrainian => format!("Помилка завантаження компонентів: {err}"),
+        }
+    }
+
+    pub fn err_launch_failed(&self, err: &str) -> String {
+        match self {
+            Self::English => format!("Failed to launch: {err}"),
+            Self::Russian => format!("Ошибка запуска: {err}"),
+            Self::Ukrainian => format!("Помилка запуску: {err}"),
+        }
+    }
+
+    pub fn err_mod_file_failed(&self, filename: &str, err: &str) -> String {
+        match self {
+            Self::English => format!("Failed to download {filename}: {err}"),
+            Self::Russian => format!("Ошибка загрузки {filename}: {err}"),
+            Self::Ukrainian => format!("Помилка завантаження {filename}: {err}"),
+        }
+    }
+
     /// Human-readable byte count (CONCEPT "Место на диске").
     pub fn disk_size(&self, bytes: u64) -> String {
         const MB: f64 = 1024.0 * 1024.0;
@@ -3688,6 +3736,12 @@ mod tests {
             assert!(!lang.dlman_title().is_empty());
             assert!(!lang.dlman_empty().is_empty());
             assert!(!lang.dlman_clear().is_empty());
+            assert!(!lang.status_loader_profile("Fabric", "0.15.11").is_empty());
+            assert!(!lang.err_version_failed("1.20.1", "x").is_empty());
+            assert!(!lang.err_java_failed("17", "x").is_empty());
+            assert!(!lang.err_components_failed("x").is_empty());
+            assert!(!lang.err_launch_failed("x").is_empty());
+            assert!(!lang.err_mod_file_failed("m.jar", "x").is_empty());
             assert!(!lang.clone_title().is_empty());
             assert!(!lang.clone_saves().is_empty());
             assert!(!lang.inst_btn_shortcut().is_empty());
