@@ -432,11 +432,24 @@ impl LauncherApp {
     /// Check installed mods against Modrinth (CONCEPT P4): exact-slug match,
     /// compatible with the selected instance, newer version number = offer.
     /// Heuristic and documented as such — a wrong guess just shows no offer.
+    /// Rescans the selected instance's `mods/` first: the cached list may
+    /// belong to another folder (e.g. the startup pre-scan).
     fn check_mod_updates(&mut self) {
         if self.mods_page.update_checking {
             return;
         }
         self.mods_page.update_checking = true;
+        let base_dir = if let Some(id) = self.selected_instance {
+            if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
+                inst.get_game_dir(&self.paths.instances_dir())
+            } else {
+                self.paths.root_dir.clone()
+            }
+        } else {
+            self.paths.root_dir.clone()
+        };
+        self.mods_page.local_mods =
+            LocalModManager::scan_mods(&base_dir.join("mods")).unwrap_or_default();
         let (tx, rx) = mpsc::channel(1);
         self.mod_update_rx = Some(rx);
         let local: Vec<(String, String, String)> = self
@@ -1257,10 +1270,13 @@ impl LauncherApp {
     /// provenance), replacing any installed copies in place.
     fn install_sodium(&mut self) {
         let lang = self.config.ui.language();
-        let loader = self
-            .selected_instance
-            .and_then(|id| self.instances.iter().find(|i| i.id == id))
-            .map(|inst| inst.loader);
+        let selected = self.selected_instance.and_then(|id| {
+            self.instances
+                .iter()
+                .find(|i| i.id == id)
+                .map(|inst| (inst.loader, inst.get_game_dir(&self.paths.instances_dir())))
+        });
+        let loader = selected.as_ref().map(|(loader, _)| *loader);
         let ok = matches!(loader, Some(LoaderType::Fabric | LoaderType::Quilt));
         if !ok {
             let msg = if loader.is_none() {
@@ -1275,6 +1291,12 @@ impl LauncherApp {
                 msg,
             );
             return;
+        }
+        // Rescan: the cached list may belong to another folder, and stale
+        // entries would duplicate instead of replacing in place.
+        if let Some((_, game_dir)) = &selected {
+            self.mods_page.local_mods =
+                LocalModManager::scan_mods(&game_dir.join("mods")).unwrap_or_default();
         }
         // Replace installed copies instead of duplicating them.
         let old_for = |name: &str| {
