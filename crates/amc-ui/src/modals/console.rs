@@ -297,16 +297,26 @@ impl ConsoleModal {
                 ui.separator();
                 ui.add_space(4.0);
 
-                // Logs list inside dark console box
+                // Logs list inside dark console box (virtualized rows;
+                // the filter vec builds only while filtering, otherwise
+                // the buffer is indexed directly — no per-frame alloc).
                 let filter_query = self.filter.trim().to_lowercase();
-                let filtered: Vec<&String> = self
-                    .logs
-                    .iter()
-                    .filter(|l| filter_query.is_empty() || l.to_lowercase().contains(&filter_query))
-                    .collect();
+                let filtered: Option<Vec<&String>> = if filter_query.is_empty() {
+                    None
+                } else {
+                    Some(
+                        self.logs
+                            .iter()
+                            .filter(|l| l.to_lowercase().contains(&filter_query))
+                            .collect(),
+                    )
+                };
 
                 let row_height = 18.0;
-                let num_rows = filtered.len();
+                let num_rows = match &filtered {
+                    Some(list) => list.len(),
+                    None => self.logs.len(),
+                };
 
                 ScrollArea::vertical()
                     .stick_to_bottom(self.autoscroll)
@@ -315,7 +325,10 @@ impl ConsoleModal {
                         ui.spacing_mut().item_spacing = vec2(0.0, 2.0);
 
                         for i in row_range {
-                            let line = filtered[i];
+                            let line: &String = match &filtered {
+                                Some(list) => list[i],
+                                None => &self.logs[i],
+                            };
                             let color = if line.contains("[ERROR]")
                                 || line.contains("Exception")
                                 || line.contains("Caused by")
