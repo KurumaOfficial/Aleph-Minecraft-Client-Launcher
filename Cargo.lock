@@ -56,9 +56,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
  "tokio",
- "tracing",
  "uuid",
 ]
 
@@ -66,7 +64,6 @@ dependencies = [
 name = "amc-core"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "chrono",
  "dirs",
  "serde",
@@ -130,10 +127,8 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
  "tokio",
  "tracing",
- "uuid",
  "zip",
 ]
 
@@ -145,9 +140,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "thiserror 1.0.69",
  "tokio",
- "tracing",
  "zip",
 ]
 
@@ -165,11 +158,9 @@ dependencies = [
  "egui",
  "image",
  "open",
- "parking_lot",
  "reqwest",
  "rfd",
  "serde",
- "serde_json",
  "tokio",
  "tracing",
  "uuid",
