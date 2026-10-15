@@ -3564,6 +3564,264 @@ impl Language {
             Self::Ukrainian => "Швидкий вхід",
         }
     }
+
+    pub fn bottom_account_ms(&self) -> &'static str {
+        match self {
+            Self::English => "Microsoft License",
+            Self::Russian => "Лицензия Microsoft",
+            Self::Ukrainian => "Ліцензія Microsoft",
+        }
+    }
+
+    pub fn bottom_account_wetid(&self) -> &'static str {
+        match self {
+            Self::English => "WetID AlephTrust",
+            Self::Russian => "WetID AlephTrust",
+            Self::Ukrainian => "WetID AlephTrust",
+        }
+    }
+
+    pub fn bottom_account_offline(&self) -> &'static str {
+        match self {
+            Self::English => "Offline Free",
+            Self::Russian => "Офлайн",
+            Self::Ukrainian => "Офлайн",
+        }
+    }
+
+    pub fn login_offline_placeholder(&self) -> &'static str {
+        match self {
+            Self::English => "Player",
+            Self::Russian => "Игрок",
+            Self::Ukrainian => "Гравець",
+        }
+    }
+
+    pub fn login_wetid_hint(&self) -> &'static str {
+        match self {
+            Self::English => "Access to AlephTrust servers, cloud skins and stats",
+            Self::Russian => "Доступ к серверам AlephTrust, облачным скинам и статистике",
+            Self::Ukrainian => "Доступ до серверів AlephTrust, хмарних скінів та статистики",
+        }
+    }
+
+    pub fn login_ms_prompt(&self) -> &'static str {
+        match self {
+            Self::English => "Sign in via official Microsoft OAuth2 Device Code Flow:",
+            Self::Russian => "Вход через официальный OAuth2 Device Code Flow:",
+            Self::Ukrainian => "Вхід через офіційний OAuth2 Device Code Flow:",
+        }
+    }
+
+    pub fn login_ms_hint(&self) -> &'static str {
+        match self {
+            Self::English => "Required for playing on official licensed servers (Hypixel, etc.)",
+            Self::Russian => {
+                "Требуется для игры на официальных лицензионных серверах (Hypixel и др.)"
+            }
+            Self::Ukrainian => "Потрібно для гри на офіційних ліцензійних серверах (Hypixel тощо)",
+        }
+    }
+
+    pub fn err_nickname_invalid(&self) -> &'static str {
+        match self {
+            Self::English => "Invalid nickname (3-16 latin letters, digits, _)",
+            Self::Russian => "Некорректный ник (3-16 латинских букв, цифр, _)",
+            Self::Ukrainian => "Некоректний нік (3-16 латинських літер, цифр, _)",
+        }
+    }
+
+    pub fn skins_account_label(&self) -> &'static str {
+        match self {
+            Self::English => "Account",
+            Self::Russian => "Аккаунт",
+            Self::Ukrainian => "Акаунт",
+        }
+    }
+
+    pub fn skins_custom_name(&self) -> &'static str {
+        match self {
+            Self::English => "Custom Skin",
+            Self::Russian => "Свой скин",
+            Self::Ukrainian => "Власний скін",
+        }
+    }
+
+    pub fn inst_copy_name(&self, name: &str) -> String {
+        match self {
+            Self::English => format!("{name} (Copy)"),
+            Self::Russian => format!("{name} (Копия)"),
+            Self::Ukrainian => format!("{name} (Копія)"),
+        }
+    }
+
+    pub fn inst_cmd_hint(&self) -> &'static str {
+        match self {
+            Self::English => "cmd /C ... / sh -c ...",
+            Self::Russian => "cmd /C ... / sh -c ...",
+            Self::Ukrainian => "cmd /C ... / sh -c ...",
+        }
+    }
+
+    pub fn err_backup_failed(&self, err: &str) -> String {
+        match self {
+            Self::English => format!("Backup failed: {err}"),
+            Self::Russian => format!("Ошибка резервной копии: {err}"),
+            Self::Ukrainian => format!("Помилка резервної копії: {err}"),
+        }
+    }
+
+    pub fn err_delete_failed(&self, err: &str) -> String {
+        match self {
+            Self::English => format!("Delete failed: {err}"),
+            Self::Russian => format!("Ошибка удаления: {err}"),
+            Self::Ukrainian => format!("Помилка видалення: {err}"),
+        }
+    }
+
+    pub fn err_restore_failed(&self, err: &str) -> String {
+        match self {
+            Self::English => format!("Restore failed: {err}"),
+            Self::Russian => format!("Ошибка восстановления: {err}"),
+            Self::Ukrainian => format!("Помилка відновлення: {err}"),
+        }
+    }
+
+    pub fn err_save_failed(&self, err: &str) -> String {
+        match self {
+            Self::English => format!("Save failed: {err}"),
+            Self::Russian => format!("Ошибка сохранения: {err}"),
+            Self::Ukrainian => format!("Помилка збереження: {err}"),
+        }
+    }
+
+    pub fn err_archive_failed(&self, err: &str) -> String {
+        match self {
+            Self::English => format!("Archive failed: {err}"),
+            Self::Russian => format!("Ошибка архива: {err}"),
+            Self::Ukrainian => format!("Помилка архіву: {err}"),
+        }
+    }
+
+    pub fn err_transfer_export_failed(&self, err: &str) -> String {
+        match self {
+            Self::English => format!("Export failed: {err}"),
+            Self::Russian => format!("Ошибка экспорта: {err}"),
+            Self::Ukrainian => format!("Помилка експорту: {err}"),
+        }
+    }
+
+    pub fn err_transfer_import_failed(&self, err: &str) -> String {
+        match self {
+            Self::English => format!("Import failed: {err}"),
+            Self::Russian => format!("Ошибка импорта: {err}"),
+            Self::Ukrainian => format!("Помилка імпорту: {err}"),
+        }
+    }
+
+    pub fn err_shortcut_failed(&self, err: &str) -> String {
+        match self {
+            Self::English => format!("Shortcut failed: {err}"),
+            Self::Russian => format!("Ошибка ярлыка: {err}"),
+            Self::Ukrainian => format!("Помилка ярлика: {err}"),
+        }
+    }
+
+    pub fn err_server_eula_required(&self) -> &'static str {
+        match self {
+            Self::English => "Accept the Mojang EULA to start the server",
+            Self::Russian => "Примите EULA Mojang для запуска сервера",
+            Self::Ukrainian => "Прийміть EULA Mojang для запуску сервера",
+        }
+    }
+
+    pub fn err_pack_no_files(&self) -> &'static str {
+        match self {
+            Self::English => "Pack has no downloadable files",
+            Self::Russian => "В сборке нет файлов для загрузки",
+            Self::Ukrainian => "У збірці немає файлів для завантаження",
+        }
+    }
+
+    pub fn err_mrpack_bad(&self, err: &str) -> String {
+        match self {
+            Self::English => format!("Bad .mrpack: {err}"),
+            Self::Russian => format!("Битый .mrpack: {err}"),
+            Self::Ukrainian => format!("Битий .mrpack: {err}"),
+        }
+    }
+
+    pub fn err_cursepack_bad(&self, err: &str) -> String {
+        match self {
+            Self::English => format!("Bad CurseForge pack: {err}"),
+            Self::Russian => format!("Битый CurseForge-пак: {err}"),
+            Self::Ukrainian => format!("Битий CurseForge-пак: {err}"),
+        }
+    }
+
+    pub fn err_optifine_no_build(&self, mc: &str) -> String {
+        match self {
+            Self::English => format!("No OptiFine builds published for MC {mc}"),
+            Self::Russian => format!("Нет сборок OptiFine для MC {mc}"),
+            Self::Ukrainian => format!("Немає збірок OptiFine для MC {mc}"),
+        }
+    }
+
+    pub fn account_tag_ms(&self) -> &'static str {
+        match self {
+            Self::English => "Microsoft",
+            Self::Russian => "Microsoft",
+            Self::Ukrainian => "Microsoft",
+        }
+    }
+
+    pub fn account_tag_wetid(&self) -> &'static str {
+        match self {
+            Self::English => "WetID",
+            Self::Russian => "WetID",
+            Self::Ukrainian => "WetID",
+        }
+    }
+
+    pub fn account_tag_offline(&self) -> &'static str {
+        match self {
+            Self::English => "Offline",
+            Self::Russian => "Офлайн",
+            Self::Ukrainian => "Офлайн",
+        }
+    }
+
+    pub fn home_hero_kicker(&self) -> &'static str {
+        match self {
+            Self::English => "Minecraft launcher",
+            Self::Russian => "Лаунчер Minecraft",
+            Self::Ukrainian => "Лаунчер Minecraft",
+        }
+    }
+
+    pub fn settings_speed_unit(&self) -> &'static str {
+        match self {
+            Self::English => "KB/s",
+            Self::Russian => "КБ/с",
+            Self::Ukrainian => "КБ/с",
+        }
+    }
+
+    pub fn hotkey_tabs_suffix(&self) -> &'static str {
+        match self {
+            Self::English => "+ 1…6",
+            Self::Russian => "+ 1…6",
+            Self::Ukrainian => "+ 1…6",
+        }
+    }
+
+    pub fn profile_uuid_label(&self, uuid: &str) -> String {
+        match self {
+            Self::English => format!("UUID: {uuid}"),
+            Self::Russian => format!("UUID: {uuid}"),
+            Self::Ukrainian => format!("UUID: {uuid}"),
+        }
+    }
 }
 
 /// Raw OS locale tag: `"ru-RU"` on Windows, `"uk_UA.UTF-8"` on POSIX.
@@ -3963,6 +4221,38 @@ mod tests {
             assert!(!lang.settings_after_minimize().is_empty());
             assert!(!lang.settings_after_keep().is_empty());
             assert!(!lang.settings_autostart().is_empty());
+            assert!(!lang.bottom_account_ms().is_empty());
+            assert!(!lang.bottom_account_wetid().is_empty());
+            assert!(!lang.bottom_account_offline().is_empty());
+            assert!(!lang.login_offline_placeholder().is_empty());
+            assert!(!lang.login_wetid_hint().is_empty());
+            assert!(!lang.login_ms_prompt().is_empty());
+            assert!(!lang.login_ms_hint().is_empty());
+            assert!(!lang.err_nickname_invalid().is_empty());
+            assert!(!lang.skins_account_label().is_empty());
+            assert!(!lang.skins_custom_name().is_empty());
+            assert!(!lang.inst_copy_name("x").is_empty());
+            assert!(!lang.inst_cmd_hint().is_empty());
+            assert!(!lang.err_backup_failed("e").is_empty());
+            assert!(!lang.err_delete_failed("e").is_empty());
+            assert!(!lang.err_restore_failed("e").is_empty());
+            assert!(!lang.err_save_failed("e").is_empty());
+            assert!(!lang.err_archive_failed("e").is_empty());
+            assert!(!lang.err_transfer_export_failed("e").is_empty());
+            assert!(!lang.err_transfer_import_failed("e").is_empty());
+            assert!(!lang.err_shortcut_failed("e").is_empty());
+            assert!(!lang.err_server_eula_required().is_empty());
+            assert!(!lang.err_pack_no_files().is_empty());
+            assert!(!lang.err_mrpack_bad("e").is_empty());
+            assert!(!lang.err_cursepack_bad("e").is_empty());
+            assert!(!lang.err_optifine_no_build("1.20").is_empty());
+            assert!(!lang.account_tag_ms().is_empty());
+            assert!(!lang.account_tag_wetid().is_empty());
+            assert!(!lang.account_tag_offline().is_empty());
+            assert!(!lang.home_hero_kicker().is_empty());
+            assert!(!lang.settings_speed_unit().is_empty());
+            assert!(!lang.hotkey_tabs_suffix().is_empty());
+            assert!(!lang.profile_uuid_label("x").is_empty());
         }
     }
 }

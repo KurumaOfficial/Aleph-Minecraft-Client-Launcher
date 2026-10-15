@@ -282,7 +282,7 @@ impl SettingsPage {
             ui.add(
                 egui::Slider::new(&mut kbps, 0..=10240)
                     .step_by(128.0)
-                    .text("KB/s"),
+                    .text(lang.settings_speed_unit()),
             );
             config.download_speed_limit_kbps = if kbps == 0 { None } else { Some(kbps as u64) };
         });
@@ -462,7 +462,7 @@ impl SettingsPage {
                         }
                     });
                 ui.label(
-                    egui::RichText::new("+ 1…6")
+                    egui::RichText::new(lang.hotkey_tabs_suffix())
                         .font(egui::FontId::proportional(11.0))
                         .color(TEXT_MUTED),
                 );

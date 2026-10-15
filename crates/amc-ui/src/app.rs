@@ -624,6 +624,7 @@ impl LauncherApp {
     /// path for moving to another PC): config + accounts + instances +
     /// favorites in one `.zip`. Worlds, mods and runtimes stay behind.
     fn export_settings_bundle(&mut self) {
+        let lang = self.config.ui.language();
         let stamp = chrono::Utc::now().format("%Y%m%d").to_string();
         let dialog = rfd::FileDialog::new()
             .add_filter("AMC settings", &["zip"])
@@ -636,7 +637,8 @@ impl LauncherApp {
                 self.settings_page.transfer_note = Some(dest.to_string_lossy().to_string());
             }
             Err(e) => {
-                self.settings_page.transfer_note = Some(format!("Export failed: {e}"));
+                self.settings_page.transfer_note =
+                    Some(lang.err_transfer_export_failed(&e.to_string()));
             }
         }
     }
@@ -645,6 +647,7 @@ impl LauncherApp {
     /// restored documents (CONCEPT P10). A stored `root_override` takes
     /// effect on the next startup, like a hand-edited config.
     fn import_settings_bundle(&mut self) {
+        let lang = self.config.ui.language();
         let dialog = rfd::FileDialog::new().add_filter("AMC settings", &["zip"]);
         let Some(pack) = dialog.pick_file() else {
             return;
@@ -677,7 +680,8 @@ impl LauncherApp {
                     Some(format!("{}: {}", restored.len(), restored.join(", ")));
             }
             Err(e) => {
-                self.settings_page.transfer_note = Some(format!("Import failed: {e}"));
+                self.settings_page.transfer_note =
+                    Some(lang.err_transfer_import_failed(&e.to_string()));
             }
         }
     }
@@ -779,6 +783,7 @@ impl LauncherApp {
         let engine = self.download_engine.clone();
         let paths = self.paths.clone();
         let java_override = self.config.default_launch_options.java_path.clone();
+        let lang = self.config.ui.language();
         tokio::spawn(async move {
             let outcome: Result<tokio::process::Child, String> = async {
                 let client = reqwest::Client::new();
@@ -802,7 +807,7 @@ impl LauncherApp {
                 .map_err(|e| e.to_string())?;
                 if !amc_minecraft::DedicatedServer::eula_accepted(&server_dir) {
                     if !eula_ok {
-                        return Err("Accept the Mojang EULA to start the server".to_string());
+                        return Err(lang.err_server_eula_required().to_string());
                     }
                     amc_minecraft::DedicatedServer::write_eula(&server_dir)
                         .map_err(|e| e.to_string())?;
@@ -876,7 +881,7 @@ impl LauncherApp {
                     .flat_map(|v| v.files.clone())
                     .find(|f| f.filename.ends_with(".mrpack"))
                     .or_else(|| versions.iter().flat_map(|v| v.files.clone()).next())
-                    .ok_or_else(|| "Pack has no downloadable files".to_string())?;
+                    .ok_or_else(|| lang.err_pack_no_files().to_string())?;
                 if let Some(parent) = dest.parent() {
                     tokio::fs::create_dir_all(parent)
                         .await
@@ -1069,12 +1074,11 @@ impl LauncherApp {
         let (tx, rx) = mpsc::channel(1);
         self.mod_install_rx = Some(rx);
         let lang = self.config.ui.language();
-        let _ = lang;
         tokio::spawn(async move {
             let index = match amc_mods::parse_mrpack_index(&pack_path) {
                 Ok(index) => index,
                 Err(e) => {
-                    let _ = tx.send(Err(format!("Bad .mrpack: {e}"))).await;
+                    let _ = tx.send(Err(lang.err_mrpack_bad(&e.to_string()))).await;
                     return;
                 }
             };
@@ -1182,13 +1186,14 @@ impl LauncherApp {
     fn import_cursepack(&mut self, pack_path: std::path::PathBuf) {
         let base_dir = self.content_base_dir();
         let engine = self.download_engine.clone();
+        let lang = self.config.ui.language();
         let (tx, rx) = mpsc::channel(1);
         self.mod_install_rx = Some(rx);
         tokio::spawn(async move {
             let manifest = match amc_mods::parse_curse_manifest(&pack_path) {
                 Ok(manifest) => manifest,
                 Err(e) => {
-                    let _ = tx.send(Err(format!("Bad CurseForge pack: {e}"))).await;
+                    let _ = tx.send(Err(lang.err_cursepack_bad(&e.to_string()))).await;
                     return;
                 }
             };
@@ -1313,6 +1318,7 @@ impl LauncherApp {
         let (tx, rx) = mpsc::channel(1);
         self.mod_install_rx = Some(rx);
         let engine = self.download_engine.clone();
+        let lang = self.config.ui.language();
         tokio::spawn(async move {
             let outcome: Result<InstallReport, String> = async {
                 let client = reqwest::Client::new();
@@ -1320,9 +1326,9 @@ impl LauncherApp {
                     .await
                     .map_err(|e| e.to_string())?;
                 let selected = OptiFineLoader::select_patch(&versions)
-                    .ok_or_else(|| format!("No OptiFine builds published for MC {mc_version}"))?;
+                    .ok_or_else(|| lang.err_optifine_no_build(&mc_version))?;
                 let safe_name = amc_core::sanitize_remote_filename(&selected.filename)
-                    .ok_or_else(|| "Unsafe OptiFine filename".to_string())?;
+                    .ok_or_else(|| lang.err_optifine_no_build(&mc_version))?;
                 let url = OptiFineLoader::download_url(&safe_name);
                 let dest = mods_dir.join(&safe_name);
                 if let Some(parent) = dest.parent() {
@@ -1481,7 +1487,7 @@ impl LauncherApp {
                         continue;
                     }
                     let (file, deps) =
-                        resolve_mod_file(&slug, source, category, &mc_version, &loader_name)
+                        resolve_mod_file(&slug, source, category, &mc_version, &loader_name, lang)
                             .await?;
                     if installed.len() >= 8 {
                         break;
@@ -1494,7 +1500,7 @@ impl LauncherApp {
                     }
                 }
                 if installed.is_empty() {
-                    return Err("Nothing to install".to_string());
+                    return Err(lang.err_pack_no_files().to_string());
                 }
                 Ok((installed, meta))
             }
@@ -1562,6 +1568,7 @@ impl LauncherApp {
                 category: ModCategory,
                 mc_version: &Option<String>,
                 loader_name: &str,
+                lang: amc_core::Language,
             ) -> Result<(ModDownloadFile, Vec<String>), String> {
                 match source {
                     ModSource::CurseForge => {
@@ -1594,15 +1601,14 @@ impl LauncherApp {
                                     mc,
                                     loader_name,
                                 )
-                                .ok_or_else(|| format!("No build for Minecraft {mc}"))?;
+                                .ok_or_else(|| lang.compat_none(mc))?;
                                 let file = mod_file_of(ver)?;
                                 Ok((file, ver.required_dependencies()))
                             }
                             None => {
-                                let ver = versions
-                                    .into_iter()
-                                    .next()
-                                    .ok_or_else(|| "No compatible mod version found".to_string())?;
+                                let ver = versions.into_iter().next().ok_or_else(|| {
+                                    lang.err_mod_resolve_failed("no compatible version")
+                                })?;
                                 let file = mod_file_of(&ver)?;
                                 Ok((file, ver.required_dependencies()))
                             }
@@ -3670,7 +3676,9 @@ impl App for LauncherApp {
                             account_id,
                             remember,
                         } => {
-                            let _ = self.account_mgr.set_active(account_id);
+                            if let Err(e) = self.account_mgr.set_active(account_id) {
+                                tracing::warn!("set active account failed: {e}");
+                            }
                             if remember {
                                 self.config.remembered_identity = Some(account_id.to_string());
                                 if let Err(e) = self.config.save_to_path(&self.paths.config_file())
@@ -3686,18 +3694,24 @@ impl App for LauncherApp {
                                 Ok(acc) => {
                                     let id = acc.id;
                                     if self.store_account(acc) {
-                                        let _ = self.account_mgr.set_active(id);
+                                        if let Err(e) = self.account_mgr.set_active(id) {
+                                            tracing::warn!("set active account failed: {e}");
+                                        }
                                         if remember {
                                             self.config.remembered_identity = Some(id.to_string());
-                                            let _ =
-                                                self.config.save_to_path(&self.paths.config_file());
+                                            if let Err(e) =
+                                                self.config.save_to_path(&self.paths.config_file())
+                                            {
+                                                tracing::warn!("config save failed: {e}");
+                                            }
                                         }
                                         self.pending_identity_pick = false;
                                         self.handle_launch();
                                     }
                                 }
-                                Err(e) => {
-                                    self.login_modal.error_msg = Some(e.to_string());
+                                Err(_) => {
+                                    self.login_modal.error_msg =
+                                        Some(lang.err_nickname_invalid().to_string());
                                     self.login_modal.is_open = true;
                                     self.pending_identity_pick = false;
                                 }
@@ -3793,17 +3807,7 @@ impl App for LauncherApp {
                                 if let Some(inst) =
                                     self.instances.iter().find(|i| i.id == id).cloned()
                                 {
-                                    let copy_name = match lang {
-                                        amc_core::Language::English => {
-                                            format!("{} (Copy)", inst.name)
-                                        }
-                                        amc_core::Language::Russian => {
-                                            format!("{} (Копия)", inst.name)
-                                        }
-                                        amc_core::Language::Ukrainian => {
-                                            format!("{} (Копія)", inst.name)
-                                        }
-                                    };
+                                    let copy_name = lang.inst_copy_name(&inst.name);
                                     if let Ok(cloned) = inst.clone_instance(
                                         &copy_name,
                                         &self.paths.instances_dir(),
@@ -3927,6 +3931,7 @@ impl App for LauncherApp {
                         // Desktop shortcut for direct instance launch
                         // (`amc --launch <id>`, CONCEPT P11/P14).
                         if let Some(id) = self.instances_page.shortcut_request.take() {
+                            let lang = self.config.ui.language();
                             if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
                                 let note = match std::env::current_exe() {
                                     Ok(exe) => {
@@ -3938,10 +3943,10 @@ impl App for LauncherApp {
                                         );
                                         match shortcut.create() {
                                             Ok(path) => path.to_string_lossy().to_string(),
-                                            Err(e) => format!("Shortcut failed: {e}"),
+                                            Err(e) => lang.err_shortcut_failed(&e.to_string()),
                                         }
                                     }
-                                    Err(e) => format!("Shortcut failed: {e}"),
+                                    Err(e) => lang.err_shortcut_failed(&e.to_string()),
                                 };
                                 push_toast(
                                     &mut self.toasts,

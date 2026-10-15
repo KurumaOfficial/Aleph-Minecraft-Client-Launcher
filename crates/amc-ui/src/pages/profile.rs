@@ -86,7 +86,7 @@ impl ProfilePage {
                             .color(TEXT_HEADING),
                     );
                     if let Some(acc) = account {
-                        super::super::modals::identity::account_tag(ui, acc.account_type);
+                        super::super::modals::identity::account_tag(ui, acc.account_type, lang);
                     }
                 });
                 ui.add_space(4.0);
@@ -115,7 +115,7 @@ impl ProfilePage {
         if let Some(acc) = account {
             ui.add_space(12.0);
             ui.label(
-                egui::RichText::new(format!("UUID: {}", acc.uuid))
+                egui::RichText::new(lang.profile_uuid_label(&acc.uuid))
                     .font(egui::FontId::monospace(11.0))
                     .color(TEXT_MUTED),
             );

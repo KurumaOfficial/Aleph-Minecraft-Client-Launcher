@@ -1423,7 +1423,7 @@ impl InstancesPage {
                     ui.label(egui::RichText::new(lang.inst_pre_label()).color(TEXT_PRIMARY));
                     ui.add(
                         TextEdit::singleline(&mut self.edit_instance_pre)
-                            .hint_text("cmd /C ... / sh -c ...")
+                            .hint_text(lang.inst_cmd_hint())
                             .desired_width(400.0)
                             .font(egui::FontId::monospace(12.0)),
                     );
@@ -1431,7 +1431,7 @@ impl InstancesPage {
                     ui.label(egui::RichText::new(lang.inst_post_label()).color(TEXT_PRIMARY));
                     ui.add(
                         TextEdit::singleline(&mut self.edit_instance_post)
-                            .hint_text("cmd /C ... / sh -c ...")
+                            .hint_text(lang.inst_cmd_hint())
                             .desired_width(400.0)
                             .font(egui::FontId::monospace(12.0)),
                     );

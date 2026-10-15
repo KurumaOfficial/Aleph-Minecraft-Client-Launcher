@@ -58,8 +58,12 @@ impl IdentityPicker {
                 ui.add_space(8.0);
                 for acc in accounts {
                     let label = match acc.account_type {
-                        AccountType::Microsoft => format!("{} (Microsoft)", acc.username),
-                        AccountType::WetId => format!("{} (WetID)", acc.username),
+                        AccountType::Microsoft => {
+                            format!("{} ({})", acc.username, lang.account_tag_ms())
+                        }
+                        AccountType::WetId => {
+                            format!("{} ({})", acc.username, lang.account_tag_wetid())
+                        }
                         AccountType::Offline => acc.username.clone(),
                     };
                     let active = self.picked_id == Some(acc.id);
@@ -118,11 +122,11 @@ impl IdentityPicker {
 }
 
 /// Readable account type tag.
-pub fn account_tag(ui: &mut Ui, account_type: AccountType) {
+pub fn account_tag(ui: &mut Ui, account_type: AccountType, lang: amc_core::Language) {
     let (label, col) = match account_type {
-        AccountType::Microsoft => ("Microsoft", Color32::from_rgb(0x70, 0x90, 0xC8)),
-        AccountType::WetId => ("WetID", RUBY_LIGHT),
-        AccountType::Offline => ("Offline", TEXT_MUTED),
+        AccountType::Microsoft => (lang.account_tag_ms(), Color32::from_rgb(0x70, 0x90, 0xC8)),
+        AccountType::WetId => (lang.account_tag_wetid(), RUBY_LIGHT),
+        AccountType::Offline => (lang.account_tag_offline(), TEXT_MUTED),
     };
     let (rect, _) = ui.allocate_exact_size(vec2(86.0, 24.0), Sense::hover());
     ui.painter().rect_filled(rect, Rounding::ZERO, BG_ELEVATED);

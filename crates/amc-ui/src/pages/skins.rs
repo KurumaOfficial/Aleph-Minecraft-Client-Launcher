@@ -219,7 +219,7 @@ impl SkinsPage {
                         self.active_skin_name = path
                             .file_name()
                             .map(|f| f.to_string_lossy().to_string())
-                            .unwrap_or_else(|| "Custom Skin".to_string());
+                            .unwrap_or_else(|| lang.skins_custom_name().to_string());
                         self.custom_skin_path = Some(path);
                         self.dirty = true;
                         self.avatar_dirty = true;
@@ -268,11 +268,7 @@ impl SkinsPage {
 
         // Account status info
         if let Some(acc) = account {
-            let acc_label = match lang {
-                amc_core::Language::English => "Account",
-                amc_core::Language::Russian => "Аккаунт",
-                amc_core::Language::Ukrainian => "Акаунт",
-            };
+            let acc_label = lang.skins_account_label();
             ui.label(
                 egui::RichText::new(format!(
                     "{acc_label}: {} ({})",

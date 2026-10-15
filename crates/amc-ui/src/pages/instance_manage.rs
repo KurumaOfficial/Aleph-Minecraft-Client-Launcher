@@ -242,7 +242,7 @@ impl InstanceManage {
                                         self.lists_dirty = true;
                                     }
                                     Err(e) => {
-                                        self.status = Some(format!("Backup failed: {e}"));
+                                        self.status = Some(lang.err_backup_failed(&e.to_string()));
                                     }
                                 }
                             }
@@ -296,7 +296,7 @@ impl InstanceManage {
                                 self.status = Some(path.to_string_lossy().to_string());
                                 self.lists_dirty = true;
                             }
-                            Err(e) => self.status = Some(format!("Delete failed: {e}")),
+                            Err(e) => self.status = Some(lang.err_delete_failed(&e.to_string())),
                         }
                     }
                     if let Some(path) = restore {
@@ -305,7 +305,7 @@ impl InstanceManage {
                                 self.status = Some(format!("{}: {world}", lang.editor_saved()));
                                 self.lists_dirty = true;
                             }
-                            Err(e) => self.status = Some(format!("Restore failed: {e}")),
+                            Err(e) => self.status = Some(lang.err_restore_failed(&e.to_string())),
                         }
                     }
                     ui.add_space(4.0);
@@ -438,7 +438,7 @@ impl InstanceManage {
                                 self.lists_dirty = true;
                             }
                             Err(e) => {
-                                self.status = Some(format!("Save failed: {e}"));
+                                self.status = Some(lang.err_save_failed(&e.to_string()));
                             }
                         }
                     }
@@ -471,7 +471,7 @@ impl InstanceManage {
                     self.status = Some(msg);
                     self.lists_dirty = true;
                 }
-                Err(e) => self.status = Some(format!("Archive failed: {e}")),
+                Err(e) => self.status = Some(lang.err_archive_failed(&e.to_string())),
             }
         }
         ui.add_space(8.0);
@@ -499,7 +499,7 @@ impl InstanceManage {
                     self.status = Some(path.to_string_lossy().to_string());
                     self.lists_dirty = true;
                 }
-                Err(e) => self.status = Some(format!("Delete failed: {e}")),
+                Err(e) => self.status = Some(lang.err_delete_failed(&e.to_string())),
             }
         }
     }

@@ -690,7 +690,7 @@ impl HomePage {
                         .color(TEXT_HEADING),
                 );
                 ui.add_space(10.0);
-                kicker(ui, "Minecraft launcher");
+                kicker(ui, lang.home_hero_kicker());
             });
         });
         if play_clicked {

@@ -88,9 +88,9 @@ impl BottomBar {
             (
                 acc.username.as_str(),
                 match acc.account_type {
-                    amc_auth::AccountType::Microsoft => "Microsoft License",
-                    amc_auth::AccountType::WetId => "WetID AlephTrust",
-                    amc_auth::AccountType::Offline => "Offline Free",
+                    amc_auth::AccountType::Microsoft => lang.bottom_account_ms(),
+                    amc_auth::AccountType::WetId => lang.bottom_account_wetid(),
+                    amc_auth::AccountType::Offline => lang.bottom_account_offline(),
                 },
             )
         } else {

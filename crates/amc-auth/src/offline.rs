@@ -7,12 +7,12 @@ pub fn validate_nickname(name: &str) -> Result<()> {
     let len = name.chars().count();
     if !(3..=16).contains(&len) {
         return Err(LauncherError::Auth(
-            "Никнейм должен содержать от 3 до 16 символов".to_string(),
+            "Invalid nickname: must be 3-16 characters".to_string(),
         ));
     }
     if !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
         return Err(LauncherError::Auth(
-            "Никнейм может содержать только латиницу, цифры и символ подчеркивания".to_string(),
+            "Invalid nickname: only latin letters, digits and _".to_string(),
         ));
     }
     Ok(())
