@@ -2,7 +2,7 @@
 //! Only cache-free widgets live here; SVG/PNG-backed ones stay out.
 
 use crate::theme;
-use egui::{pos2, vec2, Align2, Color32, FontId, Rect, Response, Rounding, Sense, Stroke, Ui};
+use egui::{pos2, vec2, Align2, Color32, FontId, Rect, Response, Sense, Stroke, Ui};
 
 pub fn text_width(ui: &Ui, text: &str, font: &FontId) -> f32 {
     ui.fonts(|fonts| {
@@ -81,7 +81,7 @@ pub fn nav_link(ui: &mut Ui, label: &str, active: bool) -> Response {
                 pos2(rect.center().x - w * 0.3, rect.bottom() - 6.0),
                 pos2(rect.center().x + w * 0.3, rect.bottom() - 4.0),
             ),
-            Rounding::ZERO,
+            crate::theme::rounding(),
             theme::ACCENT,
         );
     }
@@ -103,11 +103,11 @@ pub fn red_button(ui: &mut Ui, label: &str, width: f32, height: f32) -> Response
     } else {
         theme::lerp_color(theme::ACCENT, theme::ACCENT_LIGHT, hover)
     };
-    painter.rect_filled(rect, Rounding::ZERO, fill);
+    painter.rect_filled(rect, crate::theme::rounding(), fill);
     if hover > 0.02 && !pressed {
         painter.rect_stroke(
             Rect::from_min_max(rect.min - vec2(3.0, 3.0), rect.max + vec2(3.0, 3.0)),
-            Rounding::ZERO,
+            crate::theme::rounding(),
             Stroke::new(
                 1.0_f32,
                 theme::with_alpha(theme::ACCENT_LIGHT, (40.0 * hover) as u8),
@@ -141,13 +141,13 @@ pub fn outline_button(ui: &mut Ui, label: &str, width: f32, height: f32) -> Resp
     if hover > 0.01 {
         painter.rect_filled(
             rect,
-            Rounding::ZERO,
+            crate::theme::rounding(),
             theme::with_alpha(theme::HEAD, (14.0 * hover) as u8),
         );
     }
     painter.rect_stroke(
         rect,
-        Rounding::ZERO,
+        crate::theme::rounding(),
         Stroke::new(
             1.0_f32,
             theme::lerp_color(theme::BORDER, theme::HEAD, hover * 0.5),
@@ -189,7 +189,7 @@ pub fn ghost_link(ui: &mut Ui, label: &str) -> Response {
                 rect.bottom() - 4.0,
             ),
         ),
-        Rounding::ZERO,
+        crate::theme::rounding(),
         theme::lerp_color(theme::ACCENT_DIM, theme::ACCENT, hover),
     );
     if response.hovered() {
@@ -211,11 +211,11 @@ pub fn tag_width(ui: &mut Ui, label: &str, active: bool, width: f32) -> Response
         theme::lerp_color(theme::MUTED, theme::HEAD, hover)
     };
     if active {
-        painter.rect_filled(rect, Rounding::ZERO, theme::ACCENT_SOFT);
+        painter.rect_filled(rect, crate::theme::rounding(), theme::ACCENT_SOFT);
     }
     painter.rect_stroke(
         rect,
-        Rounding::ZERO,
+        crate::theme::rounding(),
         Stroke::new(1.0_f32, if active { theme::ACCENT } else { theme::BORDER }),
     );
     painter.text(
@@ -245,11 +245,11 @@ pub fn tag(ui: &mut Ui, label: &str, active: bool) -> Response {
         theme::lerp_color(theme::MUTED, theme::HEAD, hover)
     };
     if active {
-        painter.rect_filled(rect, Rounding::ZERO, theme::ACCENT_SOFT);
+        painter.rect_filled(rect, crate::theme::rounding(), theme::ACCENT_SOFT);
     }
     painter.rect_stroke(
         rect,
-        Rounding::ZERO,
+        crate::theme::rounding(),
         Stroke::new(1.0_f32, if active { theme::ACCENT } else { theme::BORDER }),
     );
     painter.text(
@@ -294,14 +294,14 @@ pub fn image_cover(
 pub fn red_square_deco(painter: &egui::Painter, rect: Rect) {
     painter.rect_stroke(
         rect,
-        Rounding::ZERO,
+        crate::theme::rounding(),
         Stroke::new(1.0_f32, theme::with_alpha(theme::ACCENT, 56)),
     );
     let inner = rect.shrink(40.0);
     if inner.width() > 20.0 && inner.height() > 20.0 {
         painter.rect_stroke(
             inner,
-            Rounding::ZERO,
+            crate::theme::rounding(),
             Stroke::new(1.0_f32, theme::with_alpha(theme::ACCENT, 20)),
         );
     }
@@ -312,7 +312,7 @@ pub fn card<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) -> R {
     egui::Frame::none()
         .fill(theme::CARD.into())
         .stroke(Stroke::new(1.0_f32, theme::BORDER_SOFT))
-        .rounding(Rounding::ZERO)
+        .rounding(crate::theme::rounding())
         .inner_margin(egui::Margin::symmetric(20.0, 18.0))
         .show(ui, |ui| {
             ui.set_width((width - 40.0).max(80.0));

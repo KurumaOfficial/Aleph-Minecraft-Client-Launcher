@@ -3,7 +3,7 @@ use crate::theme::{
     TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
 use crate::widgets::icons::{self, Icon};
-use egui::{vec2, Color32, Pos2, Rect, Rounding, Sense, Stroke, Ui};
+use egui::{vec2, Color32, Pos2, Rect, Sense, Stroke, Ui};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum NavTab {
@@ -24,7 +24,8 @@ impl Sidebar {
         let rect = ui.available_rect_before_wrap();
 
         // Background and right 1px border
-        ui.painter().rect_filled(rect, Rounding::ZERO, BG_ELEVATED);
+        ui.painter()
+            .rect_filled(rect, crate::theme::rounding(), BG_ELEVATED);
         ui.painter().line_segment(
             [rect.right_top(), rect.right_bottom()],
             Stroke::new(1.0_f32, BORDER_DEFAULT),
@@ -137,9 +138,13 @@ impl Sidebar {
         );
         let sq_stroke = lerp_color(RUBY, RUBY_LIGHT, hover_t);
 
-        ui.painter().rect_filled(sq_rect, Rounding::ZERO, sq_bg);
         ui.painter()
-            .rect_stroke(sq_rect, Rounding::ZERO, Stroke::new(1.5_f32, sq_stroke));
+            .rect_filled(sq_rect, crate::theme::rounding(), sq_bg);
+        ui.painter().rect_stroke(
+            sq_rect,
+            crate::theme::rounding(),
+            Stroke::new(1.5_f32, sq_stroke),
+        );
 
         // Central 'ℵ' glyph
         ui.painter().text(
@@ -179,7 +184,8 @@ impl Sidebar {
         let bg_alpha = (active_t * 42.0 + hover_t * 22.0 * (1.0 - active_t)).round() as u8;
         if bg_alpha > 0 {
             let bg_color = Color32::from_rgba_premultiplied(139, 26, 42, bg_alpha);
-            ui.painter().rect_filled(rect, Rounding::ZERO, bg_color);
+            ui.painter()
+                .rect_filled(rect, crate::theme::rounding(), bg_color);
         }
 
         // Animated Left Accent Indicator Bar (Square motif)
@@ -191,7 +197,7 @@ impl Sidebar {
                 Pos2::new(rect.left() + bar_w, rect.bottom()),
             );
             ui.painter()
-                .rect_filled(bar_rect, Rounding::ZERO, bar_color);
+                .rect_filled(bar_rect, crate::theme::rounding(), bar_color);
         }
 
         // Smooth color transition for text & icon
@@ -231,7 +237,7 @@ impl Sidebar {
                 (active_t * 220.0) as u8,
             );
             ui.painter()
-                .rect_filled(sq_dot_rect, Rounding::ZERO, dot_col);
+                .rect_filled(sq_dot_rect, crate::theme::rounding(), dot_col);
         }
 
         resp.clicked()

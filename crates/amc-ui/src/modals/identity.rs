@@ -1,6 +1,6 @@
 use amc_auth::{Account, AccountType};
 use amc_core::Language;
-use egui::{vec2, Align2, Color32, Rounding, Sense, Stroke, Ui};
+use egui::{vec2, Align2, Color32, Sense, Stroke, Ui};
 
 use crate::theme::{BG_ELEVATED, BORDER_DEFAULT, RUBY, RUBY_LIGHT, TEXT_MUTED};
 use crate::widgets::choice_chip;
@@ -129,9 +129,13 @@ pub fn account_tag(ui: &mut Ui, account_type: AccountType, lang: amc_core::Langu
         AccountType::Offline => (lang.account_tag_offline(), TEXT_MUTED.into()),
     };
     let (rect, _) = ui.allocate_exact_size(vec2(86.0, 24.0), Sense::hover());
-    ui.painter().rect_filled(rect, Rounding::ZERO, BG_ELEVATED);
     ui.painter()
-        .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0_f32, BORDER_DEFAULT));
+        .rect_filled(rect, crate::theme::rounding(), BG_ELEVATED);
+    ui.painter().rect_stroke(
+        rect,
+        crate::theme::rounding(),
+        Stroke::new(1.0_f32, BORDER_DEFAULT),
+    );
     ui.painter().text(
         rect.center(),
         Align2::CENTER_CENTER,

@@ -15,7 +15,7 @@ use crate::theme;
 use crate::widgets::icons::{self, Icon};
 use crate::widgets::NavTab;
 use amc_core::Language;
-use egui::{pos2, vec2, Align2, Color32, Rect, Rounding, Sense, Stroke, Ui};
+use egui::{pos2, vec2, Align2, Color32, Rect, Sense, Stroke, Ui};
 
 /// Tab strip height (reference: plain text row).
 pub const TABS_HEIGHT: f32 = 40.0;
@@ -43,10 +43,11 @@ fn play_button(ui: &mut Ui, label: &str, launching: bool) -> bool {
         theme::RUBY
     };
     let fill = theme::lerp_color(base, theme::ACCENT_LIGHT, hover * 0.6);
-    ui.painter().rect_filled(rect, Rounding::ZERO, fill);
+    ui.painter()
+        .rect_filled(rect, crate::theme::rounding(), fill);
     ui.painter().rect_stroke(
         rect,
-        Rounding::ZERO,
+        crate::theme::rounding(),
         Stroke::new(1.0_f32, theme::BORDER_STRONG),
     );
 
@@ -82,7 +83,8 @@ pub fn show_tabs(
 ) -> ShellAction {
     let mut action = ShellAction::default();
     let bar = ui.max_rect();
-    ui.painter().rect_filled(bar, Rounding::ZERO, theme::CARD);
+    ui.painter()
+        .rect_filled(bar, crate::theme::rounding(), theme::CARD);
     ui.painter().line_segment(
         [
             pos2(bar.left(), bar.bottom() - 0.5),
@@ -122,7 +124,7 @@ pub fn show_tabs(
                         pos2(rect.left() + 5.0, rect.bottom() - 2.0),
                         pos2(rect.right() - 5.0, rect.bottom() - 1.0),
                     ),
-                    Rounding::ZERO,
+                    crate::theme::rounding(),
                     theme::with_alpha(theme::RUBY_LIGHT, alpha as u8),
                 );
             }
@@ -163,7 +165,8 @@ pub fn show_play_bar(
 ) -> ShellAction {
     let mut action = ShellAction::default();
     let bar = ui.max_rect();
-    ui.painter().rect_filled(bar, Rounding::ZERO, theme::CARD);
+    ui.painter()
+        .rect_filled(bar, crate::theme::rounding(), theme::CARD);
     ui.painter().line_segment(
         [
             pos2(bar.left(), bar.top() + 0.5),
@@ -180,11 +183,14 @@ pub fn show_play_bar(
                 let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
                 ui.painter().rect_filled(
                     rect,
-                    Rounding::ZERO,
+                    crate::theme::rounding(),
                     theme::lerp_color(theme::FIELD, theme::CARD_HOVER, hover),
                 );
-                ui.painter()
-                    .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0_f32, theme::BORDER));
+                ui.painter().rect_stroke(
+                    rect,
+                    crate::theme::rounding(),
+                    Stroke::new(1.0_f32, theme::BORDER),
+                );
                 ui.painter().text(
                     pos2(rect.left() + 12.0, rect.center().y - 8.0),
                     Align2::LEFT_CENTER,

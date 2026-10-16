@@ -3,7 +3,7 @@ use crate::theme::{
 };
 use crate::widgets::icons::{self, Icon};
 use amc_core::Language;
-use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit};
+use egui::{vec2, Color32, ScrollArea, Sense, Stroke, TextEdit};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CrashCategory {
@@ -196,10 +196,11 @@ impl ConsoleModal {
                     let cp_stroke = lerp_color(BORDER_DEFAULT, RUBY, cp_hover);
                     let cp_text = lerp_color(TEXT_PRIMARY, Color32::WHITE, cp_hover);
 
-                    ui.painter().rect_filled(cp_rect, Rounding::ZERO, cp_bg);
+                    ui.painter()
+                        .rect_filled(cp_rect, crate::theme::rounding(), cp_bg);
                     ui.painter().rect_stroke(
                         cp_rect,
-                        Rounding::ZERO,
+                        crate::theme::rounding(),
                         Stroke::new(1.0_f32, cp_stroke),
                     );
                     ui.painter().text(
@@ -225,10 +226,11 @@ impl ConsoleModal {
                     let cl_stroke = lerp_color(BORDER_DEFAULT, RUBY, cl_hover);
                     let cl_text = lerp_color(TEXT_MUTED, TEXT_PRIMARY, cl_hover);
 
-                    ui.painter().rect_filled(cl_rect, Rounding::ZERO, cl_bg);
+                    ui.painter()
+                        .rect_filled(cl_rect, crate::theme::rounding(), cl_bg);
                     ui.painter().rect_stroke(
                         cl_rect,
-                        Rounding::ZERO,
+                        crate::theme::rounding(),
                         Stroke::new(1.0_f32, cl_stroke),
                     );
                     ui.painter().text(
@@ -253,10 +255,11 @@ impl ConsoleModal {
                     let ex_stroke = lerp_color(RUBY, RUBY_LIGHT, ex_hover);
                     let ex_text = lerp_color(RUBY_LIGHT, Color32::WHITE, ex_hover);
 
-                    ui.painter().rect_filled(ex_rect, Rounding::ZERO, ex_bg);
+                    ui.painter()
+                        .rect_filled(ex_rect, crate::theme::rounding(), ex_bg);
                     ui.painter().rect_stroke(
                         ex_rect,
-                        Rounding::ZERO,
+                        crate::theme::rounding(),
                         Stroke::new(1.0_f32, ex_stroke),
                     );
                     ui.painter().text(
@@ -285,7 +288,7 @@ impl ConsoleModal {
                     egui::Frame::none()
                         .fill(Color32::from_rgb(26, 12, 16))
                         .stroke(Stroke::new(1.5_f32, RUBY))
-                        .rounding(Rounding::ZERO)
+                        .rounding(crate::theme::rounding())
                         .inner_margin(egui::Margin::same(10.0))
                         .show(ui, |ui| {
                             ui.horizontal(|ui| {

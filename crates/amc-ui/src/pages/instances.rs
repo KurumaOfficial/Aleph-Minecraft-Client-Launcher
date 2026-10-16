@@ -10,7 +10,7 @@ use amc_auth::Account;
 use amc_core::types::{Instance, InstanceIcon, InstanceTemplate, LoaderType};
 use amc_core::Language;
 use amc_mods::ModSearchResult;
-use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
+use egui::{vec2, Color32, ScrollArea, Sense, Stroke, TextEdit, Ui};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
@@ -462,9 +462,13 @@ impl InstancesPage {
             let cr_bg = lerp_color(RUBY, RUBY_LIGHT, cr_hover);
             let cr_stroke = lerp_color(RUBY_LIGHT, Color32::WHITE, cr_hover);
 
-            ui.painter().rect_filled(cr_rect, Rounding::ZERO, cr_bg);
             ui.painter()
-                .rect_stroke(cr_rect, Rounding::ZERO, Stroke::new(1.0_f32, cr_stroke));
+                .rect_filled(cr_rect, crate::theme::rounding(), cr_bg);
+            ui.painter().rect_stroke(
+                cr_rect,
+                crate::theme::rounding(),
+                Stroke::new(1.0_f32, cr_stroke),
+            );
             ui.painter().text(
                 cr_rect.center(),
                 egui::Align2::CENTER_CENTER,
@@ -734,7 +738,7 @@ impl InstancesPage {
                 lerp_color(lerp_color(BORDER_DEFAULT, RUBY, hover_t), RUBY_LIGHT, sel_t);
             let border_width = if is_selected { 1.5_f32 } else { 1.0_f32 };
 
-            ui.painter().rect_filled(rect, Rounding::ZERO, bg);
+            ui.painter().rect_filled(rect, crate::theme::rounding(), bg);
 
             // Loader accent strip on top (Square motif from aleph.icu)
             let loader_color = match inst.loader {
@@ -750,11 +754,14 @@ impl InstancesPage {
                     rect.left_top(),
                     egui::pos2(rect.right(), rect.top() + 3.0),
                 ),
-                Rounding::ZERO,
+                crate::theme::rounding(),
                 loader_color,
             );
-            ui.painter()
-                .rect_stroke(rect, Rounding::ZERO, Stroke::new(border_width, stroke_col));
+            ui.painter().rect_stroke(
+                rect,
+                crate::theme::rounding(),
+                Stroke::new(border_width, stroke_col),
+            );
 
             let mut card = ui.new_child(
                 egui::UiBuilder::new()
@@ -779,7 +786,7 @@ impl InstancesPage {
                         );
                         ui.painter().rect_stroke(
                             icon_rect,
-                            Rounding::ZERO,
+                            crate::theme::rounding(),
                             Stroke::new(1.0_f32, BORDER_DEFAULT),
                         );
                     }
@@ -789,7 +796,7 @@ impl InstancesPage {
                             None => icons::loader_badge(inst.loader),
                         };
                         ui.painter()
-                            .rect_filled(icon_rect, Rounding::ZERO, RUBY_DIM);
+                            .rect_filled(icon_rect, crate::theme::rounding(), RUBY_DIM);
                         icons::draw_centered(
                             ui.painter(),
                             badge,
@@ -979,9 +986,13 @@ impl InstancesPage {
             let pb_bg = lerp_color(RUBY, RUBY_LIGHT, pb_hover);
             let pb_stroke = lerp_color(RUBY_LIGHT, Color32::WHITE, pb_hover);
 
-            card.painter().rect_filled(pb_rect, Rounding::ZERO, pb_bg);
             card.painter()
-                .rect_stroke(pb_rect, Rounding::ZERO, Stroke::new(1.0_f32, pb_stroke));
+                .rect_filled(pb_rect, crate::theme::rounding(), pb_bg);
+            card.painter().rect_stroke(
+                pb_rect,
+                crate::theme::rounding(),
+                Stroke::new(1.0_f32, pb_stroke),
+            );
             card.painter().text(
                 pb_rect.center(),
                 egui::Align2::CENTER_CENTER,
@@ -1338,10 +1349,10 @@ impl InstancesPage {
                             } else {
                                 lerp_color(BORDER_DEFAULT, RUBY, hover_t)
                             };
-                            ui.painter().rect_filled(rect, Rounding::ZERO, bg);
+                            ui.painter().rect_filled(rect, crate::theme::rounding(), bg);
                             ui.painter().rect_stroke(
                                 rect,
-                                Rounding::ZERO,
+                                crate::theme::rounding(),
                                 Stroke::new(1.0_f32, stroke_col),
                             );
                             icons::draw_centered(

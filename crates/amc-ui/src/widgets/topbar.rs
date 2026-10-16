@@ -2,7 +2,7 @@ use crate::theme::{self, RUBY_DIM, TEXT_MUTED};
 use crate::widgets::full::{nav_link, red_button};
 use crate::widgets::NavTab;
 use amc_core::Language;
-use egui::{pos2, vec2, Align2, Color32, Rounding, Sense, Stroke, Ui, Vec2};
+use egui::{pos2, vec2, Align2, Color32, Sense, Stroke, Ui, Vec2};
 
 /// Full reference metrics: 76px bar, 20px page padding.
 pub const TOPBAR_HEIGHT: f32 = 76.0;
@@ -57,7 +57,8 @@ pub fn show_topbar(
 
     // Bar background + bottom hairline.
     let bg_rect = ui.max_rect();
-    ui.painter().rect_filled(bg_rect, Rounding::ZERO, theme::BG);
+    ui.painter()
+        .rect_filled(bg_rect, crate::theme::rounding(), theme::BG);
     ui.painter().line_segment(
         [
             pos2(bg_rect.left(), bg_rect.bottom() - 0.5),
@@ -79,7 +80,11 @@ pub fn show_topbar(
         {
             let p = ui.painter().clone();
             let sq = egui::Rect::from_min_size(logo_resp.rect.min, Vec2::splat(22.0));
-            p.rect_stroke(sq, Rounding::ZERO, Stroke::new(2.0_f32, theme::ACCENT));
+            p.rect_stroke(
+                sq,
+                crate::theme::rounding(),
+                Stroke::new(2.0_f32, theme::ACCENT),
+            );
             p.text(
                 pos2(sq.right() + 12.0, sq.center().y),
                 Align2::LEFT_CENTER,
@@ -127,10 +132,14 @@ pub fn show_topbar(
             let painter = ui.painter().clone();
             painter.rect_filled(
                 rect,
-                Rounding::ZERO,
+                crate::theme::rounding(),
                 theme::lerp_color(theme::BG, theme::CARD_HOVER, anim),
             );
-            painter.rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0_f32, theme::BORDER));
+            painter.rect_stroke(
+                rect,
+                crate::theme::rounding(),
+                Stroke::new(1.0_f32, theme::BORDER),
+            );
             let avatar_rect =
                 egui::Rect::from_min_size(rect.min + vec2(5.0, 5.0), Vec2::splat(30.0));
             match avatar {
@@ -143,12 +152,12 @@ pub fn show_topbar(
                     );
                     painter.rect_stroke(
                         avatar_rect,
-                        Rounding::ZERO,
+                        crate::theme::rounding(),
                         Stroke::new(1.0_f32, theme::BORDER),
                     );
                 }
                 None => {
-                    painter.rect_filled(avatar_rect, Rounding::ZERO, RUBY_DIM);
+                    painter.rect_filled(avatar_rect, crate::theme::rounding(), RUBY_DIM);
                     let initial = display
                         .chars()
                         .next()

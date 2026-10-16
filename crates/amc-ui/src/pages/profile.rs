@@ -1,6 +1,6 @@
 use amc_auth::Account;
 use amc_core::Language;
-use egui::{vec2, Color32, Rounding, Sense, Ui};
+use egui::{vec2, Color32, Sense, Ui};
 use image::RgbaImage;
 
 use crate::theme::{BG_ELEVATED, BORDER_DEFAULT, TEXT_HEADING, TEXT_MUTED};
@@ -55,10 +55,10 @@ impl ProfilePage {
             // Avatar card.
             let (av_rect, _) = ui.allocate_exact_size(vec2(120.0, 120.0), Sense::hover());
             ui.painter()
-                .rect_filled(av_rect, Rounding::ZERO, BG_ELEVATED);
+                .rect_filled(av_rect, crate::theme::rounding(), BG_ELEVATED);
             ui.painter().rect_stroke(
                 av_rect,
-                Rounding::ZERO,
+                crate::theme::rounding(),
                 egui::Stroke::new(1.0_f32, BORDER_DEFAULT),
             );
             if let Some(tex) = &self.tex {

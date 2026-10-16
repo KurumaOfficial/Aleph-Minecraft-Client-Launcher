@@ -132,6 +132,8 @@ pub struct Palette {
     pub warn: Color32,
     /// Info color.
     pub info: Color32,
+    /// Border color of hovered egui-native widgets (per-style hover accent).
+    pub hover_stroke: Color32,
     /// Corner rounding used by shared widgets and pages.
     pub rounding: f32,
 }
@@ -228,6 +230,7 @@ pub const ALEPH: Palette = Palette {
     success: Color32::from_rgb(0x50, 0xB0, 0x50),
     warn: Color32::from_rgb(0xC0, 0x7A, 0x30),
     info: Color32::from_rgb(0x70, 0x90, 0xC8),
+    hover_stroke: Color32::from_rgb(0x1C, 0x09, 0x0B),
     rounding: 0.0,
 };
 
@@ -257,12 +260,100 @@ pub const MODRINTH_GREEN_LIGHT: Color32 = Color32::from_rgb(0x43, 0xE4, 0x88);
 /// Brand green, disabled/launching.
 pub const MODRINTH_GREEN_DIM: Color32 = Color32::from_rgb(0x12, 0x8A, 0x45);
 
-/// MultiMC / Prism palette (placeholder until its restyle step).
-const MULTIMC: Palette = ALEPH;
-/// Legacy Mojang palette (placeholder until its restyle step).
-const LEGACY: Palette = ALEPH;
-/// Millida palette (placeholder until its restyle step).
-const MILLIDA: Palette = ALEPH;
+/// MultiMC / Prism palette (Qt light gray, selection blue); values follow
+/// the default Qt Fusion look the launcher ships with.
+const MULTIMC: Palette = Palette {
+    bg: Color32::from_rgb(0xEF, 0xEF, 0xEF),
+    card: Color32::from_rgb(0xFF, 0xFF, 0xFF),
+    card_hover: Color32::from_rgb(0xE5, 0xF3, 0xFF),
+    field: Color32::from_rgb(0xFF, 0xFF, 0xFF),
+    bg_card: Color32::from_rgb(0xE6, 0xE6, 0xE6),
+    bg_active: Color32::from_rgb(0xDC, 0xE9, 0xF5),
+    border: Color32::from_rgb(0xB8, 0xB8, 0xB8),
+    border_soft: Color32::from_rgb(0xD6, 0xD6, 0xD6),
+    border_strong: Color32::from_rgb(0x9A, 0x9A, 0x9A),
+    border_subtle: tint(Color32::from_rgb(0x30, 0x8C, 0xC6), 40),
+    border_default: tint(Color32::from_rgb(0x30, 0x8C, 0xC6), 70),
+    border_accent: tint(Color32::from_rgb(0x30, 0x8C, 0xC6), 130),
+    text: Color32::from_rgb(0x1A, 0x1A, 0x1A),
+    head: Color32::from_rgb(0x00, 0x00, 0x00),
+    muted: Color32::from_rgb(0x5E, 0x5E, 0x5E),
+    muted_dim: Color32::from_rgb(0x80, 0x80, 0x80),
+    text_dim: Color32::from_rgb(0x6E, 0x6E, 0x6E),
+    accent: Color32::from_rgb(0x30, 0x8C, 0xC6),
+    accent_light: Color32::from_rgb(0x3F, 0xA3, 0xDE),
+    accent_dim: Color32::from_rgb(0x2A, 0x6E, 0x9C),
+    accent_soft: Color32::from_rgb(0xDC, 0xE9, 0xF5),
+    danger: Color32::from_rgb(0xC0, 0x39, 0x2B),
+    success: Color32::from_rgb(0x3C, 0x8E, 0x3C),
+    warn: Color32::from_rgb(0xC0, 0x7A, 0x30),
+    info: Color32::from_rgb(0x30, 0x8C, 0xC6),
+    hover_stroke: Color32::from_rgb(0x9A, 0x9A, 0x9A),
+    rounding: 2.0,
+};
+/// Legacy Mojang launcher palette (light gray chrome, green primary button);
+/// values follow the launcher's public screenshots.
+const LEGACY: Palette = Palette {
+    bg: Color32::from_rgb(0xD6, 0xD6, 0xD6),
+    card: Color32::from_rgb(0xF2, 0xF2, 0xF2),
+    card_hover: Color32::from_rgb(0xE9, 0xE9, 0xE9),
+    field: Color32::from_rgb(0xFF, 0xFF, 0xFF),
+    bg_card: Color32::from_rgb(0xC9, 0xC9, 0xC9),
+    bg_active: Color32::from_rgb(0xE4, 0xEE, 0xDD),
+    border: Color32::from_rgb(0xA8, 0xA8, 0xA8),
+    border_soft: Color32::from_rgb(0xC4, 0xC4, 0xC4),
+    border_strong: Color32::from_rgb(0x8A, 0x8A, 0x8A),
+    border_subtle: tint(Color32::from_rgb(0x6D, 0xBE, 0x45), 40),
+    border_default: tint(Color32::from_rgb(0x6D, 0xBE, 0x45), 70),
+    border_accent: tint(Color32::from_rgb(0x6D, 0xBE, 0x45), 130),
+    text: Color32::from_rgb(0x33, 0x33, 0x33),
+    head: Color32::from_rgb(0x11, 0x11, 0x11),
+    muted: Color32::from_rgb(0x66, 0x66, 0x66),
+    muted_dim: Color32::from_rgb(0x8A, 0x8A, 0x8A),
+    text_dim: Color32::from_rgb(0x75, 0x75, 0x75),
+    accent: Color32::from_rgb(0x6D, 0xBE, 0x45),
+    accent_light: Color32::from_rgb(0x8B, 0xD9, 0x6A),
+    accent_dim: Color32::from_rgb(0x4C, 0x8A, 0x35),
+    accent_soft: Color32::from_rgb(0xE8, 0xF2, 0xE0),
+    danger: Color32::from_rgb(0xB0, 0x30, 0x30),
+    success: Color32::from_rgb(0x6D, 0xBE, 0x45),
+    warn: Color32::from_rgb(0xC0, 0x7A, 0x30),
+    info: Color32::from_rgb(0x3B, 0x78, 0xB4),
+    hover_stroke: Color32::from_rgb(0x8A, 0x8A, 0x8A),
+    rounding: 2.0,
+};
+/// Millida palette (dark charcoal with the mint-green accent). Values follow
+/// the design tokens published in the launcher's public GPL source tree
+/// (`--m-bg`, `--m-surface`, `--m-accent`, `--m-danger`, …).
+const MILLIDA: Palette = Palette {
+    bg: Color32::from_rgb(0x16, 0x17, 0x18),
+    card: Color32::from_rgb(0x1E, 0x1F, 0x20),
+    card_hover: Color32::from_rgb(0x26, 0x27, 0x2A),
+    field: Color32::from_rgb(0x13, 0x13, 0x14),
+    bg_card: Color32::from_rgb(0x13, 0x13, 0x14),
+    bg_active: Color32::from_rgb(0x2A, 0x2B, 0x2E),
+    border: tint(Color32::from_rgb(0xFF, 0xFF, 0xFF), 18),
+    border_soft: tint(Color32::from_rgb(0xFF, 0xFF, 0xFF), 12),
+    border_strong: tint(Color32::from_rgb(0xFF, 0xFF, 0xFF), 36),
+    border_subtle: tint(Color32::from_rgb(0x5E, 0xC6, 0x4D), 33),
+    border_default: tint(Color32::from_rgb(0x5E, 0xC6, 0x4D), 45),
+    border_accent: tint(Color32::from_rgb(0x5E, 0xC6, 0x4D), 100),
+    text: Color32::from_rgb(0xED, 0xEF, 0xEE),
+    head: Color32::from_rgb(0xFF, 0xFF, 0xFF),
+    muted: tint(Color32::from_rgb(0xED, 0xEF, 0xEE), 204),
+    muted_dim: tint(Color32::from_rgb(0xED, 0xEF, 0xEE), 168),
+    text_dim: tint(Color32::from_rgb(0xED, 0xEF, 0xEE), 133),
+    accent: Color32::from_rgb(0x5E, 0xC6, 0x4D),
+    accent_light: Color32::from_rgb(0x70, 0xD5, 0x5F),
+    accent_dim: Color32::from_rgb(0x40, 0x87, 0x2F),
+    accent_soft: tint(Color32::from_rgb(0x5E, 0xC6, 0x4D), 33),
+    danger: Color32::from_rgb(0xFF, 0x6B, 0x5E),
+    success: Color32::from_rgb(0x5E, 0xC6, 0x4D),
+    warn: Color32::from_rgb(0xF5, 0xAA, 0x38),
+    info: Color32::from_rgb(0x6A, 0xA9, 0xE9),
+    hover_stroke: tint(Color32::from_rgb(0x5E, 0xC6, 0x4D), 150),
+    rounding: 8.0,
+};
 
 /// Modrinth palette: gray surfaces with the brand green as the accent.
 const MODRINTH: Palette = Palette {
@@ -291,6 +382,7 @@ const MODRINTH: Palette = Palette {
     success: MODRINTH_GREEN,
     warn: Color32::from_rgb(0xF5, 0xA5, 0x24),
     info: Color32::from_rgb(0x7D, 0xB5, 0xFF),
+    hover_stroke: tint(MODRINTH_GREEN, 150),
     rounding: 6.0,
 };
 
@@ -616,34 +708,65 @@ fn apply_common_style(style: &mut egui::Style) {
     );
 }
 
-pub fn apply_aleph_theme(ctx: &Context) {
+/// Apply the palette of the active shell. Call [`set_palette`] first, then
+/// this, and every egui-native widget (scroll bars, text edits, tooltips,
+/// windows) matches the tokens the shared pages draw with.
+pub fn apply_active_theme(ctx: &Context) {
+    let id = palette_id();
+    let light = matches!(id, PaletteId::Multimc | PaletteId::Legacy);
     let mut style = (*ctx.style()).clone();
     apply_common_style(&mut style);
+    style.visuals = visuals_from(&palette_of(id), light);
+    ctx.set_style(style);
+}
 
-    let palette = ALEPH;
-    let mut visuals = Visuals::dark();
+/// Aleph Studio theme (the studio default, dark ruby-black).
+pub fn apply_aleph_theme(ctx: &Context) {
+    set_palette(PaletteId::Aleph);
+    apply_active_theme(ctx);
+}
+
+/// Modrinth-style theme entry point (gray surfaces, green accent).
+pub fn apply_modrinth_theme(ctx: &Context) {
+    set_palette(PaletteId::Modrinth);
+    apply_active_theme(ctx);
+}
+
+/// Egui visuals derived from one concrete palette; `light` selects the light
+/// baseline (MultiMC/Legacy) instead of the dark one.
+fn visuals_from(palette: &Palette, light: bool) -> Visuals {
+    let mut visuals = if light {
+        Visuals::light()
+    } else {
+        Visuals::dark()
+    };
+    let rounding = Rounding::same(palette.rounding);
     visuals.panel_fill = palette.bg;
     visuals.window_fill = palette.card;
     visuals.extreme_bg_color = palette.field;
     visuals.faint_bg_color = palette.accent_soft;
     visuals.window_stroke = Stroke::new(1.0_f32, palette.border);
-    visuals.window_rounding = Rounding::ZERO;
-    visuals.menu_rounding = Rounding::ZERO;
+    visuals.window_rounding = rounding;
+    visuals.menu_rounding = rounding;
     visuals.window_shadow = egui::epaint::Shadow {
         offset: egui::vec2(0.0, 12.0),
         blur: 32.0,
         spread: 0.0,
-        color: Color32::from_black_alpha(160),
+        color: Color32::from_black_alpha(if light { 90 } else { 160 }),
     };
     visuals.popup_shadow = visuals.window_shadow;
     visuals.selection.bg_fill = with_alpha(palette.accent, 80);
     visuals.selection.stroke = Stroke::new(1.0_f32, palette.accent_light);
-    visuals.hyperlink_color = palette.accent_light;
+    visuals.hyperlink_color = if light {
+        palette.accent_dim
+    } else {
+        palette.accent_light
+    };
     visuals.override_text_color = Some(palette.text);
     visuals.striped = false;
 
     let card_stroke = Stroke::new(1.0_f32, palette.border_soft);
-    let accent_stroke = Stroke::new(1.0_f32, palette.border);
+    let hover_stroke = Stroke::new(1.0_f32, palette.hover_stroke);
     for widgets in [
         &mut visuals.widgets.noninteractive,
         &mut visuals.widgets.inactive,
@@ -653,81 +776,19 @@ pub fn apply_aleph_theme(ctx: &Context) {
         widgets.weak_bg_fill = palette.field;
         widgets.bg_stroke = card_stroke;
         widgets.fg_stroke = Stroke::new(1.0_f32, palette.text);
-        widgets.rounding = Rounding::ZERO;
+        widgets.rounding = rounding;
     }
     visuals.widgets.hovered.bg_fill = palette.card_hover;
     visuals.widgets.hovered.weak_bg_fill = palette.card_hover;
-    visuals.widgets.hovered.bg_stroke = accent_stroke;
+    visuals.widgets.hovered.bg_stroke = hover_stroke;
     visuals.widgets.hovered.fg_stroke = Stroke::new(1.0_f32, palette.head);
-    visuals.widgets.hovered.rounding = Rounding::ZERO;
+    visuals.widgets.hovered.rounding = rounding;
 
     visuals.widgets.active.bg_fill = palette.accent_soft;
     visuals.widgets.active.weak_bg_fill = palette.accent_soft;
     visuals.widgets.active.bg_stroke = Stroke::new(1.0_f32, palette.accent);
     visuals.widgets.active.fg_stroke = Stroke::new(1.0_f32, palette.accent_light);
-    visuals.widgets.active.rounding = Rounding::ZERO;
+    visuals.widgets.active.rounding = rounding;
 
-    style.visuals = visuals;
-
-    ctx.set_style(style);
-}
-
-/// Apply the Modrinth-style palette (gray surfaces, green accent) while the
-/// Modrinth shell is active. Mirrors [`apply_aleph_theme`]: the shared pages
-/// keep drawing with the Aleph constants, while egui-native widgets (scroll
-/// bars, text edits, tooltips, windows) and the shell's own panels pick up
-/// the gray/green look.
-pub fn apply_modrinth_theme(ctx: &Context) {
-    let mut style = (*ctx.style()).clone();
-    apply_common_style(&mut style);
-
-    let palette = palette_of(PaletteId::Modrinth);
-    let mut visuals = Visuals::dark();
-    visuals.panel_fill = palette.bg;
-    visuals.window_fill = palette.bg;
-    visuals.extreme_bg_color = palette.field;
-    visuals.faint_bg_color = palette.card;
-    visuals.window_stroke = Stroke::new(1.0_f32, palette.card);
-    visuals.window_rounding = Rounding::ZERO;
-    visuals.menu_rounding = Rounding::ZERO;
-    visuals.window_shadow = egui::epaint::Shadow {
-        offset: egui::vec2(0.0, 12.0),
-        blur: 32.0,
-        spread: 0.0,
-        color: Color32::from_black_alpha(160),
-    };
-    visuals.popup_shadow = visuals.window_shadow;
-    visuals.selection.bg_fill = with_alpha(palette.accent, 60);
-    visuals.selection.stroke = Stroke::new(1.0_f32, palette.accent);
-    visuals.hyperlink_color = palette.accent;
-    visuals.override_text_color = Some(palette.text);
-    visuals.striped = false;
-
-    let card_stroke = Stroke::new(1.0_f32, palette.card);
-    for widgets in [
-        &mut visuals.widgets.noninteractive,
-        &mut visuals.widgets.inactive,
-        &mut visuals.widgets.open,
-    ] {
-        widgets.bg_fill = palette.card;
-        widgets.weak_bg_fill = palette.field;
-        widgets.bg_stroke = card_stroke;
-        widgets.fg_stroke = Stroke::new(1.0_f32, palette.text);
-        widgets.rounding = Rounding::ZERO;
-    }
-    visuals.widgets.hovered.bg_fill = palette.card_hover;
-    visuals.widgets.hovered.weak_bg_fill = palette.card_hover;
-    visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, with_alpha(palette.accent, 150));
-    visuals.widgets.hovered.fg_stroke = Stroke::new(1.0_f32, palette.accent_light);
-    visuals.widgets.hovered.rounding = Rounding::ZERO;
-
-    visuals.widgets.active.bg_fill = palette.card_hover;
-    visuals.widgets.active.weak_bg_fill = palette.card_hover;
-    visuals.widgets.active.bg_stroke = Stroke::new(1.0_f32, palette.accent);
-    visuals.widgets.active.fg_stroke = Stroke::new(1.0_f32, palette.accent_light);
-    visuals.widgets.active.rounding = Rounding::ZERO;
-
-    style.visuals = visuals;
-
-    ctx.set_style(style);
+    visuals
 }

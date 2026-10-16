@@ -4,7 +4,7 @@ use crate::theme::{
 };
 use crate::widgets::icons::{self, Icon};
 use amc_auth::Account;
-use egui::{vec2, Color32, Pos2, Rect, Rounding, Sense, Stroke, Ui};
+use egui::{vec2, Color32, Pos2, Rect, Sense, Stroke, Ui};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct BottomBarResponse {
@@ -30,7 +30,7 @@ impl BottomBar {
 
         // Background and top border
         ui.painter()
-            .rect_filled(bar_rect, Rounding::ZERO, BG_ELEVATED);
+            .rect_filled(bar_rect, crate::theme::rounding(), BG_ELEVATED);
         ui.painter().line_segment(
             [bar_rect.left_top(), bar_rect.right_top()],
             Stroke::new(1.0_f32, BORDER_DEFAULT),
@@ -60,10 +60,12 @@ impl BottomBar {
         let (av_rect, _) = left_ui.allocate_exact_size(vec2(av_size, av_size), Sense::hover());
         left_ui
             .painter()
-            .rect_filled(av_rect, Rounding::ZERO, RUBY_DIM);
-        left_ui
-            .painter()
-            .rect_stroke(av_rect, Rounding::ZERO, Stroke::new(2.0_f32, RUBY));
+            .rect_filled(av_rect, crate::theme::rounding(), RUBY_DIM);
+        left_ui.painter().rect_stroke(
+            av_rect,
+            crate::theme::rounding(),
+            Stroke::new(2.0_f32, RUBY),
+        );
 
         if let Some(tex) = avatar_texture {
             left_ui.painter().image(
@@ -132,10 +134,10 @@ impl BottomBar {
 
         left_ui
             .painter()
-            .rect_filled(login_rect, Rounding::ZERO, login_bg);
+            .rect_filled(login_rect, crate::theme::rounding(), login_bg);
         left_ui.painter().rect_stroke(
             login_rect,
-            Rounding::ZERO,
+            crate::theme::rounding(),
             Stroke::new(1.0_f32, login_stroke),
         );
         left_ui.painter().text(
@@ -179,10 +181,12 @@ impl BottomBar {
 
         right_ui
             .painter()
-            .rect_filled(pa_rect, Rounding::ZERO, pa_bg);
-        right_ui
-            .painter()
-            .rect_stroke(pa_rect, Rounding::ZERO, Stroke::new(1.5_f32, pa_stroke));
+            .rect_filled(pa_rect, crate::theme::rounding(), pa_bg);
+        right_ui.painter().rect_stroke(
+            pa_rect,
+            crate::theme::rounding(),
+            Stroke::new(1.5_f32, pa_stroke),
+        );
         icons::draw_centered(
             right_ui.painter(),
             Icon::CaretDown,
@@ -228,10 +232,12 @@ impl BottomBar {
 
         right_ui
             .painter()
-            .rect_filled(pm_rect, Rounding::ZERO, pm_bg);
-        right_ui
-            .painter()
-            .rect_stroke(pm_rect, Rounding::ZERO, Stroke::new(2.0_f32, stroke_col));
+            .rect_filled(pm_rect, crate::theme::rounding(), pm_bg);
+        right_ui.painter().rect_stroke(
+            pm_rect,
+            crate::theme::rounding(),
+            Stroke::new(2.0_f32, stroke_col),
+        );
 
         // When launching: render sleek animated top scan-line (runs only during launch!)
         if is_launching {
@@ -248,7 +254,7 @@ impl BottomBar {
             );
             right_ui
                 .painter()
-                .rect_filled(scan_rect, Rounding::ZERO, Color32::WHITE);
+                .rect_filled(scan_rect, crate::theme::rounding(), Color32::WHITE);
             right_ui
                 .ctx()
                 .request_repaint_after(std::time::Duration::from_millis(16));

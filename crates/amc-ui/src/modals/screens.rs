@@ -1,4 +1,4 @@
-use egui::{vec2, Color32, Rounding, Sense, Stroke};
+use egui::{vec2, Color32, Sense, Stroke};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
@@ -107,10 +107,14 @@ impl ScreensModal {
                                     let tex = self.thumb(ui.ctx(), &path);
                                     let (rect, resp) =
                                         ui.allocate_exact_size(vec2(200.0, 120.0), Sense::click());
-                                    ui.painter().rect_filled(rect, Rounding::ZERO, BG_CARD);
+                                    ui.painter().rect_filled(
+                                        rect,
+                                        crate::theme::rounding(),
+                                        BG_CARD,
+                                    );
                                     ui.painter().rect_stroke(
                                         rect,
-                                        Rounding::ZERO,
+                                        crate::theme::rounding(),
                                         Stroke::new(1.0_f32, BORDER_DEFAULT),
                                     );
                                     if let Some(t) = tex {

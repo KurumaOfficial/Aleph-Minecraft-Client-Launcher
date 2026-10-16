@@ -1,4 +1,4 @@
-use egui::{vec2, Color32, Rounding, Ui};
+use egui::{vec2, Color32, Ui};
 
 pub fn draw_custom_badge(ui: &mut Ui, text: &str, bg_color: impl Into<Color32>) {
     let bg_color = bg_color.into();
@@ -11,7 +11,8 @@ pub fn draw_custom_badge(ui: &mut Ui, text: &str, bg_color: impl Into<Color32>) 
     let badge_size = text_size + padding * 2.0;
 
     let (rect, _) = ui.allocate_exact_size(badge_size, egui::Sense::hover());
-    ui.painter().rect_filled(rect, Rounding::ZERO, bg_color);
+    ui.painter()
+        .rect_filled(rect, crate::theme::rounding(), bg_color);
     ui.painter().text(
         rect.center(),
         egui::Align2::CENTER_CENTER,

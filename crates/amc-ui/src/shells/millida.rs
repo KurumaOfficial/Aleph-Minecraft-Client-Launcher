@@ -19,7 +19,7 @@ use crate::theme;
 use crate::widgets::icons::{self, Icon};
 use crate::widgets::NavTab;
 use amc_core::Language;
-use egui::{pos2, vec2, Align2, Color32, Rect, Rounding, Sense, Stroke, Ui};
+use egui::{pos2, vec2, Align2, Color32, Rect, Sense, Stroke, Ui};
 
 /// Left navigation rail width (reference: slim icon strip).
 pub const NAV_WIDTH: f32 = 56.0;
@@ -65,10 +65,11 @@ fn quick_play_button(ui: &mut Ui, lang: Language, launching: bool) -> bool {
         theme::RUBY
     };
     let fill = theme::lerp_color(base, theme::ACCENT_LIGHT, hover * 0.6);
-    ui.painter().rect_filled(rect, Rounding::ZERO, fill);
+    ui.painter()
+        .rect_filled(rect, crate::theme::rounding(), fill);
     ui.painter().rect_stroke(
         rect,
-        Rounding::ZERO,
+        crate::theme::rounding(),
         Stroke::new(1.0_f32, theme::BORDER_STRONG),
     );
 
@@ -109,7 +110,8 @@ pub fn show_nav(
 ) -> ShellAction {
     let mut action = ShellAction::default();
     let bar = ui.max_rect();
-    ui.painter().rect_filled(bar, Rounding::ZERO, theme::CARD);
+    ui.painter()
+        .rect_filled(bar, crate::theme::rounding(), theme::CARD);
     ui.painter().line_segment(
         [
             pos2(bar.right() - 0.5, bar.top()),
@@ -137,7 +139,8 @@ pub fn show_nav(
             } else {
                 theme::with_alpha(theme::CARD_HOVER, (hover * 255.0) as u8)
             };
-            ui.painter().rect_filled(rect, Rounding::ZERO, fill);
+            ui.painter()
+                .rect_filled(rect, crate::theme::rounding(), fill);
         }
         let glyph = if active {
             theme::HEAD.into()
@@ -223,10 +226,10 @@ pub fn show_lobby(
     // Hero / continue card.
     let (hero_rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 118.0), Sense::hover());
     ui.painter()
-        .rect_filled(hero_rect, Rounding::ZERO, theme::CARD);
+        .rect_filled(hero_rect, crate::theme::rounding(), theme::CARD);
     ui.painter().rect_stroke(
         hero_rect,
-        Rounding::ZERO,
+        crate::theme::rounding(),
         Stroke::new(1.0_f32, theme::BORDER),
     );
     ui.painter().rect_filled(
@@ -234,7 +237,7 @@ pub fn show_lobby(
             hero_rect.left_top(),
             pos2(hero_rect.left() + 3.0, hero_rect.bottom()),
         ),
-        Rounding::ZERO,
+        crate::theme::rounding(),
         theme::RUBY,
     );
 
@@ -296,7 +299,7 @@ pub fn show_lobby(
             let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
             ui.painter().rect_filled(
                 rect,
-                Rounding::ZERO,
+                crate::theme::rounding(),
                 theme::lerp_color(theme::CARD, theme::CARD_HOVER, hover),
             );
             let stroke = if hover > 0.5 {
@@ -305,7 +308,7 @@ pub fn show_lobby(
                 theme::BORDER
             };
             ui.painter()
-                .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0_f32, stroke));
+                .rect_stroke(rect, crate::theme::rounding(), Stroke::new(1.0_f32, stroke));
             icons::draw(
                 ui.painter(),
                 *icon,

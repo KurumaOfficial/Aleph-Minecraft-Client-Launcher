@@ -4,7 +4,7 @@ use crate::theme::{
 use crate::widgets::icons::{self, Icon};
 use amc_auth::{login_offline, Account, DeviceCodeResponse};
 use amc_core::Language;
-use egui::{vec2, Color32, Rounding, Sense, Stroke, TextEdit, Ui};
+use egui::{vec2, Color32, Sense, Stroke, TextEdit, Ui};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum LoginMode {
@@ -121,10 +121,11 @@ impl LoginModal {
                         let btn_bg = lerp_color(RUBY, RUBY_LIGHT, btn_hover);
                         let btn_stroke = lerp_color(RUBY_LIGHT, Color32::WHITE, btn_hover);
 
-                        ui.painter().rect_filled(btn_rect, Rounding::ZERO, btn_bg);
+                        ui.painter()
+                            .rect_filled(btn_rect, crate::theme::rounding(), btn_bg);
                         ui.painter().rect_stroke(
                             btn_rect,
-                            Rounding::ZERO,
+                            crate::theme::rounding(),
                             Stroke::new(1.0_f32, btn_stroke),
                         );
                         ui.painter().text(
@@ -208,10 +209,11 @@ impl LoginModal {
                             ui.vertical_centered(|ui| {
                                 let (rect, _) =
                                     ui.allocate_exact_size(vec2(260.0, 50.0), egui::Sense::hover());
-                                ui.painter().rect_filled(rect, Rounding::ZERO, BG_HOVER);
+                                ui.painter()
+                                    .rect_filled(rect, crate::theme::rounding(), BG_HOVER);
                                 ui.painter().rect_stroke(
                                     rect,
-                                    Rounding::ZERO,
+                                    crate::theme::rounding(),
                                     Stroke::new(2.0_f32, RUBY),
                                 );
                                 ui.painter().text(
@@ -299,9 +301,12 @@ impl LoginModal {
             act_t,
         );
 
-        ui.painter().rect_filled(rect, Rounding::ZERO, bg);
-        ui.painter()
-            .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0_f32, stroke_col));
+        ui.painter().rect_filled(rect, crate::theme::rounding(), bg);
+        ui.painter().rect_stroke(
+            rect,
+            crate::theme::rounding(),
+            Stroke::new(1.0_f32, stroke_col),
+        );
         ui.painter().text(
             rect.center(),
             egui::Align2::CENTER_CENTER,

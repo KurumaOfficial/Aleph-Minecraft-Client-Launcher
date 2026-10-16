@@ -2,7 +2,7 @@ use crate::theme::{RUBY, RUBY_LIGHT, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY};
 use crate::widgets::icons::{self, Icon};
 use amc_core::Language;
 use amc_downloader::DownloadProgress;
-use egui::{vec2, ProgressBar, Rounding};
+use egui::{vec2, ProgressBar};
 
 pub struct DownloadOverlay;
 
@@ -55,7 +55,7 @@ impl DownloadOverlay {
                 let bar = ProgressBar::new(ratio)
                     .text(format!("{:.1}%", progress.percent()))
                     .fill(RUBY.into())
-                    .rounding(Rounding::ZERO);
+                    .rounding(crate::theme::rounding());
 
                 ui.add(bar);
 

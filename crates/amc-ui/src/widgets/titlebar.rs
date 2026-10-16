@@ -2,7 +2,7 @@ use crate::theme::{
     lerp_color, BORDER_SUBTLE, RUBY_DIM, RUBY_LIGHT, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
 use crate::widgets::icons::{self, Icon};
-use egui::{vec2, Color32, Pos2, Rect, Response, Rounding, Sense, Stroke, Ui, ViewportCommand};
+use egui::{vec2, Color32, Pos2, Rect, Response, Sense, Stroke, Ui, ViewportCommand};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TitleBarResponse {
@@ -148,7 +148,7 @@ impl TitleBar {
         }
 
         if bg != Color32::TRANSPARENT {
-            ui.painter().rect_filled(rect, Rounding::ZERO, bg);
+            ui.painter().rect_filled(rect, crate::theme::rounding(), bg);
         }
 
         let target_line = if is_close {

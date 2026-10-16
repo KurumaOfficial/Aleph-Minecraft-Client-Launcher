@@ -3,7 +3,7 @@ use crate::theme::{
     TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
 use amc_auth::Account;
-use egui::{vec2, Color32, Rounding, Sense, Stroke, TextureOptions, Ui};
+use egui::{vec2, Color32, Sense, Stroke, TextureOptions, Ui};
 use image::RgbaImage;
 use std::path::PathBuf;
 
@@ -66,9 +66,13 @@ impl SkinsPage {
         let preview_height = 420.0;
         let (rect, _) = ui.allocate_exact_size(vec2(preview_width, preview_height), Sense::hover());
 
-        ui.painter().rect_filled(rect, Rounding::ZERO, BG_ELEVATED);
         ui.painter()
-            .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0_f32, BORDER_DEFAULT));
+            .rect_filled(rect, crate::theme::rounding(), BG_ELEVATED);
+        ui.painter().rect_stroke(
+            rect,
+            crate::theme::rounding(),
+            Stroke::new(1.0_f32, BORDER_DEFAULT),
+        );
 
         let mut child = ui.new_child(
             egui::UiBuilder::new()
@@ -103,9 +107,13 @@ impl SkinsPage {
                 cb_act,
             );
 
-            ui.painter().rect_filled(cb_rect, Rounding::ZERO, cb_bg);
             ui.painter()
-                .rect_stroke(cb_rect, Rounding::ZERO, Stroke::new(1.0_f32, cb_stroke));
+                .rect_filled(cb_rect, crate::theme::rounding(), cb_bg);
+            ui.painter().rect_stroke(
+                cb_rect,
+                crate::theme::rounding(),
+                Stroke::new(1.0_f32, cb_stroke),
+            );
             ui.painter().text(
                 cb_rect.center(),
                 egui::Align2::CENTER_CENTER,
@@ -137,9 +145,13 @@ impl SkinsPage {
                 sb_act,
             );
 
-            ui.painter().rect_filled(sb_rect, Rounding::ZERO, sb_bg);
             ui.painter()
-                .rect_stroke(sb_rect, Rounding::ZERO, Stroke::new(1.0_f32, sb_stroke));
+                .rect_filled(sb_rect, crate::theme::rounding(), sb_bg);
+            ui.painter().rect_stroke(
+                sb_rect,
+                crate::theme::rounding(),
+                Stroke::new(1.0_f32, sb_stroke),
+            );
             ui.painter().text(
                 sb_rect.center(),
                 egui::Align2::CENTER_CENTER,
@@ -162,10 +174,10 @@ impl SkinsPage {
             let (img_rect, _) = child.allocate_exact_size(vec2(130.0, 260.0), Sense::hover());
             child
                 .painter()
-                .rect_filled(img_rect, Rounding::ZERO, BG_HOVER);
+                .rect_filled(img_rect, crate::theme::rounding(), BG_HOVER);
             child.painter().rect_stroke(
                 img_rect,
-                Rounding::ZERO,
+                crate::theme::rounding(),
                 Stroke::new(1.0_f32, BORDER_STRONG),
             );
             child.painter().image(
@@ -198,9 +210,13 @@ impl SkinsPage {
             let up_bg = lerp_color(RUBY, RUBY_LIGHT, up_hover);
             let up_stroke = lerp_color(RUBY_LIGHT, Color32::WHITE, up_hover);
 
-            ui.painter().rect_filled(up_rect, Rounding::ZERO, up_bg);
             ui.painter()
-                .rect_stroke(up_rect, Rounding::ZERO, Stroke::new(1.0_f32, up_stroke));
+                .rect_filled(up_rect, crate::theme::rounding(), up_bg);
+            ui.painter().rect_stroke(
+                up_rect,
+                crate::theme::rounding(),
+                Stroke::new(1.0_f32, up_stroke),
+            );
             ui.painter().text(
                 up_rect.center(),
                 egui::Align2::CENTER_CENTER,
@@ -240,9 +256,13 @@ impl SkinsPage {
             let rs_stroke = lerp_color(BORDER_DEFAULT, RUBY, rs_hover);
             let rs_text = lerp_color(TEXT_PRIMARY, Color32::WHITE, rs_hover);
 
-            ui.painter().rect_filled(rs_rect, Rounding::ZERO, rs_bg);
             ui.painter()
-                .rect_stroke(rs_rect, Rounding::ZERO, Stroke::new(1.0_f32, rs_stroke));
+                .rect_filled(rs_rect, crate::theme::rounding(), rs_bg);
+            ui.painter().rect_stroke(
+                rs_rect,
+                crate::theme::rounding(),
+                Stroke::new(1.0_f32, rs_stroke),
+            );
             ui.painter().text(
                 rs_rect.center(),
                 egui::Align2::CENTER_CENTER,

@@ -1,5 +1,5 @@
 use crate::theme::{BG_ELEVATED, BORDER_DEFAULT, RUBY_LIGHT, TEXT_PRIMARY};
-use egui::{vec2, Align2, Color32, Rounding, Sense, Stroke};
+use egui::{vec2, Align2, Color32, Sense, Stroke};
 use std::time::{Duration, Instant};
 
 /// In-app toast notifications (CONCEPT "Уведомления", P10).
@@ -70,10 +70,11 @@ pub fn show_toasts(ctx: &egui::Context, toasts: &mut Vec<Toast>) {
             ui.vertical(|ui| {
                 for toast in toasts.iter() {
                     let (rect, _) = ui.allocate_exact_size(vec2(300.0, 44.0), Sense::hover());
-                    ui.painter().rect_filled(rect, Rounding::ZERO, BG_ELEVATED);
+                    ui.painter()
+                        .rect_filled(rect, crate::theme::rounding(), BG_ELEVATED);
                     ui.painter().rect_stroke(
                         rect,
-                        Rounding::ZERO,
+                        crate::theme::rounding(),
                         Stroke::new(1.0_f32, BORDER_DEFAULT),
                     );
                     ui.painter().rect_filled(
@@ -81,7 +82,7 @@ pub fn show_toasts(ctx: &egui::Context, toasts: &mut Vec<Toast>) {
                             rect.left_top(),
                             egui::pos2(rect.left() + 3.0, rect.bottom()),
                         ),
-                        Rounding::ZERO,
+                        crate::theme::rounding(),
                         toast.kind.accent(),
                     );
                     ui.painter().text(

@@ -91,7 +91,7 @@ pub fn show_sidebar(
     let mut action = ShellAction::default();
     let bar = ui.max_rect();
     ui.painter()
-        .rect_filled(bar, Rounding::ZERO, theme::MODRINTH_BG);
+        .rect_filled(bar, crate::theme::rounding(), theme::MODRINTH_BG);
     ui.painter().line_segment(
         [
             pos2(bar.right() - 0.5, bar.top()),

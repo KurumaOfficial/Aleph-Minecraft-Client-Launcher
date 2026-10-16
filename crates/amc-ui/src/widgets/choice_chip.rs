@@ -1,7 +1,7 @@
 use crate::theme::{
     lerp_color, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT, TEXT_MUTED, TEXT_PRIMARY,
 };
-use egui::{vec2, Color32, Rounding, Sense, Stroke, Ui};
+use egui::{vec2, Color32, Sense, Stroke, Ui};
 
 /// Selectable option chip shared by the settings groups and the first-run
 /// wizard. Returns true when clicked.
@@ -25,9 +25,12 @@ pub fn choice_chip(
         act_t,
     );
 
-    ui.painter().rect_filled(rect, Rounding::ZERO, bg);
-    ui.painter()
-        .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0_f32, stroke_col));
+    ui.painter().rect_filled(rect, crate::theme::rounding(), bg);
+    ui.painter().rect_stroke(
+        rect,
+        crate::theme::rounding(),
+        Stroke::new(1.0_f32, stroke_col),
+    );
     ui.painter().text(
         rect.center(),
         egui::Align2::CENTER_CENTER,

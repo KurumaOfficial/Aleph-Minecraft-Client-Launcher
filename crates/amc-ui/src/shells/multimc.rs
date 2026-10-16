@@ -21,7 +21,7 @@ use crate::theme;
 use crate::widgets::icons::{self, Icon};
 use crate::widgets::NavTab;
 use amc_core::Language;
-use egui::{pos2, vec2, Rounding, Sense, Stroke, Ui};
+use egui::{pos2, vec2, Sense, Stroke, Ui};
 
 /// Toolbar height (Prism: QToolBar-style 40px strip).
 pub const TOOLBAR_HEIGHT: f32 = 40.0;
@@ -64,7 +64,8 @@ pub fn show_toolbar(
     let mut action = ShellAction::default();
 
     let bar = ui.max_rect();
-    ui.painter().rect_filled(bar, Rounding::ZERO, theme::CARD);
+    ui.painter()
+        .rect_filled(bar, crate::theme::rounding(), theme::CARD);
     ui.painter().line_segment(
         [
             pos2(bar.left(), bar.bottom() - 0.5),
@@ -105,7 +106,8 @@ pub fn show_toolbar(
             } else {
                 theme::with_alpha(theme::CARD_HOVER, (hover * 255.0) as u8)
             };
-            ui.painter().rect_filled(rect, Rounding::ZERO, fill);
+            ui.painter()
+                .rect_filled(rect, crate::theme::rounding(), fill);
             let glyph = if active {
                 theme::HEAD.into()
             } else {
@@ -171,7 +173,8 @@ pub fn show_toolbar(
 /// Status bar: ready state on the left, launcher version on the right.
 pub fn show_status_bar(ui: &mut Ui, lang: Language, version: &str) {
     let bar = ui.max_rect();
-    ui.painter().rect_filled(bar, Rounding::ZERO, theme::CARD);
+    ui.painter()
+        .rect_filled(bar, crate::theme::rounding(), theme::CARD);
     ui.painter().line_segment(
         [
             pos2(bar.left(), bar.top() + 0.5),

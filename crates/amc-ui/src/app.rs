@@ -2841,17 +2841,22 @@ async fn resolve_java_for_install(
 
 impl App for LauncherApp {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
-        // Per-shell palette: Modrinth swaps the egui visuals (gray surfaces,
-        // green accent), every other shell uses the Aleph theme. Applied
-        // only when the shell actually changes, not per frame.
+        // Per-shell palette: each visual shell resolves the shared theme
+        // tokens against its own palette (MultiMC Qt light, Legacy Mojang
+        // light, Millida charcoal, Modrinth gray/green; the studio shells
+        // keep Aleph). Applied only when the shell actually changes.
         let palette_shell = self.config.app_mode.shell();
         if self.theme_shell != Some(palette_shell) {
             self.theme_shell = Some(palette_shell);
-            if palette_shell == amc_core::config::ShellKind::Modrinth {
-                crate::theme::apply_modrinth_theme(ctx);
-            } else {
-                apply_aleph_theme(ctx);
-            }
+            let palette = match palette_shell {
+                amc_core::config::ShellKind::Multimc => crate::theme::PaletteId::Multimc,
+                amc_core::config::ShellKind::Legacy => crate::theme::PaletteId::Legacy,
+                amc_core::config::ShellKind::Millida => crate::theme::PaletteId::Millida,
+                amc_core::config::ShellKind::Modrinth => crate::theme::PaletteId::Modrinth,
+                _ => crate::theme::PaletteId::Aleph,
+            };
+            crate::theme::set_palette(palette);
+            crate::theme::apply_active_theme(ctx);
         }
 
         // In-app hotkeys (CONCEPT, P10): Ctrl+1..6 switch tabs, the

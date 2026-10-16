@@ -8,7 +8,7 @@ use amc_auth::AccountManager;
 use amc_core::config::{AppMode, LauncherConfig};
 use amc_core::paths::LauncherPaths;
 use amc_core::Language;
-use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
+use egui::{vec2, Color32, ScrollArea, Sense, Stroke, TextEdit, Ui};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SettingsSubTab {
@@ -145,9 +145,12 @@ impl SettingsPage {
             act_t,
         );
 
-        ui.painter().rect_filled(rect, Rounding::ZERO, bg);
-        ui.painter()
-            .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0_f32, stroke_col));
+        ui.painter().rect_filled(rect, crate::theme::rounding(), bg);
+        ui.painter().rect_stroke(
+            rect,
+            crate::theme::rounding(),
+            Stroke::new(1.0_f32, stroke_col),
+        );
         ui.painter().text(
             rect.center(),
             egui::Align2::CENTER_CENTER,

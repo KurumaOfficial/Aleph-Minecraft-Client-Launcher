@@ -10,7 +10,7 @@ use crate::theme;
 use crate::widgets::icons::{self, Icon};
 use crate::widgets::NavTab;
 use amc_core::Language;
-use egui::{pos2, vec2, Color32, Rect, Rounding, Sense, Stroke, Ui};
+use egui::{pos2, vec2, Color32, Rect, Sense, Stroke, Ui};
 
 /// Dock height (slim strip, no text labels).
 pub const DOCK_HEIGHT: f32 = 46.0;
@@ -35,10 +35,11 @@ fn hero_play_button(ui: &mut Ui, lang: Language, launching: bool) -> bool {
         theme::RUBY
     };
     let fill = theme::lerp_color(base, theme::ACCENT_LIGHT, hover * 0.6);
-    ui.painter().rect_filled(rect, Rounding::ZERO, fill);
+    ui.painter()
+        .rect_filled(rect, crate::theme::rounding(), fill);
     ui.painter().rect_stroke(
         rect,
-        Rounding::ZERO,
+        crate::theme::rounding(),
         Stroke::new(1.0_f32, theme::BORDER_STRONG),
     );
 
@@ -164,7 +165,8 @@ pub fn show_screen(
 pub fn show_dock(ui: &mut Ui, lang: Language, current_tab: NavTab) -> ShellAction {
     let mut action = ShellAction::default();
     let bar = ui.max_rect();
-    ui.painter().rect_filled(bar, Rounding::ZERO, theme::BG);
+    ui.painter()
+        .rect_filled(bar, crate::theme::rounding(), theme::BG);
     ui.painter().line_segment(
         [
             pos2(bar.left(), bar.top() + 0.5),
@@ -188,7 +190,8 @@ pub fn show_dock(ui: &mut Ui, lang: Language, current_tab: NavTab) -> ShellActio
             } else {
                 theme::with_alpha(theme::CARD_HOVER, (hover * 255.0) as u8)
             };
-            ui.painter().rect_filled(rect, Rounding::ZERO, fill);
+            ui.painter()
+                .rect_filled(rect, crate::theme::rounding(), fill);
             let glyph = if active {
                 theme::HEAD.into()
             } else {

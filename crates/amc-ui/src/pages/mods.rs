@@ -5,7 +5,7 @@ use crate::theme::{
 use crate::widgets::icons::{self, icon_button, Icon};
 use amc_core::Language;
 use amc_mods::types::{LocalMod, ModCategory, ModSearchResult, ModSource, SearchSort};
-use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
+use egui::{vec2, Color32, ScrollArea, Sense, Stroke, TextEdit, Ui};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
@@ -244,9 +244,13 @@ impl ModsPage {
                 loc_act,
             );
 
-            ui.painter().rect_filled(loc_rect, Rounding::ZERO, loc_bg);
             ui.painter()
-                .rect_stroke(loc_rect, Rounding::ZERO, Stroke::new(1.0_f32, loc_stroke));
+                .rect_filled(loc_rect, crate::theme::rounding(), loc_bg);
+            ui.painter().rect_stroke(
+                loc_rect,
+                crate::theme::rounding(),
+                Stroke::new(1.0_f32, loc_stroke),
+            );
             ui.painter().text(
                 loc_rect.center(),
                 egui::Align2::CENTER_CENTER,
@@ -289,9 +293,13 @@ impl ModsPage {
                 sea_act,
             );
 
-            ui.painter().rect_filled(sea_rect, Rounding::ZERO, sea_bg);
             ui.painter()
-                .rect_stroke(sea_rect, Rounding::ZERO, Stroke::new(1.0_f32, sea_stroke));
+                .rect_filled(sea_rect, crate::theme::rounding(), sea_bg);
+            ui.painter().rect_stroke(
+                sea_rect,
+                crate::theme::rounding(),
+                Stroke::new(1.0_f32, sea_stroke),
+            );
             ui.painter().text(
                 sea_rect.center(),
                 egui::Align2::CENTER_CENTER,
@@ -450,10 +458,10 @@ impl ModsPage {
                     let bg = lerp_color(BG_CARD, BG_HOVER, hover_t);
                     let stroke_col = lerp_color(BORDER_DEFAULT, RUBY, hover_t);
 
-                    ui.painter().rect_filled(rect, Rounding::ZERO, bg);
+                    ui.painter().rect_filled(rect, crate::theme::rounding(), bg);
                     ui.painter().rect_stroke(
                         rect,
-                        Rounding::ZERO,
+                        crate::theme::rounding(),
                         Stroke::new(1.0_f32, stroke_col),
                     );
 
@@ -900,10 +908,10 @@ impl ModsPage {
                     let bg = lerp_color(BG_CARD, BG_HOVER, hover_t);
                     let stroke_col = lerp_color(BORDER_DEFAULT, RUBY, hover_t);
 
-                    ui.painter().rect_filled(rect, Rounding::ZERO, bg);
+                    ui.painter().rect_filled(rect, crate::theme::rounding(), bg);
                     ui.painter().rect_stroke(
                         rect,
-                        Rounding::ZERO,
+                        crate::theme::rounding(),
                         Stroke::new(1.0_f32, stroke_col),
                     );
 
@@ -1123,10 +1131,12 @@ impl ModsPage {
                         let ib_bg = lerp_color(RUBY, RUBY_LIGHT, ib_hover);
                         let ib_stroke = lerp_color(RUBY_LIGHT, Color32::WHITE, ib_hover);
 
-                        child.painter().rect_filled(ib_rect, Rounding::ZERO, ib_bg);
+                        child
+                            .painter()
+                            .rect_filled(ib_rect, crate::theme::rounding(), ib_bg);
                         child.painter().rect_stroke(
                             ib_rect,
-                            Rounding::ZERO,
+                            crate::theme::rounding(),
                             Stroke::new(1.0_f32, ib_stroke),
                         );
                         child.painter().text(

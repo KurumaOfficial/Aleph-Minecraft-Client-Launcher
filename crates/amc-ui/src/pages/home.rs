@@ -7,7 +7,7 @@ use crate::widgets::full::{ghost_link, image_cover, kicker, red_button, red_squa
 use crate::widgets::icons::{self, Icon};
 use amc_core::types::{GameVersion, ReleaseType};
 use amc_minecraft::{FavoriteServerEntry, ServerStatus};
-use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
+use egui::{vec2, Color32, ScrollArea, Sense, Stroke, TextEdit, Ui};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
@@ -173,9 +173,13 @@ impl HomePage {
             let sort_stroke = lerp_color(BORDER_DEFAULT, RUBY, sort_hover);
             let sort_text = lerp_color(TEXT_PRIMARY, Color32::WHITE, sort_hover);
 
-            ui.painter().rect_filled(sort_rect, Rounding::ZERO, sort_bg);
             ui.painter()
-                .rect_stroke(sort_rect, Rounding::ZERO, Stroke::new(1.0_f32, sort_stroke));
+                .rect_filled(sort_rect, crate::theme::rounding(), sort_bg);
+            ui.painter().rect_stroke(
+                sort_rect,
+                crate::theme::rounding(),
+                Stroke::new(1.0_f32, sort_stroke),
+            );
             let sort_galley = ui.painter().layout_no_wrap(
                 sort_label.to_owned(),
                 egui::FontId::proportional(12.0),
@@ -334,10 +338,10 @@ impl HomePage {
                         lerp_color(lerp_color(BORDER_DEFAULT, RUBY, hover_t), RUBY_LIGHT, sel_t);
                     let border_width = if is_selected { 1.5_f32 } else { 1.0_f32 };
 
-                    ui.painter().rect_filled(rect, Rounding::ZERO, bg);
+                    ui.painter().rect_filled(rect, crate::theme::rounding(), bg);
                     ui.painter().rect_stroke(
                         rect,
-                        Rounding::ZERO,
+                        crate::theme::rounding(),
                         Stroke::new(border_width, stroke_col),
                     );
 
@@ -348,7 +352,7 @@ impl HomePage {
                             egui::pos2(rect.left() + 3.0 * sel_t, rect.bottom()),
                         );
                         ui.painter()
-                            .rect_filled(bar_rect, Rounding::ZERO, RUBY_LIGHT);
+                            .rect_filled(bar_rect, crate::theme::rounding(), RUBY_LIGHT);
                     }
 
                     let mut child = ui.new_child(
@@ -691,12 +695,12 @@ impl HomePage {
         match &self.hero_texture {
             Some(tex) => image_cover(&painter, hero, tex, Color32::WHITE),
             None => {
-                painter.rect_filled(hero, Rounding::ZERO, BG_CARD);
+                painter.rect_filled(hero, crate::theme::rounding(), BG_CARD);
             }
         }
         painter.rect_filled(
             hero,
-            Rounding::ZERO,
+            crate::theme::rounding(),
             Color32::from_rgba_unmultiplied(8, 6, 6, 208),
         );
 
@@ -778,7 +782,7 @@ impl HomePage {
                     ui.set_width(w);
                     ui.painter().rect_filled(
                         egui::Rect::from_min_size(ui.min_rect().min, vec2(w, 1.0)),
-                        Rounding::ZERO,
+                        crate::theme::rounding(),
                         BORDER_STRONG,
                     );
                     ui.add_space(10.0);
@@ -839,7 +843,7 @@ impl HomePage {
                 let dim = egui::Rect::from_min_size(screen.min, screen.size());
                 painter.rect_filled(
                     dim,
-                    Rounding::ZERO,
+                    crate::theme::rounding(),
                     Color32::from_rgba_unmultiplied(0, 0, 0, (120.0 * anim) as u8),
                 );
                 let dim_resp = ui.interact(dim, ui.id().with("drawer-dim"), Sense::click());
@@ -851,8 +855,12 @@ impl HomePage {
                     }
                 }
 
-                painter.rect_filled(panel, Rounding::ZERO, BG_CARD);
-                painter.rect_stroke(panel, Rounding::ZERO, Stroke::new(1.0_f32, BORDER_DEFAULT));
+                painter.rect_filled(panel, crate::theme::rounding(), BG_CARD);
+                painter.rect_stroke(
+                    panel,
+                    crate::theme::rounding(),
+                    Stroke::new(1.0_f32, BORDER_DEFAULT),
+                );
 
                 let inner = panel.shrink(18.0);
                 ui.allocate_new_ui(egui::UiBuilder::new().max_rect(inner), |ui| {
@@ -945,9 +953,12 @@ impl HomePage {
             active_t,
         );
 
-        ui.painter().rect_filled(rect, Rounding::ZERO, bg);
-        ui.painter()
-            .rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0_f32, stroke_col));
+        ui.painter().rect_filled(rect, crate::theme::rounding(), bg);
+        ui.painter().rect_stroke(
+            rect,
+            crate::theme::rounding(),
+            Stroke::new(1.0_f32, stroke_col),
+        );
         ui.painter().text(
             rect.center(),
             egui::Align2::CENTER_CENTER,

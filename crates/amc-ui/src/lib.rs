@@ -6,4 +6,4 @@ pub mod theme;
 pub mod widgets;
 
 pub use app::LauncherApp;
-pub use theme::{apply_aleph_theme, apply_modrinth_theme, setup_fonts};
+pub use theme::{apply_active_theme, apply_aleph_theme, apply_modrinth_theme, setup_fonts};
