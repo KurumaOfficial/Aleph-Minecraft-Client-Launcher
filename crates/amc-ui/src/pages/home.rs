@@ -1,9 +1,10 @@
 use crate::theme::{
     lerp_color, ACCENT_DIM, BG_CARD, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, BORDER_STRONG, RUBY,
-    RUBY_DIM, RUBY_LIGHT, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
+    RUBY_DIM, RUBY_LIGHT, SUCCESS, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
 use crate::widgets::draw_custom_badge;
 use crate::widgets::full::{ghost_link, image_cover, kicker, red_button, red_square_deco, tag};
+use crate::widgets::icons::{self, Icon};
 use amc_core::types::{GameVersion, ReleaseType};
 use amc_minecraft::{FavoriteServerEntry, ServerStatus};
 use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
@@ -157,10 +158,11 @@ impl HomePage {
 
             ui.add_space(8.0);
 
-            // Sort Toggle Button
+            // Sort Toggle Button (label plus a painter-drawn caret: the
+            // bundled fonts carry no ▾/▴ coverage in the UI face).
             let sort_label = match self.sort_order {
-                SortOrder::Newest => format!("{} ▾", lang.home_sort_newest()),
-                SortOrder::Oldest => format!("{} ▴", lang.home_sort_oldest()),
+                SortOrder::Newest => lang.home_sort_newest(),
+                SortOrder::Oldest => lang.home_sort_oldest(),
             };
 
             let (sort_rect, sort_resp) = ui.allocate_exact_size(vec2(140.0, 32.0), Sense::click());
@@ -174,12 +176,33 @@ impl HomePage {
             ui.painter().rect_filled(sort_rect, Rounding::ZERO, sort_bg);
             ui.painter()
                 .rect_stroke(sort_rect, Rounding::ZERO, Stroke::new(1.0_f32, sort_stroke));
-            ui.painter().text(
-                sort_rect.center(),
-                egui::Align2::CENTER_CENTER,
-                &sort_label,
+            let sort_galley = ui.painter().layout_no_wrap(
+                sort_label.to_owned(),
                 egui::FontId::proportional(12.0),
                 sort_text,
+            );
+            let caret = match self.sort_order {
+                SortOrder::Newest => Icon::CaretDown,
+                SortOrder::Oldest => Icon::CaretUp,
+            };
+            let content_w = sort_galley.size().x + 16.0;
+            ui.painter().galley(
+                egui::pos2(
+                    sort_rect.center().x - content_w / 2.0,
+                    sort_rect.center().y - sort_galley.size().y / 2.0,
+                ),
+                sort_galley,
+                sort_text,
+            );
+            icons::draw(
+                ui.painter(),
+                caret,
+                egui::Rect::from_center_size(
+                    egui::pos2(sort_rect.right() - 14.0, sort_rect.center().y),
+                    vec2(10.0, 10.0),
+                ),
+                sort_text,
+                1.3,
             );
 
             if sort_resp.clicked() {
@@ -337,15 +360,21 @@ impl HomePage {
                     child.add_space(14.0);
 
                     // Version type icon
-                    let icon_glyph = match v.release_type {
-                        ReleaseType::Release => "📦",
-                        ReleaseType::Snapshot => "🧪",
-                        ReleaseType::Beta => "⚙",
-                        ReleaseType::Alpha => "🔨",
-                        ReleaseType::Old => "📜",
+                    let icon = match v.release_type {
+                        ReleaseType::Release => Icon::Package,
+                        ReleaseType::Snapshot => Icon::Flask,
+                        ReleaseType::Beta => Icon::Gear,
+                        ReleaseType::Alpha => Icon::Hammer,
+                        ReleaseType::Old => Icon::Doc,
                     };
-                    child.label(
-                        egui::RichText::new(icon_glyph).font(egui::FontId::proportional(18.0)),
+                    let (icon_rect, _) =
+                        child.allocate_exact_size(egui::Vec2::splat(18.0), Sense::hover());
+                    icons::draw(
+                        child.painter(),
+                        icon,
+                        icon_rect.shrink(1.0),
+                        TEXT_MUTED,
+                        1.4,
                     );
                     child.add_space(10.0);
 
@@ -580,9 +609,9 @@ impl HomePage {
                 );
                 ui.add_space(8.0);
                 if let Some(status) = self.fav_status.get(&fav.address) {
-                    let (dot, text) = if status.is_online {
+                    let (dot_color, text) = if status.is_online {
                         (
-                            "🟢",
+                            SUCCESS,
                             format!(
                                 "{} ms • {}/{} • {}",
                                 status.ping_ms,
@@ -592,13 +621,24 @@ impl HomePage {
                             ),
                         )
                     } else {
-                        ("🔴", status.motd.clone())
+                        (RUBY_LIGHT, status.motd.clone())
                     };
-                    ui.label(
-                        egui::RichText::new(format!("{dot} {text}"))
-                            .font(egui::FontId::proportional(12.0))
-                            .color(TEXT_MUTED),
-                    );
+                    ui.horizontal(|ui| {
+                        let (dot_rect, _) =
+                            ui.allocate_exact_size(vec2(10.0, 10.0), Sense::hover());
+                        icons::draw_centered(
+                            ui.painter(),
+                            Icon::Dot,
+                            dot_rect.center(),
+                            10.0,
+                            dot_color,
+                        );
+                        ui.label(
+                            egui::RichText::new(text)
+                                .font(egui::FontId::proportional(12.0))
+                                .color(TEXT_MUTED),
+                        );
+                    });
                 } else if self.fav_pinging {
                     ui.spinner();
                 }

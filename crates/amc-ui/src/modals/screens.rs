@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::theme::{BG_CARD, BORDER_DEFAULT, TEXT_MUTED};
+use crate::widgets::icons::{icon_button, Icon};
 
 /// Screenshot gallery modal (CONCEPT "Скриншоты", P10): thumbnails from
 /// every instance's `screenshots/` folder, click opens externally,
@@ -149,10 +150,7 @@ impl ScreensModal {
                                         ui.with_layout(
                                             egui::Layout::right_to_left(egui::Align::Center),
                                             |ui| {
-                                                if ui
-                                                    .button(
-                                                        egui::RichText::new("🗑").color(TEXT_MUTED),
-                                                    )
+                                                if icon_button(ui, Icon::Trash, TEXT_MUTED)
                                                     .clicked()
                                                     && std::fs::remove_file(&path).is_ok()
                                                 {

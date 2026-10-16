@@ -2,6 +2,7 @@ use crate::theme::{
     lerp_color, BG_ACTIVE, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, BORDER_STRONG, RUBY, RUBY_DIM,
     RUBY_LIGHT, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
+use crate::widgets::icons::{self, Icon};
 use amc_auth::Account;
 use egui::{vec2, Color32, Pos2, Rect, Rounding, Sense, Stroke, Ui};
 
@@ -72,11 +73,11 @@ impl BottomBar {
                 Color32::WHITE,
             );
         } else {
-            left_ui.painter().text(
+            icons::draw_centered(
+                left_ui.painter(),
+                Icon::Person,
                 av_rect.center(),
-                egui::Align2::CENTER_CENTER,
-                "👤",
-                egui::FontId::proportional(20.0),
+                22.0,
                 RUBY_LIGHT,
             );
         }
@@ -182,11 +183,11 @@ impl BottomBar {
         right_ui
             .painter()
             .rect_stroke(pa_rect, Rounding::ZERO, Stroke::new(1.5_f32, pa_stroke));
-        right_ui.painter().text(
+        icons::draw_centered(
+            right_ui.painter(),
+            Icon::CaretDown,
             pa_rect.center(),
-            egui::Align2::CENTER_CENTER,
-            "▾",
-            egui::FontId::proportional(16.0),
+            16.0,
             pa_fg,
         );
 

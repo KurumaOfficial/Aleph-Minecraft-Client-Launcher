@@ -2,6 +2,7 @@ use crate::theme::{
     lerp_color, BG_CARD, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT, SUCCESS,
     TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
+use crate::widgets::icons::{self, icon_button, Icon};
 use amc_core::Language;
 use amc_mods::types::{LocalMod, ModCategory, ModSearchResult, ModSource, SearchSort};
 use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
@@ -352,13 +353,23 @@ impl ModsPage {
                 ui.horizontal(|ui| {
                     let all_selected = !self.local_mods.is_empty()
                         && self.selected_local.len() == self.local_mods.len();
-                    if ui
-                        .button(if all_selected {
-                            "☐"
-                        } else {
-                            lang.batch_select_all()
-                        })
-                        .clicked()
+                    let batch_icon = if all_selected {
+                        Icon::Close
+                    } else {
+                        Icon::Check
+                    };
+                    let batch_font = egui::TextStyle::Button.resolve(ui.style());
+                    let batch_fill = ui.visuals().widgets.inactive.weak_bg_fill;
+                    if icons::icon_text_button(
+                        ui,
+                        batch_icon,
+                        None,
+                        lang.batch_select_all(),
+                        TEXT_PRIMARY,
+                        batch_font,
+                        batch_fill,
+                    )
+                    .clicked()
                     {
                         if all_selected {
                             self.selected_local.clear();
@@ -464,8 +475,17 @@ impl ModsPage {
                             .remove(&m.path.to_string_lossy().to_string());
                     }
 
-                    // Mod Icon
-                    child.label(egui::RichText::new("🧩").font(egui::FontId::proportional(20.0)));
+                    // Mod icon (painter vector: the bundled fonts carry no
+                    // emoji, so a glyph would render as a tofu box).
+                    let (mod_icon_rect, _) =
+                        child.allocate_exact_size(vec2(20.0, 20.0), Sense::hover());
+                    icons::draw_centered(
+                        child.painter(),
+                        Icon::Puzzle,
+                        mod_icon_rect.center(),
+                        18.0,
+                        TEXT_PRIMARY,
+                    );
                     child.add_space(10.0);
 
                     // Name + version with truncation
@@ -522,10 +542,7 @@ impl ModsPage {
                     child.add_space(8.0);
 
                     // Delete button
-                    if child
-                        .button(egui::RichText::new("🗑").color(TEXT_MUTED))
-                        .clicked()
-                    {
+                    if icon_button(&mut child, Icon::Trash, TEXT_MUTED).clicked() {
                         to_delete = Some(idx);
                     }
 
@@ -533,17 +550,17 @@ impl ModsPage {
                     if let Some(offer) = self.update_offers.get(&m.name).cloned() {
                         child.add_space(8.0);
                         let pinned = self.pinned_keys.contains(&offer.slug);
-                        if child
-                            .button(
-                                egui::RichText::new(if pinned { "📍" } else { "📌" })
-                                    .color(if pinned { RUBY_LIGHT } else { TEXT_MUTED }),
-                            )
-                            .on_hover_text(if pinned {
-                                lang.mods_unpin()
-                            } else {
-                                lang.mods_pin()
-                            })
-                            .clicked()
+                        if icon_button(
+                            &mut child,
+                            if pinned { Icon::Pin } else { Icon::PinOutline },
+                            if pinned { RUBY_LIGHT } else { TEXT_MUTED },
+                        )
+                        .on_hover_text(if pinned {
+                            lang.mods_unpin()
+                        } else {
+                            lang.mods_pin()
+                        })
+                        .clicked()
                         {
                             self.pin_toggle = Some(offer.slug.clone());
                         }
@@ -681,9 +698,18 @@ impl ModsPage {
 
             if self.search_provider == ModSource::Modrinth {
                 ui.add_space(8.0);
-                if ui
-                    .button(egui::RichText::new(format!("🔥 {}", lang.discover_title())))
-                    .clicked()
+                let btn_font = egui::TextStyle::Button.resolve(ui.style());
+                let btn_fill = ui.visuals().widgets.inactive.weak_bg_fill;
+                if icons::icon_text_button(
+                    ui,
+                    Icon::Flame,
+                    None,
+                    lang.discover_title(),
+                    TEXT_PRIMARY,
+                    btn_font,
+                    btn_fill,
+                )
+                .clicked()
                 {
                     self.search_query.clear();
                     if let Some(f) = on_search.take() {
@@ -708,33 +734,45 @@ impl ModsPage {
                     let cat_rp = self.search_category == ModCategory::ResourcePack;
                     let cat_sh = self.search_category == ModCategory::Shader;
 
-                    let b_mod = egui::Button::new(
-                        egui::RichText::new(format!("🧩 {}", lang.mods_cat_mods()))
-                            .font(egui::FontId::proportional(11.0))
-                            .color(if cat_mod { Color32::WHITE } else { TEXT_MUTED }),
+                    if icons::icon_text_button(
+                        ui,
+                        Icon::Puzzle,
+                        None,
+                        lang.mods_cat_mods(),
+                        if cat_mod { Color32::WHITE } else { TEXT_MUTED },
+                        egui::FontId::proportional(11.0),
+                        if cat_mod { RUBY } else { BG_ELEVATED },
                     )
-                    .fill(if cat_mod { RUBY } else { BG_ELEVATED });
-                    if ui.add(b_mod).clicked() {
+                    .clicked()
+                    {
                         self.search_category = ModCategory::Mod;
                     }
 
-                    let b_rp = egui::Button::new(
-                        egui::RichText::new(format!("🎨 {}", lang.mods_cat_resourcepacks()))
-                            .font(egui::FontId::proportional(11.0))
-                            .color(if cat_rp { Color32::WHITE } else { TEXT_MUTED }),
+                    if icons::icon_text_button(
+                        ui,
+                        Icon::Palette,
+                        None,
+                        lang.mods_cat_resourcepacks(),
+                        if cat_rp { Color32::WHITE } else { TEXT_MUTED },
+                        egui::FontId::proportional(11.0),
+                        if cat_rp { RUBY } else { BG_ELEVATED },
                     )
-                    .fill(if cat_rp { RUBY } else { BG_ELEVATED });
-                    if ui.add(b_rp).clicked() {
+                    .clicked()
+                    {
                         self.search_category = ModCategory::ResourcePack;
                     }
 
-                    let b_sh = egui::Button::new(
-                        egui::RichText::new(format!("☀️ {}", lang.mods_cat_shaders()))
-                            .font(egui::FontId::proportional(11.0))
-                            .color(if cat_sh { Color32::WHITE } else { TEXT_MUTED }),
+                    if icons::icon_text_button(
+                        ui,
+                        Icon::Sun,
+                        None,
+                        lang.mods_cat_shaders(),
+                        if cat_sh { Color32::WHITE } else { TEXT_MUTED },
+                        egui::FontId::proportional(11.0),
+                        if cat_sh { RUBY } else { BG_ELEVATED },
                     )
-                    .fill(if cat_sh { RUBY } else { BG_ELEVATED });
-                    if ui.add(b_sh).clicked() {
+                    .clicked()
+                    {
                         self.search_category = ModCategory::Shader;
                     }
                 }
@@ -744,22 +782,30 @@ impl ModsPage {
                 ui.add_space(12.0);
                 let sort_rel = self.search_sort == SearchSort::Relevance;
                 let sort_dl = self.search_sort == SearchSort::Downloads;
-                let b_rel = egui::Button::new(
-                    egui::RichText::new(format!("≡ {}", lang.mods_sort_relevance()))
-                        .font(egui::FontId::proportional(11.0))
-                        .color(if sort_rel { Color32::WHITE } else { TEXT_MUTED }),
+                if icons::icon_text_button(
+                    ui,
+                    Icon::List,
+                    None,
+                    lang.mods_sort_relevance(),
+                    if sort_rel { Color32::WHITE } else { TEXT_MUTED },
+                    egui::FontId::proportional(11.0),
+                    if sort_rel { RUBY } else { BG_ELEVATED },
                 )
-                .fill(if sort_rel { RUBY } else { BG_ELEVATED });
-                if ui.add(b_rel).clicked() {
+                .clicked()
+                {
                     self.search_sort = SearchSort::Relevance;
                 }
-                let b_dl = egui::Button::new(
-                    egui::RichText::new(format!("⬇ {}", lang.mods_sort_downloads()))
-                        .font(egui::FontId::proportional(11.0))
-                        .color(if sort_dl { Color32::WHITE } else { TEXT_MUTED }),
+                if icons::icon_text_button(
+                    ui,
+                    Icon::Download,
+                    None,
+                    lang.mods_sort_downloads(),
+                    if sort_dl { Color32::WHITE } else { TEXT_MUTED },
+                    egui::FontId::proportional(11.0),
+                    if sort_dl { RUBY } else { BG_ELEVATED },
                 )
-                .fill(if sort_dl { RUBY } else { BG_ELEVATED });
-                if ui.add(b_dl).clicked() {
+                .clicked()
+                {
                     self.search_sort = SearchSort::Downloads;
                 }
             });
@@ -861,13 +907,19 @@ impl ModsPage {
                             egui::Color32::WHITE,
                         );
                     } else {
-                        let icon_glyph = match item.source {
-                            ModSource::Modrinth => "🌐",
-                            ModSource::CurseForge => "🔥",
-                            ModSource::Local => "🧩",
+                        let source_icon = match item.source {
+                            ModSource::Modrinth => Icon::Globe,
+                            ModSource::CurseForge => Icon::Flame,
+                            ModSource::Local => Icon::Puzzle,
                         };
-                        child.label(
-                            egui::RichText::new(icon_glyph).font(egui::FontId::proportional(22.0)),
+                        let (src_rect, _) =
+                            child.allocate_exact_size(vec2(36.0, 36.0), Sense::hover());
+                        icons::draw_centered(
+                            child.painter(),
+                            source_icon,
+                            src_rect.center(),
+                            22.0,
+                            TEXT_PRIMARY,
                         );
                     }
                     child.add_space(12.0);
@@ -898,18 +950,22 @@ impl ModsPage {
                                     .font(egui::FontId::proportional(10.0))
                                     .color(RUBY_LIGHT),
                             );
-                            ui.label(
-                                egui::RichText::new(format!("⬇ {}", item.downloads))
-                                    .font(egui::FontId::proportional(10.0))
-                                    .color(TEXT_MUTED),
+                            icons::icon_label(
+                                ui,
+                                Icon::Download,
+                                &item.downloads.to_string(),
+                                TEXT_MUTED,
+                                egui::FontId::proportional(10.0),
                             );
                             // Rating from the marketplace (Modrinth follows);
                             // unknown (0) stays silent instead of guessing.
                             if item.rating > 0 {
-                                ui.label(
-                                    egui::RichText::new(format!("★ {}", item.rating))
-                                        .font(egui::FontId::proportional(10.0))
-                                        .color(TEXT_MUTED),
+                                icons::icon_label(
+                                    ui,
+                                    Icon::Star,
+                                    &item.rating.to_string(),
+                                    TEXT_MUTED,
+                                    egui::FontId::proportional(10.0),
                                 );
                             }
                         });
@@ -939,14 +995,22 @@ impl ModsPage {
                             if !item.loaders.is_empty() {
                                 hint.push_str(&format!(" • {}", item.loaders.join(" ")));
                             }
+                            let hint_color = if fits { SUCCESS } else { TEXT_MUTED };
                             if fits {
-                                hint = format!("✓ {hint}");
+                                icons::icon_label(
+                                    ui,
+                                    Icon::Check,
+                                    &hint,
+                                    hint_color,
+                                    egui::FontId::proportional(10.0),
+                                );
+                            } else {
+                                ui.label(
+                                    egui::RichText::new(hint)
+                                        .font(egui::FontId::proportional(10.0))
+                                        .color(hint_color),
+                                );
                             }
-                            ui.label(
-                                egui::RichText::new(hint)
-                                    .font(egui::FontId::proportional(10.0))
-                                    .color(if fits { SUCCESS } else { TEXT_MUTED }),
-                            );
                         }
                     });
 
@@ -959,17 +1023,21 @@ impl ModsPage {
                     };
                     if let Some(key) = wish_key {
                         let wished = wishlist.contains(&key);
-                        if child
-                            .button(
-                                egui::RichText::new(if wished { "♥" } else { "♡" })
-                                    .color(if wished { RUBY_LIGHT } else { TEXT_MUTED }),
-                            )
-                            .on_hover_text(if wished {
-                                lang.wishlist_remove()
+                        if icon_button(
+                            &mut child,
+                            if wished {
+                                Icon::Heart
                             } else {
-                                lang.wishlist_add()
-                            })
-                            .clicked()
+                                Icon::HeartOutline
+                            },
+                            if wished { RUBY_LIGHT } else { TEXT_MUTED },
+                        )
+                        .on_hover_text(if wished {
+                            lang.wishlist_remove()
+                        } else {
+                            lang.wishlist_add()
+                        })
+                        .clicked()
                         {
                             if wished {
                                 wishlist.retain(|k| k != &key);

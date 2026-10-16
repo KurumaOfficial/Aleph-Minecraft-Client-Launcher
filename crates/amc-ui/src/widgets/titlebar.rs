@@ -1,6 +1,7 @@
 use crate::theme::{
     lerp_color, BORDER_SUBTLE, RUBY_DIM, RUBY_LIGHT, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
+use crate::widgets::icons::{self, Icon};
 use egui::{vec2, Color32, Pos2, Rect, Response, Rounding, Sense, Stroke, Ui, ViewportCommand};
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -61,7 +62,7 @@ impl TitleBar {
             Pos2::new(controls_start_x, bar_rect.top()),
             vec2(button_w, height),
         );
-        let gal_resp = Self::draw_control_button(ui, gal_rect, "🖼", false);
+        let gal_resp = Self::draw_control_button(ui, gal_rect, Icon::Gallery, false);
         if gal_resp.clicked() {
             response.gallery_clicked = true;
         }
@@ -72,7 +73,7 @@ impl TitleBar {
             Pos2::new(controls_start_x + button_w, bar_rect.top()),
             vec2(button_w, height),
         );
-        let con_resp = Self::draw_control_button(ui, con_rect, "📟", false);
+        let con_resp = Self::draw_control_button(ui, con_rect, Icon::Console, false);
         if con_resp.clicked() {
             response.console_clicked = true;
         }
@@ -83,7 +84,7 @@ impl TitleBar {
             Pos2::new(controls_start_x + button_w * 2.0, bar_rect.top()),
             vec2(button_w, height),
         );
-        let dl_resp = Self::draw_control_button(ui, dl_rect, "⤓", false);
+        let dl_resp = Self::draw_control_button(ui, dl_rect, Icon::Download, false);
         if dl_resp.clicked() {
             response.downloads_clicked = true;
         }
@@ -94,18 +95,22 @@ impl TitleBar {
             Pos2::new(controls_start_x + button_w * 3.0, bar_rect.top()),
             vec2(button_w, height),
         );
-        if Self::draw_control_button(ui, min_rect, "—", false).clicked() {
+        if Self::draw_control_button(ui, min_rect, Icon::Minimize, false).clicked() {
             ui.ctx().send_viewport_cmd(ViewportCommand::Minimized(true));
         }
 
         // Maximize Button
         let is_maximized = ui.input(|i| i.viewport().maximized.unwrap_or(false));
-        let max_symbol = if is_maximized { "❐" } else { "□" };
+        let max_icon = if is_maximized {
+            Icon::Restore
+        } else {
+            Icon::Maximize
+        };
         let max_rect = Rect::from_min_size(
             Pos2::new(controls_start_x + button_w * 4.0, bar_rect.top()),
             vec2(button_w, height),
         );
-        if Self::draw_control_button(ui, max_rect, max_symbol, false).clicked() {
+        if Self::draw_control_button(ui, max_rect, max_icon, false).clicked() {
             ui.ctx()
                 .send_viewport_cmd(ViewportCommand::Maximized(!is_maximized));
         }
@@ -115,7 +120,7 @@ impl TitleBar {
             Pos2::new(controls_start_x + button_w * 5.0, bar_rect.top()),
             vec2(button_w, height),
         );
-        if Self::draw_control_button(ui, close_rect, "✕", true).clicked() {
+        if Self::draw_control_button(ui, close_rect, Icon::Close, true).clicked() {
             ui.ctx().send_viewport_cmd(ViewportCommand::Close);
         }
 
@@ -124,7 +129,7 @@ impl TitleBar {
         response
     }
 
-    fn draw_control_button(ui: &mut Ui, rect: Rect, symbol: &str, is_close: bool) -> Response {
+    fn draw_control_button(ui: &mut Ui, rect: Rect, icon: Icon, is_close: bool) -> Response {
         let resp = ui.allocate_rect(rect, Sense::click());
         let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
         let press_t = ui
@@ -146,20 +151,14 @@ impl TitleBar {
             ui.painter().rect_filled(rect, Rounding::ZERO, bg);
         }
 
-        let target_text = if is_close {
+        let target_line = if is_close {
             Color32::WHITE
         } else {
             TEXT_PRIMARY
         };
-        let text_color = lerp_color(TEXT_MUTED, target_text, hover_t);
+        let line_color = lerp_color(TEXT_MUTED, target_line, hover_t);
 
-        ui.painter().text(
-            rect.center(),
-            egui::Align2::CENTER_CENTER,
-            symbol,
-            egui::FontId::proportional(12.0),
-            text_color,
-        );
+        icons::draw(ui.painter(), icon, rect.shrink(11.5), line_color, 1.4);
 
         resp
     }

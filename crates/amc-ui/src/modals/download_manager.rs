@@ -1,4 +1,5 @@
 use crate::theme::{TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY};
+use crate::widgets::icons::{self, Icon};
 use amc_downloader::DownloadRecord;
 use egui::{vec2, ScrollArea};
 
@@ -50,16 +51,14 @@ impl DownloadManager {
                         ui.spacing_mut().item_spacing = vec2(0.0, 6.0);
                         for record in history.iter().rev() {
                             ui.horizontal(|ui| {
-                                let (glyph, col) = if record.ok {
-                                    ("✓", TEXT_MUTED)
+                                let (state_rect, _) =
+                                    ui.allocate_exact_size(vec2(12.0, 12.0), egui::Sense::hover());
+                                let (icon, col) = if record.ok {
+                                    (Icon::Check, TEXT_MUTED)
                                 } else {
-                                    ("✗", TEXT_PRIMARY)
+                                    (Icon::Close, TEXT_PRIMARY)
                                 };
-                                ui.label(
-                                    egui::RichText::new(glyph)
-                                        .font(egui::FontId::proportional(12.0))
-                                        .color(col),
-                                );
+                                icons::draw(ui.painter(), icon, state_rect, col, 1.4);
                                 let mut name = record.filename.clone();
                                 if name.chars().count() > 44 {
                                     name =

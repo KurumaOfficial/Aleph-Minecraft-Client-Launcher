@@ -1,4 +1,5 @@
 use crate::theme::{RUBY, RUBY_LIGHT, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY};
+use crate::widgets::icons::{self, Icon};
 use amc_core::Language;
 use amc_downloader::DownloadProgress;
 use egui::{vec2, ProgressBar, Rounding};
@@ -73,26 +74,32 @@ impl DownloadOverlay {
 
                 // Speed, Bytes, ETA in one row
                 ui.horizontal(|ui| {
-                    ui.label(
-                        egui::RichText::new(format!("💾 {}", progress.formatted_bytes(&lang)))
-                            .font(egui::FontId::proportional(12.0))
-                            .color(TEXT_PRIMARY),
+                    icons::icon_label(
+                        ui,
+                        Icon::Disk,
+                        &progress.formatted_bytes(&lang),
+                        TEXT_PRIMARY,
+                        egui::FontId::proportional(12.0),
                     );
 
                     ui.add_space(16.0);
 
-                    ui.label(
-                        egui::RichText::new(format!("⚡ {}", progress.formatted_speed(&lang)))
-                            .font(egui::FontId::proportional(12.0))
-                            .color(RUBY_LIGHT),
+                    icons::icon_label(
+                        ui,
+                        Icon::Bolt,
+                        &progress.formatted_speed(&lang),
+                        RUBY_LIGHT,
+                        egui::FontId::proportional(12.0),
                     );
 
                     ui.add_space(16.0);
 
-                    ui.label(
-                        egui::RichText::new(format!("⏳ {}", progress.formatted_eta(&lang)))
-                            .font(egui::FontId::proportional(12.0))
-                            .color(TEXT_MUTED),
+                    icons::icon_label(
+                        ui,
+                        Icon::Hourglass,
+                        &progress.formatted_eta(&lang),
+                        TEXT_MUTED,
+                        egui::FontId::proportional(12.0),
                     );
                 });
 

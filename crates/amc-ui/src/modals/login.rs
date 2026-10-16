@@ -1,6 +1,7 @@
 use crate::theme::{
     lerp_color, BG_ACTIVE, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT, TEXT_MUTED, TEXT_PRIMARY,
 };
+use crate::widgets::icons::{self, Icon};
 use amc_auth::{login_offline, Account, DeviceCodeResponse};
 use amc_core::Language;
 use egui::{vec2, Color32, Rounding, Sense, Stroke, TextEdit, Ui};
@@ -79,9 +80,12 @@ impl LoginModal {
                 ui.add_space(16.0);
 
                 if let Some(err) = &self.error_msg {
-                    ui.label(
-                        egui::RichText::new(format!("⚠ {err}"))
-                            .color(Color32::from_rgb(0xE8, 0x40, 0x40)),
+                    icons::icon_label(
+                        ui,
+                        Icon::Warning,
+                        err,
+                        Color32::from_rgb(0xE8, 0x40, 0x40),
+                        egui::TextStyle::Body.resolve(ui.style()),
                     );
                     ui.add_space(8.0);
                 }

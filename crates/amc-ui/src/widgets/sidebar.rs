@@ -2,6 +2,7 @@ use crate::theme::{
     lerp_color, BG_ELEVATED, BORDER_DEFAULT, BORDER_SUBTLE, RUBY, RUBY_DIM, RUBY_LIGHT, TEXT_DIM,
     TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
+use crate::widgets::icons::{self, Icon};
 use egui::{vec2, Color32, Pos2, Rect, Rounding, Sense, Stroke, Ui};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -35,27 +36,42 @@ impl Sidebar {
 
             // Navigation Items
             ui.add_space(8.0);
-            if Self::nav_item(ui, lang.nav_home(), "⌂", *current_tab == NavTab::Home) {
+            if Self::nav_item(
+                ui,
+                lang.nav_home(),
+                Icon::Home,
+                *current_tab == NavTab::Home,
+            ) {
                 *current_tab = NavTab::Home;
             }
             if Self::nav_item(
                 ui,
                 lang.nav_instances(),
-                "⊞",
+                Icon::Grid,
                 *current_tab == NavTab::Modpacks,
             ) {
                 *current_tab = NavTab::Modpacks;
             }
-            if Self::nav_item(ui, lang.nav_mods(), "◈", *current_tab == NavTab::Mods) {
+            if Self::nav_item(
+                ui,
+                lang.nav_mods(),
+                Icon::Diamond,
+                *current_tab == NavTab::Mods,
+            ) {
                 *current_tab = NavTab::Mods;
             }
-            if Self::nav_item(ui, lang.nav_skins(), "👤", *current_tab == NavTab::Skins) {
+            if Self::nav_item(
+                ui,
+                lang.nav_skins(),
+                Icon::Person,
+                *current_tab == NavTab::Skins,
+            ) {
                 *current_tab = NavTab::Skins;
             }
             if Self::nav_item(
                 ui,
                 lang.nav_profile(),
-                "🪪",
+                Icon::Card,
                 *current_tab == NavTab::Profile,
             ) {
                 *current_tab = NavTab::Profile;
@@ -82,13 +98,13 @@ impl Sidebar {
             if Self::nav_item(
                 ui,
                 lang.nav_settings(),
-                "⚙",
+                Icon::Gear,
                 *current_tab == NavTab::Settings,
             ) {
                 *current_tab = NavTab::Settings;
             }
 
-            if Self::nav_item(ui, lang.nav_exit(), "⏻", false) {
+            if Self::nav_item(ui, lang.nav_exit(), Icon::Power, false) {
                 exit_clicked = true;
             }
         });
@@ -153,7 +169,7 @@ impl Sidebar {
         );
     }
 
-    fn nav_item(ui: &mut Ui, label: &str, icon: &str, is_active: bool) -> bool {
+    fn nav_item(ui: &mut Ui, label: &str, icon: Icon, is_active: bool) -> bool {
         let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 38.0), Sense::click());
 
         let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
@@ -183,11 +199,11 @@ impl Sidebar {
         let text_color = lerp_color(normal_text, RUBY_LIGHT, active_t);
 
         // Icon
-        ui.painter().text(
-            Pos2::new(rect.left() + 16.0, rect.center().y),
-            egui::Align2::LEFT_CENTER,
+        icons::draw_centered(
+            ui.painter(),
             icon,
-            egui::FontId::proportional(14.0),
+            Pos2::new(rect.left() + 23.0, rect.center().y),
+            15.0,
             text_color,
         );
 

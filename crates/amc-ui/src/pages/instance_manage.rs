@@ -1,4 +1,5 @@
 use crate::theme::{TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY};
+use crate::widgets::icons::{self, Icon};
 use amc_core::types::Instance;
 use amc_core::{HealthReport, Language};
 use egui::{vec2, Color32, ScrollArea, TextEdit};
@@ -7,7 +8,7 @@ use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 /// Per-instance management modal (CONCEPT P2 + P9): world backups, config
-/// files and integrity live behind the 🛠 card button so the grid stays
+/// files and integrity live behind the wrench card button so the grid stays
 /// glanceable. All operations are synchronous filesystem work; nothing
 /// here touches `instances.json`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -373,7 +374,8 @@ impl InstanceManage {
         }
         // File filter (CONCEPT P2 config editor search).
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new("🔍").color(TEXT_MUTED));
+            let (rect, _) = ui.allocate_exact_size(egui::Vec2::splat(14.0), egui::Sense::hover());
+            icons::draw(ui.painter(), Icon::Search, rect, TEXT_MUTED, 1.3);
             ui.add(
                 TextEdit::singleline(&mut self.cfg_filter)
                     .hint_text(lang.editor_filter_hint())
@@ -437,7 +439,9 @@ impl InstanceManage {
                     // Hits memoized by (find, text_len); the full
                     // `to_lowercase` over up to 256KB runs only on change.
                     ui.horizontal(|ui| {
-                        ui.label(egui::RichText::new("⌕").color(TEXT_MUTED));
+                        let (find_rect, _) =
+                            ui.allocate_exact_size(vec2(12.0, 12.0), egui::Sense::hover());
+                        icons::draw(ui.painter(), Icon::Search, find_rect, TEXT_MUTED, 1.3);
                         ui.add(
                             TextEdit::singleline(&mut self.cfg_find)
                                 .hint_text(lang.editor_find_hint())
@@ -605,21 +609,31 @@ impl InstanceManage {
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 for check in &checks {
-                    let dot = if check.ok { "✓" } else { "✗" };
                     let color = if check.ok {
                         TEXT_MUTED
                     } else {
                         Color32::from_rgb(0xE8, 0x55, 0x70)
                     };
-                    let mut text = format!("{dot} {}", check.name);
+                    let mut text = check.name.clone();
                     if !check.detail.is_empty() {
                         text.push_str(&format!(" — {}", check.detail));
                     }
-                    ui.label(
-                        egui::RichText::new(text)
-                            .font(egui::FontId::monospace(11.0))
-                            .color(color),
-                    );
+                    ui.horizontal(|ui| {
+                        let (state_rect, _) =
+                            ui.allocate_exact_size(vec2(12.0, 12.0), egui::Sense::hover());
+                        icons::draw(
+                            ui.painter(),
+                            if check.ok { Icon::Check } else { Icon::Close },
+                            state_rect,
+                            color,
+                            1.3,
+                        );
+                        ui.label(
+                            egui::RichText::new(&text)
+                                .font(egui::FontId::monospace(11.0))
+                                .color(color),
+                        );
+                    });
                 }
             });
     }

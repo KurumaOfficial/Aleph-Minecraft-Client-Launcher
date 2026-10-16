@@ -2,6 +2,7 @@ pub mod badge;
 pub mod bottom_bar;
 pub mod choice_chip;
 pub mod full;
+pub mod icons;
 pub mod sidebar;
 pub mod titlebar;
 pub mod toasts;

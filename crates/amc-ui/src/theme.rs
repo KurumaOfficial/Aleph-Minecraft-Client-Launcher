@@ -224,6 +224,29 @@ pub fn setup_fonts(ctx: &Context) {
         .entry(FontFamily::Monospace)
         .or_default()
         .insert(1, "jb-mono-reg".to_owned());
+
+    // Belt and braces: the bundled faces have no emoji coverage, so every
+    // family ends with egui's emoji fonts. Chrome icons are painter-drawn
+    // vectors; this only keeps stray glyphs in user text off tofu boxes
+    // (e.g. a nickname pasted from a chat).
+    for family in [
+        FontFamily::Proportional,
+        FontFamily::Monospace,
+        FontFamily::Name("bold".into()),
+        FontFamily::Name("display".into()),
+        FontFamily::Name("displayreg".into()),
+        FontFamily::Name("mono".into()),
+        FontFamily::Name("serif".into()),
+        FontFamily::Name("serifit".into()),
+    ] {
+        let chain = fonts.families.entry(family).or_default();
+        for fallback in ["NotoEmoji-Regular", "emoji-icon-font"] {
+            if !chain.iter().any(|name| name == fallback) {
+                chain.push(fallback.to_owned());
+            }
+        }
+    }
+
     ctx.set_fonts(fonts);
 }
 

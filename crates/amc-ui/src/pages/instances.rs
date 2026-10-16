@@ -5,6 +5,7 @@ use crate::theme::{
 };
 use crate::widgets::choice_chip;
 use crate::widgets::full::tag;
+use crate::widgets::icons::{self, icon_button, Icon};
 use amc_auth::Account;
 use amc_core::types::{Instance, InstanceIcon, InstanceTemplate, LoaderType};
 use amc_core::Language;
@@ -540,19 +541,22 @@ impl InstancesPage {
         // Discover trending modpacks (CONCEPT P4): inside the instances
         // tab, never on the home screen.
         ui.horizontal(|ui| {
-            let label = if self.discover_open {
-                format!("🔥 {} ▾", lang.discover_title())
+            let caret = if self.discover_open {
+                Icon::CaretDown
             } else {
-                format!("🔥 {} ▸", lang.discover_title())
+                Icon::CaretRight
             };
-            if ui
-                .button(
-                    egui::RichText::new(label)
-                        .font(egui::FontId::proportional(14.0))
-                        .strong()
-                        .color(TEXT_HEADING),
-                )
-                .clicked()
+            let fill = ui.visuals().widgets.inactive.weak_bg_fill;
+            if icons::icon_text_button(
+                ui,
+                Icon::Flame,
+                Some(caret),
+                lang.discover_title(),
+                TEXT_HEADING,
+                egui::FontId::proportional(14.0),
+                fill,
+            )
+            .clicked()
             {
                 self.discover_open = !self.discover_open;
             }
@@ -584,16 +588,20 @@ impl InstancesPage {
                             .strong()
                             .color(TEXT_PRIMARY),
                     );
-                    ui.label(
-                        egui::RichText::new(format!("⬇ {}", pack.downloads))
-                            .font(egui::FontId::proportional(11.0))
-                            .color(TEXT_MUTED),
+                    icons::icon_label(
+                        ui,
+                        Icon::Download,
+                        &pack.downloads.to_string(),
+                        TEXT_MUTED,
+                        egui::FontId::proportional(11.0),
                     );
                     if pack.rating > 0 {
-                        ui.label(
-                            egui::RichText::new(format!("★ {}", pack.rating))
-                                .font(egui::FontId::proportional(11.0))
-                                .color(TEXT_MUTED),
+                        icons::icon_label(
+                            ui,
+                            Icon::Star,
+                            &pack.rating.to_string(),
+                            TEXT_MUTED,
+                            egui::FontId::proportional(11.0),
                         );
                     }
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -776,41 +784,42 @@ impl InstancesPage {
                         );
                     }
                     None => {
-                        let icon_glyph = match inst.icon.as_deref().and_then(InstanceIcon::glyph) {
-                            Some(glyph) => glyph,
-                            None => match inst.loader {
-                                LoaderType::Vanilla => "🟩",
-                                LoaderType::Fabric => "🧵",
-                                LoaderType::Quilt => "🪡",
-                                LoaderType::Forge => "🔨",
-                                LoaderType::NeoForge => "⚡",
-                                LoaderType::OptiFine => "✨",
-                            },
+                        let badge = match inst.icon.as_deref().and_then(icons::instance_preset) {
+                            Some(preset) => preset,
+                            None => icons::loader_badge(inst.loader),
                         };
                         ui.painter()
                             .rect_filled(icon_rect, Rounding::ZERO, RUBY_DIM);
-                        ui.painter().text(
+                        icons::draw_centered(
+                            ui.painter(),
+                            badge,
                             icon_rect.center(),
-                            egui::Align2::CENTER_CENTER,
-                            icon_glyph,
-                            egui::FontId::proportional(22.0),
+                            20.0,
                             Color32::WHITE,
                         );
                     }
                 }
                 ui.add_space(8.0);
                 ui.vertical(|inner| {
-                    let title = if inst.pinned {
-                        format!("{} 📌", truncate_name(&inst.name, 22))
-                    } else {
-                        truncate_name(&inst.name, 22)
-                    };
-                    inner.label(
-                        egui::RichText::new(title)
-                            .font(egui::FontId::proportional(15.0))
-                            .strong()
-                            .color(TEXT_HEADING),
-                    );
+                    inner.horizontal(|ui| {
+                        ui.label(
+                            egui::RichText::new(truncate_name(&inst.name, 22))
+                                .font(egui::FontId::proportional(15.0))
+                                .strong()
+                                .color(TEXT_HEADING),
+                        );
+                        if inst.pinned {
+                            let (pin_rect, _) =
+                                ui.allocate_exact_size(vec2(13.0, 13.0), Sense::hover());
+                            icons::draw_centered(
+                                ui.painter(),
+                                Icon::Pin,
+                                pin_rect.center(),
+                                12.0,
+                                RUBY_LIGHT,
+                            );
+                        }
+                    });
                     inner.label(
                         egui::RichText::new(format!("MC {}", inst.game_version))
                             .font(egui::FontId::proportional(12.0))
@@ -826,7 +835,7 @@ impl InstancesPage {
 
             card.add_space(6.0);
 
-            // Stats line: playtime, RAM, disk.
+            // Stats line: playtime, disk, RAM, sessions.
             let play_time_str = if inst.total_played_minutes == 0 {
                 lang.inst_never_played().to_string()
             } else if inst.total_played_minutes < 60 {
@@ -844,23 +853,38 @@ impl InstancesPage {
                 Some(bytes) => lang.disk_size(*bytes),
                 None => "…".to_string(),
             };
-            let ram_text = match inst.ram_mb {
-                Some(ram) => format!(" • {ram} MB"),
-                None => String::new(),
-            };
-            let sessions_text = if inst.sessions > 0 {
-                format!(" • ▶ {}", lang.inst_sessions_label(inst.sessions))
-            } else {
-                String::new()
-            };
-            card.label(
-                egui::RichText::new(format!(
-                    "• ⏱ {} • 💾 {size_text}{ram_text}{sessions_text}",
-                    lang.inst_playtime_label(&play_time_str)
-                ))
-                .font(egui::FontId::proportional(11.0))
-                .color(TEXT_MUTED),
-            );
+            card.horizontal(|ui| {
+                icons::icon_label(
+                    ui,
+                    Icon::Clock,
+                    &lang.inst_playtime_label(&play_time_str),
+                    TEXT_MUTED,
+                    egui::FontId::proportional(11.0),
+                );
+                icons::icon_label(
+                    ui,
+                    Icon::Disk,
+                    &size_text,
+                    TEXT_MUTED,
+                    egui::FontId::proportional(11.0),
+                );
+                if let Some(ram) = inst.ram_mb {
+                    ui.label(
+                        egui::RichText::new(format!("{ram} MB"))
+                            .font(egui::FontId::proportional(11.0))
+                            .color(TEXT_MUTED),
+                    );
+                }
+                if inst.sessions > 0 {
+                    icons::icon_label(
+                        ui,
+                        Icon::Play,
+                        &lang.inst_sessions_label(inst.sessions),
+                        TEXT_MUTED,
+                        egui::FontId::proportional(11.0),
+                    );
+                }
+            });
             if page.local_badges.get(&inst_id).copied().unwrap_or(false) {
                 card.label(
                     egui::RichText::new(lang.badge_local_mods())
@@ -870,10 +894,12 @@ impl InstancesPage {
                 );
             }
             if !inst.tags.is_empty() {
-                card.label(
-                    egui::RichText::new(format!("🏷 {}", truncate_name(&inst.tags.join(", "), 40)))
-                        .font(egui::FontId::proportional(11.0))
-                        .color(TEXT_MUTED),
+                icons::icon_label(
+                    &mut card,
+                    Icon::Tag,
+                    &truncate_name(&inst.tags.join(", "), 40),
+                    TEXT_MUTED,
+                    egui::FontId::proportional(11.0),
                 );
             }
 
@@ -882,16 +908,14 @@ impl InstancesPage {
             // Quick actions row.
             let inst_dir = inst.get_game_dir(instances_dir);
             card.horizontal(|ui| {
-                if ui
-                    .button(egui::RichText::new("📁").color(TEXT_PRIMARY))
+                if icon_button(ui, Icon::Folder, TEXT_PRIMARY)
                     .on_hover_text(lang.inst_btn_folder())
                     .clicked()
                 {
                     let _ = std::fs::create_dir_all(&inst_dir);
                     let _ = open::that(&inst_dir);
                 }
-                if ui
-                    .button(egui::RichText::new("⚙").color(TEXT_PRIMARY))
+                if icon_button(ui, Icon::Gear, TEXT_PRIMARY)
                     .on_hover_text(lang.inst_btn_edit())
                     .clicked()
                 {
@@ -915,8 +939,7 @@ impl InstancesPage {
                     page.edit_instance_post = inst.post_exit_cmd.clone();
                     page.show_edit_modal = true;
                 }
-                if ui
-                    .button(egui::RichText::new("📋").color(TEXT_PRIMARY))
+                if icon_button(ui, Icon::Clipboard, TEXT_PRIMARY)
                     .on_hover_text(lang.inst_btn_clone())
                     .clicked()
                 {
@@ -924,22 +947,19 @@ impl InstancesPage {
                     page.clone_with_saves = true;
                     page.show_clone_modal = true;
                 }
-                if ui
-                    .button(egui::RichText::new("🔗").color(TEXT_PRIMARY))
+                if icon_button(ui, Icon::Link, TEXT_PRIMARY)
                     .on_hover_text(lang.inst_btn_shortcut())
                     .clicked()
                 {
                     page.shortcut_request = Some(inst_id);
                 }
-                if ui
-                    .button(egui::RichText::new("🛠").color(TEXT_PRIMARY))
+                if icon_button(ui, Icon::Wrench, TEXT_PRIMARY)
                     .on_hover_text(lang.editor_title())
                     .clicked()
                 {
                     page.manage.open_for(inst_id);
                 }
-                if ui
-                    .button(egui::RichText::new("🗑").color(TEXT_MUTED))
+                if icon_button(ui, Icon::Trash, TEXT_MUTED)
                     .on_hover_text(lang.inst_btn_delete())
                     .clicked()
                 {
@@ -1307,7 +1327,7 @@ impl InstancesPage {
                     ui.label(egui::RichText::new(lang.inst_icon_title()).color(TEXT_PRIMARY));
                     ui.horizontal_wrapped(|ui| {
                         ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
-                        for (key, glyph) in InstanceIcon::ALL {
+                        for (key, _) in InstanceIcon::ALL {
                             let active = self.edit_instance_icon.as_deref() == Some(key);
                             let (rect, resp) =
                                 ui.allocate_exact_size(vec2(40.0, 40.0), Sense::click());
@@ -1324,11 +1344,11 @@ impl InstancesPage {
                                 Rounding::ZERO,
                                 Stroke::new(1.0_f32, stroke_col),
                             );
-                            ui.painter().text(
+                            icons::draw_centered(
+                                ui.painter(),
+                                icons::instance_preset(key).unwrap_or(Icon::Grid),
                                 rect.center(),
-                                egui::Align2::CENTER_CENTER,
-                                glyph,
-                                egui::FontId::proportional(20.0),
+                                20.0,
                                 TEXT_PRIMARY,
                             );
                             if resp.clicked() {

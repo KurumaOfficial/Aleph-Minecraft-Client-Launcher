@@ -3,6 +3,7 @@ use crate::theme::{
     TEXT_PRIMARY,
 };
 use crate::widgets::choice_chip;
+use crate::widgets::icons::{icon_button, Icon};
 use amc_auth::AccountManager;
 use amc_core::config::{AppMode, LauncherConfig};
 use amc_core::paths::LauncherPaths;
@@ -366,9 +367,7 @@ impl SettingsPage {
                     }
                 }
                 if config.root_override.is_some()
-                    && ui
-                        .button(egui::RichText::new("✕").color(TEXT_MUTED))
-                        .clicked()
+                    && icon_button(ui, Icon::Close, TEXT_MUTED).clicked()
                 {
                     config.root_override = None;
                 }
@@ -409,9 +408,7 @@ impl SettingsPage {
                     }
                 }
                 if config.world_backup_dir.is_some()
-                    && ui
-                        .button(egui::RichText::new("✕").color(TEXT_MUTED))
-                        .clicked()
+                    && icon_button(ui, Icon::Close, TEXT_MUTED).clicked()
                 {
                     config.world_backup_dir = None;
                 }
@@ -724,10 +721,7 @@ impl SettingsPage {
                             .color(TEXT_PRIMARY),
                     );
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui
-                            .button(egui::RichText::new("🗑").color(TEXT_MUTED))
-                            .clicked()
-                        {
+                        if icon_button(ui, Icon::Trash, TEXT_MUTED).clicked() {
                             delete_group = Some(name.clone());
                         }
                     });
@@ -804,7 +798,7 @@ impl SettingsPage {
                         .color(TEXT_HEADING),
                 );
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("↻").clicked() {
+                    if icon_button(ui, Icon::Refresh, TEXT_PRIMARY).clicked() {
                         self.java_scan = None;
                         self.java_scan_rx = None;
                         self.managed_runtimes = None;
@@ -922,10 +916,7 @@ impl SettingsPage {
                                 .font(egui::FontId::monospace(12.0))
                                 .color(TEXT_PRIMARY),
                         );
-                        if ui
-                            .button(egui::RichText::new("✕").color(TEXT_MUTED))
-                            .clicked()
-                        {
+                        if icon_button(ui, Icon::Close, TEXT_MUTED).clicked() {
                             delete_runtime = Some(name.clone());
                         }
                     });
@@ -961,10 +952,7 @@ impl SettingsPage {
                             .font(egui::FontId::monospace(12.0))
                             .color(TEXT_PRIMARY),
                     );
-                    if ui
-                        .button(egui::RichText::new("✕").color(TEXT_MUTED))
-                        .clicked()
-                    {
+                    if icon_button(ui, Icon::Close, TEXT_MUTED).clicked() {
                         to_remove = Some(idx);
                     }
                 });
@@ -1064,10 +1052,7 @@ impl SettingsPage {
                             .font(egui::FontId::monospace(12.0))
                             .color(TEXT_PRIMARY),
                     );
-                    if ui
-                        .button(egui::RichText::new("✕").color(TEXT_MUTED))
-                        .clicked()
-                    {
+                    if icon_button(ui, Icon::Close, TEXT_MUTED).clicked() {
                         game_arg_to_remove = Some(idx);
                     }
                 });

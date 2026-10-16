@@ -1,6 +1,7 @@
 use crate::theme::{
     lerp_color, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT, TEXT_MUTED, TEXT_PRIMARY,
 };
+use crate::widgets::icons::{self, Icon};
 use amc_core::Language;
 use egui::{vec2, Color32, Rounding, ScrollArea, Sense, Stroke, TextEdit};
 
@@ -288,9 +289,14 @@ impl ConsoleModal {
                         .inner_margin(egui::Margin::same(10.0))
                         .show(ui, |ui| {
                             ui.horizontal(|ui| {
-                                ui.label(
-                                    egui::RichText::new("⚠️")
-                                        .font(egui::FontId::proportional(22.0)),
+                                let (warn_rect, _) =
+                                    ui.allocate_exact_size(vec2(22.0, 22.0), Sense::hover());
+                                icons::draw_centered(
+                                    ui.painter(),
+                                    Icon::Warning,
+                                    warn_rect.center(),
+                                    20.0,
+                                    RUBY_LIGHT,
                                 );
                                 ui.vertical(|ui| {
                                     ui.horizontal(|ui| {
@@ -314,11 +320,12 @@ impl ConsoleModal {
                                             .color(TEXT_PRIMARY),
                                     );
                                     ui.add_space(2.0);
-                                    ui.label(
-                                        egui::RichText::new(format!("💡 {}", diag.solution))
-                                            .font(egui::FontId::proportional(12.0))
-                                            .strong()
-                                            .color(Color32::from_rgb(255, 204, 100)),
+                                    icons::icon_label(
+                                        ui,
+                                        Icon::Bulb,
+                                        &diag.solution,
+                                        Color32::from_rgb(255, 204, 100),
+                                        egui::FontId::proportional(12.0),
                                     );
                                 });
                             });
