@@ -17,6 +17,35 @@ pub enum SettingsSubTab {
     Accounts,
 }
 
+/// Localized (name, description) pair for a visual style row. Shared by the
+/// Settings page and the first-run wizard so both stay in sync.
+pub fn mode_labels(lang: Language, mode: AppMode) -> (&'static str, &'static str) {
+    match mode {
+        AppMode::Simple => (
+            lang.settings_mode_simple(),
+            lang.settings_mode_simple_desc(),
+        ),
+        AppMode::Professional => (lang.settings_mode_pro(), lang.settings_mode_pro_desc()),
+        AppMode::Multimc => (
+            lang.settings_mode_multimc(),
+            lang.settings_mode_multimc_desc(),
+        ),
+        AppMode::Ultra => (lang.settings_mode_ultra(), lang.settings_mode_ultra_desc()),
+        AppMode::Legacy => (
+            lang.settings_mode_legacy(),
+            lang.settings_mode_legacy_desc(),
+        ),
+        AppMode::Millida => (
+            lang.settings_mode_millida(),
+            lang.settings_mode_millida_desc(),
+        ),
+        AppMode::Modrinth => (
+            lang.settings_mode_modrinth(),
+            lang.settings_mode_modrinth_desc(),
+        ),
+    }
+}
+
 pub struct SettingsPage {
     pub sub_tab: SettingsSubTab,
     pub custom_jvm_arg_input: String,
@@ -173,15 +202,7 @@ impl SettingsPage {
             ui.add_space(8.0);
 
             for mode in AppMode::ALL {
-                let (name, desc) = match mode {
-                    AppMode::Simple => (
-                        lang.settings_mode_simple(),
-                        lang.settings_mode_simple_desc(),
-                    ),
-                    AppMode::Professional => {
-                        (lang.settings_mode_pro(), lang.settings_mode_pro_desc())
-                    }
-                };
+                let (name, desc) = mode_labels(lang, mode);
                 ui.horizontal(|ui| {
                     if choice_chip(ui, name, 170.0, 36.0, 12.5, config.app_mode == mode) {
                         config.app_mode = mode;

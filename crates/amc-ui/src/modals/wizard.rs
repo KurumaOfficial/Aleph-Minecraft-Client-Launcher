@@ -156,13 +156,7 @@ impl WizardFlow {
 
     fn show_mode(&mut self, ui: &mut Ui, lang: Language) {
         for mode in AppMode::ALL {
-            let (name, desc) = match mode {
-                AppMode::Simple => (
-                    lang.settings_mode_simple(),
-                    lang.settings_mode_simple_desc(),
-                ),
-                AppMode::Professional => (lang.settings_mode_pro(), lang.settings_mode_pro_desc()),
-            };
+            let (name, desc) = crate::pages::settings::mode_labels(lang, mode);
             ui.horizontal(|ui| {
                 if choice_chip(ui, name, 170.0, 36.0, 12.5, self.mode == mode) {
                     self.mode = mode;

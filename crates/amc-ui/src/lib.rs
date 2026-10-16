@@ -1,6 +1,7 @@
 pub mod app;
 pub mod modals;
 pub mod pages;
+pub mod shells;
 pub mod theme;
 pub mod widgets;
 

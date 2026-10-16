@@ -1938,6 +1938,161 @@ impl Language {
         }
     }
 
+    pub fn settings_mode_multimc(&self) -> &'static str {
+        match self {
+            Self::English => "MultiMC / Prism",
+            Self::Russian => "MultiMC / Prism",
+            Self::Ukrainian => "MultiMC / Prism",
+        }
+    }
+
+    pub fn settings_mode_multimc_desc(&self) -> &'static str {
+        match self {
+            Self::English => "Toolbar, build list and status bar",
+            Self::Russian => "Тулбар, список сборок и статус-бар",
+            Self::Ukrainian => "Тулбар, список збірок і статус-бар",
+        }
+    }
+
+    pub fn settings_mode_ultra(&self) -> &'static str {
+        match self {
+            Self::English => "Aleph Ultra",
+            Self::Russian => "Aleph Ультра",
+            Self::Ukrainian => "Aleph Ультра",
+        }
+    }
+
+    pub fn settings_mode_ultra_desc(&self) -> &'static str {
+        match self {
+            Self::English => "Nickname, version and Play — nothing else",
+            Self::Russian => "Ник, версия и Играть — больше ничего",
+            Self::Ukrainian => "Нік, версія та Грати — більше нічого",
+        }
+    }
+
+    pub fn settings_mode_legacy(&self) -> &'static str {
+        match self {
+            Self::English => "Legacy",
+            Self::Russian => "Legacy",
+            Self::Ukrainian => "Legacy",
+        }
+    }
+
+    pub fn settings_mode_legacy_desc(&self) -> &'static str {
+        match self {
+            Self::English => "Text tabs and a bottom Play panel",
+            Self::Russian => "Текстовые вкладки и нижняя панель Play",
+            Self::Ukrainian => "Текстові вкладки та нижня панель грати",
+        }
+    }
+
+    pub fn settings_mode_millida(&self) -> &'static str {
+        match self {
+            Self::English => "Millida",
+            Self::Russian => "Millida",
+            Self::Ukrainian => "Millida",
+        }
+    }
+
+    pub fn settings_mode_millida_desc(&self) -> &'static str {
+        match self {
+            Self::English => "Lobby tiles plus content pages",
+            Self::Russian => "Лобби-плитки плюс контентные страницы",
+            Self::Ukrainian => "Лобі-плитки та контентні сторінки",
+        }
+    }
+
+    pub fn settings_mode_modrinth(&self) -> &'static str {
+        match self {
+            Self::English => "Modrinth",
+            Self::Russian => "Modrinth",
+            Self::Ukrainian => "Modrinth",
+        }
+    }
+
+    pub fn settings_mode_modrinth_desc(&self) -> &'static str {
+        match self {
+            Self::English => "Sidebar navigation, green accents on gray",
+            Self::Russian => "Навигация-сайдбар, зелёные акценты на сером",
+            Self::Ukrainian => "Навігація-сайдбар, зелені акценти на сірому",
+        }
+    }
+
+    // ==========================================
+    // Alternative shells (visual styles)
+    // ==========================================
+    pub fn status_ready(&self) -> &'static str {
+        match self {
+            Self::English => "Ready",
+            Self::Russian => "Готово",
+            Self::Ukrainian => "Готово",
+        }
+    }
+
+    pub fn shell_nickname(&self) -> &'static str {
+        match self {
+            Self::English => "Nickname",
+            Self::Russian => "Никнейм",
+            Self::Ukrainian => "Нікнейм",
+        }
+    }
+
+    pub fn shell_version(&self) -> &'static str {
+        match self {
+            Self::English => "Version",
+            Self::Russian => "Версия",
+            Self::Ukrainian => "Версія",
+        }
+    }
+
+    pub fn shell_quick_play(&self) -> &'static str {
+        match self {
+            Self::English => "Continue",
+            Self::Russian => "Продолжить",
+            Self::Ukrainian => "Продовжити",
+        }
+    }
+
+    pub fn shell_lobby_title(&self) -> &'static str {
+        match self {
+            Self::English => "Game lobby",
+            Self::Russian => "Игровое лобби",
+            Self::Ukrainian => "Ігрове лобі",
+        }
+    }
+
+    pub fn shell_play_tile(&self) -> &'static str {
+        match self {
+            Self::English => "Play now",
+            Self::Russian => "Играть сейчас",
+            Self::Ukrainian => "Грати зараз",
+        }
+    }
+
+    pub fn shell_versions_tile(&self) -> &'static str {
+        match self {
+            Self::English => "Latest versions",
+            Self::Russian => "Последние версии",
+            Self::Ukrainian => "Останні версії",
+        }
+    }
+
+    pub fn shell_add_instance(&self) -> &'static str {
+        match self {
+            Self::English => "Add instance",
+            Self::Russian => "Добавить сборку",
+            Self::Ukrainian => "Додати збірку",
+        }
+    }
+
+    pub fn shell_launch_instance(&self) -> &'static str {
+        match self {
+            Self::English => "Launch",
+            Self::Russian => "Запустить",
+            Self::Ukrainian => "Запустити",
+        }
+    }
+
     // ==========================================
     // First-run wizard (ROADMAP P1)
     // ==========================================
@@ -3964,6 +4119,33 @@ mod tests {
             assert!(!lang.settings_mode_simple_desc().is_empty());
             assert!(!lang.settings_mode_pro().is_empty());
             assert!(!lang.settings_mode_pro_desc().is_empty());
+            for (name, desc) in [
+                (
+                    lang.settings_mode_multimc(),
+                    lang.settings_mode_multimc_desc(),
+                ),
+                (lang.settings_mode_ultra(), lang.settings_mode_ultra_desc()),
+                (
+                    lang.settings_mode_legacy(),
+                    lang.settings_mode_legacy_desc(),
+                ),
+                (
+                    lang.settings_mode_millida(),
+                    lang.settings_mode_millida_desc(),
+                ),
+                (
+                    lang.settings_mode_modrinth(),
+                    lang.settings_mode_modrinth_desc(),
+                ),
+                (lang.status_ready(), lang.shell_nickname()),
+                (lang.shell_version(), lang.shell_quick_play()),
+                (lang.shell_lobby_title(), lang.shell_play_tile()),
+                (lang.shell_versions_tile(), lang.shell_add_instance()),
+                (lang.shell_launch_instance(), lang.shell_quick_play()),
+            ] {
+                assert!(!name.is_empty());
+                assert!(!desc.is_empty());
+            }
             assert!(!lang.wizard_title().is_empty());
             assert!(!lang.wizard_step_language().is_empty());
             assert!(!lang.wizard_step_mode().is_empty());

@@ -78,26 +78,91 @@ impl Default for UiSettings {
     }
 }
 
-/// Launcher operation mode (CONCEPT "Режимы работы", ROADMAP P1).
+/// Launcher operation mode / visual style (CONCEPT "Режимы работы", ROADMAP P1).
 /// Persisted in `config.json`; freely switchable from Settings at any time.
+/// `Simple` / `Professional` are the original Aleph shells and keep their
+/// historical serde names, so existing configs load unchanged. Layouts that
+/// echo other launchers only rearrange AMC's own widgets and reuse no
+/// third-party assets (see `amc-ui::shells` for per-project credits).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum AppMode {
-    /// Single active setup with a quick-start button for newcomers.
+    /// Aleph simplified: sidebar + bottom Play bar.
     #[default]
     Simple,
-    /// Multiple isolated instances (MultiMC/Prism-grade).
+    /// Aleph professional: top nav bar with account chip + Play.
     Professional,
+    /// MultiMC/Prism-inspired: toolbar + instance list + status bar.
+    Multimc,
+    /// Aleph ultra-simplified: nickname + version + Play, no tabs.
+    Ultra,
+    /// Legacy-inspired: text tabs + footer Play bar.
+    Legacy,
+    /// Millida-inspired: lobby tiles + content.
+    Millida,
+    /// Modrinth-inspired: sidebar navigation, green accents on gray.
+    Modrinth,
+}
+
+/// Chrome shell a mode renders around the shared tab pages.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShellKind {
+    /// Sidebar navigation (Simple).
+    Sidebar,
+    /// Top navigation bar (Professional).
+    Topbar,
+    /// Standalone ultra-minimal screen (Ultra).
+    Ultra,
+    /// Toolbar + list + status bar (Multimc).
+    Multimc,
+    /// Text tabs + footer Play bar (Legacy).
+    Legacy,
+    /// Lobby tiles + content (Millida).
+    Millida,
+    /// Sidebar navigation with green accents (Modrinth).
+    Modrinth,
 }
 
 impl AppMode {
-    pub const ALL: [AppMode; 2] = [AppMode::Simple, AppMode::Professional];
+    pub const ALL: [AppMode; 7] = [
+        AppMode::Simple,
+        AppMode::Professional,
+        AppMode::Multimc,
+        AppMode::Ultra,
+        AppMode::Legacy,
+        AppMode::Millida,
+        AppMode::Modrinth,
+    ];
 
+    /// Cycle to the next mode in [`AppMode::ALL`] order.
     pub fn toggle(self) -> Self {
+        let pos = Self::ALL.iter().position(|m| *m == self).unwrap_or(0);
+        Self::ALL[(pos + 1) % Self::ALL.len()]
+    }
+
+    /// Chrome shell rendered for this mode.
+    pub fn shell(self) -> ShellKind {
         match self {
-            Self::Simple => Self::Professional,
-            Self::Professional => Self::Simple,
+            Self::Simple => ShellKind::Sidebar,
+            Self::Professional => ShellKind::Topbar,
+            Self::Multimc => ShellKind::Multimc,
+            Self::Ultra => ShellKind::Ultra,
+            Self::Legacy => ShellKind::Legacy,
+            Self::Millida => ShellKind::Millida,
+            Self::Modrinth => ShellKind::Modrinth,
         }
+    }
+
+    /// Whether the shared bottom bar (account chip + Play) is visible in
+    /// this mode. Alternative shells paint their own account/Play chrome,
+    /// so the shared bar stays hidden there to avoid duplicate buttons.
+    pub fn shows_bottom_bar(self) -> bool {
+        matches!(self, Self::Simple)
+    }
+
+    /// Whether the mode opens on the instance list instead of Home.
+    pub fn opens_on_instances(self) -> bool {
+        matches!(self, Self::Professional | Self::Multimc)
     }
 }
 
@@ -367,12 +432,50 @@ mod tests {
         let pro = serde_json::to_string(&AppMode::Professional).unwrap();
         assert_eq!(simple, "\"simple\"");
         assert_eq!(pro, "\"professional\"");
+        // Historical values from shipped configs must keep loading.
         assert_eq!(
             serde_json::from_str::<AppMode>("\"professional\"").unwrap(),
             AppMode::Professional
         );
-        assert_eq!(AppMode::Simple.toggle(), AppMode::Professional);
-        assert_eq!(AppMode::Professional.toggle(), AppMode::Simple);
+        assert_eq!(
+            serde_json::from_str::<AppMode>("\"simple\"").unwrap(),
+            AppMode::Simple
+        );
+    }
+
+    #[test]
+    fn test_app_mode_all_variants_roundtrip() {
+        for mode in AppMode::ALL {
+            let json = serde_json::to_string(&mode).unwrap();
+            let back: AppMode = serde_json::from_str(&json).unwrap();
+            assert_eq!(back, mode, "roundtrip for {mode:?}");
+        }
+    }
+
+    #[test]
+    fn test_app_mode_toggle_cycles_all() {
+        let mut mode = AppMode::Simple;
+        let mut seen = vec![mode];
+        for _ in 1..AppMode::ALL.len() {
+            mode = mode.toggle();
+            seen.push(mode);
+        }
+        assert_eq!(seen, AppMode::ALL.to_vec());
+        // One more toggle wraps back to the first style.
+        assert_eq!(mode.toggle(), AppMode::Simple);
+    }
+
+    #[test]
+    fn test_app_mode_shell_and_bar_semantics() {
+        assert_eq!(AppMode::Simple.shell(), ShellKind::Sidebar);
+        assert_eq!(AppMode::Professional.shell(), ShellKind::Topbar);
+        assert!(AppMode::Simple.shows_bottom_bar());
+        for mode in AppMode::ALL.iter().filter(|m| **m != AppMode::Simple) {
+            assert!(!mode.shows_bottom_bar(), "{mode:?} hides the shared bar");
+        }
+        assert!(AppMode::Professional.opens_on_instances());
+        assert!(AppMode::Multimc.opens_on_instances());
+        assert!(!AppMode::Ultra.opens_on_instances());
     }
 
     #[test]

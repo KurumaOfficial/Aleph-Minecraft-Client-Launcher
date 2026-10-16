@@ -182,9 +182,9 @@ impl LauncherApp {
 
         let lang = config.ui.language();
 
-        // Professional mode opens on instances (computed before `config` moves
-        // into the app struct below).
-        let initial_tab = if config.app_mode == amc_core::config::AppMode::Professional {
+        // Professional-style chrome opens on instances (computed before
+        // `config` moves into the app struct below).
+        let initial_tab = if config.app_mode.opens_on_instances() {
             NavTab::Modpacks
         } else {
             NavTab::Home
@@ -407,7 +407,7 @@ impl LauncherApp {
         if let Some(flow) = self.wizard.take() {
             self.config.ui.set_language(flow.language);
             self.config.app_mode = flow.mode;
-            self.current_tab = if flow.mode == amc_core::config::AppMode::Professional {
+            self.current_tab = if flow.mode.opens_on_instances() {
                 NavTab::Modpacks
             } else {
                 NavTab::Home
@@ -3591,38 +3591,55 @@ impl App for LauncherApp {
                 }
             });
 
-        // 2. Bottom control bar
-        TopBottomPanel::bottom("bottom_bar")
-            .exact_height(76.0)
-            .frame(egui::Frame::none())
-            .show(ctx, |ui| {
-                let active_acc = self.account_mgr.active_account();
-                let is_launching = self.is_launching;
+        // 2. Bottom control bar: only shells that keep the shared bar show
+        // it here. Alternative shells own their account/Play chrome, so the
+        // shared bar stays hidden to avoid duplicate buttons.
+        if self.config.app_mode.shows_bottom_bar() {
+            TopBottomPanel::bottom("bottom_bar")
+                .exact_height(76.0)
+                .frame(egui::Frame::none())
+                .show(ctx, |ui| {
+                    let active_acc = self.account_mgr.active_account();
+                    let is_launching = self.is_launching;
 
-                let bbar_resp = BottomBar::show(
-                    ui,
-                    active_acc,
-                    is_launching,
-                    self.avatar_texture.as_ref(),
-                    lang,
-                );
-                if bbar_resp.login_clicked {
-                    self.login_modal.is_open = true;
-                }
-                if bbar_resp.launch_clicked {
-                    self.handle_launch();
-                }
-                if bbar_resp.options_clicked {
-                    self.current_tab = NavTab::Settings;
-                }
-            });
+                    let bbar_resp = BottomBar::show(
+                        ui,
+                        active_acc,
+                        is_launching,
+                        self.avatar_texture.as_ref(),
+                        lang,
+                    );
+                    if bbar_resp.login_clicked {
+                        self.login_modal.is_open = true;
+                    }
+                    if bbar_resp.launch_clicked {
+                        self.handle_launch();
+                    }
+                    if bbar_resp.options_clicked {
+                        self.current_tab = NavTab::Settings;
+                    }
+                });
+        }
 
-        // 3. Navigation: Full-style top bar in Professional, sidebar in Simple.
-        // The slide id is driven in both branches so the animation replays
-        // on every mode switch.
+        // 3. Navigation chrome per shell. The slide id is driven in both
+        // branches so the animation replays on every mode switch. Shells
+        // beyond Sidebar/Topbar are wired in one at a time; they fall back
+        // to the Topbar layout until their module lands.
         let pro_slide_id = egui::Id::new("pro_topbar_slide");
-        let is_pro = self.config.app_mode == amc_core::config::AppMode::Professional;
-        if is_pro {
+        let shell = self.config.app_mode.shell();
+        if shell == amc_core::config::ShellKind::Sidebar {
+            ctx.animate_bool_responsive(pro_slide_id, false);
+            SidePanel::left("sidebar_panel")
+                .exact_width(170.0)
+                .resizable(false)
+                .frame(egui::Frame::none())
+                .show(ctx, |ui| {
+                    let exit_clicked = Sidebar::show(ui, &mut self.current_tab, lang);
+                    if exit_clicked {
+                        ui.ctx().send_viewport_cmd(ViewportCommand::Close);
+                    }
+                });
+        } else {
             let slide_t = ctx.animate_bool_responsive(pro_slide_id, true);
             let slide_px = (1.0 - slide_t) * topbar::TOPBAR_HEIGHT;
             let acc_name: Option<String> = self
@@ -3652,18 +3669,6 @@ impl App for LauncherApp {
                     }
                     if resp.play_clicked {
                         self.handle_launch();
-                    }
-                });
-        } else {
-            ctx.animate_bool_responsive(pro_slide_id, false);
-            SidePanel::left("sidebar_panel")
-                .exact_width(170.0)
-                .resizable(false)
-                .frame(egui::Frame::none())
-                .show(ctx, |ui| {
-                    let exit_clicked = Sidebar::show(ui, &mut self.current_tab, lang);
-                    if exit_clicked {
-                        ui.ctx().send_viewport_cmd(ViewportCommand::Close);
                     }
                 });
         }
