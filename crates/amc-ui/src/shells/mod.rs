@@ -33,6 +33,20 @@ pub mod multimc;
 pub mod ultra;
 
 use crate::widgets::NavTab;
+use amc_core::Language;
+
+/// Localized page name for a shared `NavTab` (used by shell toolbars and
+/// docks as button labels).
+pub fn tab_label(tab: NavTab, lang: Language) -> &'static str {
+    match tab {
+        NavTab::Home => lang.nav_home(),
+        NavTab::Modpacks => lang.nav_instances(),
+        NavTab::Mods => lang.nav_mods(),
+        NavTab::Skins => lang.nav_skins(),
+        NavTab::Profile => lang.nav_profile(),
+        NavTab::Settings => lang.nav_settings(),
+    }
+}
 
 /// Actions a shell asks the app to perform. The app maps them onto its
 /// existing handlers (tab switch, launch, login modal, exit), so shells

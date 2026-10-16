@@ -3674,6 +3674,19 @@ impl App for LauncherApp {
                         self.handle_launch();
                     }
                 });
+        } else if shell == amc_core::config::ShellKind::Ultra {
+            // Ultra: a slim centered icon dock; the Home tab itself is the
+            // minimal screen drawn in the central panel.
+            ctx.animate_bool_responsive(pro_slide_id, false);
+            TopBottomPanel::bottom("ultra_dock")
+                .exact_height(crate::shells::ultra::DOCK_HEIGHT)
+                .frame(egui::Frame::none())
+                .show(ctx, |ui| {
+                    let action = crate::shells::ultra::show_dock(ui, lang, self.current_tab);
+                    if let Some(tab) = action.tab {
+                        self.current_tab = tab;
+                    }
+                });
         } else {
             let slide_t = ctx.animate_bool_responsive(pro_slide_id, true);
             let slide_px = (1.0 - slide_t) * topbar::TOPBAR_HEIGHT;
@@ -3785,6 +3798,44 @@ impl App for LauncherApp {
 
                 match self.current_tab {
                     NavTab::Home => {
+                        if self.config.app_mode.shell() == amc_core::config::ShellKind::Ultra {
+                            // Ultra screen: wordmark, account, selected
+                            // instance, Play. Data is copied out first so
+                            // `handle_launch` can borrow `self` mutably.
+                            let account_name: Option<String> = self
+                                .account_mgr
+                                .active_account()
+                                .map(|a| a.username.clone());
+                            let instance: Option<(String, String, String)> = self
+                                .selected_instance
+                                .and_then(|id| self.instances.iter().find(|i| i.id == id))
+                                .map(|i| {
+                                    (
+                                        i.name.clone(),
+                                        i.game_version.clone(),
+                                        i.loader.as_str().to_string(),
+                                    )
+                                });
+                            let action = crate::shells::ultra::show_screen(
+                                &mut content_ui,
+                                lang,
+                                account_name.as_deref(),
+                                instance.as_ref().map(|(name, version, loader)| {
+                                    (name.as_str(), version.as_str(), loader.as_str())
+                                }),
+                                self.is_launching,
+                            );
+                            if let Some(tab) = action.tab {
+                                self.current_tab = tab;
+                            }
+                            if action.login {
+                                self.login_modal.is_open = true;
+                            }
+                            if action.launch {
+                                self.handle_launch();
+                            }
+                            return;
+                        }
                         let home_ctx = HomeContext {
                             versions_dir: &self.paths.versions_dir(),
                             instances_count: self.instances.len(),

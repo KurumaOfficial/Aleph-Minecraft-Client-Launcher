@@ -16,7 +16,7 @@
 //! account chip and Launch button, and the status bar repeats the ready
 //! state and the launcher version.
 
-use crate::shells::ShellAction;
+use crate::shells::{tab_label, ShellAction};
 use crate::theme;
 use crate::widgets::icons::{self, Icon};
 use crate::widgets::NavTab;
@@ -39,17 +39,6 @@ pub const TOOLBAR_TABS: [(NavTab, Icon); 5] = [
     (NavTab::Profile, Icon::Person),
     (NavTab::Settings, Icon::Gear),
 ];
-
-fn tab_label(tab: NavTab, lang: Language) -> &'static str {
-    match tab {
-        NavTab::Home => lang.nav_home(),
-        NavTab::Modpacks => lang.nav_instances(),
-        NavTab::Mods => lang.nav_mods(),
-        NavTab::Skins => lang.nav_skins(),
-        NavTab::Profile => lang.nav_profile(),
-        NavTab::Settings => lang.nav_settings(),
-    }
-}
 
 /// Vertical hairline between toolbar groups.
 fn toolbar_separator(ui: &mut Ui) {
