@@ -3639,6 +3639,41 @@ impl App for LauncherApp {
                         ui.ctx().send_viewport_cmd(ViewportCommand::Close);
                     }
                 });
+        } else if shell == amc_core::config::ShellKind::Multimc {
+            // MultiMC/Prism: main toolbar on top, status bar at the bottom,
+            // shared pages (opening on the instance list) in the middle.
+            ctx.animate_bool_responsive(pro_slide_id, false);
+            TopBottomPanel::bottom("multimc_status")
+                .exact_height(crate::shells::multimc::STATUS_HEIGHT)
+                .frame(egui::Frame::none())
+                .show(ctx, |ui| {
+                    crate::shells::multimc::show_status_bar(ui, lang, env!("CARGO_PKG_VERSION"));
+                });
+            let acc_name: Option<String> = self
+                .account_mgr
+                .active_account()
+                .map(|a| a.username.clone());
+            TopBottomPanel::top("multimc_toolbar")
+                .exact_height(crate::shells::multimc::TOOLBAR_HEIGHT)
+                .frame(egui::Frame::none())
+                .show(ctx, |ui| {
+                    let action = crate::shells::multimc::show_toolbar(
+                        ui,
+                        lang,
+                        self.current_tab,
+                        acc_name.as_deref(),
+                        self.is_launching,
+                    );
+                    if let Some(tab) = action.tab {
+                        self.current_tab = tab;
+                    }
+                    if action.login {
+                        self.login_modal.is_open = true;
+                    }
+                    if action.launch {
+                        self.handle_launch();
+                    }
+                });
         } else {
             let slide_t = ctx.animate_bool_responsive(pro_slide_id, true);
             let slide_px = (1.0 - slide_t) * topbar::TOPBAR_HEIGHT;
