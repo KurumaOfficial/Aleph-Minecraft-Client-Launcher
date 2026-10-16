@@ -362,6 +362,60 @@ impl Language {
         }
     }
 
+    /// Modrinth App shell: library page heading (reference: "Library").
+    pub fn inst_library_title(&self) -> &'static str {
+        match self {
+            Self::English => "Library",
+            Self::Russian => "Библиотека",
+            Self::Ukrainian => "Бібліотека",
+        }
+    }
+
+    /// Modrinth App shell: compact search placeholder (reference: "Search").
+    pub fn inst_library_search(&self) -> &'static str {
+        match self {
+            Self::English => "Search",
+            Self::Russian => "Поиск",
+            Self::Ukrainian => "Пошук",
+        }
+    }
+
+    /// Modrinth App shell: secondary "New group" toolbar button.
+    pub fn inst_btn_new_group(&self) -> &'static str {
+        match self {
+            Self::English => "New group",
+            Self::Russian => "Новая группа",
+            Self::Ukrainian => "Нова група",
+        }
+    }
+
+    /// Modrinth App shell: brand "New instance" toolbar button.
+    pub fn inst_btn_new_instance(&self) -> &'static str {
+        match self {
+            Self::English => "New instance",
+            Self::Russian => "Новая сборка",
+            Self::Ukrainian => "Нова збірка",
+        }
+    }
+
+    /// Modrinth App shell: group-by combobox value when grouping is off.
+    pub fn inst_group_none(&self) -> &'static str {
+        match self {
+            Self::English => "No grouping",
+            Self::Russian => "Без группировки",
+            Self::Ukrainian => "Без групування",
+        }
+    }
+
+    /// Modrinth App shell: filter combobox label (reference: "Filter by").
+    pub fn inst_filter_by(&self) -> &'static str {
+        match self {
+            Self::English => "Filter by",
+            Self::Russian => "Фильтр по",
+            Self::Ukrainian => "Фільтр за",
+        }
+    }
+
     pub fn inst_empty(&self) -> &'static str {
         match self {
             Self::English => "No instances created yet. Click '+ CREATE INSTANCE' to add one!",
@@ -4110,6 +4164,12 @@ mod tests {
             assert!(!lang.diag_mixin_title().is_empty());
             assert!(!lang.diag_gpu_title().is_empty());
             assert!(!lang.inst_btn_clone().is_empty());
+            assert!(!lang.inst_library_title().is_empty());
+            assert!(!lang.inst_library_search().is_empty());
+            assert!(!lang.inst_btn_new_group().is_empty());
+            assert!(!lang.inst_btn_new_instance().is_empty());
+            assert!(!lang.inst_group_none().is_empty());
+            assert!(!lang.inst_filter_by().is_empty());
             assert!(!lang.mods_cat_mods().is_empty());
             assert!(!lang.mods_cat_resourcepacks().is_empty());
             assert!(!lang.mods_cat_shaders().is_empty());

@@ -13,8 +13,9 @@
 //! AMC mapping: the sidebar carries the shared `NavTab` rows, the green Play
 //! button (the reference's primary action) and the account chip. The
 //! gray/green palette is applied to the egui visuals through
-//! [`crate::theme::apply_modrinth_theme`] while this shell is active; the
-//! shared pages keep their Aleph colors.
+//! [`crate::theme::apply_modrinth_theme`] while this shell is active. The
+//! instances page gains the reference's library layout (heading, toolbar,
+//! card grid) through `pages::instances::LibrarySkin::Modrinth`.
 
 use crate::shells::{tab_label, ShellAction};
 use crate::theme;

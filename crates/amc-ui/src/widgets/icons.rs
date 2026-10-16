@@ -34,6 +34,9 @@ pub enum Icon {
     ChevronRight,
     // Actions
     Search,
+    Sort,
+    Filter,
+    Plus,
     Trash,
     Folder,
     Refresh,
@@ -107,6 +110,9 @@ impl Icon {
         Icon::CaretRight,
         Icon::ChevronRight,
         Icon::Search,
+        Icon::Sort,
+        Icon::Filter,
+        Icon::Plus,
         Icon::Trash,
         Icon::Folder,
         Icon::Refresh,
@@ -323,6 +329,26 @@ pub fn draw(painter: &Painter, icon: Icon, rect: Rect, color: impl Into<Color32>
         Icon::Search => {
             circle(-0.18, -0.18, 0.58);
             seg(vec2(0.24, 0.24), vec2(0.85, 0.85));
+        }
+        Icon::Sort => {
+            seg(vec2(-0.72, -0.45), vec2(0.72, -0.45));
+            seg(vec2(-0.72, 0.0), vec2(0.32, 0.0));
+            seg(vec2(-0.72, 0.45), vec2(0.0, 0.45));
+        }
+        Icon::Filter => {
+            line(&[
+                vec2(-0.78, -0.5),
+                vec2(0.78, -0.5),
+                vec2(0.12, 0.1),
+                vec2(0.12, 0.62),
+                vec2(-0.12, 0.82),
+                vec2(-0.12, 0.1),
+                vec2(-0.78, -0.5),
+            ]);
+        }
+        Icon::Plus => {
+            seg(vec2(-0.62, 0.0), vec2(0.62, 0.0));
+            seg(vec2(0.0, -0.62), vec2(0.0, 0.62));
         }
         Icon::Trash => {
             seg(vec2(-0.78, -0.5), vec2(0.78, -0.5));

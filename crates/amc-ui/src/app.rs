@@ -3938,7 +3938,18 @@ impl App for LauncherApp {
                     }
                 }
 
-                match self.current_tab {
+                // Modrinth shell: the reference app opens on its library, so
+                // the Home tab shows the instance-library replica as well.
+                let active_tab = if self.config.app_mode.shell()
+                    == amc_core::config::ShellKind::Modrinth
+                    && self.current_tab == NavTab::Home
+                {
+                    NavTab::Modpacks
+                } else {
+                    self.current_tab
+                };
+
+                match active_tab {
                     NavTab::Home => {
                         if self.config.app_mode.shell() == amc_core::config::ShellKind::Ultra {
                             // Ultra screen: wordmark, account, selected
@@ -4053,6 +4064,13 @@ impl App for LauncherApp {
                                 &self.instances,
                             ),
                             suggested_ram_mb: self.hw_suggested_ram,
+                            skin: if self.config.app_mode.shell()
+                                == amc_core::config::ShellKind::Modrinth
+                            {
+                                crate::pages::instances::LibrarySkin::Modrinth
+                            } else {
+                                crate::pages::instances::LibrarySkin::Amc
+                            },
                         };
                         let action = self.instances_page.show(
                             &mut content_ui,

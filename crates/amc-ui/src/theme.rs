@@ -241,17 +241,23 @@ pub const ALEPH: Palette = Palette {
 // (`--surface-1` canvas, `--surface-3` raised rows, muted text, green
 // `--brand`); only colors and layout ideas are borrowed, no assets or code.
 
-/// Canvas (`--surface-1`).
+/// Canvas (`--surface-1` #16181c).
 pub const MODRINTH_BG: Color32 = Color32::from_rgb(0x16, 0x18, 0x1C);
-/// Raised rows / cards (`--surface-3`).
+/// Raised rows / cards (`--surface-3` #27292e).
 pub const MODRINTH_SURFACE: Color32 = Color32::from_rgb(0x27, 0x29, 0x2E);
-/// Hover state for rows.
-pub const MODRINTH_SURFACE_HOVER: Color32 = Color32::from_rgb(0x30, 0x33, 0x39);
-/// Inset fields / inputs.
-pub const MODRINTH_FIELD: Color32 = Color32::from_rgb(0x0E, 0x10, 0x13);
-/// Primary text (`--text-primary`).
+/// Buttons, inputs and hover rows (`--surface-4` #34363c).
+pub const MODRINTH_SURFACE_HOVER: Color32 = Color32::from_rgb(0x34, 0x36, 0x3C);
+/// Dividers and stronger outlines (`--surface-5` #42444a).
+pub const MODRINTH_SURFACE_HIGH: Color32 = Color32::from_rgb(0x42, 0x44, 0x4A);
+/// Inset fields / inputs (the reference uses the raised gray here too).
+pub const MODRINTH_FIELD: Color32 = Color32::from_rgb(0x34, 0x36, 0x3C);
+/// Primary text (`--color-base` #b0bac5).
 pub const MODRINTH_TEXT: Color32 = Color32::from_rgb(0xB0, 0xBA, 0xC5);
-/// Secondary text.
+/// Heading / contrast text (`--color-contrast` #ffffff).
+pub const MODRINTH_TEXT_CONTRAST: Color32 = Color32::from_rgb(0xFF, 0xFF, 0xFF);
+/// Secondary text (`--color-secondary` #96a2b0).
+pub const MODRINTH_TEXT_SECONDARY: Color32 = Color32::from_rgb(0x96, 0xA2, 0xB0);
+/// Faint secondary text.
 pub const MODRINTH_MUTED: Color32 = Color32::from_rgb(0x72, 0x7C, 0x88);
 /// Brand green (`--brand`).
 pub const MODRINTH_GREEN: Color32 = Color32::from_rgb(0x1B, 0xD9, 0x6A);
@@ -365,12 +371,12 @@ const MODRINTH: Palette = Palette {
     bg_active: MODRINTH_SURFACE_HOVER,
     border: Color32::from_rgb(0x1E, 0x20, 0x25),
     border_soft: Color32::from_rgb(0x1A, 0x1C, 0x20),
-    border_strong: MODRINTH_SURFACE_HOVER,
-    border_subtle: tint(MODRINTH_GREEN, 28),
-    border_default: tint(MODRINTH_GREEN, 45),
+    border_strong: tint(Color32::WHITE, 90),
+    border_subtle: MODRINTH_SURFACE_HOVER,
+    border_default: MODRINTH_SURFACE_HIGH,
     border_accent: tint(MODRINTH_GREEN, 100),
     text: MODRINTH_TEXT,
-    head: Color32::from_rgb(0xDE, 0xE7, 0xEF),
+    head: MODRINTH_TEXT_CONTRAST,
     muted: MODRINTH_MUTED,
     muted_dim: Color32::from_rgb(0x51, 0x59, 0x63),
     text_dim: Color32::from_rgb(0x5A, 0x63, 0x6E),
@@ -382,7 +388,7 @@ const MODRINTH: Palette = Palette {
     success: MODRINTH_GREEN,
     warn: Color32::from_rgb(0xF5, 0xA5, 0x24),
     info: Color32::from_rgb(0x7D, 0xB5, 0xFF),
-    hover_stroke: tint(MODRINTH_GREEN, 150),
+    hover_stroke: tint(Color32::WHITE, 70),
     rounding: 6.0,
 };
 
