@@ -10,7 +10,7 @@
 //! the panel shows the selected instance plus the ruby Play button, and all
 //! colors stay in the Aleph palette (no Mojang assets involved).
 
-use crate::shells::{tab_label, ShellAction};
+use crate::shells::{short_name, tab_label, ShellAction};
 use crate::theme;
 use crate::widgets::icons::{self, Icon};
 use crate::widgets::NavTab;
@@ -32,15 +32,6 @@ pub const TABS: [NavTab; 6] = [
     NavTab::Profile,
     NavTab::Settings,
 ];
-
-/// Cut a display name to `max` characters with an ellipsis.
-fn short_name(name: &str, max: usize) -> String {
-    if name.chars().count() <= max {
-        name.to_string()
-    } else {
-        format!("{}…", name.chars().take(max).collect::<String>())
-    }
-}
 
 /// Bottom Play button with a leading vector play mark.
 fn play_button(ui: &mut Ui, label: &str, launching: bool) -> bool {

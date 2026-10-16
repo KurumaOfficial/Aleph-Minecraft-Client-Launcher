@@ -48,6 +48,17 @@ pub fn tab_label(tab: NavTab, lang: Language) -> &'static str {
     }
 }
 
+/// Cut a display name to `max` characters with a trailing ellipsis (shell
+/// chrome: instance names in panels keep their row height instead of
+/// wrapping).
+pub fn short_name(name: &str, max: usize) -> String {
+    if name.chars().count() <= max {
+        name.to_string()
+    } else {
+        format!("{}…", name.chars().take(max).collect::<String>())
+    }
+}
+
 /// Actions a shell asks the app to perform. The app maps them onto its
 /// existing handlers (tab switch, launch, login modal, exit), so shells
 /// never touch launch or navigation state directly.
@@ -107,5 +118,17 @@ mod tests {
         assert!(base.login);
         assert!(base.exit);
         assert!(!base.launch);
+    }
+
+    #[test]
+    fn test_short_name_truncates_with_ellipsis() {
+        assert_eq!(short_name("Short", 10), "Short");
+        let long = "a".repeat(40);
+        let cut = short_name(&long, 30);
+        assert_eq!(cut.chars().count(), 31);
+        assert!(cut.ends_with('…'));
+        // Multi-byte characters count as characters, not bytes.
+        assert_eq!(short_name("Привет", 6), "Привет");
+        assert_eq!(short_name("Привет", 3), "При…");
     }
 }
