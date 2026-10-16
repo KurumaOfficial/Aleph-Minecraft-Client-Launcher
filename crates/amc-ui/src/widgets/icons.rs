@@ -713,17 +713,27 @@ pub fn icon_button(ui: &mut Ui, icon: Icon, color: impl Into<Color32>) -> Respon
         .ctx()
         .animate_bool_responsive(response.id, response.hovered());
     if hover > 0.02 {
+        let plate = if ui.visuals().dark_mode {
+            Color32::WHITE
+        } else {
+            Color32::BLACK
+        };
         ui.painter().rect_filled(
             rect,
-            Rounding::ZERO,
-            with_alpha(Color32::WHITE, (12.0 * hover) as u8),
+            crate::theme::rounding(),
+            with_alpha(plate, (12.0 * hover) as u8),
         );
     }
+    let hover_target = if ui.visuals().dark_mode {
+        Color32::WHITE
+    } else {
+        Color32::BLACK
+    };
     draw(
         ui.painter(),
         icon,
         rect.shrink(4.5),
-        lerp_color(color, Color32::WHITE, hover * 0.55),
+        lerp_color(color, hover_target, hover * 0.55),
         1.4,
     );
     if response.hovered() {

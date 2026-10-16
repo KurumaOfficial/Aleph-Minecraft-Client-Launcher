@@ -1,5 +1,5 @@
 use crate::theme::{
-    lerp_color, BORDER_SUBTLE, RUBY_DIM, RUBY_LIGHT, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
+    lerp_color, BORDER_SUBTLE, CARD_HOVER, DANGER, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
 use crate::widgets::icons::{self, Icon};
 use egui::{vec2, Color32, Pos2, Rect, Response, Sense, Stroke, Ui, ViewportCommand};
@@ -136,15 +136,15 @@ impl TitleBar {
             .ctx()
             .animate_bool_responsive(resp.id.with("pr"), resp.is_pointer_button_down_on());
 
-        let target_bg = if is_close {
-            RUBY_LIGHT.into()
+        let target_bg: Color32 = if is_close {
+            DANGER.into()
         } else {
-            Color32::from_rgb(0x18, 0x0E, 0x10)
+            CARD_HOVER.into()
         };
 
         let mut bg = lerp_color(Color32::TRANSPARENT, target_bg, hover_t);
         if is_close && press_t > 0.0 {
-            bg = lerp_color(bg, RUBY_DIM, press_t);
+            bg = lerp_color(bg, Color32::BLACK, press_t * 0.25);
         }
 
         if bg != Color32::TRANSPARENT {
