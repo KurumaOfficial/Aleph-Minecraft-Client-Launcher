@@ -3687,6 +3687,62 @@ impl App for LauncherApp {
                         self.current_tab = tab;
                     }
                 });
+        } else if shell == amc_core::config::ShellKind::Legacy {
+            // Legacy-inspired: plain text tabs on top with the account chip,
+            // and a Play panel at the bottom with the selected instance; the
+            // shared pages stay in the middle.
+            ctx.animate_bool_responsive(pro_slide_id, false);
+            let acc_name: Option<String> = self
+                .account_mgr
+                .active_account()
+                .map(|a| a.username.clone());
+            let play_instance: Option<(String, String, String)> = self
+                .selected_instance
+                .and_then(|id| self.instances.iter().find(|i| i.id == id))
+                .map(|i| {
+                    (
+                        i.name.clone(),
+                        i.game_version.clone(),
+                        i.loader.as_str().to_string(),
+                    )
+                });
+            let launching = self.is_launching;
+            TopBottomPanel::bottom("legacy_play")
+                .exact_height(crate::shells::legacy::PLAY_HEIGHT)
+                .frame(egui::Frame::none())
+                .show(ctx, |ui| {
+                    let action = crate::shells::legacy::show_play_bar(
+                        ui,
+                        lang,
+                        play_instance.as_ref().map(|(name, version, loader)| {
+                            (name.as_str(), version.as_str(), loader.as_str())
+                        }),
+                        launching,
+                    );
+                    if let Some(tab) = action.tab {
+                        self.current_tab = tab;
+                    }
+                    if action.launch {
+                        self.handle_launch();
+                    }
+                });
+            TopBottomPanel::top("legacy_tabs")
+                .exact_height(crate::shells::legacy::TABS_HEIGHT)
+                .frame(egui::Frame::none())
+                .show(ctx, |ui| {
+                    let action = crate::shells::legacy::show_tabs(
+                        ui,
+                        lang,
+                        self.current_tab,
+                        acc_name.as_deref(),
+                    );
+                    if let Some(tab) = action.tab {
+                        self.current_tab = tab;
+                    }
+                    if action.login {
+                        self.login_modal.is_open = true;
+                    }
+                });
         } else {
             let slide_t = ctx.animate_bool_responsive(pro_slide_id, true);
             let slide_px = (1.0 - slide_t) * topbar::TOPBAR_HEIGHT;
