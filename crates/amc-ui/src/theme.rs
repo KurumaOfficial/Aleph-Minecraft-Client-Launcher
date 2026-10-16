@@ -38,6 +38,32 @@ pub const WARN: Color32 = Color32::from_rgb(0xC0, 0x7A, 0x30);
 pub const INFO: Color32 = Color32::from_rgb(0x70, 0x90, 0xC8);
 
 // ---------------------------------------------------------------------------
+// Modrinth-style shell palette (green accent on gray surfaces)
+// ---------------------------------------------------------------------------
+// Values follow the public dark-theme CSS variables of the Modrinth app
+// (`--surface-1` canvas, `--surface-3` raised rows, muted text, green
+// `--brand`); only colors and layout ideas are borrowed, no assets or code.
+
+/// Canvas (`--surface-1`).
+pub const MODRINTH_BG: Color32 = Color32::from_rgb(0x16, 0x18, 0x1C);
+/// Raised rows / cards (`--surface-3`).
+pub const MODRINTH_SURFACE: Color32 = Color32::from_rgb(0x27, 0x29, 0x2E);
+/// Hover state for rows.
+pub const MODRINTH_SURFACE_HOVER: Color32 = Color32::from_rgb(0x30, 0x33, 0x39);
+/// Inset fields / inputs.
+pub const MODRINTH_FIELD: Color32 = Color32::from_rgb(0x0E, 0x10, 0x13);
+/// Primary text (`--text-primary`).
+pub const MODRINTH_TEXT: Color32 = Color32::from_rgb(0xB0, 0xBA, 0xC5);
+/// Secondary text.
+pub const MODRINTH_MUTED: Color32 = Color32::from_rgb(0x72, 0x7C, 0x88);
+/// Brand green (`--brand`).
+pub const MODRINTH_GREEN: Color32 = Color32::from_rgb(0x1B, 0xD9, 0x6A);
+/// Brand green, hover/light.
+pub const MODRINTH_GREEN_LIGHT: Color32 = Color32::from_rgb(0x43, 0xE4, 0x88);
+/// Brand green, disabled/launching.
+pub const MODRINTH_GREEN_DIM: Color32 = Color32::from_rgb(0x12, 0x8A, 0x45);
+
+// ---------------------------------------------------------------------------
 // Legacy aliases (same values, kept for existing widgets)
 // ---------------------------------------------------------------------------
 
@@ -250,13 +276,40 @@ pub fn setup_fonts(ctx: &Context) {
     ctx.set_fonts(fonts);
 }
 
-pub fn apply_aleph_theme(ctx: &Context) {
-    let mut style = (*ctx.style()).clone();
+/// Spacing and typography shared by every palette; palette functions only
+/// swap `style.visuals` after calling this.
+fn apply_common_style(style: &mut egui::Style) {
     style.animation_time = 0.15;
     style.spacing.item_spacing = egui::vec2(8.0, 8.0);
     style.spacing.button_padding = egui::vec2(12.0, 7.0);
     style.spacing.interact_size = egui::vec2(28.0, 26.0);
     style.spacing.scroll.bar_width = 6.0;
+
+    style.text_styles.insert(
+        TextStyle::Heading,
+        FontId::new(24.0, FontFamily::Name("display".into())),
+    );
+    style.text_styles.insert(
+        TextStyle::Body,
+        FontId::new(16.0, FontFamily::Name("serif".into())),
+    );
+    style.text_styles.insert(
+        TextStyle::Button,
+        FontId::new(12.0, FontFamily::Name("mono".into())),
+    );
+    style.text_styles.insert(
+        TextStyle::Small,
+        FontId::new(11.0, FontFamily::Name("mono".into())),
+    );
+    style.text_styles.insert(
+        TextStyle::Monospace,
+        FontId::new(12.5, FontFamily::Monospace),
+    );
+}
+
+pub fn apply_aleph_theme(ctx: &Context) {
+    let mut style = (*ctx.style()).clone();
+    apply_common_style(&mut style);
 
     let mut visuals = Visuals::dark();
     visuals.panel_fill = BG;
@@ -306,26 +359,64 @@ pub fn apply_aleph_theme(ctx: &Context) {
 
     style.visuals = visuals;
 
-    style.text_styles.insert(
-        TextStyle::Heading,
-        FontId::new(24.0, FontFamily::Name("display".into())),
-    );
-    style.text_styles.insert(
-        TextStyle::Body,
-        FontId::new(16.0, FontFamily::Name("serif".into())),
-    );
-    style.text_styles.insert(
-        TextStyle::Button,
-        FontId::new(12.0, FontFamily::Name("mono".into())),
-    );
-    style.text_styles.insert(
-        TextStyle::Small,
-        FontId::new(11.0, FontFamily::Name("mono".into())),
-    );
-    style.text_styles.insert(
-        TextStyle::Monospace,
-        FontId::new(12.5, FontFamily::Monospace),
-    );
+    ctx.set_style(style);
+}
+
+/// Apply the Modrinth-style palette (gray surfaces, green accent) while the
+/// Modrinth shell is active. Mirrors [`apply_aleph_theme`]: the shared pages
+/// keep drawing with the Aleph constants, while egui-native widgets (scroll
+/// bars, text edits, tooltips, windows) and the shell's own panels pick up
+/// the gray/green look.
+pub fn apply_modrinth_theme(ctx: &Context) {
+    let mut style = (*ctx.style()).clone();
+    apply_common_style(&mut style);
+
+    let mut visuals = Visuals::dark();
+    visuals.panel_fill = MODRINTH_BG;
+    visuals.window_fill = MODRINTH_BG;
+    visuals.extreme_bg_color = MODRINTH_FIELD;
+    visuals.faint_bg_color = MODRINTH_SURFACE;
+    visuals.window_stroke = Stroke::new(1.0_f32, MODRINTH_SURFACE);
+    visuals.window_rounding = Rounding::ZERO;
+    visuals.menu_rounding = Rounding::ZERO;
+    visuals.window_shadow = egui::epaint::Shadow {
+        offset: egui::vec2(0.0, 12.0),
+        blur: 32.0,
+        spread: 0.0,
+        color: Color32::from_black_alpha(160),
+    };
+    visuals.popup_shadow = visuals.window_shadow;
+    visuals.selection.bg_fill = with_alpha(MODRINTH_GREEN, 60);
+    visuals.selection.stroke = Stroke::new(1.0_f32, MODRINTH_GREEN);
+    visuals.hyperlink_color = MODRINTH_GREEN;
+    visuals.override_text_color = Some(MODRINTH_TEXT);
+    visuals.striped = false;
+
+    let card_stroke = Stroke::new(1.0_f32, MODRINTH_SURFACE);
+    for widgets in [
+        &mut visuals.widgets.noninteractive,
+        &mut visuals.widgets.inactive,
+        &mut visuals.widgets.open,
+    ] {
+        widgets.bg_fill = MODRINTH_SURFACE;
+        widgets.weak_bg_fill = MODRINTH_FIELD;
+        widgets.bg_stroke = card_stroke;
+        widgets.fg_stroke = Stroke::new(1.0_f32, MODRINTH_TEXT);
+        widgets.rounding = Rounding::ZERO;
+    }
+    visuals.widgets.hovered.bg_fill = MODRINTH_SURFACE_HOVER;
+    visuals.widgets.hovered.weak_bg_fill = MODRINTH_SURFACE_HOVER;
+    visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, with_alpha(MODRINTH_GREEN, 150));
+    visuals.widgets.hovered.fg_stroke = Stroke::new(1.0_f32, MODRINTH_GREEN_LIGHT);
+    visuals.widgets.hovered.rounding = Rounding::ZERO;
+
+    visuals.widgets.active.bg_fill = MODRINTH_SURFACE_HOVER;
+    visuals.widgets.active.weak_bg_fill = MODRINTH_SURFACE_HOVER;
+    visuals.widgets.active.bg_stroke = Stroke::new(1.0_f32, MODRINTH_GREEN);
+    visuals.widgets.active.fg_stroke = Stroke::new(1.0_f32, MODRINTH_GREEN_LIGHT);
+    visuals.widgets.active.rounding = Rounding::ZERO;
+
+    style.visuals = visuals;
 
     ctx.set_style(style);
 }

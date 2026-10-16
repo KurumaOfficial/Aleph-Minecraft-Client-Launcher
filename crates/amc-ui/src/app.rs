@@ -122,6 +122,10 @@ pub struct LauncherApp {
     /// Last autosaved config for the Settings tab (avoids per-frame FS
     /// writes; persists only on actual change).
     settings_saved_config: Option<LauncherConfig>,
+    /// Shell whose palette is currently applied to the egui style; the
+    /// Modrinth shell swaps the visuals, so the theme is re-applied only
+    /// when the shell actually changes.
+    theme_shell: Option<amc_core::config::ShellKind>,
 }
 
 /// Outcome of a mod installation batch (CONCEPT P4): downloaded files plus
@@ -278,6 +282,7 @@ impl LauncherApp {
             ms_code_rx: None,
             ms_poll_rx: None,
             settings_saved_config: None,
+            theme_shell: None,
             pending_direct_connect: None,
         }
     }
@@ -2836,6 +2841,19 @@ async fn resolve_java_for_install(
 
 impl App for LauncherApp {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
+        // Per-shell palette: Modrinth swaps the egui visuals (gray surfaces,
+        // green accent), every other shell uses the Aleph theme. Applied
+        // only when the shell actually changes, not per frame.
+        let palette_shell = self.config.app_mode.shell();
+        if self.theme_shell != Some(palette_shell) {
+            self.theme_shell = Some(palette_shell);
+            if palette_shell == amc_core::config::ShellKind::Modrinth {
+                crate::theme::apply_modrinth_theme(ctx);
+            } else {
+                apply_aleph_theme(ctx);
+            }
+        }
+
         // In-app hotkeys (CONCEPT, P10): Ctrl+1..6 switch tabs, the
         // configured key plays. Skipped while typing or when a modal
         // grabs input.
@@ -3769,6 +3787,37 @@ impl App for LauncherApp {
                         self.login_modal.is_open = true;
                     }
                 });
+        } else if shell == amc_core::config::ShellKind::Modrinth {
+            // Modrinth: sidebar navigation over gray surfaces with the green
+            // accent (egui visuals are swapped at the top of `update`).
+            ctx.animate_bool_responsive(pro_slide_id, false);
+            let acc_name: Option<String> = self
+                .account_mgr
+                .active_account()
+                .map(|a| a.username.clone());
+            let launching = self.is_launching;
+            SidePanel::left("modrinth_sidebar")
+                .exact_width(crate::shells::modrinth::SIDEBAR_WIDTH)
+                .resizable(false)
+                .frame(egui::Frame::none())
+                .show(ctx, |ui| {
+                    let action = crate::shells::modrinth::show_sidebar(
+                        ui,
+                        lang,
+                        self.current_tab,
+                        acc_name.as_deref(),
+                        launching,
+                    );
+                    if let Some(tab) = action.tab {
+                        self.current_tab = tab;
+                    }
+                    if action.login {
+                        self.login_modal.is_open = true;
+                    }
+                    if action.launch {
+                        self.handle_launch();
+                    }
+                });
         } else {
             let slide_t = ctx.animate_bool_responsive(pro_slide_id, true);
             let slide_px = (1.0 - slide_t) * topbar::TOPBAR_HEIGHT;
@@ -3803,9 +3852,15 @@ impl App for LauncherApp {
                 });
         }
 
-        // 4. Central content panel
+        // 4. Central content panel. The Modrinth shell swaps the canvas for
+        // the gray surface of its palette; every other shell keeps BG.
+        let canvas = if shell == amc_core::config::ShellKind::Modrinth {
+            crate::theme::MODRINTH_BG
+        } else {
+            BG
+        };
         CentralPanel::default()
-            .frame(egui::Frame::none().fill(BG))
+            .frame(egui::Frame::none().fill(canvas))
             .show(ctx, |ui| {
                 let inner_rect = ui
                     .available_rect_before_wrap()
