@@ -10,35 +10,229 @@ use egui::{
 };
 
 // ---------------------------------------------------------------------------
-// Full canonical palette
+// Dynamic palettes
+// ---------------------------------------------------------------------------
+// Call sites keep using the same `theme::NAME` constants as before, but each
+// constant is now a palette token: it resolves to the color of the active
+// shell palette when it reaches the painter. Swapping the palette repaints
+// every shared page, so a shell can reproduce its reference look (gray/green
+// Modrinth, light MultiMC, Mojang-light Legacy, …) without forking pages.
+
+/// Palette token; its public names are the `theme::` color constants below.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShellColor {
+    Bg,
+    Card,
+    CardHover,
+    Field,
+    BgCard,
+    BgActive,
+    Border,
+    BorderSoft,
+    BorderStrong,
+    BorderSubtle,
+    BorderDefault,
+    BorderAccent,
+    Text,
+    Head,
+    Muted,
+    MutedDim,
+    TextDim,
+    Accent,
+    AccentLight,
+    AccentDim,
+    AccentSoft,
+    Danger,
+    Success,
+    Warn,
+    Info,
+    Ruby,
+    RubyLight,
+    RubyDim,
+    RubySoft,
+    TextPrimary,
+    TextHeading,
+    TextMuted,
+    BgElevated,
+    BgHover,
+    BgInput,
+    Warning,
+    BadgeSnapshot,
+    BadgeBeta,
+    BadgeAlpha,
+    BadgeOld,
+}
+
+/// One shell style; selects both the palette tokens and the egui visuals.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum PaletteId {
+    /// Aleph Studio (dark ruby-black, the default).
+    #[default]
+    Aleph,
+    /// MultiMC / Prism (Qt light gray).
+    Multimc,
+    /// Legacy Mojang launcher (light gray, green primary).
+    Legacy,
+    /// Millida (dark violet).
+    Millida,
+    /// Modrinth (gray surfaces, green accent).
+    Modrinth,
+}
+
+/// Concrete colors of one palette.
+#[derive(Debug, Clone, Copy)]
+pub struct Palette {
+    /// App canvas behind the central panel.
+    pub bg: Color32,
+    /// Cards / raised panels.
+    pub card: Color32,
+    /// Hover state of cards and rows.
+    pub card_hover: Color32,
+    /// Inset fields and inputs.
+    pub field: Color32,
+    /// Lower (deeper) surface used by sidebars.
+    pub bg_card: Color32,
+    /// Pressed/active surface.
+    pub bg_active: Color32,
+    /// Default hairline border.
+    pub border: Color32,
+    /// Softer border for inner cards.
+    pub border_soft: Color32,
+    /// Strong border for emphasized frames.
+    pub border_strong: Color32,
+    /// Accent-tinted subtle border.
+    pub border_subtle: Color32,
+    /// Accent-tinted default border.
+    pub border_default: Color32,
+    /// Accent-tinted strong border.
+    pub border_accent: Color32,
+    /// Primary text.
+    pub text: Color32,
+    /// Headings.
+    pub head: Color32,
+    /// Secondary text.
+    pub muted: Color32,
+    /// Faintest text (footer chrome).
+    pub muted_dim: Color32,
+    /// Dimmest text tier.
+    pub text_dim: Color32,
+    /// Primary accent (buttons, selection).
+    pub accent: Color32,
+    /// Accent hover/light.
+    pub accent_light: Color32,
+    /// Accent, disabled/launching.
+    pub accent_dim: Color32,
+    /// Accent-tinted soft surface.
+    pub accent_soft: Color32,
+    /// Error color.
+    pub danger: Color32,
+    /// Success color.
+    pub success: Color32,
+    /// Warning color.
+    pub warn: Color32,
+    /// Info color.
+    pub info: Color32,
+    /// Corner rounding used by shared widgets and pages.
+    pub rounding: f32,
+}
+
+impl Palette {
+    const fn resolve(self, token: ShellColor) -> Color32 {
+        match token {
+            ShellColor::Bg => self.bg,
+            ShellColor::Card => self.card,
+            ShellColor::CardHover => self.card_hover,
+            ShellColor::Field => self.field,
+            ShellColor::BgCard => self.bg_card,
+            ShellColor::BgActive => self.bg_active,
+            ShellColor::Border => self.border,
+            ShellColor::BorderSoft => self.border_soft,
+            ShellColor::BorderStrong => self.border_strong,
+            ShellColor::BorderSubtle => self.border_subtle,
+            ShellColor::BorderDefault => self.border_default,
+            ShellColor::BorderAccent => self.border_accent,
+            ShellColor::Text => self.text,
+            ShellColor::Head => self.head,
+            ShellColor::Muted => self.muted,
+            ShellColor::MutedDim => self.muted_dim,
+            ShellColor::TextDim => self.text_dim,
+            ShellColor::Accent => self.accent,
+            ShellColor::AccentLight => self.accent_light,
+            ShellColor::AccentDim => self.accent_dim,
+            ShellColor::AccentSoft => self.accent_soft,
+            ShellColor::Danger => self.danger,
+            ShellColor::Success => self.success,
+            ShellColor::Warn => self.warn,
+            ShellColor::Info => self.info,
+            // Aliases share the canonical entries so a palette only defines
+            // each color once.
+            ShellColor::Ruby => self.accent,
+            ShellColor::RubyLight => self.accent_light,
+            ShellColor::RubyDim => self.accent_dim,
+            ShellColor::RubySoft => self.accent_soft,
+            ShellColor::TextPrimary => self.text,
+            ShellColor::TextHeading => self.head,
+            ShellColor::TextMuted => self.muted,
+            ShellColor::BgElevated => self.card,
+            ShellColor::BgHover => self.card_hover,
+            ShellColor::BgInput => self.field,
+            ShellColor::Warning => self.warn,
+            ShellColor::BadgeSnapshot => self.info,
+            ShellColor::BadgeBeta => self.success,
+            ShellColor::BadgeAlpha => self.warn,
+            ShellColor::BadgeOld => self.text_dim,
+        }
+    }
+}
+
+/// Unmultiplied color at a custom alpha (const-friendly for palette tables;
+/// stored premultiplied like `Color32` does internally).
+const fn tint(color: Color32, alpha: u8) -> Color32 {
+    let a = alpha as u32;
+    Color32::from_rgba_premultiplied(
+        (color.r() as u32 * a / 255) as u8,
+        (color.g() as u32 * a / 255) as u8,
+        (color.b() as u32 * a / 255) as u8,
+        alpha,
+    )
+}
+
+// ---------------------------------------------------------------------------
+// Palettes
 // ---------------------------------------------------------------------------
 
-pub const BG: Color32 = Color32::from_rgb(0x08, 0x06, 0x06);
-pub const CARD: Color32 = Color32::from_rgb(0x0F, 0x0B, 0x0B);
-pub const CARD_HOVER: Color32 = Color32::from_rgb(0x16, 0x0D, 0x0E);
-pub const FIELD: Color32 = Color32::from_rgb(0x0A, 0x07, 0x08);
-
-pub const BORDER: Color32 = Color32::from_rgb(0x1C, 0x09, 0x0B);
-pub const BORDER_SOFT: Color32 = Color32::from_rgb(0x15, 0x08, 0x0A);
-pub const BORDER_STRONG: Color32 = Color32::from_rgb(0x29, 0x0B, 0x0F);
-
-pub const TEXT: Color32 = Color32::from_rgb(0xE8, 0xDA, 0xDA);
-pub const HEAD: Color32 = Color32::from_rgb(0xD4, 0xC4, 0xBB);
-pub const MUTED: Color32 = Color32::from_rgb(0x7C, 0x6B, 0x64);
-pub const MUTED_DIM: Color32 = Color32::from_rgb(0x57, 0x46, 0x3F);
-
-pub const ACCENT: Color32 = Color32::from_rgb(0x8B, 0x1A, 0x2A);
-pub const ACCENT_LIGHT: Color32 = Color32::from_rgb(0xB5, 0x22, 0x39);
-pub const ACCENT_DIM: Color32 = Color32::from_rgb(0x5C, 0x10, 0x19);
-pub const ACCENT_SOFT: Color32 = Color32::from_rgb(0x16, 0x0A, 0x0C);
-
-pub const DANGER: Color32 = Color32::from_rgb(0xB5, 0x22, 0x39);
-pub const SUCCESS: Color32 = Color32::from_rgb(0x50, 0xB0, 0x50);
-pub const WARN: Color32 = Color32::from_rgb(0xC0, 0x7A, 0x30);
-pub const INFO: Color32 = Color32::from_rgb(0x70, 0x90, 0xC8);
+/// Aleph Studio palette (dark ruby-black): the original AMC look.
+pub const ALEPH: Palette = Palette {
+    bg: Color32::from_rgb(0x08, 0x06, 0x06),
+    card: Color32::from_rgb(0x0F, 0x0B, 0x0B),
+    card_hover: Color32::from_rgb(0x16, 0x0D, 0x0E),
+    field: Color32::from_rgb(0x0A, 0x07, 0x08),
+    bg_card: Color32::from_rgb(0x0C, 0x08, 0x09),
+    bg_active: Color32::from_rgb(0x18, 0x0C, 0x0E),
+    border: Color32::from_rgb(0x1C, 0x09, 0x0B),
+    border_soft: Color32::from_rgb(0x15, 0x08, 0x0A),
+    border_strong: Color32::from_rgb(0x29, 0x0B, 0x0F),
+    border_subtle: Color32::from_rgba_premultiplied(139, 26, 42, 28),
+    border_default: Color32::from_rgba_premultiplied(139, 26, 42, 45),
+    border_accent: Color32::from_rgba_premultiplied(181, 34, 57, 100),
+    text: Color32::from_rgb(0xE8, 0xDA, 0xDA),
+    head: Color32::from_rgb(0xD4, 0xC4, 0xBB),
+    muted: Color32::from_rgb(0x7C, 0x6B, 0x64),
+    muted_dim: Color32::from_rgb(0x57, 0x46, 0x3F),
+    text_dim: Color32::from_rgb(0x5A, 0x4A, 0x44),
+    accent: Color32::from_rgb(0x8B, 0x1A, 0x2A),
+    accent_light: Color32::from_rgb(0xB5, 0x22, 0x39),
+    accent_dim: Color32::from_rgb(0x5C, 0x10, 0x19),
+    accent_soft: Color32::from_rgb(0x16, 0x0A, 0x0C),
+    danger: Color32::from_rgb(0xB5, 0x22, 0x39),
+    success: Color32::from_rgb(0x50, 0xB0, 0x50),
+    warn: Color32::from_rgb(0xC0, 0x7A, 0x30),
+    info: Color32::from_rgb(0x70, 0x90, 0xC8),
+    rounding: 0.0,
+};
 
 // ---------------------------------------------------------------------------
-// Modrinth-style shell palette (green accent on gray surfaces)
+// Modrinth-style colors (green accent on gray surfaces)
 // ---------------------------------------------------------------------------
 // Values follow the public dark-theme CSS variables of the Modrinth app
 // (`--surface-1` canvas, `--surface-3` raised rows, muted text, green
@@ -63,44 +257,157 @@ pub const MODRINTH_GREEN_LIGHT: Color32 = Color32::from_rgb(0x43, 0xE4, 0x88);
 /// Brand green, disabled/launching.
 pub const MODRINTH_GREEN_DIM: Color32 = Color32::from_rgb(0x12, 0x8A, 0x45);
 
+/// MultiMC / Prism palette (placeholder until its restyle step).
+const MULTIMC: Palette = ALEPH;
+/// Legacy Mojang palette (placeholder until its restyle step).
+const LEGACY: Palette = ALEPH;
+/// Millida palette (placeholder until its restyle step).
+const MILLIDA: Palette = ALEPH;
+
+/// Modrinth palette: gray surfaces with the brand green as the accent.
+const MODRINTH: Palette = Palette {
+    bg: MODRINTH_BG,
+    card: MODRINTH_SURFACE,
+    card_hover: MODRINTH_SURFACE_HOVER,
+    field: MODRINTH_FIELD,
+    bg_card: Color32::from_rgb(0x12, 0x14, 0x17),
+    bg_active: MODRINTH_SURFACE_HOVER,
+    border: Color32::from_rgb(0x1E, 0x20, 0x25),
+    border_soft: Color32::from_rgb(0x1A, 0x1C, 0x20),
+    border_strong: MODRINTH_SURFACE_HOVER,
+    border_subtle: tint(MODRINTH_GREEN, 28),
+    border_default: tint(MODRINTH_GREEN, 45),
+    border_accent: tint(MODRINTH_GREEN, 100),
+    text: MODRINTH_TEXT,
+    head: Color32::from_rgb(0xDE, 0xE7, 0xEF),
+    muted: MODRINTH_MUTED,
+    muted_dim: Color32::from_rgb(0x51, 0x59, 0x63),
+    text_dim: Color32::from_rgb(0x5A, 0x63, 0x6E),
+    accent: MODRINTH_GREEN,
+    accent_light: MODRINTH_GREEN_LIGHT,
+    accent_dim: MODRINTH_GREEN_DIM,
+    accent_soft: tint(MODRINTH_GREEN, 26),
+    danger: Color32::from_rgb(0xFF, 0x49, 0x6B),
+    success: MODRINTH_GREEN,
+    warn: Color32::from_rgb(0xF5, 0xA5, 0x24),
+    info: Color32::from_rgb(0x7D, 0xB5, 0xFF),
+    rounding: 6.0,
+};
+
+const PALETTES: [Palette; 5] = [ALEPH, MULTIMC, LEGACY, MILLIDA, MODRINTH];
+
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static ACTIVE_PALETTE: AtomicUsize = AtomicUsize::new(0);
+
+/// Switch the palette every `theme::` color token resolves to; called
+/// together with the matching `apply_*_theme` visuals when the shell changes.
+pub fn set_palette(id: PaletteId) {
+    ACTIVE_PALETTE.store(id as usize, Ordering::Relaxed);
+}
+
+/// Palette currently active.
+pub fn palette_id() -> PaletteId {
+    match ACTIVE_PALETTE.load(Ordering::Relaxed) {
+        1 => PaletteId::Multimc,
+        2 => PaletteId::Legacy,
+        3 => PaletteId::Millida,
+        4 => PaletteId::Modrinth,
+        _ => PaletteId::Aleph,
+    }
+}
+
+/// Concrete palette of `id`, independent of what is currently active (used
+/// by the `apply_*_theme` visuals functions).
+pub const fn palette_of(id: PaletteId) -> Palette {
+    PALETTES[id as usize]
+}
+
+/// Corner rounding of the active palette; shared widgets and pages call this
+/// instead of hardcoding `Rounding::ZERO` so softer styles round the whole
+/// app while Aleph stays sharp.
+pub fn rounding() -> Rounding {
+    Rounding::same(active_palette().rounding)
+}
+
+fn active_palette() -> Palette {
+    PALETTES[ACTIVE_PALETTE
+        .load(Ordering::Relaxed)
+        .min(PALETTES.len() - 1)]
+}
+
 // ---------------------------------------------------------------------------
-// Legacy aliases (same values, kept for existing widgets)
+// Public color tokens (resolve against the active palette)
 // ---------------------------------------------------------------------------
 
-pub const BG_ELEVATED: Color32 = Color32::from_rgb(0x0F, 0x0B, 0x0B);
-pub const BG_HOVER: Color32 = Color32::from_rgb(0x16, 0x0D, 0x0E);
-pub const BG_CARD: Color32 = Color32::from_rgb(0x0C, 0x08, 0x09);
-pub const BG_ACTIVE: Color32 = Color32::from_rgb(0x18, 0x0C, 0x0E);
-pub const BG_INPUT: Color32 = Color32::from_rgb(0x0A, 0x07, 0x08);
+pub const BG: ShellColor = ShellColor::Bg;
+pub const CARD: ShellColor = ShellColor::Card;
+pub const CARD_HOVER: ShellColor = ShellColor::CardHover;
+pub const FIELD: ShellColor = ShellColor::Field;
 
-pub const RUBY: Color32 = Color32::from_rgb(0x8B, 0x1A, 0x2A);
-pub const RUBY_LIGHT: Color32 = Color32::from_rgb(0xB5, 0x22, 0x39);
-pub const RUBY_DIM: Color32 = Color32::from_rgb(0x5C, 0x10, 0x19);
-pub const RUBY_SOFT: Color32 = Color32::from_rgb(0x16, 0x0A, 0x0C);
+pub const BORDER: ShellColor = ShellColor::Border;
+pub const BORDER_SOFT: ShellColor = ShellColor::BorderSoft;
+pub const BORDER_STRONG: ShellColor = ShellColor::BorderStrong;
 
-pub const TEXT_PRIMARY: Color32 = Color32::from_rgb(0xE8, 0xDA, 0xDA);
-pub const TEXT_HEADING: Color32 = Color32::from_rgb(0xD4, 0xC4, 0xBB);
-pub const TEXT_MUTED: Color32 = Color32::from_rgb(0x7C, 0x6B, 0x64);
-pub const TEXT_DIM: Color32 = Color32::from_rgb(0x5A, 0x4A, 0x44);
+pub const TEXT: ShellColor = ShellColor::Text;
+pub const HEAD: ShellColor = ShellColor::Head;
+pub const MUTED: ShellColor = ShellColor::Muted;
+pub const MUTED_DIM: ShellColor = ShellColor::MutedDim;
 
-pub const BORDER_SUBTLE: Color32 = Color32::from_rgba_premultiplied(139, 26, 42, 28);
-pub const BORDER_DEFAULT: Color32 = Color32::from_rgba_premultiplied(139, 26, 42, 45);
-pub const BORDER_ACCENT: Color32 = Color32::from_rgba_premultiplied(181, 34, 57, 100);
+pub const ACCENT: ShellColor = ShellColor::Accent;
+pub const ACCENT_LIGHT: ShellColor = ShellColor::AccentLight;
+pub const ACCENT_DIM: ShellColor = ShellColor::AccentDim;
+pub const ACCENT_SOFT: ShellColor = ShellColor::AccentSoft;
 
-pub const WARNING: Color32 = Color32::from_rgb(0xC0, 0x7A, 0x30);
+pub const DANGER: ShellColor = ShellColor::Danger;
+pub const SUCCESS: ShellColor = ShellColor::Success;
+pub const WARN: ShellColor = ShellColor::Warn;
+pub const INFO: ShellColor = ShellColor::Info;
 
-pub const BADGE_SNAPSHOT: Color32 = Color32::from_rgb(0x70, 0x90, 0xC8);
-pub const BADGE_BETA: Color32 = Color32::from_rgb(0x50, 0xB0, 0x50);
-pub const BADGE_ALPHA: Color32 = Color32::from_rgb(0xC0, 0x7A, 0x30);
-pub const BADGE_OLD: Color32 = Color32::from_rgb(0x5A, 0x4A, 0x44);
+// Legacy aliases (same tokens, kept for existing widgets).
+
+pub const BG_ELEVATED: ShellColor = ShellColor::BgElevated;
+pub const BG_HOVER: ShellColor = ShellColor::BgHover;
+pub const BG_CARD: ShellColor = ShellColor::BgCard;
+pub const BG_ACTIVE: ShellColor = ShellColor::BgActive;
+pub const BG_INPUT: ShellColor = ShellColor::BgInput;
+
+pub const RUBY: ShellColor = ShellColor::Ruby;
+pub const RUBY_LIGHT: ShellColor = ShellColor::RubyLight;
+pub const RUBY_DIM: ShellColor = ShellColor::RubyDim;
+pub const RUBY_SOFT: ShellColor = ShellColor::RubySoft;
+
+pub const TEXT_PRIMARY: ShellColor = ShellColor::TextPrimary;
+pub const TEXT_HEADING: ShellColor = ShellColor::TextHeading;
+pub const TEXT_MUTED: ShellColor = ShellColor::TextMuted;
+pub const TEXT_DIM: ShellColor = ShellColor::TextDim;
+
+pub const BORDER_SUBTLE: ShellColor = ShellColor::BorderSubtle;
+pub const BORDER_DEFAULT: ShellColor = ShellColor::BorderDefault;
+pub const BORDER_ACCENT: ShellColor = ShellColor::BorderAccent;
+
+pub const WARNING: ShellColor = ShellColor::Warning;
+
+pub const BADGE_SNAPSHOT: ShellColor = ShellColor::BadgeSnapshot;
+pub const BADGE_BETA: ShellColor = ShellColor::BadgeBeta;
+pub const BADGE_ALPHA: ShellColor = ShellColor::BadgeAlpha;
+pub const BADGE_OLD: ShellColor = ShellColor::BadgeOld;
+
+impl From<ShellColor> for Color32 {
+    fn from(token: ShellColor) -> Self {
+        active_palette().resolve(token)
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 /// Linear interpolation between two colors (straight alpha, Full 1:1).
+/// Accepts raw `Color32`s and palette tokens alike.
 #[inline]
-pub fn lerp_color(a: Color32, b: Color32, t: f32) -> Color32 {
+pub fn lerp_color(a: impl Into<Color32>, b: impl Into<Color32>, t: f32) -> Color32 {
+    let (a, b) = (a.into(), b.into());
     let t = t.clamp(0.0, 1.0);
     let mix = |x: u8, y: u8| (x as f32 + (y as f32 - x as f32) * t) as u8;
     Color32::from_rgba_unmultiplied(
@@ -111,7 +418,9 @@ pub fn lerp_color(a: Color32, b: Color32, t: f32) -> Color32 {
     )
 }
 
-pub fn with_alpha(color: Color32, alpha: u8) -> Color32 {
+/// The same color at a different alpha; accepts tokens and raw colors.
+pub fn with_alpha(color: impl Into<Color32>, alpha: u8) -> Color32 {
+    let color = color.into();
     Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), alpha)
 }
 
@@ -311,12 +620,13 @@ pub fn apply_aleph_theme(ctx: &Context) {
     let mut style = (*ctx.style()).clone();
     apply_common_style(&mut style);
 
+    let palette = ALEPH;
     let mut visuals = Visuals::dark();
-    visuals.panel_fill = BG;
-    visuals.window_fill = CARD;
-    visuals.extreme_bg_color = FIELD;
-    visuals.faint_bg_color = ACCENT_SOFT;
-    visuals.window_stroke = Stroke::new(1.0_f32, BORDER);
+    visuals.panel_fill = palette.bg;
+    visuals.window_fill = palette.card;
+    visuals.extreme_bg_color = palette.field;
+    visuals.faint_bg_color = palette.accent_soft;
+    visuals.window_stroke = Stroke::new(1.0_f32, palette.border);
     visuals.window_rounding = Rounding::ZERO;
     visuals.menu_rounding = Rounding::ZERO;
     visuals.window_shadow = egui::epaint::Shadow {
@@ -326,35 +636,35 @@ pub fn apply_aleph_theme(ctx: &Context) {
         color: Color32::from_black_alpha(160),
     };
     visuals.popup_shadow = visuals.window_shadow;
-    visuals.selection.bg_fill = with_alpha(ACCENT, 80);
-    visuals.selection.stroke = Stroke::new(1.0_f32, ACCENT_LIGHT);
-    visuals.hyperlink_color = ACCENT_LIGHT;
-    visuals.override_text_color = Some(TEXT);
+    visuals.selection.bg_fill = with_alpha(palette.accent, 80);
+    visuals.selection.stroke = Stroke::new(1.0_f32, palette.accent_light);
+    visuals.hyperlink_color = palette.accent_light;
+    visuals.override_text_color = Some(palette.text);
     visuals.striped = false;
 
-    let card_stroke = Stroke::new(1.0_f32, BORDER_SOFT);
-    let accent_stroke = Stroke::new(1.0_f32, BORDER);
+    let card_stroke = Stroke::new(1.0_f32, palette.border_soft);
+    let accent_stroke = Stroke::new(1.0_f32, palette.border);
     for widgets in [
         &mut visuals.widgets.noninteractive,
         &mut visuals.widgets.inactive,
         &mut visuals.widgets.open,
     ] {
-        widgets.bg_fill = CARD;
-        widgets.weak_bg_fill = FIELD;
+        widgets.bg_fill = palette.card;
+        widgets.weak_bg_fill = palette.field;
         widgets.bg_stroke = card_stroke;
-        widgets.fg_stroke = Stroke::new(1.0_f32, TEXT);
+        widgets.fg_stroke = Stroke::new(1.0_f32, palette.text);
         widgets.rounding = Rounding::ZERO;
     }
-    visuals.widgets.hovered.bg_fill = CARD_HOVER;
-    visuals.widgets.hovered.weak_bg_fill = CARD_HOVER;
+    visuals.widgets.hovered.bg_fill = palette.card_hover;
+    visuals.widgets.hovered.weak_bg_fill = palette.card_hover;
     visuals.widgets.hovered.bg_stroke = accent_stroke;
-    visuals.widgets.hovered.fg_stroke = Stroke::new(1.0_f32, HEAD);
+    visuals.widgets.hovered.fg_stroke = Stroke::new(1.0_f32, palette.head);
     visuals.widgets.hovered.rounding = Rounding::ZERO;
 
-    visuals.widgets.active.bg_fill = ACCENT_SOFT;
-    visuals.widgets.active.weak_bg_fill = ACCENT_SOFT;
-    visuals.widgets.active.bg_stroke = Stroke::new(1.0_f32, ACCENT);
-    visuals.widgets.active.fg_stroke = Stroke::new(1.0_f32, ACCENT_LIGHT);
+    visuals.widgets.active.bg_fill = palette.accent_soft;
+    visuals.widgets.active.weak_bg_fill = palette.accent_soft;
+    visuals.widgets.active.bg_stroke = Stroke::new(1.0_f32, palette.accent);
+    visuals.widgets.active.fg_stroke = Stroke::new(1.0_f32, palette.accent_light);
     visuals.widgets.active.rounding = Rounding::ZERO;
 
     style.visuals = visuals;
@@ -371,12 +681,13 @@ pub fn apply_modrinth_theme(ctx: &Context) {
     let mut style = (*ctx.style()).clone();
     apply_common_style(&mut style);
 
+    let palette = palette_of(PaletteId::Modrinth);
     let mut visuals = Visuals::dark();
-    visuals.panel_fill = MODRINTH_BG;
-    visuals.window_fill = MODRINTH_BG;
-    visuals.extreme_bg_color = MODRINTH_FIELD;
-    visuals.faint_bg_color = MODRINTH_SURFACE;
-    visuals.window_stroke = Stroke::new(1.0_f32, MODRINTH_SURFACE);
+    visuals.panel_fill = palette.bg;
+    visuals.window_fill = palette.bg;
+    visuals.extreme_bg_color = palette.field;
+    visuals.faint_bg_color = palette.card;
+    visuals.window_stroke = Stroke::new(1.0_f32, palette.card);
     visuals.window_rounding = Rounding::ZERO;
     visuals.menu_rounding = Rounding::ZERO;
     visuals.window_shadow = egui::epaint::Shadow {
@@ -386,34 +697,34 @@ pub fn apply_modrinth_theme(ctx: &Context) {
         color: Color32::from_black_alpha(160),
     };
     visuals.popup_shadow = visuals.window_shadow;
-    visuals.selection.bg_fill = with_alpha(MODRINTH_GREEN, 60);
-    visuals.selection.stroke = Stroke::new(1.0_f32, MODRINTH_GREEN);
-    visuals.hyperlink_color = MODRINTH_GREEN;
-    visuals.override_text_color = Some(MODRINTH_TEXT);
+    visuals.selection.bg_fill = with_alpha(palette.accent, 60);
+    visuals.selection.stroke = Stroke::new(1.0_f32, palette.accent);
+    visuals.hyperlink_color = palette.accent;
+    visuals.override_text_color = Some(palette.text);
     visuals.striped = false;
 
-    let card_stroke = Stroke::new(1.0_f32, MODRINTH_SURFACE);
+    let card_stroke = Stroke::new(1.0_f32, palette.card);
     for widgets in [
         &mut visuals.widgets.noninteractive,
         &mut visuals.widgets.inactive,
         &mut visuals.widgets.open,
     ] {
-        widgets.bg_fill = MODRINTH_SURFACE;
-        widgets.weak_bg_fill = MODRINTH_FIELD;
+        widgets.bg_fill = palette.card;
+        widgets.weak_bg_fill = palette.field;
         widgets.bg_stroke = card_stroke;
-        widgets.fg_stroke = Stroke::new(1.0_f32, MODRINTH_TEXT);
+        widgets.fg_stroke = Stroke::new(1.0_f32, palette.text);
         widgets.rounding = Rounding::ZERO;
     }
-    visuals.widgets.hovered.bg_fill = MODRINTH_SURFACE_HOVER;
-    visuals.widgets.hovered.weak_bg_fill = MODRINTH_SURFACE_HOVER;
-    visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, with_alpha(MODRINTH_GREEN, 150));
-    visuals.widgets.hovered.fg_stroke = Stroke::new(1.0_f32, MODRINTH_GREEN_LIGHT);
+    visuals.widgets.hovered.bg_fill = palette.card_hover;
+    visuals.widgets.hovered.weak_bg_fill = palette.card_hover;
+    visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, with_alpha(palette.accent, 150));
+    visuals.widgets.hovered.fg_stroke = Stroke::new(1.0_f32, palette.accent_light);
     visuals.widgets.hovered.rounding = Rounding::ZERO;
 
-    visuals.widgets.active.bg_fill = MODRINTH_SURFACE_HOVER;
-    visuals.widgets.active.weak_bg_fill = MODRINTH_SURFACE_HOVER;
-    visuals.widgets.active.bg_stroke = Stroke::new(1.0_f32, MODRINTH_GREEN);
-    visuals.widgets.active.fg_stroke = Stroke::new(1.0_f32, MODRINTH_GREEN_LIGHT);
+    visuals.widgets.active.bg_fill = palette.card_hover;
+    visuals.widgets.active.weak_bg_fill = palette.card_hover;
+    visuals.widgets.active.bg_stroke = Stroke::new(1.0_f32, palette.accent);
+    visuals.widgets.active.fg_stroke = Stroke::new(1.0_f32, palette.accent_light);
     visuals.widgets.active.rounding = Rounding::ZERO;
 
     style.visuals = visuals;

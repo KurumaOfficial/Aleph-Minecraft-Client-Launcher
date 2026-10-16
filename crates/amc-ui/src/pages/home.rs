@@ -395,7 +395,7 @@ impl HomePage {
 
                     // Release type badge
                     let badge_color = match v.release_type {
-                        ReleaseType::Release => RUBY,
+                        ReleaseType::Release => RUBY.into(),
                         ReleaseType::Snapshot => Color32::from_rgb(0xB8, 0x86, 0x0B),
                         _ => Color32::from_rgb(0x4A, 0x55, 0x68),
                     };

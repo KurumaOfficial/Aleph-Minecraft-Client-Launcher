@@ -54,7 +54,7 @@ impl DownloadOverlay {
                 let ratio = progress.ratio();
                 let bar = ProgressBar::new(ratio)
                     .text(format!("{:.1}%", progress.percent()))
-                    .fill(RUBY)
+                    .fill(RUBY.into())
                     .rounding(Rounding::ZERO);
 
                 ui.add(bar);

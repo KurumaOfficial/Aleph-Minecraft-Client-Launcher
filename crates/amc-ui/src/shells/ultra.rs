@@ -190,7 +190,7 @@ pub fn show_dock(ui: &mut Ui, lang: Language, current_tab: NavTab) -> ShellActio
             };
             ui.painter().rect_filled(rect, Rounding::ZERO, fill);
             let glyph = if active {
-                theme::HEAD
+                theme::HEAD.into()
             } else {
                 theme::lerp_color(theme::MUTED, theme::HEAD, hover)
             };

@@ -22,7 +22,7 @@ impl ToastKind {
 
     fn accent(&self) -> Color32 {
         match self {
-            Self::Updates => RUBY_LIGHT,
+            Self::Updates => RUBY_LIGHT.into(),
             Self::Downloads => Color32::from_rgb(0x50, 0xB0, 0x50),
             Self::Launcher => Color32::from_rgb(0x70, 0x90, 0xC8),
         }
@@ -89,7 +89,7 @@ pub fn show_toasts(ctx: &egui::Context, toasts: &mut Vec<Toast>) {
                         Align2::CENTER_CENTER,
                         &toast.text,
                         egui::FontId::proportional(12.0),
-                        TEXT_PRIMARY,
+                        TEXT_PRIMARY.into(),
                     );
                 }
             });

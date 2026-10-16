@@ -64,7 +64,7 @@ pub fn nav_link(ui: &mut Ui, label: &str, active: bool) -> Response {
             .animate_bool_with_time(ui.id().with(("nav", label)), response.hovered(), 0.15);
     let painter = ui.painter().clone();
     let color = if active {
-        theme::HEAD
+        theme::HEAD.into()
     } else {
         theme::lerp_color(theme::MUTED, theme::HEAD, hover)
     };
@@ -99,7 +99,7 @@ pub fn red_button(ui: &mut Ui, label: &str, width: f32, height: f32) -> Response
     let pressed = response.is_pointer_button_down_on();
     let painter = ui.painter().clone();
     let fill = if pressed {
-        theme::ACCENT_DIM
+        theme::ACCENT_DIM.into()
     } else {
         theme::lerp_color(theme::ACCENT, theme::ACCENT_LIGHT, hover)
     };
@@ -206,7 +206,7 @@ pub fn tag_width(ui: &mut Ui, label: &str, active: bool, width: f32) -> Response
             .animate_bool_with_time(ui.id().with(("tagw", label)), response.hovered(), 0.12);
     let painter = ui.painter();
     let color = if active {
-        theme::ACCENT_LIGHT
+        theme::ACCENT_LIGHT.into()
     } else {
         theme::lerp_color(theme::MUTED, theme::HEAD, hover)
     };
@@ -240,7 +240,7 @@ pub fn tag(ui: &mut Ui, label: &str, active: bool) -> Response {
             .animate_bool_with_time(ui.id().with(("tag", label)), response.hovered(), 0.12);
     let painter = ui.painter();
     let color = if active {
-        theme::ACCENT_LIGHT
+        theme::ACCENT_LIGHT.into()
     } else {
         theme::lerp_color(theme::MUTED, theme::HEAD, hover)
     };
@@ -310,7 +310,7 @@ pub fn red_square_deco(painter: &egui::Painter, rect: Rect) {
 pub fn card<R>(ui: &mut Ui, add_contents: impl FnOnce(&mut Ui) -> R) -> R {
     let width = ui.available_width();
     egui::Frame::none()
-        .fill(theme::CARD)
+        .fill(theme::CARD.into())
         .stroke(Stroke::new(1.0_f32, theme::BORDER_SOFT))
         .rounding(Rounding::ZERO)
         .inner_margin(egui::Margin::symmetric(20.0, 18.0))

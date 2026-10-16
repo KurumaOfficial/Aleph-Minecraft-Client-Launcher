@@ -390,7 +390,7 @@ impl ConsoleModal {
                             } else if line.contains("[DEBUG]") {
                                 Color32::from_rgb(120, 110, 110)
                             } else {
-                                TEXT_PRIMARY
+                                TEXT_PRIMARY.into()
                             };
 
                             ui.label(

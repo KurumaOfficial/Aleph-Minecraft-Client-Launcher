@@ -103,7 +103,7 @@ pub fn show_tabs(
                 ui.allocate_exact_size(vec2(galley.size().x + 26.0, 26.0), Sense::click());
             let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
             let color = if active {
-                theme::HEAD
+                theme::HEAD.into()
             } else {
                 theme::lerp_color(theme::MUTED, theme::TEXT, hover)
             };
@@ -190,14 +190,14 @@ pub fn show_play_bar(
                     Align2::LEFT_CENTER,
                     short_name(name, 30),
                     theme::display_reg(13.0),
-                    theme::TEXT,
+                    theme::TEXT.into(),
                 );
                 ui.painter().text(
                     pos2(rect.left() + 12.0, rect.center().y + 10.0),
                     Align2::LEFT_CENTER,
                     format!("MC {version} • {loader}"),
                     theme::mono(10.0),
-                    theme::MUTED,
+                    theme::MUTED.into(),
                 );
                 icons::draw(
                     ui.painter(),

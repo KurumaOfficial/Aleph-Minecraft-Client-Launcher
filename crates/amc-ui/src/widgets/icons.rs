@@ -188,7 +188,9 @@ pub fn loader_badge(loader: LoaderType) -> Icon {
 }
 
 /// Draw `icon` centered in `rect` with a stroke of `width` device pixels.
-pub fn draw(painter: &Painter, icon: Icon, rect: Rect, color: Color32, width: f32) {
+/// Accepts palette tokens and raw colors alike.
+pub fn draw(painter: &Painter, icon: Icon, rect: Rect, color: impl Into<Color32>, width: f32) {
+    let color: Color32 = color.into();
     let stroke = Stroke::new(width, color);
     let center = rect.center();
     let scale = rect.width().min(rect.height()) / 2.0;
@@ -703,7 +705,8 @@ pub fn draw(painter: &Painter, icon: Icon, rect: Rect, color: Color32, width: f3
 
 /// Compact clickable icon button with a subtle hover plate. Returns the raw
 /// response so call sites can attach tooltips.
-pub fn icon_button(ui: &mut Ui, icon: Icon, color: Color32) -> Response {
+pub fn icon_button(ui: &mut Ui, icon: Icon, color: impl Into<Color32>) -> Response {
+    let color = color.into();
     let side = 22.0;
     let (rect, response) = ui.allocate_exact_size(Vec2::splat(side), Sense::click());
     let hover = ui
@@ -731,7 +734,13 @@ pub fn icon_button(ui: &mut Ui, icon: Icon, color: Color32) -> Response {
 
 /// Draw an icon at an exact center inside an already-allocated layout rect
 /// (used by widgets that paint outside the normal `Ui` flow).
-pub fn draw_centered(painter: &Painter, icon: Icon, center: Pos2, size: f32, color: Color32) {
+pub fn draw_centered(
+    painter: &Painter,
+    icon: Icon,
+    center: Pos2,
+    size: f32,
+    color: impl Into<Color32>,
+) {
     draw(
         painter,
         icon,
@@ -743,7 +752,14 @@ pub fn draw_centered(painter: &Painter, icon: Icon, center: Pos2, size: f32, col
 
 /// Inline icon followed by a text label ("clock 3 h") in a centered row.
 /// `font` sizes both the icon and the text so badges stay aligned.
-pub fn icon_label(ui: &mut Ui, icon: Icon, text: &str, color: Color32, font: egui::FontId) {
+pub fn icon_label(
+    ui: &mut Ui,
+    icon: Icon,
+    text: &str,
+    color: impl Into<Color32>,
+    font: egui::FontId,
+) {
+    let color = color.into();
     ui.horizontal(|ui| {
         let size = font.size + 1.0;
         let (rect, _) = ui.allocate_exact_size(Vec2::splat(size), Sense::hover());
@@ -762,10 +778,12 @@ pub fn icon_text_button(
     leading: Icon,
     trailing: Option<Icon>,
     text: &str,
-    text_color: Color32,
+    text_color: impl Into<Color32>,
     font: egui::FontId,
-    fill: Color32,
+    fill: impl Into<Color32>,
 ) -> Response {
+    let text_color = text_color.into();
+    let fill = fill.into();
     let galley = ui
         .painter()
         .layout_no_wrap(text.to_owned(), font.clone(), text_color);

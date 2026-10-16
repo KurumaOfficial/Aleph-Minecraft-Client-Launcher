@@ -1,6 +1,7 @@
 use egui::{vec2, Color32, Rounding, Ui};
 
-pub fn draw_custom_badge(ui: &mut Ui, text: &str, bg_color: Color32) {
+pub fn draw_custom_badge(ui: &mut Ui, text: &str, bg_color: impl Into<Color32>) {
+    let bg_color = bg_color.into();
     let font = egui::FontId::proportional(10.0);
     let padding = vec2(8.0, 3.0);
     let text_size = ui

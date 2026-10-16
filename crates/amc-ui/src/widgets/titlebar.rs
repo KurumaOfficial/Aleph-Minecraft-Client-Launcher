@@ -51,7 +51,7 @@ impl TitleBar {
             egui::Align2::LEFT_CENTER,
             title,
             egui::FontId::proportional(12.0),
-            TEXT_HEADING,
+            TEXT_HEADING.into(),
         );
 
         // Window controls on the right
@@ -137,7 +137,7 @@ impl TitleBar {
             .animate_bool_responsive(resp.id.with("pr"), resp.is_pointer_button_down_on());
 
         let target_bg = if is_close {
-            RUBY_LIGHT
+            RUBY_LIGHT.into()
         } else {
             Color32::from_rgb(0x18, 0x0E, 0x10)
         };
@@ -154,7 +154,7 @@ impl TitleBar {
         let target_line = if is_close {
             Color32::WHITE
         } else {
-            TEXT_PRIMARY
+            TEXT_PRIMARY.into()
         };
         let line_color = lerp_color(TEXT_MUTED, target_line, hover_t);
 

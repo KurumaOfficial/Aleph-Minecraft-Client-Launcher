@@ -1128,7 +1128,7 @@ impl SettingsPage {
                             .color(if is_active {
                                 Color32::WHITE
                             } else {
-                                TEXT_PRIMARY
+                                TEXT_PRIMARY.into()
                             }),
                     );
 

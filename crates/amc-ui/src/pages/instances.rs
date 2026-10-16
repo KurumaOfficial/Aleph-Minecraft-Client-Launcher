@@ -739,7 +739,7 @@ impl InstancesPage {
             // Loader accent strip on top (Square motif from aleph.icu)
             let loader_color = match inst.loader {
                 LoaderType::Vanilla => Color32::from_rgb(0x38, 0x8E, 0x3C),
-                LoaderType::Fabric => RUBY_LIGHT,
+                LoaderType::Fabric => RUBY_LIGHT.into(),
                 LoaderType::Quilt => Color32::from_rgb(0x9C, 0x27, 0xB0),
                 LoaderType::Forge => Color32::from_rgb(0xE6, 0x51, 0x00),
                 LoaderType::NeoForge => Color32::from_rgb(0xFF, 0x6D, 0x00),
@@ -1334,7 +1334,7 @@ impl InstancesPage {
                             let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
                             let bg = lerp_color(BG_CARD, BG_HOVER, hover_t);
                             let stroke_col = if active {
-                                RUBY_LIGHT
+                                RUBY_LIGHT.into()
                             } else {
                                 lerp_color(BORDER_DEFAULT, RUBY, hover_t)
                             };

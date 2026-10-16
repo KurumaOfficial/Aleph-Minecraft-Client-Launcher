@@ -610,7 +610,7 @@ impl InstanceManage {
             .show(ui, |ui| {
                 for check in &checks {
                     let color = if check.ok {
-                        TEXT_MUTED
+                        TEXT_MUTED.into()
                     } else {
                         Color32::from_rgb(0xE8, 0x55, 0x70)
                     };

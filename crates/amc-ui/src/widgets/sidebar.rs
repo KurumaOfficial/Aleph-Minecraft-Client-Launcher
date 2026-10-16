@@ -165,7 +165,7 @@ impl Sidebar {
             egui::Align2::LEFT_CENTER,
             "ALEPH.ICU STUDIO",
             egui::FontId::monospace(9.0),
-            TEXT_DIM,
+            TEXT_DIM.into(),
         );
     }
 
@@ -223,10 +223,11 @@ impl Sidebar {
                 Pos2::new(rect.right() - 14.0, rect.center().y - sq_dot_size / 2.0),
                 vec2(sq_dot_size, sq_dot_size),
             );
+            let ruby_light: Color32 = RUBY_LIGHT.into();
             let dot_col = Color32::from_rgba_premultiplied(
-                RUBY_LIGHT.r(),
-                RUBY_LIGHT.g(),
-                RUBY_LIGHT.b(),
+                ruby_light.r(),
+                ruby_light.g(),
+                ruby_light.b(),
                 (active_t * 220.0) as u8,
             );
             ui.painter()

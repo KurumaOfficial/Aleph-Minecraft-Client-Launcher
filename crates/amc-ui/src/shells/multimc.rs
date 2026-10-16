@@ -107,7 +107,7 @@ pub fn show_toolbar(
             };
             ui.painter().rect_filled(rect, Rounding::ZERO, fill);
             let glyph = if active {
-                theme::HEAD
+                theme::HEAD.into()
             } else {
                 theme::lerp_color(theme::MUTED, theme::HEAD, hover)
             };

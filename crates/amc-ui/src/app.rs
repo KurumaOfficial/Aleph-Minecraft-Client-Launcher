@@ -3857,7 +3857,7 @@ impl App for LauncherApp {
         let canvas = if shell == amc_core::config::ShellKind::Modrinth {
             crate::theme::MODRINTH_BG
         } else {
-            BG
+            BG.into()
         };
         CentralPanel::default()
             .frame(egui::Frame::none().fill(canvas))

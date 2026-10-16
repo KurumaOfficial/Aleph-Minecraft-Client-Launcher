@@ -125,8 +125,8 @@ impl IdentityPicker {
 pub fn account_tag(ui: &mut Ui, account_type: AccountType, lang: amc_core::Language) {
     let (label, col) = match account_type {
         AccountType::Microsoft => (lang.account_tag_ms(), Color32::from_rgb(0x70, 0x90, 0xC8)),
-        AccountType::WetId => (lang.account_tag_wetid(), RUBY_LIGHT),
-        AccountType::Offline => (lang.account_tag_offline(), TEXT_MUTED),
+        AccountType::WetId => (lang.account_tag_wetid(), RUBY_LIGHT.into()),
+        AccountType::Offline => (lang.account_tag_offline(), TEXT_MUTED.into()),
     };
     let (rect, _) = ui.allocate_exact_size(vec2(86.0, 24.0), Sense::hover());
     ui.painter().rect_filled(rect, Rounding::ZERO, BG_ELEVATED);

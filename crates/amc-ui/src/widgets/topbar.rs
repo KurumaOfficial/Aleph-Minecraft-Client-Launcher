@@ -85,7 +85,7 @@ pub fn show_topbar(
                 Align2::LEFT_CENTER,
                 "ALEPH LAUNCHER",
                 theme::display(12.0),
-                theme::HEAD,
+                theme::HEAD.into(),
             );
         }
         if logo_resp.clicked() {

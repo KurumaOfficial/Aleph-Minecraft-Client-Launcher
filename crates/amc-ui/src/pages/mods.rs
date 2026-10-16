@@ -629,7 +629,7 @@ impl ModsPage {
                     .color(if mr_active {
                         Color32::WHITE
                     } else {
-                        TEXT_MUTED
+                        TEXT_MUTED.into()
                     }),
             )
             .fill(if mr_active { RUBY } else { BG_HOVER })
@@ -646,7 +646,7 @@ impl ModsPage {
                     .color(if cf_active {
                         Color32::WHITE
                     } else {
-                        TEXT_MUTED
+                        TEXT_MUTED.into()
                     }),
             )
             .fill(if cf_active { RUBY } else { BG_HOVER })
@@ -739,7 +739,11 @@ impl ModsPage {
                         Icon::Puzzle,
                         None,
                         lang.mods_cat_mods(),
-                        if cat_mod { Color32::WHITE } else { TEXT_MUTED },
+                        if cat_mod {
+                            Color32::WHITE
+                        } else {
+                            TEXT_MUTED.into()
+                        },
                         egui::FontId::proportional(11.0),
                         if cat_mod { RUBY } else { BG_ELEVATED },
                     )
@@ -753,7 +757,11 @@ impl ModsPage {
                         Icon::Palette,
                         None,
                         lang.mods_cat_resourcepacks(),
-                        if cat_rp { Color32::WHITE } else { TEXT_MUTED },
+                        if cat_rp {
+                            Color32::WHITE
+                        } else {
+                            TEXT_MUTED.into()
+                        },
                         egui::FontId::proportional(11.0),
                         if cat_rp { RUBY } else { BG_ELEVATED },
                     )
@@ -767,7 +775,11 @@ impl ModsPage {
                         Icon::Sun,
                         None,
                         lang.mods_cat_shaders(),
-                        if cat_sh { Color32::WHITE } else { TEXT_MUTED },
+                        if cat_sh {
+                            Color32::WHITE
+                        } else {
+                            TEXT_MUTED.into()
+                        },
                         egui::FontId::proportional(11.0),
                         if cat_sh { RUBY } else { BG_ELEVATED },
                     )
@@ -787,7 +799,11 @@ impl ModsPage {
                     Icon::List,
                     None,
                     lang.mods_sort_relevance(),
-                    if sort_rel { Color32::WHITE } else { TEXT_MUTED },
+                    if sort_rel {
+                        Color32::WHITE
+                    } else {
+                        TEXT_MUTED.into()
+                    },
                     egui::FontId::proportional(11.0),
                     if sort_rel { RUBY } else { BG_ELEVATED },
                 )
@@ -800,7 +816,11 @@ impl ModsPage {
                     Icon::Download,
                     None,
                     lang.mods_sort_downloads(),
-                    if sort_dl { Color32::WHITE } else { TEXT_MUTED },
+                    if sort_dl {
+                        Color32::WHITE
+                    } else {
+                        TEXT_MUTED.into()
+                    },
                     egui::FontId::proportional(11.0),
                     if sort_dl { RUBY } else { BG_ELEVATED },
                 )

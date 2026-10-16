@@ -215,13 +215,13 @@ impl BottomBar {
 
         let base_bg = lerp_color(RUBY, RUBY_LIGHT, hover_t);
         let pm_bg = if is_launching {
-            RUBY_DIM
+            RUBY_DIM.into()
         } else {
             lerp_color(base_bg, RUBY_DIM, press_t)
         };
 
         let stroke_col = if is_launching {
-            RUBY
+            RUBY.into()
         } else {
             lerp_color(RUBY, Color32::from_rgb(0xE8, 0x55, 0x70), hover_t)
         };

@@ -140,7 +140,7 @@ pub fn show_nav(
             ui.painter().rect_filled(rect, Rounding::ZERO, fill);
         }
         let glyph = if active {
-            theme::HEAD
+            theme::HEAD.into()
         } else {
             theme::lerp_color(theme::MUTED, theme::HEAD, hover)
         };
@@ -251,14 +251,14 @@ pub fn show_lobby(
                 Align2::LEFT_CENTER,
                 short_name(name, 34),
                 theme::display_reg(21.0),
-                theme::TEXT,
+                theme::TEXT.into(),
             );
             ui.painter().text(
                 pos2(inner.left(), inner.center().y + 13.0),
                 Align2::LEFT_CENTER,
                 format!("MC {version} • {loader}"),
                 theme::mono(11.0),
-                theme::MUTED,
+                theme::MUTED.into(),
             );
             hero.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if quick_play_button(ui, lang, launching) {
