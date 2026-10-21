@@ -24,6 +24,11 @@ impl TitleBar {
         let rect = ui.available_rect_before_wrap();
         let bar_rect = Rect::from_min_size(rect.min, vec2(rect.width(), height));
 
+        // Light shells (MultiMC/Legacy) need their chrome color here too;
+        // otherwise the frameless top strip falls back to the black window
+        // background and dark heading text becomes unreadable.
+        ui.painter().rect_filled(bar_rect, egui::Rounding::ZERO, BG);
+
         // Draw bottom separator
         ui.painter().line_segment(
             [bar_rect.left_bottom(), bar_rect.right_bottom()],

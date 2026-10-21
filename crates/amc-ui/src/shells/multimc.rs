@@ -30,7 +30,7 @@ pub const NEWS_HEIGHT: f32 = 24.0;
 pub const STATUS_HEIGHT: f32 = 22.0;
 /// Width of the right instance toolbar (the reference sizes it to its
 /// longest text-only label).
-pub const INSTANCE_BAR_WIDTH: f32 = 136.0;
+pub const INSTANCE_BAR_WIDTH: f32 = 176.0;
 
 /// The highlighted-text role of the Qt "Bright" theme (`#eff0f1`).
 const HIGHLIGHTED_TEXT: Color32 = Color32::from_rgb(0xEF, 0xF0, 0xF1);
