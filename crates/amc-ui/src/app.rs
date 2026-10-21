@@ -3879,61 +3879,48 @@ impl App for LauncherApp {
                     }
                 });
         } else if shell == amc_core::config::ShellKind::Legacy {
-            // Legacy-inspired: plain text tabs on top with the account chip,
-            // and a Play panel at the bottom with the selected instance; the
-            // shared pages stay in the middle.
+            // Legacy launcher: folder tabs on top (white active sheet), a
+            // bottom bar with the Profile / Version combos and the green
+            // Play button; the shared pages render on the white canvas.
             ctx.animate_bool_responsive(pro_slide_id, false);
-            let acc_name: Option<String> = self
-                .account_mgr
-                .active_account()
-                .map(|a| a.username.clone());
-            let play_instance: Option<(String, String, String)> = self
-                .selected_instance
-                .and_then(|id| self.instances.iter().find(|i| i.id == id))
-                .map(|i| {
-                    (
-                        i.name.clone(),
-                        i.game_version.clone(),
-                        i.loader.as_str().to_string(),
-                    )
-                });
+            let mut shell_action = crate::shells::ShellAction::default();
             let launching = self.is_launching;
             TopBottomPanel::bottom("legacy_play")
                 .exact_height(crate::shells::legacy::PLAY_HEIGHT)
                 .frame(egui::Frame::none())
                 .show(ctx, |ui| {
-                    let action = crate::shells::legacy::show_play_bar(
-                        ui,
-                        lang,
-                        play_instance.as_ref().map(|(name, version, loader)| {
-                            (name.as_str(), version.as_str(), loader.as_str())
-                        }),
-                        launching,
-                    );
-                    if let Some(tab) = action.tab {
-                        self.current_tab = tab;
-                    }
-                    if action.launch {
-                        self.handle_launch();
-                    }
+                    let bar_ctx = crate::shells::legacy::PlayBarCtx {
+                        instances: &self.instances,
+                        selected: self.selected_instance,
+                    };
+                    let action =
+                        crate::shells::legacy::show_play_bar(ui, lang, &bar_ctx, launching);
+                    shell_action.merge(action);
                 });
             TopBottomPanel::top("legacy_tabs")
                 .exact_height(crate::shells::legacy::TABS_HEIGHT)
                 .frame(egui::Frame::none())
                 .show(ctx, |ui| {
-                    let action = crate::shells::legacy::show_tabs(
-                        ui,
-                        lang,
-                        self.current_tab,
-                        acc_name.as_deref(),
-                    );
-                    if let Some(tab) = action.tab {
-                        self.current_tab = tab;
-                    }
-                    if action.login {
-                        self.login_modal.is_open = true;
-                    }
+                    let action = crate::shells::legacy::show_tabs(ui, lang, self.current_tab);
+                    shell_action.merge(action);
                 });
+            if let Some(tab) = shell_action.tab {
+                self.current_tab = tab;
+            }
+            if shell_action.new_instance {
+                self.current_tab = NavTab::Modpacks;
+                self.instances_page.new_instance_ram = self.hw_suggested_ram;
+                self.instances_page.show_create_modal = true;
+            }
+            if let Some(id) = shell_action.select_instance {
+                self.selected_instance = Some(id);
+                if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
+                    self.selected_version = Some(inst.game_version.clone());
+                }
+            }
+            if shell_action.launch {
+                self.handle_launch();
+            }
         } else if shell == amc_core::config::ShellKind::Millida {
             // Millida: slim icon rail on the left; the Home tab itself is
             // the lobby drawn in the central panel.
@@ -4025,12 +4012,13 @@ impl App for LauncherApp {
                 });
         }
 
-        // 4. Central content panel. The Modrinth shell swaps the canvas for
-        // the gray surface of its palette; every other shell keeps BG.
-        let canvas = if shell == amc_core::config::ShellKind::Modrinth {
-            crate::theme::MODRINTH_BG
-        } else {
-            BG.into()
+        // 4. Central content panel. Modrinth paints its own gray surface and
+        // Legacy the white page its folder tabs merge into; the other
+        // shells keep the palette background.
+        let canvas: egui::Color32 = match shell {
+            amc_core::config::ShellKind::Modrinth => crate::theme::MODRINTH_BG,
+            amc_core::config::ShellKind::Legacy => crate::theme::FIELD.into(),
+            _ => BG.into(),
         };
         CentralPanel::default()
             .frame(egui::Frame::none().fill(canvas))

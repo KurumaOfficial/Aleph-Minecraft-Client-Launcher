@@ -2371,6 +2371,46 @@ impl Language {
         }
     }
 
+    pub fn shell_profile_label(&self) -> &'static str {
+        match self {
+            Self::English => "Profile",
+            Self::Russian => "Профиль",
+            Self::Ukrainian => "Профіль",
+        }
+    }
+
+    pub fn shell_version_label(&self) -> &'static str {
+        match self {
+            Self::English => "Version",
+            Self::Russian => "Версия",
+            Self::Ukrainian => "Версія",
+        }
+    }
+
+    pub fn shell_new_profile(&self) -> &'static str {
+        match self {
+            Self::English => "New profile…",
+            Self::Russian => "Новый профиль…",
+            Self::Ukrainian => "Новий профіль…",
+        }
+    }
+
+    pub fn shell_no_profile(&self) -> &'static str {
+        match self {
+            Self::English => "No profile",
+            Self::Russian => "Нет профиля",
+            Self::Ukrainian => "Немає профілю",
+        }
+    }
+
+    pub fn shell_use_latest(&self) -> &'static str {
+        match self {
+            Self::English => "Use latest version",
+            Self::Russian => "Последняя версия",
+            Self::Ukrainian => "Остання версія",
+        }
+    }
+
     // ==========================================
     // First-run wizard (ROADMAP P1)
     // ==========================================
@@ -4422,6 +4462,11 @@ mod tests {
             assert!(!lang.shell_export_instance().is_empty());
             assert!(!lang.shell_delete().is_empty());
             assert!(!lang.shell_copy_instance().is_empty());
+            assert!(!lang.shell_profile_label().is_empty());
+            assert!(!lang.shell_version_label().is_empty());
+            assert!(!lang.shell_new_profile().is_empty());
+            assert!(!lang.shell_no_profile().is_empty());
+            assert!(!lang.shell_use_latest().is_empty());
             assert!(!lang.mods_cat_mods().is_empty());
             assert!(!lang.mods_cat_resourcepacks().is_empty());
             assert!(!lang.mods_cat_shaders().is_empty());

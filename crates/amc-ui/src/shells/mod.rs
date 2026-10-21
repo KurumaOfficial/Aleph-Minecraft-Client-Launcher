@@ -88,6 +88,8 @@ pub struct ShellAction {
     pub shortcut_instance: bool,
     /// Switch the active account (MultiMC accounts menu).
     pub account: Option<uuid::Uuid>,
+    /// Select an instance (Legacy profile dropdown, profile editor).
+    pub select_instance: Option<uuid::Uuid>,
 }
 
 impl ShellAction {
@@ -98,6 +100,9 @@ impl ShellAction {
         }
         if self.account.is_none() {
             self.account = other.account;
+        }
+        if self.select_instance.is_none() {
+            self.select_instance = other.select_instance;
         }
         self.launch |= other.launch;
         self.login |= other.login;
@@ -134,16 +139,19 @@ mod tests {
     fn test_shell_action_merge_fills_empty_fields() {
         let mut base = ShellAction::default();
         let account = uuid::Uuid::new_v4();
+        let instance = uuid::Uuid::new_v4();
         base.merge(ShellAction {
             tab: Some(NavTab::Modpacks),
             login: true,
             exit: true,
             new_instance: true,
             account: Some(account),
+            select_instance: Some(instance),
             ..ShellAction::default()
         });
         assert_eq!(base.tab, Some(NavTab::Modpacks));
         assert_eq!(base.account, Some(account));
+        assert_eq!(base.select_instance, Some(instance));
         assert!(base.login);
         assert!(base.exit);
         assert!(base.new_instance);
