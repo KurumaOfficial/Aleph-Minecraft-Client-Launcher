@@ -160,37 +160,56 @@ impl TitleBar {
             Stroke::new(1.0_f32, crate::theme::MODRINTH_SURFACE_HIGH),
         );
 
-        // Left brand mark + wordmark.
-        let mark = Rect::from_min_size(
-            pos2(bar.left() + 14.0, bar.center().y - 12.0),
-            vec2(24.0, 24.0),
+        // Official reference wordmark (bundled asset, rendered at the same
+        // 28 px optical height as the original TextLogo component).
+        let wordmark_h = 28.0;
+        let wordmark_w = wordmark_h * (1654.0 / 297.0);
+        let wordmark = Rect::from_min_size(
+            pos2(bar.left() + 14.0, bar.center().y - wordmark_h / 2.0),
+            vec2(wordmark_w, wordmark_h),
         );
-        painter.rect_filled(mark, Rounding::same(6.0), crate::theme::MODRINTH_GREEN);
-        let diamond = Rect::from_center_size(mark.center(), vec2(10.0, 10.0));
-        painter.add(egui::Shape::convex_polygon(
-            vec![
-                diamond.center_top(),
-                diamond.right_center(),
-                diamond.center_bottom(),
-                diamond.left_center(),
-            ],
-            Color32::from_white_alpha(235),
-            Stroke::NONE,
-        ));
-        let brand = painter.layout_no_wrap(
-            "ALEPH".to_owned(),
-            crate::theme::display(13.0),
-            crate::theme::MODRINTH_TEXT_CONTRAST,
-        );
-        let brand_x = mark.right() + 8.0;
-        painter.galley(
-            pos2(brand_x, bar.center().y - brand.size().y / 2.0),
-            brand.clone(),
-            crate::theme::MODRINTH_TEXT_CONTRAST,
-        );
+        let brand_right =
+            if let Some(tex) = crate::widgets::modrinth_assets::wordmark_texture(ui.ctx()) {
+                painter.image(
+                    tex.id(),
+                    wordmark,
+                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                    Color32::WHITE,
+                );
+                wordmark.right()
+            } else {
+                let mark = Rect::from_min_size(
+                    pos2(bar.left() + 14.0, bar.center().y - 12.0),
+                    vec2(24.0, 24.0),
+                );
+                painter.rect_filled(mark, Rounding::same(6.0), crate::theme::MODRINTH_GREEN);
+                let diamond = Rect::from_center_size(mark.center(), vec2(10.0, 10.0));
+                painter.add(egui::Shape::convex_polygon(
+                    vec![
+                        diamond.center_top(),
+                        diamond.right_center(),
+                        diamond.center_bottom(),
+                        diamond.left_center(),
+                    ],
+                    Color32::from_white_alpha(235),
+                    Stroke::NONE,
+                ));
+                let brand = painter.layout_no_wrap(
+                    "ALEPH".to_owned(),
+                    crate::theme::display(13.0),
+                    crate::theme::MODRINTH_TEXT_CONTRAST,
+                );
+                let brand_x = mark.right() + 8.0;
+                painter.galley(
+                    pos2(brand_x, bar.center().y - brand.size().y / 2.0),
+                    brand.clone(),
+                    crate::theme::MODRINTH_TEXT_CONTRAST,
+                );
+                brand_x + brand.size().x
+            };
 
         // Disabled browser-style history arrows (the app has no route stack).
-        let mut x = brand_x + brand.size().x + 14.0;
+        let mut x = brand_right + 14.0;
         for (idx, icon) in [Icon::ChevronLeft, Icon::ChevronRight]
             .into_iter()
             .enumerate()

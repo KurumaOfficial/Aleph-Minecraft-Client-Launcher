@@ -1666,19 +1666,43 @@ impl InstancesPage {
                 );
             }
             None => {
-                let badge = match inst.icon.as_deref().and_then(icons::instance_preset) {
-                    Some(preset) => preset,
-                    None => icons::loader_badge(inst.loader),
-                };
-                ui.painter()
-                    .rect_filled(icon_rect, Rounding::same(16.0), MODRINTH_SURFACE_HOVER);
-                icons::draw_centered(
-                    ui.painter(),
-                    badge,
-                    icon_rect.center(),
-                    icon_rect.width() * 0.34,
-                    MODRINTH_TEXT,
-                );
+                if let Some(preset) = inst.icon.as_deref().and_then(icons::instance_preset) {
+                    ui.painter().rect_filled(
+                        icon_rect,
+                        Rounding::same(16.0),
+                        MODRINTH_SURFACE_HOVER,
+                    );
+                    icons::draw_centered(
+                        ui.painter(),
+                        preset,
+                        icon_rect.center(),
+                        icon_rect.width() * 0.34,
+                        MODRINTH_TEXT,
+                    );
+                } else if let Some(tex) =
+                    crate::widgets::modrinth_assets::loader_texture(ui.ctx(), inst.loader)
+                {
+                    // Reference default artwork (bundled PNG assets).
+                    ui.painter().image(
+                        tex.id(),
+                        icon_rect,
+                        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                        Color32::WHITE,
+                    );
+                } else {
+                    ui.painter().rect_filled(
+                        icon_rect,
+                        Rounding::same(16.0),
+                        MODRINTH_SURFACE_HOVER,
+                    );
+                    icons::draw_centered(
+                        ui.painter(),
+                        icons::loader_badge(inst.loader),
+                        icon_rect.center(),
+                        icon_rect.width() * 0.34,
+                        MODRINTH_TEXT,
+                    );
+                }
             }
         }
 
@@ -2188,28 +2212,52 @@ impl InstancesPage {
                                                             );
                                                         }
                                                         None => {
-                                                            let badge = match inst
+                                                            if let Some(preset) = inst
                                                                 .icon
                                                                 .as_deref()
                                                                 .and_then(icons::instance_preset)
                                                             {
-                                                                Some(preset) => preset,
-                                                                None => {
-                                                                    icons::loader_badge(inst.loader)
-                                                                }
-                                                            };
-                                                            ui.painter().rect_filled(
-                                                                icon_rect,
-                                                                Rounding::same(8.0),
-                                                                MODRINTH_SURFACE_HOVER,
-                                                            );
-                                                            icons::draw_centered(
-                                                                ui.painter(),
-                                                                badge,
-                                                                icon_rect.center(),
-                                                                14.0,
-                                                                with_alpha(MODRINTH_TEXT, fade),
-                                                            );
+                                                                ui.painter().rect_filled(
+                                                                    icon_rect,
+                                                                    Rounding::same(8.0),
+                                                                    MODRINTH_SURFACE_HOVER,
+                                                                );
+                                                                icons::draw_centered(
+                                                                    ui.painter(),
+                                                                    preset,
+                                                                    icon_rect.center(),
+                                                                    14.0,
+                                                                    with_alpha(MODRINTH_TEXT, fade),
+                                                                );
+                                                            } else if let Some(tex) =
+                                                                crate::widgets::modrinth_assets::loader_texture(
+                                                                    ui.ctx(),
+                                                                    inst.loader,
+                                                                )
+                                                            {
+                                                                ui.painter().image(
+                                                                    tex.id(),
+                                                                    icon_rect,
+                                                                    Rect::from_min_max(
+                                                                        pos2(0.0, 0.0),
+                                                                        pos2(1.0, 1.0),
+                                                                    ),
+                                                                    with_alpha(Color32::WHITE, fade),
+                                                                );
+                                                            } else {
+                                                                ui.painter().rect_filled(
+                                                                    icon_rect,
+                                                                    Rounding::same(8.0),
+                                                                    MODRINTH_SURFACE_HOVER,
+                                                                );
+                                                                icons::draw_centered(
+                                                                    ui.painter(),
+                                                                    icons::loader_badge(inst.loader),
+                                                                    icon_rect.center(),
+                                                                    14.0,
+                                                                    with_alpha(MODRINTH_TEXT, fade),
+                                                                );
+                                                            }
                                                         }
                                                     }
 

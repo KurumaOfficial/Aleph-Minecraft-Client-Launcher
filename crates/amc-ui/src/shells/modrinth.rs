@@ -103,17 +103,9 @@ pub fn show_sidebar(
         Stroke::new(1.0_f32, theme::MODRINTH_SURFACE),
     );
 
-    // Wordmark header (same brand block as the other shells).
+    // The reference puts its wordmark in the titlebar only; the navigation
+    // rail starts directly with the page rows.
     ui.add_space(14.0);
-    ui.horizontal(|ui| {
-        ui.add_space(PAD);
-        ui.label(
-            egui::RichText::new("ALEPH LAUNCHER")
-                .font(theme::display(12.0))
-                .color(theme::MODRINTH_TEXT),
-        );
-    });
-    ui.add_space(12.0);
 
     // Page rows: green-tinted pill when active, gray hover otherwise.
     for (tab, icon) in NAV_TABS {
