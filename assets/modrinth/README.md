@@ -9,6 +9,8 @@ Bundled UI artwork used only by the Modrinth-inspired shell:
   titlebar surface colour.
 - `branding/modrinth-icon.png` — Modrinth App icon from
   `refs/modrinth/apps/app/icons/128x128.png`.
+- `skins/steve.png` — default Steve skin from
+  `refs/modrinth/apps/app-frontend/src/assets/skins/steve.png`.
 
 Source: Modrinth App (Theseus), Modrinth / Theseus contributors,
 GPL-3.0, <https://github.com/modrinth/code>. The launcher credits this

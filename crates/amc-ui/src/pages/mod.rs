@@ -14,4 +14,4 @@ pub use mods::{
 };
 pub use profile::{ProfileAction, ProfilePage};
 pub use settings::SettingsPage;
-pub use skins::SkinsPage;
+pub use skins::{SkinsPage, SkinsSkin};

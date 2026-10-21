@@ -1183,6 +1183,96 @@ impl Language {
         }
     }
 
+    /// Modrinth shell: skin selector page title.
+    pub fn skins_selector_title(&self) -> &'static str {
+        match self {
+            Self::English => "Skin selector",
+            Self::Russian => "Выбор скина",
+            Self::Ukrainian => "Вибір скіна",
+        }
+    }
+
+    /// Modrinth shell: saved skins list heading.
+    pub fn skins_saved_title(&self) -> &'static str {
+        match self {
+            Self::English => "Saved skins",
+            Self::Russian => "Сохранённые скины",
+            Self::Ukrainian => "Збережені скіни",
+        }
+    }
+
+    /// Modrinth shell: add-skin action.
+    pub fn skins_add(&self) -> &'static str {
+        match self {
+            Self::English => "Add skin",
+            Self::Russian => "Добавить скин",
+            Self::Ukrainian => "Додати скін",
+        }
+    }
+
+    /// Modrinth shell: active-skin badge.
+    pub fn skins_active_badge(&self) -> &'static str {
+        match self {
+            Self::English => "Active",
+            Self::Russian => "Активный",
+            Self::Ukrainian => "Активний",
+        }
+    }
+
+    /// Modrinth shell: default skin section heading.
+    pub fn skins_defaults(&self) -> &'static str {
+        match self {
+            Self::English => "Default skins",
+            Self::Russian => "Стандартные скины",
+            Self::Ukrainian => "Стандартні скіни",
+        }
+    }
+
+    /// Modrinth shell: empty saved-skins state.
+    pub fn skins_no_saved(&self) -> &'static str {
+        match self {
+            Self::English => "No saved skins yet",
+            Self::Russian => "Сохранённых скинов пока нет",
+            Self::Ukrainian => "Збережених скінів ще немає",
+        }
+    }
+
+    /// Modrinth shell: demo-account notice.
+    pub fn skins_demo_notice(&self) -> &'static str {
+        match self {
+            Self::English => "Sign in to save and apply skins",
+            Self::Russian => "Войдите, чтобы сохранять и применять скины",
+            Self::Ukrainian => "Увійдіть, щоб зберігати та застосовувати скіни",
+        }
+    }
+
+    /// Modrinth shell: load-skin action without the emoji prefix.
+    pub fn skins_load_skin(&self) -> &'static str {
+        match self {
+            Self::English => "Load skin",
+            Self::Russian => "Загрузить скин",
+            Self::Ukrainian => "Завантажити скін",
+        }
+    }
+
+    /// Modrinth shell: classic model label.
+    pub fn skins_model_classic(&self) -> &'static str {
+        match self {
+            Self::English => "Classic",
+            Self::Russian => "Классический",
+            Self::Ukrainian => "Класичний",
+        }
+    }
+
+    /// Modrinth shell: slim model label.
+    pub fn skins_model_slim(&self) -> &'static str {
+        match self {
+            Self::English => "Slim",
+            Self::Russian => "Тонкий",
+            Self::Ukrainian => "Тонкий",
+        }
+    }
+
     pub fn skins_slim(&self) -> &'static str {
         match self {
             Self::English => "Slim (Alex 3px)",
@@ -4922,6 +5012,16 @@ mod tests {
             assert!(!lang.mods_empty_hint().is_empty());
             assert!(!lang.mods_browse_action().is_empty());
             assert!(!lang.skins_title().is_empty());
+            assert!(!lang.skins_selector_title().is_empty());
+            assert!(!lang.skins_saved_title().is_empty());
+            assert!(!lang.skins_add().is_empty());
+            assert!(!lang.skins_active_badge().is_empty());
+            assert!(!lang.skins_defaults().is_empty());
+            assert!(!lang.skins_no_saved().is_empty());
+            assert!(!lang.skins_demo_notice().is_empty());
+            assert!(!lang.skins_load_skin().is_empty());
+            assert!(!lang.skins_model_classic().is_empty());
+            assert!(!lang.skins_model_slim().is_empty());
             assert!(!lang.login_modal_title().is_empty());
             assert!(!lang.console_title().is_empty());
             assert!(!lang.diag_header_label().is_empty());

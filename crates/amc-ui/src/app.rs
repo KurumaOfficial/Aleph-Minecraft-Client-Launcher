@@ -28,7 +28,7 @@ use crate::modals::{
 use crate::pages::{
     icon_cache_file, icon_key, HomeContext, HomePage, InstanceAction, InstancesContext,
     InstancesPage, ModUpdateResult, ModsActions, ModsPage, ModsSkin, ProfileAction, ProfilePage,
-    SettingsPage, SkinsPage,
+    SettingsPage, SkinsPage, SkinsSkin,
 };
 use crate::theme::{apply_aleph_theme, BG};
 use crate::widgets::{
@@ -4726,7 +4726,12 @@ impl App for LauncherApp {
                     }
                     NavTab::Skins => {
                         let acc = self.account_mgr.active_account();
-                        self.skins_page.show(&mut content_ui, acc, lang);
+                        let skins_skin = if shell == amc_core::config::ShellKind::Modrinth {
+                            SkinsSkin::Modrinth
+                        } else {
+                            SkinsSkin::Amc
+                        };
+                        self.skins_page.show(&mut content_ui, acc, lang, skins_skin);
                     }
                     NavTab::Profile => {
                         let acc = self.account_mgr.active_account();

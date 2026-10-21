@@ -2,10 +2,21 @@ use crate::theme::{
     lerp_color, BG_CARD, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, BORDER_STRONG, RUBY, RUBY_LIGHT,
     TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
+use crate::widgets::icons::{self, Icon};
 use amc_auth::Account;
-use egui::{vec2, Color32, Sense, Stroke, TextureOptions, Ui};
+use egui::{pos2, vec2, Color32, Rect, Sense, Stroke, TextureOptions, Ui};
 use image::RgbaImage;
 use std::path::PathBuf;
+
+const STEVE_SKIN: &[u8] = include_bytes!("../../../../assets/modrinth/skins/steve.png");
+
+/// Visual skin for the shared skin page.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SkinsSkin {
+    #[default]
+    Amc,
+    Modrinth,
+}
 
 pub struct SkinsPage {
     pub is_slim_model: bool,
@@ -32,7 +43,17 @@ impl Default for SkinsPage {
 }
 
 impl SkinsPage {
-    pub fn show(&mut self, ui: &mut Ui, account: Option<&Account>, lang: amc_core::Language) {
+    pub fn show(
+        &mut self,
+        ui: &mut Ui,
+        account: Option<&Account>,
+        lang: amc_core::Language,
+        skin: SkinsSkin,
+    ) {
+        if skin == SkinsSkin::Modrinth {
+            self.show_modrinth(ui, account, lang);
+            return;
+        }
         ui.add_space(20.0);
 
         ui.label(
@@ -45,21 +66,7 @@ impl SkinsPage {
         ui.add_space(14.0);
 
         // Update preview texture if dirty
-        if self.dirty || self.texture_handle.is_none() {
-            let img = match &self.skin_image {
-                Some(img) => composite_front_skin(img, self.is_slim_model),
-                None => {
-                    let default_skin = generate_default_skin(self.is_slim_model);
-                    composite_front_skin(&default_skin, self.is_slim_model)
-                }
-            };
-            self.texture_handle = Some(ui.ctx().load_texture(
-                "skin_preview",
-                img,
-                TextureOptions::NEAREST,
-            ));
-            self.dirty = false;
-        }
+        self.ensure_preview_texture(ui.ctx());
 
         // Preview box
         let preview_width = 460.0;
@@ -300,6 +307,543 @@ impl SkinsPage {
             );
         }
     }
+
+    fn ensure_preview_texture(&mut self, ctx: &egui::Context) {
+        if !self.dirty && self.texture_handle.is_some() {
+            return;
+        }
+        let image = match &self.skin_image {
+            Some(image) => composite_front_skin(image, self.is_slim_model),
+            None => {
+                let default = if self.is_slim_model {
+                    generate_default_skin(true)
+                } else {
+                    embedded_steve().unwrap_or_else(|| generate_default_skin(false))
+                };
+                composite_front_skin(&default, self.is_slim_model)
+            }
+        };
+        self.texture_handle =
+            Some(ctx.load_texture("skin_preview", image, TextureOptions::NEAREST));
+        self.dirty = false;
+    }
+
+    fn load_skin_dialog(&mut self, lang: amc_core::Language) {
+        if let Some(path) = rfd::FileDialog::new()
+            .add_filter("Minecraft Skins (*.png)", &["png"])
+            .pick_file()
+        {
+            if let Ok(img) = image::open(&path) {
+                self.skin_image = Some(img.to_rgba8());
+                self.active_skin_name = path
+                    .file_name()
+                    .map(|f| f.to_string_lossy().to_string())
+                    .unwrap_or_else(|| lang.skins_custom_name().to_string());
+                self.custom_skin_path = Some(path);
+                self.dirty = true;
+                self.avatar_dirty = true;
+            }
+        }
+    }
+
+    /// Modrinth reference composition: a sticky preview column and a skin
+    /// library rail with the active skin, default heads and an add tile.
+    fn show_modrinth(&mut self, ui: &mut Ui, account: Option<&Account>, lang: amc_core::Language) {
+        self.ensure_preview_texture(ui.ctx());
+
+        ui.add_space(12.0);
+        ui.label(
+            egui::RichText::new(lang.skins_selector_title())
+                .font(egui::FontId::proportional(24.0))
+                .strong()
+                .color(TEXT_HEADING),
+        );
+        ui.add_space(12.0);
+
+        let available = ui.available_width();
+        let gap = 16.0;
+        let left_w = (available * 0.46).clamp(270.0, 360.0);
+        let right_w = (available - left_w - gap).max(220.0);
+        let panel_h = (ui.available_height() - 4.0).max(420.0);
+
+        ui.horizontal_top(|ui| {
+            ui.allocate_ui_with_layout(
+                vec2(left_w, panel_h),
+                egui::Layout::top_down(egui::Align::Min),
+                |ui| self.show_modrinth_preview(ui, account, lang, left_w, panel_h),
+            );
+            ui.add_space(gap);
+            ui.allocate_ui_with_layout(
+                vec2(right_w, panel_h),
+                egui::Layout::top_down(egui::Align::Min),
+                |ui| {
+                    egui::ScrollArea::vertical()
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| self.show_modrinth_skin_list(ui, lang, right_w));
+                },
+            );
+        });
+    }
+
+    fn show_modrinth_preview(
+        &mut self,
+        ui: &mut Ui,
+        account: Option<&Account>,
+        lang: amc_core::Language,
+        width: f32,
+        panel_h: f32,
+    ) {
+        let preview_h = (panel_h - 136.0).max(250.0);
+        let (rect, _) = ui.allocate_exact_size(vec2(width, preview_h), Sense::hover());
+        ui.painter().rect_filled(
+            rect,
+            egui::Rounding::same(20.0),
+            crate::theme::MODRINTH_SURFACE,
+        );
+        ui.painter().rect_stroke(
+            rect,
+            egui::Rounding::same(20.0),
+            Stroke::new(1.0_f32, crate::theme::MODRINTH_SURFACE_HIGH),
+        );
+        ui.painter().circle_filled(
+            pos2(rect.center().x, rect.center().y + 10.0),
+            preview_h * 0.34,
+            crate::theme::with_alpha(crate::theme::MODRINTH_GREEN, 12),
+        );
+
+        if let Some(tex) = &self.texture_handle {
+            let image_h = (preview_h - 54.0).min(400.0);
+            let image_w = image_h / 2.0;
+            let image_rect = Rect::from_center_size(
+                pos2(rect.center().x, rect.center().y + 8.0),
+                vec2(image_w, image_h),
+            );
+            ui.painter().image(
+                tex.id(),
+                image_rect,
+                Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                Color32::WHITE,
+            );
+        }
+
+        let chip = Rect::from_min_size(
+            pos2(rect.left() + 14.0, rect.top() + 14.0),
+            vec2(92.0, 24.0),
+        );
+        ui.painter().rect_filled(
+            chip,
+            egui::Rounding::same(12.0),
+            crate::theme::with_alpha(crate::theme::MODRINTH_BG, 170),
+        );
+        ui.painter().text(
+            chip.center(),
+            egui::Align2::CENTER_CENTER,
+            if self.is_slim_model {
+                lang.skins_model_slim()
+            } else {
+                lang.skins_model_classic()
+            },
+            egui::FontId::proportional(11.0),
+            crate::theme::MODRINTH_TEXT,
+        );
+
+        ui.add_space(10.0);
+        if let Some(new_slim) = modrinth_model_switch(ui, self.is_slim_model, lang, width) {
+            self.is_slim_model = new_slim;
+            self.dirty = true;
+            self.avatar_dirty = true;
+        }
+
+        ui.add_space(8.0);
+        let button_w = ((width - 8.0) / 2.0).max(110.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing = vec2(8.0, 0.0);
+            if modrinth_skin_button(ui, Icon::Folder, lang.skins_load_skin(), true, button_w) {
+                self.load_skin_dialog(lang);
+            }
+            let reset_label = if self.is_slim_model {
+                lang.skins_btn_reset_alex()
+            } else {
+                lang.skins_btn_reset_steve()
+            };
+            if modrinth_skin_button(ui, Icon::Refresh, reset_label, false, button_w) {
+                self.skin_image = None;
+                self.custom_skin_path = None;
+                self.active_skin_name = if self.is_slim_model {
+                    "Alex".to_string()
+                } else {
+                    "Steve".to_string()
+                };
+                self.dirty = true;
+                self.avatar_dirty = true;
+            }
+        });
+
+        ui.add_space(8.0);
+        let status = match account {
+            Some(acc) => format!(
+                "{}: {} ({})",
+                lang.skins_account_label(),
+                acc.username,
+                acc.account_type.as_str()
+            ),
+            None => lang.skins_demo_notice().to_string(),
+        };
+        ui.label(
+            egui::RichText::new(status)
+                .font(egui::FontId::proportional(11.5))
+                .color(crate::theme::MODRINTH_TEXT_SECONDARY),
+        );
+    }
+
+    fn show_modrinth_skin_list(&mut self, ui: &mut Ui, lang: amc_core::Language, width: f32) {
+        ui.horizontal(|ui| {
+            ui.label(
+                egui::RichText::new(lang.nav_skins())
+                    .font(egui::FontId::proportional(16.0))
+                    .strong()
+                    .color(crate::theme::MODRINTH_TEXT_CONTRAST),
+            );
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if modrinth_skin_button(
+                    ui,
+                    Icon::Plus,
+                    lang.skins_add(),
+                    true,
+                    (width * 0.42).clamp(104.0, 150.0),
+                ) {
+                    self.load_skin_dialog(lang);
+                }
+            });
+        });
+        ui.add_space(10.0);
+
+        // Active skin.
+        let (card, _) = ui.allocate_exact_size(vec2(width, 72.0), Sense::hover());
+        ui.painter().rect_filled(
+            card,
+            egui::Rounding::same(12.0),
+            crate::theme::MODRINTH_SURFACE,
+        );
+        ui.painter().rect_stroke(
+            card,
+            egui::Rounding::same(12.0),
+            Stroke::new(1.0_f32, crate::theme::MODRINTH_SURFACE_HIGH),
+        );
+        let head_rect = Rect::from_min_size(
+            pos2(card.left() + 12.0, card.top() + 12.0),
+            vec2(48.0, 48.0),
+        );
+        ui.painter().rect_filled(
+            head_rect,
+            egui::Rounding::same(8.0),
+            crate::theme::MODRINTH_SURFACE_HOVER,
+        );
+        if let Some(tex) = &self.texture_handle {
+            ui.painter().image(
+                tex.id(),
+                head_rect.shrink(5.0),
+                Rect::from_min_max(pos2(0.25, 0.0), pos2(0.75, 0.25)),
+                Color32::WHITE,
+            );
+        }
+        ui.painter().text(
+            pos2(card.left() + 72.0, card.center().y - 9.0),
+            egui::Align2::LEFT_CENTER,
+            truncate_skin_name(&self.active_skin_name, 28),
+            egui::FontId::proportional(13.5),
+            crate::theme::MODRINTH_TEXT_CONTRAST,
+        );
+        ui.painter().text(
+            pos2(card.left() + 72.0, card.center().y + 11.0),
+            egui::Align2::LEFT_CENTER,
+            if self.is_slim_model {
+                lang.skins_model_slim()
+            } else {
+                lang.skins_model_classic()
+            },
+            egui::FontId::proportional(11.0),
+            crate::theme::MODRINTH_TEXT_SECONDARY,
+        );
+        let badge = Rect::from_min_size(
+            pos2(card.right() - 78.0, card.center().y - 12.0),
+            vec2(66.0, 24.0),
+        );
+        ui.painter().rect_filled(
+            badge,
+            egui::Rounding::same(12.0),
+            crate::theme::with_alpha(crate::theme::MODRINTH_GREEN, 24),
+        );
+        ui.painter().text(
+            badge.center(),
+            egui::Align2::CENTER_CENTER,
+            lang.skins_active_badge(),
+            egui::FontId::proportional(10.5),
+            crate::theme::MODRINTH_GREEN,
+        );
+
+        ui.add_space(16.0);
+        ui.label(
+            egui::RichText::new(lang.skins_defaults())
+                .font(egui::FontId::proportional(12.5))
+                .strong()
+                .color(crate::theme::MODRINTH_TEXT_SECONDARY),
+        );
+        ui.add_space(8.0);
+        let tile_gap = 8.0;
+        let tile_w = ((width - tile_gap) / 2.0).max(90.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing = vec2(tile_gap, 0.0);
+            for (slim, label, tex) in [
+                (false, "Steve", default_head_texture(ui.ctx(), false)),
+                (true, "Alex", default_head_texture(ui.ctx(), true)),
+            ] {
+                let (tile, resp) = ui.allocate_exact_size(vec2(tile_w, 92.0), Sense::click());
+                let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+                let active = self.skin_image.is_none() && self.is_slim_model == slim;
+                ui.painter().rect_filled(
+                    tile,
+                    egui::Rounding::same(12.0),
+                    crate::theme::lerp_color(
+                        crate::theme::MODRINTH_SURFACE,
+                        crate::theme::MODRINTH_SURFACE_HOVER,
+                        hover,
+                    ),
+                );
+                ui.painter().rect_stroke(
+                    tile,
+                    egui::Rounding::same(12.0),
+                    Stroke::new(
+                        1.0_f32,
+                        if active {
+                            crate::theme::MODRINTH_GREEN
+                        } else {
+                            crate::theme::MODRINTH_SURFACE_HIGH
+                        },
+                    ),
+                );
+                let head = Rect::from_center_size(
+                    pos2(tile.center().x, tile.top() + 34.0),
+                    vec2(44.0, 44.0),
+                );
+                ui.painter().image(
+                    tex.id(),
+                    head,
+                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                    Color32::WHITE,
+                );
+                ui.painter().text(
+                    pos2(tile.center().x, tile.bottom() - 17.0),
+                    egui::Align2::CENTER_CENTER,
+                    label,
+                    egui::FontId::proportional(12.0),
+                    crate::theme::MODRINTH_TEXT_CONTRAST,
+                );
+                if resp.hovered() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
+                if resp.clicked() {
+                    self.is_slim_model = slim;
+                    self.skin_image = None;
+                    self.custom_skin_path = None;
+                    self.active_skin_name = label.to_string();
+                    self.dirty = true;
+                    self.avatar_dirty = true;
+                }
+            }
+        });
+
+        ui.add_space(16.0);
+        ui.label(
+            egui::RichText::new(lang.skins_saved_title())
+                .font(egui::FontId::proportional(12.5))
+                .strong()
+                .color(crate::theme::MODRINTH_TEXT_SECONDARY),
+        );
+        ui.add_space(8.0);
+        let (empty, resp) = ui.allocate_exact_size(vec2(width, 62.0), Sense::click());
+        let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+        ui.painter().rect_filled(
+            empty,
+            egui::Rounding::same(12.0),
+            crate::theme::lerp_color(Color32::TRANSPARENT, crate::theme::MODRINTH_SURFACE, hover),
+        );
+        ui.painter().rect_stroke(
+            empty,
+            egui::Rounding::same(12.0),
+            Stroke::new(1.0_f32, crate::theme::MODRINTH_SURFACE_HIGH),
+        );
+        icons::draw(
+            ui.painter(),
+            Icon::Plus,
+            Rect::from_center_size(
+                pos2(empty.left() + 24.0, empty.center().y),
+                vec2(15.0, 15.0),
+            ),
+            crate::theme::MODRINTH_GREEN,
+            1.5,
+        );
+        ui.painter().text(
+            pos2(empty.left() + 42.0, empty.center().y),
+            egui::Align2::LEFT_CENTER,
+            lang.skins_no_saved(),
+            egui::FontId::proportional(12.0),
+            crate::theme::MODRINTH_TEXT_SECONDARY,
+        );
+        if resp.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+        if resp.clicked() {
+            self.load_skin_dialog(lang);
+        }
+    }
+}
+
+fn truncate_skin_name(name: &str, max: usize) -> String {
+    if name.chars().count() <= max {
+        name.to_string()
+    } else {
+        format!("{}…", name.chars().take(max).collect::<String>())
+    }
+}
+
+fn embedded_steve() -> Option<RgbaImage> {
+    image::load_from_memory(STEVE_SKIN)
+        .ok()
+        .map(|img| img.to_rgba8())
+}
+
+fn default_head_texture(ctx: &egui::Context, slim: bool) -> egui::TextureHandle {
+    let id = egui::Id::new(("modrinth_default_head", slim));
+    if let Some(tex) = ctx.data(|data| data.get_temp::<egui::TextureHandle>(id)) {
+        return tex;
+    }
+    let image = extract_head_avatar(None, slim);
+    let texture = ctx.load_texture(
+        format!("modrinth-default-head-{slim}"),
+        image,
+        TextureOptions::NEAREST,
+    );
+    ctx.data_mut(|data| data.insert_temp(id, texture.clone()));
+    texture
+}
+
+fn modrinth_model_switch(
+    ui: &mut Ui,
+    slim: bool,
+    lang: amc_core::Language,
+    width: f32,
+) -> Option<bool> {
+    let mut result = None;
+    let (tray, _) = ui.allocate_exact_size(vec2(width, 36.0), Sense::hover());
+    ui.painter()
+        .rect_filled(tray, egui::Rounding::same(18.0), crate::theme::MODRINTH_BG);
+    let segment_w = (tray.width() - 8.0) / 2.0;
+    for (idx, (label, active, value)) in [
+        (lang.skins_model_classic(), !slim, false),
+        (lang.skins_model_slim(), slim, true),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let rect = Rect::from_min_size(
+            pos2(tray.left() + 4.0 + idx as f32 * segment_w, tray.top() + 4.0),
+            vec2(segment_w, 28.0),
+        );
+        let resp = ui.interact(rect, ui.id().with(("skin_model", idx)), Sense::click());
+        let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+        if active {
+            ui.painter().rect_filled(
+                rect,
+                egui::Rounding::same(14.0),
+                crate::theme::MODRINTH_GREEN,
+            );
+        } else if hover > 0.02 {
+            ui.painter().rect_filled(
+                rect,
+                egui::Rounding::same(14.0),
+                crate::theme::with_alpha(
+                    crate::theme::MODRINTH_SURFACE_HIGH,
+                    (hover * 255.0) as u8,
+                ),
+            );
+        }
+        ui.painter().text(
+            rect.center(),
+            egui::Align2::CENTER_CENTER,
+            label,
+            egui::FontId::proportional(12.0),
+            if active {
+                crate::theme::MODRINTH_BG
+            } else {
+                crate::theme::MODRINTH_TEXT
+            },
+        );
+        if resp.clicked() {
+            result = Some(value);
+        }
+    }
+    result
+}
+
+fn modrinth_skin_button(ui: &mut Ui, icon: Icon, label: &str, primary: bool, width: f32) -> bool {
+    let (rect, resp) = ui.allocate_exact_size(vec2(width, 38.0), Sense::click());
+    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+    let fill = if primary {
+        crate::theme::lerp_color(
+            crate::theme::MODRINTH_GREEN,
+            crate::theme::MODRINTH_GREEN_LIGHT,
+            hover * 0.6,
+        )
+    } else {
+        crate::theme::lerp_color(
+            Color32::TRANSPARENT,
+            crate::theme::MODRINTH_SURFACE_HOVER,
+            hover,
+        )
+    };
+    ui.painter()
+        .rect_filled(rect, egui::Rounding::same(10.0), fill);
+    ui.painter().rect_stroke(
+        rect,
+        egui::Rounding::same(10.0),
+        Stroke::new(
+            1.0_f32,
+            if primary {
+                crate::theme::MODRINTH_GREEN
+            } else {
+                crate::theme::MODRINTH_SURFACE_HIGH
+            },
+        ),
+    );
+    let text_color = if primary {
+        crate::theme::MODRINTH_BG
+    } else {
+        crate::theme::MODRINTH_TEXT
+    };
+    let galley = ui.painter().layout_no_wrap(
+        label.to_owned(),
+        egui::FontId::proportional(12.5),
+        text_color,
+    );
+    let content_w = 15.0 + 7.0 + galley.size().x;
+    let left = rect.center().x - content_w / 2.0;
+    icons::draw(
+        ui.painter(),
+        icon,
+        Rect::from_center_size(pos2(left + 7.5, rect.center().y), vec2(15.0, 15.0)),
+        text_color,
+        1.4,
+    );
+    ui.painter().galley(
+        pos2(left + 22.0, rect.center().y - galley.size().y / 2.0),
+        galley,
+        text_color,
+    );
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp.clicked()
 }
 
 pub fn extract_head_avatar(skin: Option<&RgbaImage>, is_slim: bool) -> egui::ColorImage {
@@ -307,7 +851,11 @@ pub fn extract_head_avatar(skin: Option<&RgbaImage>, is_slim: bool) -> egui::Col
     let img = match skin {
         Some(s) => s,
         None => {
-            default_img = generate_default_skin(is_slim);
+            default_img = if is_slim {
+                generate_default_skin(true)
+            } else {
+                embedded_steve().unwrap_or_else(|| generate_default_skin(false))
+            };
             &default_img
         }
     };
