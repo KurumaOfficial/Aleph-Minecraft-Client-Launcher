@@ -2131,6 +2131,116 @@ impl Language {
         }
     }
 
+    /// Millida classic rail: the lobby (Home) entry.
+    pub fn shell_rail_play(&self) -> &'static str {
+        match self {
+            Self::English => "Play",
+            Self::Russian => "Играть",
+            Self::Ukrainian => "Грати",
+        }
+    }
+
+    /// Millida classic rail: the instance list entry.
+    pub fn shell_rail_builds(&self) -> &'static str {
+        match self {
+            Self::English => "My builds",
+            Self::Russian => "Мои сборки",
+            Self::Ukrainian => "Мої збірки",
+        }
+    }
+
+    /// Millida classic rail: the content catalog entry.
+    pub fn shell_rail_catalog(&self) -> &'static str {
+        match self {
+            Self::English => "Catalog",
+            Self::Russian => "Каталог",
+            Self::Ukrainian => "Каталог",
+        }
+    }
+
+    pub fn shell_tile_builds(&self) -> &'static str {
+        match self {
+            Self::English => "Builds",
+            Self::Russian => "Сборки",
+            Self::Ukrainian => "Збірки",
+        }
+    }
+
+    pub fn shell_tile_mods(&self) -> &'static str {
+        match self {
+            Self::English => "Mods",
+            Self::Russian => "Моды",
+            Self::Ukrainian => "Моди",
+        }
+    }
+
+    pub fn shell_tile_skins(&self) -> &'static str {
+        match self {
+            Self::English => "Skins",
+            Self::Russian => "Скины",
+            Self::Ukrainian => "Скіни",
+        }
+    }
+
+    pub fn shell_tile_settings(&self) -> &'static str {
+        match self {
+            Self::English => "Settings",
+            Self::Russian => "Настройки",
+            Self::Ukrainian => "Налаштування",
+        }
+    }
+
+    /// Millida lobby dock: caption above the selected build.
+    pub fn shell_mode_today(&self) -> &'static str {
+        match self {
+            Self::English => "Playing today",
+            Self::Russian => "Сегодня играем",
+            Self::Ukrainian => "Граємо сьогодні",
+        }
+    }
+
+    /// Millida lobby dock: no instance has been picked yet.
+    pub fn shell_mode_empty(&self) -> &'static str {
+        match self {
+            Self::English => "Nothing selected",
+            Self::Russian => "Ещё не выбрано",
+            Self::Ukrainian => "Ще не обрано",
+        }
+    }
+
+    pub fn shell_pick_build(&self) -> &'static str {
+        match self {
+            Self::English => "Pick a build",
+            Self::Russian => "Выберите сборку",
+            Self::Ukrainian => "Виберіть збірку",
+        }
+    }
+
+    pub fn shell_ready_to_launch(&self) -> &'static str {
+        match self {
+            Self::English => "Ready to launch",
+            Self::Russian => "Готов к запуску",
+            Self::Ukrainian => "Готовий до запуску",
+        }
+    }
+
+    /// Millida lobby promo card: small caption and its button.
+    pub fn shell_promo_label(&self) -> &'static str {
+        match self {
+            Self::English => "Community",
+            Self::Russian => "Сообщество",
+            Self::Ukrainian => "Спільнота",
+        }
+    }
+
+    pub fn shell_promo_action(&self) -> &'static str {
+        match self {
+            Self::English => "Open",
+            Self::Russian => "Открыть",
+            Self::Ukrainian => "Відкрити",
+        }
+    }
+
     pub fn shell_add_instance(&self) -> &'static str {
         match self {
             Self::English => "Add instance",
@@ -4467,6 +4577,19 @@ mod tests {
             assert!(!lang.shell_new_profile().is_empty());
             assert!(!lang.shell_no_profile().is_empty());
             assert!(!lang.shell_use_latest().is_empty());
+            assert!(!lang.shell_rail_play().is_empty());
+            assert!(!lang.shell_rail_builds().is_empty());
+            assert!(!lang.shell_rail_catalog().is_empty());
+            assert!(!lang.shell_tile_builds().is_empty());
+            assert!(!lang.shell_tile_mods().is_empty());
+            assert!(!lang.shell_tile_skins().is_empty());
+            assert!(!lang.shell_tile_settings().is_empty());
+            assert!(!lang.shell_mode_today().is_empty());
+            assert!(!lang.shell_mode_empty().is_empty());
+            assert!(!lang.shell_pick_build().is_empty());
+            assert!(!lang.shell_ready_to_launch().is_empty());
+            assert!(!lang.shell_promo_label().is_empty());
+            assert!(!lang.shell_promo_action().is_empty());
             assert!(!lang.mods_cat_mods().is_empty());
             assert!(!lang.mods_cat_resourcepacks().is_empty());
             assert!(!lang.mods_cat_shaders().is_empty());

@@ -3665,12 +3665,24 @@ impl App for LauncherApp {
             }
         }
 
-        // 1. Top custom titlebar
+        // 1. Top custom titlebar. Millida follows its reference chrome: a
+        // 44 px bar with the brand centred and only window buttons on the
+        // right (the shell keeps utility shortcuts in its own chrome).
+        let shell = self.config.app_mode.shell();
+        let title_height = if shell == amc_core::config::ShellKind::Millida {
+            44.0
+        } else {
+            36.0
+        };
         TopBottomPanel::top("title_bar")
-            .exact_height(36.0)
+            .exact_height(title_height)
             .frame(egui::Frame::none())
             .show(ctx, |ui| {
-                let tb_resp = TitleBar::show(ui, "Aleph Launcher", lang);
+                let tb_resp = if shell == amc_core::config::ShellKind::Millida {
+                    TitleBar::show_pixel(ui, "Aleph Launcher")
+                } else {
+                    TitleBar::show(ui, "Aleph Launcher", lang)
+                };
                 if tb_resp.console_clicked {
                     self.console_modal.is_open = !self.console_modal.is_open;
                 }
@@ -3717,7 +3729,6 @@ impl App for LauncherApp {
         // beyond Sidebar/Topbar are wired in one at a time; they fall back
         // to the Topbar layout until their module lands.
         let pro_slide_id = egui::Id::new("pro_topbar_slide");
-        let shell = self.config.app_mode.shell();
         if shell == amc_core::config::ShellKind::Sidebar {
             ctx.animate_bool_responsive(pro_slide_id, false);
             SidePanel::left("sidebar_panel")
@@ -3922,31 +3933,42 @@ impl App for LauncherApp {
                 self.handle_launch();
             }
         } else if shell == amc_core::config::ShellKind::Millida {
-            // Millida: slim icon rail on the left; the Home tab itself is
-            // the lobby drawn in the central panel.
+            // Millida: the default lobby fills the window and has no rail;
+            // every other page opens behind the classic 236 px rail.
             ctx.animate_bool_responsive(pro_slide_id, false);
             let acc_name: Option<String> = self
                 .account_mgr
                 .active_account()
                 .map(|a| a.username.clone());
-            SidePanel::left("millida_nav")
-                .exact_width(crate::shells::millida::NAV_WIDTH)
-                .resizable(false)
-                .frame(egui::Frame::none())
-                .show(ctx, |ui| {
-                    let action = crate::shells::millida::show_nav(
-                        ui,
-                        lang,
-                        self.current_tab,
-                        acc_name.as_deref(),
-                    );
-                    if let Some(tab) = action.tab {
-                        self.current_tab = tab;
-                    }
-                    if action.login {
-                        self.login_modal.is_open = true;
-                    }
-                });
+            if self.current_tab != NavTab::Home {
+                SidePanel::left("millida_nav")
+                    .exact_width(crate::shells::millida::RAIL_WIDTH)
+                    .resizable(false)
+                    .frame(egui::Frame::none())
+                    .show(ctx, |ui| {
+                        let action = crate::shells::millida::show_rail(
+                            ui,
+                            lang,
+                            self.current_tab,
+                            acc_name.as_deref(),
+                        );
+                        if let Some(tab) = action.tab {
+                            self.current_tab = tab;
+                        }
+                        if action.login {
+                            self.login_modal.is_open = true;
+                        }
+                        if action.console {
+                            self.console_modal.is_open = !self.console_modal.is_open;
+                        }
+                        if action.downloads {
+                            self.download_manager.open = !self.download_manager.open;
+                        }
+                        if action.gallery {
+                            self.screens_modal.open = !self.screens_modal.open;
+                        }
+                    });
+            }
         } else if shell == amc_core::config::ShellKind::Modrinth {
             // Modrinth: sidebar navigation over gray surfaces with the green
             // accent (egui visuals are swapped at the top of `update`).
@@ -4023,9 +4045,17 @@ impl App for LauncherApp {
         CentralPanel::default()
             .frame(egui::Frame::none().fill(canvas))
             .show(ctx, |ui| {
-                let inner_rect = ui
-                    .available_rect_before_wrap()
-                    .shrink2(egui::vec2(24.0, 12.0));
+                // Millida's default lobby is edge-to-edge (the reference cuts
+                // all content padding on the play screen); other pages keep
+                // the shared breathing room.
+                let available = ui.available_rect_before_wrap();
+                let edge_to_edge = shell == amc_core::config::ShellKind::Millida
+                    && self.current_tab == NavTab::Home;
+                let inner_rect = if edge_to_edge {
+                    available
+                } else {
+                    available.shrink2(egui::vec2(24.0, 12.0))
+                };
                 let mut content_ui = ui.new_child(
                     egui::UiBuilder::new()
                         .max_rect(inner_rect)
@@ -4146,10 +4176,9 @@ impl App for LauncherApp {
                             return;
                         }
                         if self.config.app_mode.shell() == amc_core::config::ShellKind::Millida {
-                            // Millida lobby (playhub): the hero card plus hub
-                            // tiles. Data is copied out first so
-                            // `handle_launch` can borrow `self` mutably.
-                            let instance: Option<(String, String, String)> = self
+                            // Millida default lobby. Data is copied out first
+                            // so `handle_launch` can borrow `self` mutably.
+                            let instance: Option<(String, String, String, u64)> = self
                                 .selected_instance
                                 .and_then(|id| self.instances.iter().find(|i| i.id == id))
                                 .map(|i| {
@@ -4157,21 +4186,45 @@ impl App for LauncherApp {
                                         i.name.clone(),
                                         i.game_version.clone(),
                                         i.loader.as_str().to_string(),
+                                        i.total_played_minutes,
                                     )
+                                });
+                            let account: Option<String> = self
+                                .account_mgr
+                                .active_account()
+                                .map(|a| a.username.clone());
+                            let lobby_instance =
+                                instance.as_ref().map(|(name, version, loader, minutes)| {
+                                    crate::shells::millida::LobbyInstance {
+                                        name: name.as_str(),
+                                        version: version.as_str(),
+                                        loader: loader.as_str(),
+                                        minutes: *minutes,
+                                    }
                                 });
                             let action = crate::shells::millida::show_lobby(
                                 &mut content_ui,
                                 lang,
-                                instance.as_ref().map(|(name, version, loader)| {
-                                    (name.as_str(), version.as_str(), loader.as_str())
-                                }),
-                                self.is_launching,
+                                &crate::shells::millida::LobbyCtx {
+                                    instance: lobby_instance,
+                                    account: account.as_deref(),
+                                    launching: self.is_launching,
+                                },
                             );
                             if let Some(tab) = action.tab {
                                 self.current_tab = tab;
                             }
                             if action.launch {
                                 self.handle_launch();
+                            }
+                            if action.login {
+                                self.login_modal.is_open = true;
+                            }
+                            if action.console {
+                                self.console_modal.is_open = !self.console_modal.is_open;
+                            }
+                            if action.downloads {
+                                self.download_manager.open = !self.download_manager.open;
                             }
                             return;
                         }

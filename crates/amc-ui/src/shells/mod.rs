@@ -90,6 +90,12 @@ pub struct ShellAction {
     pub account: Option<uuid::Uuid>,
     /// Select an instance (Legacy profile dropdown, profile editor).
     pub select_instance: Option<uuid::Uuid>,
+    /// Toggle the console overlay (Millida lobby corner).
+    pub console: bool,
+    /// Toggle the download manager (Millida lobby corner).
+    pub downloads: bool,
+    /// Toggle the screenshots gallery (Millida rail shortcut).
+    pub gallery: bool,
 }
 
 impl ShellAction {
@@ -104,6 +110,9 @@ impl ShellAction {
         if self.select_instance.is_none() {
             self.select_instance = other.select_instance;
         }
+        self.console |= other.console;
+        self.downloads |= other.downloads;
+        self.gallery |= other.gallery;
         self.launch |= other.launch;
         self.login |= other.login;
         self.exit |= other.exit;
@@ -147,11 +156,15 @@ mod tests {
             new_instance: true,
             account: Some(account),
             select_instance: Some(instance),
+            console: true,
+            gallery: true,
             ..ShellAction::default()
         });
         assert_eq!(base.tab, Some(NavTab::Modpacks));
         assert_eq!(base.account, Some(account));
         assert_eq!(base.select_instance, Some(instance));
+        assert!(base.console);
+        assert!(base.gallery);
         assert!(base.login);
         assert!(base.exit);
         assert!(base.new_instance);
