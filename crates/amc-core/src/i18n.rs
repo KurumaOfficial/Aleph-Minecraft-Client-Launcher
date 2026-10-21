@@ -960,6 +960,60 @@ impl Language {
         }
     }
 
+    /// Modrinth shell: sentence-case local tab label.
+    pub fn mods_tab_installed_plain(&self) -> &'static str {
+        match self {
+            Self::English => "Installed",
+            Self::Russian => "Установленные",
+            Self::Ukrainian => "Встановлені",
+        }
+    }
+
+    /// Modrinth shell: sentence-case search tab label.
+    pub fn mods_tab_search_plain(&self) -> &'static str {
+        match self {
+            Self::English => "Search mods",
+            Self::Russian => "Поиск модов",
+            Self::Ukrainian => "Пошук модів",
+        }
+    }
+
+    /// Modrinth shell: folder action without the emoji prefix.
+    pub fn mods_open_folder_plain(&self) -> &'static str {
+        match self {
+            Self::English => "Open mods folder",
+            Self::Russian => "Открыть папку mods",
+            Self::Ukrainian => "Відкрити папку mods",
+        }
+    }
+
+    /// Modrinth shell: local list empty state.
+    pub fn mods_empty_title(&self) -> &'static str {
+        match self {
+            Self::English => "No mods installed",
+            Self::Russian => "Моды не установлены",
+            Self::Ukrainian => "Моди не встановлено",
+        }
+    }
+
+    /// Modrinth shell: local list empty state hint.
+    pub fn mods_empty_hint(&self) -> &'static str {
+        match self {
+            Self::English => "Find mods for this instance in the Modrinth catalog.",
+            Self::Russian => "Найдите моды для этой сборки в каталоге Modrinth.",
+            Self::Ukrainian => "Знайдіть моди для цієї збірки в каталозі Modrinth.",
+        }
+    }
+
+    /// Modrinth shell: empty-state action.
+    pub fn mods_browse_action(&self) -> &'static str {
+        match self {
+            Self::English => "Browse mods",
+            Self::Russian => "Найти моды",
+            Self::Ukrainian => "Знайти моди",
+        }
+    }
+
     pub fn mods_tab_search_modrinth(&self) -> &'static str {
         match self {
             Self::English => "SEARCH (MODRINTH)",
@@ -4861,6 +4915,12 @@ mod tests {
             assert!(!lang.home_title().is_empty());
             assert!(!lang.inst_title().is_empty());
             assert!(!lang.mods_title().is_empty());
+            assert!(!lang.mods_tab_installed_plain().is_empty());
+            assert!(!lang.mods_tab_search_plain().is_empty());
+            assert!(!lang.mods_open_folder_plain().is_empty());
+            assert!(!lang.mods_empty_title().is_empty());
+            assert!(!lang.mods_empty_hint().is_empty());
+            assert!(!lang.mods_browse_action().is_empty());
             assert!(!lang.skins_title().is_empty());
             assert!(!lang.login_modal_title().is_empty());
             assert!(!lang.console_title().is_empty());

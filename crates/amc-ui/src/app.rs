@@ -27,7 +27,7 @@ use crate::modals::{
 };
 use crate::pages::{
     icon_cache_file, icon_key, HomeContext, HomePage, InstanceAction, InstancesContext,
-    InstancesPage, ModUpdateResult, ModsActions, ModsPage, ProfileAction, ProfilePage,
+    InstancesPage, ModUpdateResult, ModsActions, ModsPage, ModsSkin, ProfileAction, ProfilePage,
     SettingsPage, SkinsPage,
 };
 use crate::theme::{apply_aleph_theme, BG};
@@ -4592,10 +4592,31 @@ impl App for LauncherApp {
                         }
 
                         let mut update_install = None;
+                        let mods_skin = if shell == amc_core::config::ShellKind::Modrinth {
+                            ModsSkin::Modrinth
+                        } else {
+                            ModsSkin::Amc
+                        };
+                        let mods_meta = if mods_skin == ModsSkin::Modrinth {
+                            self.selected_instance
+                                .and_then(|id| self.instances.iter().find(|i| i.id == id))
+                                .map(|i| {
+                                    format!(
+                                        "{} · Minecraft {} · {}",
+                                        i.name,
+                                        i.game_version,
+                                        i.loader.as_str()
+                                    )
+                                })
+                        } else {
+                            None
+                        };
                         self.mods_page.show(
                             &mut content_ui,
                             &mods_dir,
                             lang,
+                            mods_skin,
+                            mods_meta.as_deref(),
                             ModsActions {
                                 wishlist: &mut self.config.wishlist,
                                 update_install: &mut update_install,

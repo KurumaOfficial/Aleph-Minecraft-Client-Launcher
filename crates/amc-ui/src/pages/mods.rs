@@ -16,6 +16,15 @@ pub enum ModsSubTab {
     Search,
 }
 
+/// Visual skin for the shared mods page. The Modrinth shell uses a rounded
+/// segmented switch and sentence-case labels from the reference app.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ModsSkin {
+    #[default]
+    Amc,
+    Modrinth,
+}
+
 /// Outcome of one update check (CONCEPT P4): the fresh local scan
 /// plus the offers derived from it. The scan runs off the UI thread
 /// (jar manifest parsing), so both travel in one message.
@@ -189,6 +198,8 @@ impl ModsPage {
         ui: &mut Ui,
         mods_dir: &Path,
         lang: Language,
+        skin: ModsSkin,
+        instance_meta: Option<&str>,
         actions: ModsActions<'_, S, I>,
     ) where
         S: FnOnce(String, ModSource, ModCategory, SearchSort),
@@ -197,12 +208,32 @@ impl ModsPage {
         ui.add_space(20.0);
 
         // Header
+        let title_size = if skin == ModsSkin::Modrinth {
+            24.0
+        } else {
+            26.0
+        };
+        let title = if skin == ModsSkin::Modrinth {
+            lang.nav_mods()
+        } else {
+            lang.mods_title()
+        };
         ui.label(
-            egui::RichText::new(lang.mods_title())
-                .font(egui::FontId::proportional(26.0))
+            egui::RichText::new(title)
+                .font(egui::FontId::proportional(title_size))
                 .strong()
                 .color(TEXT_HEADING),
         );
+        if skin == ModsSkin::Modrinth {
+            if let Some(meta) = instance_meta {
+                ui.add_space(4.0);
+                ui.label(
+                    egui::RichText::new(meta)
+                        .font(egui::FontId::proportional(12.0))
+                        .color(crate::theme::MODRINTH_TEXT_SECONDARY),
+                );
+            }
+        }
 
         ui.add_space(14.0);
 
@@ -216,114 +247,120 @@ impl ModsPage {
         }
 
         // Subtabs: Local / Search
-        ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing = vec2(8.0, 0.0);
+        if skin == ModsSkin::Modrinth {
+            self.show_modrinth_tabs(ui, lang, mods_dir);
+        } else {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing = vec2(8.0, 0.0);
 
-            let local_active = self.sub_tab == ModsSubTab::Local;
-            let search_active = self.sub_tab == ModsSubTab::Search;
+                let local_active = self.sub_tab == ModsSubTab::Local;
+                let search_active = self.sub_tab == ModsSubTab::Search;
 
-            // Local Tab Button
-            let (loc_rect, loc_resp) = ui.allocate_exact_size(vec2(130.0, 32.0), Sense::click());
-            let loc_hover = ui
-                .ctx()
-                .animate_bool_responsive(loc_resp.id, loc_resp.hovered());
-            let loc_act = ui.ctx().animate_bool(loc_resp.id.with("act"), local_active);
-            let loc_bg = lerp_color(
-                lerp_color(Color32::TRANSPARENT, BG_HOVER, loc_hover),
-                RUBY,
-                loc_act,
-            );
-            let loc_stroke = lerp_color(
-                lerp_color(BORDER_DEFAULT, RUBY, loc_hover),
-                RUBY_LIGHT,
-                loc_act,
-            );
-            let loc_text = lerp_color(
-                lerp_color(TEXT_MUTED, TEXT_PRIMARY, loc_hover),
-                Color32::WHITE,
-                loc_act,
-            );
+                // Local Tab Button
+                let (loc_rect, loc_resp) =
+                    ui.allocate_exact_size(vec2(130.0, 32.0), Sense::click());
+                let loc_hover = ui
+                    .ctx()
+                    .animate_bool_responsive(loc_resp.id, loc_resp.hovered());
+                let loc_act = ui.ctx().animate_bool(loc_resp.id.with("act"), local_active);
+                let loc_bg = lerp_color(
+                    lerp_color(Color32::TRANSPARENT, BG_HOVER, loc_hover),
+                    RUBY,
+                    loc_act,
+                );
+                let loc_stroke = lerp_color(
+                    lerp_color(BORDER_DEFAULT, RUBY, loc_hover),
+                    RUBY_LIGHT,
+                    loc_act,
+                );
+                let loc_text = lerp_color(
+                    lerp_color(TEXT_MUTED, TEXT_PRIMARY, loc_hover),
+                    Color32::WHITE,
+                    loc_act,
+                );
 
-            ui.painter()
-                .rect_filled(loc_rect, crate::theme::rounding(), loc_bg);
-            ui.painter().rect_stroke(
-                loc_rect,
-                crate::theme::rounding(),
-                Stroke::new(1.0_f32, loc_stroke),
-            );
-            ui.painter().text(
-                loc_rect.center(),
-                egui::Align2::CENTER_CENTER,
-                lang.mods_tab_installed(),
-                egui::FontId::proportional(12.0),
-                loc_text,
-            );
+                ui.painter()
+                    .rect_filled(loc_rect, crate::theme::rounding(), loc_bg);
+                ui.painter().rect_stroke(
+                    loc_rect,
+                    crate::theme::rounding(),
+                    Stroke::new(1.0_f32, loc_stroke),
+                );
+                ui.painter().text(
+                    loc_rect.center(),
+                    egui::Align2::CENTER_CENTER,
+                    lang.mods_tab_installed(),
+                    egui::FontId::proportional(12.0),
+                    loc_text,
+                );
 
-            if loc_resp.clicked() {
-                self.sub_tab = ModsSubTab::Local;
-            }
+                if loc_resp.clicked() {
+                    self.sub_tab = ModsSubTab::Local;
+                }
 
-            // Search Tab Button
-            let search_label = match self.search_provider {
-                ModSource::Modrinth => lang.mods_tab_search_modrinth(),
-                ModSource::CurseForge => lang.mods_tab_search_curseforge(),
-                _ => lang.mods_tab_search_generic(),
-            };
+                // Search Tab Button
+                let search_label = match self.search_provider {
+                    ModSource::Modrinth => lang.mods_tab_search_modrinth(),
+                    ModSource::CurseForge => lang.mods_tab_search_curseforge(),
+                    _ => lang.mods_tab_search_generic(),
+                };
 
-            let (sea_rect, sea_resp) = ui.allocate_exact_size(vec2(160.0, 32.0), Sense::click());
-            let sea_hover = ui
-                .ctx()
-                .animate_bool_responsive(sea_resp.id, sea_resp.hovered());
-            let sea_act = ui
-                .ctx()
-                .animate_bool(sea_resp.id.with("act"), search_active);
-            let sea_bg = lerp_color(
-                lerp_color(Color32::TRANSPARENT, BG_HOVER, sea_hover),
-                RUBY,
-                sea_act,
-            );
-            let sea_stroke = lerp_color(
-                lerp_color(BORDER_DEFAULT, RUBY, sea_hover),
-                RUBY_LIGHT,
-                sea_act,
-            );
-            let sea_text = lerp_color(
-                lerp_color(TEXT_MUTED, TEXT_PRIMARY, sea_hover),
-                Color32::WHITE,
-                sea_act,
-            );
+                let (sea_rect, sea_resp) =
+                    ui.allocate_exact_size(vec2(160.0, 32.0), Sense::click());
+                let sea_hover = ui
+                    .ctx()
+                    .animate_bool_responsive(sea_resp.id, sea_resp.hovered());
+                let sea_act = ui
+                    .ctx()
+                    .animate_bool(sea_resp.id.with("act"), search_active);
+                let sea_bg = lerp_color(
+                    lerp_color(Color32::TRANSPARENT, BG_HOVER, sea_hover),
+                    RUBY,
+                    sea_act,
+                );
+                let sea_stroke = lerp_color(
+                    lerp_color(BORDER_DEFAULT, RUBY, sea_hover),
+                    RUBY_LIGHT,
+                    sea_act,
+                );
+                let sea_text = lerp_color(
+                    lerp_color(TEXT_MUTED, TEXT_PRIMARY, sea_hover),
+                    Color32::WHITE,
+                    sea_act,
+                );
 
-            ui.painter()
-                .rect_filled(sea_rect, crate::theme::rounding(), sea_bg);
-            ui.painter().rect_stroke(
-                sea_rect,
-                crate::theme::rounding(),
-                Stroke::new(1.0_f32, sea_stroke),
-            );
-            ui.painter().text(
-                sea_rect.center(),
-                egui::Align2::CENTER_CENTER,
-                search_label,
-                egui::FontId::proportional(12.0),
-                sea_text,
-            );
+                ui.painter()
+                    .rect_filled(sea_rect, crate::theme::rounding(), sea_bg);
+                ui.painter().rect_stroke(
+                    sea_rect,
+                    crate::theme::rounding(),
+                    Stroke::new(1.0_f32, sea_stroke),
+                );
+                ui.painter().text(
+                    sea_rect.center(),
+                    egui::Align2::CENTER_CENTER,
+                    search_label,
+                    egui::FontId::proportional(12.0),
+                    sea_text,
+                );
 
-            if sea_resp.clicked() {
-                self.sub_tab = ModsSubTab::Search;
-            }
+                if sea_resp.clicked() {
+                    self.sub_tab = ModsSubTab::Search;
+                }
 
-            ui.add_space(16.0);
+                ui.add_space(16.0);
 
-            if ui.button(lang.mods_btn_open_folder()).clicked() {
-                let _ = std::fs::create_dir_all(mods_dir);
-                let _ = open::that(mods_dir);
-            }
-        });
+                if ui.button(lang.mods_btn_open_folder()).clicked() {
+                    let _ = std::fs::create_dir_all(mods_dir);
+                    let _ = open::that(mods_dir);
+                }
+            });
+        }
 
         ui.add_space(14.0);
 
         match self.sub_tab {
-            ModsSubTab::Local => self.show_local_mods(ui, lang, actions.update_install),
+            ModsSubTab::Local => self.show_local_mods(ui, lang, skin, actions.update_install),
             ModsSubTab::Search => self.show_search(
                 ui,
                 lang,
@@ -334,13 +371,203 @@ impl ModsPage {
         }
     }
 
+    /// Reference `NavTabs` treatment for the Modrinth shell: a rounded
+    /// surface tray with a green selected pill and sentence-case labels.
+    fn show_modrinth_tabs(&mut self, ui: &mut Ui, lang: Language, mods_dir: &Path) {
+        let font = egui::FontId::new(13.0, egui::FontFamily::Name("bold".into()));
+        let installed = lang.mods_tab_installed_plain().to_owned();
+        let search = lang.mods_tab_search_plain().to_owned();
+        let installed_w = (ui
+            .painter()
+            .layout_no_wrap(installed.clone(), font.clone(), Color32::PLACEHOLDER)
+            .size()
+            .x
+            + 32.0)
+            .max(118.0);
+        let search_w = (ui
+            .painter()
+            .layout_no_wrap(search.clone(), font.clone(), Color32::PLACEHOLDER)
+            .size()
+            .x
+            + 32.0)
+            .max(134.0);
+
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing = vec2(8.0, 0.0);
+            let (tray, _) =
+                ui.allocate_exact_size(vec2(installed_w + search_w + 8.0, 40.0), Sense::hover());
+            ui.painter().rect_filled(
+                tray,
+                egui::Rounding::same(20.0),
+                crate::theme::MODRINTH_SURFACE,
+            );
+            let mut x = tray.left() + 4.0;
+            for (idx, (label, width, active)) in [
+                (installed, installed_w, self.sub_tab == ModsSubTab::Local),
+                (search, search_w, self.sub_tab == ModsSubTab::Search),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let rect =
+                    egui::Rect::from_min_size(egui::pos2(x, tray.top() + 4.0), vec2(width, 32.0));
+                let resp = ui.interact(
+                    rect,
+                    ui.id().with(("modrinth_mods_tab", idx)),
+                    Sense::click(),
+                );
+                let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+                if active {
+                    ui.painter().rect_filled(
+                        rect,
+                        egui::Rounding::same(16.0),
+                        crate::theme::MODRINTH_GREEN,
+                    );
+                } else if hover > 0.02 {
+                    ui.painter().rect_filled(
+                        rect,
+                        egui::Rounding::same(16.0),
+                        crate::theme::lerp_color(
+                            Color32::TRANSPARENT,
+                            crate::theme::MODRINTH_SURFACE_HIGH,
+                            hover,
+                        ),
+                    );
+                }
+                let color = if active {
+                    crate::theme::MODRINTH_BG
+                } else {
+                    crate::theme::lerp_color(
+                        crate::theme::MODRINTH_TEXT,
+                        crate::theme::MODRINTH_TEXT_CONTRAST,
+                        hover,
+                    )
+                };
+                ui.painter().text(
+                    rect.center(),
+                    egui::Align2::CENTER_CENTER,
+                    &label,
+                    font.clone(),
+                    color,
+                );
+                if resp.hovered() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
+                if resp.clicked() {
+                    self.sub_tab = if idx == 0 {
+                        ModsSubTab::Local
+                    } else {
+                        ModsSubTab::Search
+                    };
+                }
+                x += width;
+            }
+
+            ui.add_space(8.0);
+            let folder_label = lang.mods_open_folder_plain();
+            let label_galley = ui.painter().layout_no_wrap(
+                folder_label.to_owned(),
+                egui::FontId::proportional(12.5),
+                Color32::PLACEHOLDER,
+            );
+            let button_w = (label_galley.size().x + 54.0).max(150.0);
+            let (button, resp) = ui.allocate_exact_size(vec2(button_w, 40.0), Sense::click());
+            let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+            ui.painter().rect_filled(
+                button,
+                egui::Rounding::same(20.0),
+                crate::theme::lerp_color(
+                    Color32::TRANSPARENT,
+                    crate::theme::MODRINTH_SURFACE,
+                    hover,
+                ),
+            );
+            ui.painter().rect_stroke(
+                button,
+                egui::Rounding::same(20.0),
+                Stroke::new(1.0_f32, crate::theme::MODRINTH_SURFACE_HIGH),
+            );
+            icons::draw(
+                ui.painter(),
+                Icon::Folder,
+                egui::Rect::from_center_size(
+                    egui::pos2(button.left() + 22.0, button.center().y),
+                    vec2(15.0, 15.0),
+                ),
+                crate::theme::MODRINTH_TEXT,
+                1.3,
+            );
+            ui.painter().galley(
+                egui::pos2(
+                    button.left() + 36.0,
+                    button.center().y - label_galley.size().y / 2.0,
+                ),
+                label_galley,
+                crate::theme::MODRINTH_TEXT,
+            );
+            if resp.hovered() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+            }
+            if resp.clicked() {
+                let _ = std::fs::create_dir_all(mods_dir);
+                let _ = open::that(mods_dir);
+            }
+        });
+    }
+
     fn show_local_mods(
         &mut self,
         ui: &mut Ui,
         lang: Language,
+        skin: ModsSkin,
         update_install: &mut Option<(ModSearchResult, String)>,
     ) {
         if self.local_mods.is_empty() {
+            if skin == ModsSkin::Modrinth {
+                ui.add_space(36.0);
+                ui.vertical_centered(|ui| {
+                    let (icon_rect, _) = ui.allocate_exact_size(vec2(64.0, 64.0), Sense::hover());
+                    ui.painter().rect_filled(
+                        icon_rect,
+                        egui::Rounding::same(16.0),
+                        crate::theme::MODRINTH_SURFACE,
+                    );
+                    icons::draw_centered(
+                        ui.painter(),
+                        Icon::Puzzle,
+                        icon_rect.center(),
+                        28.0,
+                        crate::theme::MODRINTH_GREEN,
+                    );
+                    ui.add_space(14.0);
+                    ui.label(
+                        egui::RichText::new(lang.mods_empty_title())
+                            .font(egui::FontId::proportional(16.0))
+                            .strong()
+                            .color(crate::theme::MODRINTH_TEXT_CONTRAST),
+                    );
+                    ui.add_space(4.0);
+                    ui.label(
+                        egui::RichText::new(lang.mods_empty_hint())
+                            .font(egui::FontId::proportional(12.5))
+                            .color(crate::theme::MODRINTH_TEXT_SECONDARY),
+                    );
+                    ui.add_space(14.0);
+                    let button = egui::Button::new(
+                        egui::RichText::new(lang.mods_browse_action())
+                            .font(egui::FontId::proportional(13.0))
+                            .strong()
+                            .color(crate::theme::MODRINTH_BG),
+                    )
+                    .fill(crate::theme::MODRINTH_GREEN)
+                    .rounding(egui::Rounding::same(10.0))
+                    .min_size(vec2(154.0, 38.0));
+                    if ui.add(button).clicked() {
+                        self.sub_tab = ModsSubTab::Search;
+                    }
+                });
+                return;
+            }
             ui.add_space(50.0);
             ui.vertical_centered(|ui| {
                 ui.label(
@@ -625,8 +852,7 @@ impl ModsPage {
         on_search: impl FnOnce(String, ModSource, ModCategory, SearchSort),
         on_install: impl FnOnce(ModSearchResult),
     ) {
-        ui.horizontal(|ui| {
-            // Source switch buttons
+        ui.horizontal_wrapped(|ui| {
             let mr_active = self.search_provider == ModSource::Modrinth;
             let cf_active = self.search_provider == ModSource::CurseForge;
 
@@ -667,7 +893,7 @@ impl ModsPage {
 
             ui.add_space(8.0);
 
-            let search_width = (ui.available_width() - 100.0).max(180.0);
+            let search_width = (ui.available_width() - 240.0).max(160.0);
             let hint = match self.search_provider {
                 ModSource::Modrinth => lang.mods_search_hint("Modrinth"),
                 ModSource::CurseForge => lang.mods_search_hint("CurseForge"),
