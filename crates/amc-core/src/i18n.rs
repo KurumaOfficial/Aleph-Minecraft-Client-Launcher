@@ -632,6 +632,123 @@ impl Language {
         }
     }
 
+    /// Modrinth shell: titlebar back button tooltip.
+    pub fn modrinth_title_back(&self) -> &'static str {
+        match self {
+            Self::English => "Go back",
+            Self::Russian => "Назад",
+            Self::Ukrainian => "Назад",
+        }
+    }
+
+    /// Modrinth shell: titlebar forward button tooltip.
+    pub fn modrinth_title_forward(&self) -> &'static str {
+        match self {
+            Self::English => "Go forward",
+            Self::Russian => "Вперёд",
+            Self::Ukrainian => "Уперед",
+        }
+    }
+
+    /// Modrinth shell: right sidebar toggle tooltip.
+    pub fn modrinth_toggle_sidebar(&self) -> &'static str {
+        match self {
+            Self::English => "Toggle sidebar",
+            Self::Russian => "Боковая панель",
+            Self::Ukrainian => "Бічна панель",
+        }
+    }
+
+    /// Modrinth shell: titlebar idle status.
+    pub fn modrinth_no_running(&self) -> &'static str {
+        match self {
+            Self::English => "No instances running",
+            Self::Russian => "Нет запущенных сборок",
+            Self::Ukrainian => "Немає запущених збірок",
+        }
+    }
+
+    /// Modrinth shell: right sidebar account heading.
+    pub fn modrinth_playing_as(&self) -> &'static str {
+        match self {
+            Self::English => "Playing as",
+            Self::Russian => "Вы играете как",
+            Self::Ukrainian => "Ви граєте як",
+        }
+    }
+
+    /// Modrinth shell: right sidebar empty account slot.
+    pub fn modrinth_no_account(&self) -> &'static str {
+        match self {
+            Self::English => "No account selected",
+            Self::Russian => "Аккаунт не выбран",
+            Self::Ukrainian => "Акаунт не вибрано",
+        }
+    }
+
+    /// Modrinth shell: sign-in action.
+    pub fn modrinth_sign_in(&self) -> &'static str {
+        match self {
+            Self::English => "Sign in",
+            Self::Russian => "Войти",
+            Self::Ukrainian => "Увійти",
+        }
+    }
+
+    /// Modrinth shell: right sidebar friends heading.
+    pub fn modrinth_friends(&self) -> &'static str {
+        match self {
+            Self::English => "Friends",
+            Self::Russian => "Друзья",
+            Self::Ukrainian => "Друзі",
+        }
+    }
+
+    /// Modrinth shell: friends section empty state.
+    pub fn modrinth_no_friends(&self) -> &'static str {
+        match self {
+            Self::English => "Sign in to Modrinth to see friends",
+            Self::Russian => "Войдите в Modrinth, чтобы видеть друзей",
+            Self::Ukrainian => "Увійдіть у Modrinth, щоб бачити друзів",
+        }
+    }
+
+    /// Modrinth shell: right sidebar news heading.
+    pub fn modrinth_news(&self) -> &'static str {
+        match self {
+            Self::English => "News",
+            Self::Russian => "Новости",
+            Self::Ukrainian => "Новини",
+        }
+    }
+
+    /// Modrinth shell: static news card (launcher updates).
+    pub fn modrinth_news_updates(&self) -> &'static str {
+        match self {
+            Self::English => "Launcher updates",
+            Self::Russian => "Обновления лаунчера",
+            Self::Ukrainian => "Оновлення лаунчера",
+        }
+    }
+
+    /// Modrinth shell: static news card (community).
+    pub fn modrinth_news_community(&self) -> &'static str {
+        match self {
+            Self::English => "Community spotlight",
+            Self::Russian => "Новости сообщества",
+            Self::Ukrainian => "Новини спільноти",
+        }
+    }
+
+    /// Modrinth shell: news card meta line.
+    pub fn modrinth_news_today(&self) -> &'static str {
+        match self {
+            Self::English => "Today",
+            Self::Russian => "Сегодня",
+            Self::Ukrainian => "Сьогодні",
+        }
+    }
+
     pub fn inst_empty(&self) -> &'static str {
         match self {
             Self::English => "No instances created yet. Click '+ CREATE INSTANCE' to add one!",
@@ -4784,6 +4901,19 @@ mod tests {
             assert!(!lang.inst_ctx_shortcut().is_empty());
             assert!(!lang.inst_ctx_folder().is_empty());
             assert!(!lang.inst_ctx_delete().is_empty());
+            assert!(!lang.modrinth_title_back().is_empty());
+            assert!(!lang.modrinth_title_forward().is_empty());
+            assert!(!lang.modrinth_toggle_sidebar().is_empty());
+            assert!(!lang.modrinth_no_running().is_empty());
+            assert!(!lang.modrinth_playing_as().is_empty());
+            assert!(!lang.modrinth_no_account().is_empty());
+            assert!(!lang.modrinth_sign_in().is_empty());
+            assert!(!lang.modrinth_friends().is_empty());
+            assert!(!lang.modrinth_no_friends().is_empty());
+            assert!(!lang.modrinth_news().is_empty());
+            assert!(!lang.modrinth_news_updates().is_empty());
+            assert!(!lang.modrinth_news_community().is_empty());
+            assert!(!lang.modrinth_news_today().is_empty());
             assert!(!lang.shell_folders().is_empty());
             assert!(!lang.shell_view_instance_folder().is_empty());
             assert!(!lang.shell_view_central_mods().is_empty());

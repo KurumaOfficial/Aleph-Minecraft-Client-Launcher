@@ -127,6 +127,8 @@ pub struct LauncherApp {
     /// Modrinth shell swaps the visuals, so the theme is re-applied only
     /// when the shell actually changes.
     theme_shell: Option<amc_core::config::ShellKind>,
+    /// Modrinth right rail (accounts/friends/news) visibility.
+    modrinth_sidebar_open: bool,
 }
 
 /// Outcome of a mod installation batch (CONCEPT P4): downloaded files plus
@@ -284,6 +286,7 @@ impl LauncherApp {
             ms_poll_rx: None,
             settings_saved_config: None,
             theme_shell: None,
+            modrinth_sidebar_open: true,
             pending_direct_connect: None,
         }
     }
@@ -3671,6 +3674,8 @@ impl App for LauncherApp {
         let shell = self.config.app_mode.shell();
         let title_height = if shell == amc_core::config::ShellKind::Millida {
             44.0
+        } else if shell == amc_core::config::ShellKind::Modrinth {
+            48.0
         } else {
             36.0
         };
@@ -3680,6 +3685,21 @@ impl App for LauncherApp {
             .show(ctx, |ui| {
                 let tb_resp = if shell == amc_core::config::ShellKind::Millida {
                     TitleBar::show_pixel(ui, "Aleph Launcher")
+                } else if shell == amc_core::config::ShellKind::Modrinth {
+                    let breadcrumb = if self.current_tab == NavTab::Home
+                        || self.current_tab == NavTab::Modpacks
+                    {
+                        lang.inst_library_title()
+                    } else {
+                        crate::shells::tab_label(self.current_tab, lang)
+                    };
+                    TitleBar::show_modrinth(
+                        ui,
+                        lang,
+                        breadcrumb,
+                        self.modrinth_sidebar_open,
+                        self.is_launching,
+                    )
                 } else {
                     TitleBar::show(ui, "Aleph Launcher", lang)
                 };
@@ -3691,6 +3711,9 @@ impl App for LauncherApp {
                 }
                 if tb_resp.downloads_clicked {
                     self.download_manager.open = !self.download_manager.open;
+                }
+                if tb_resp.sidebar_toggle {
+                    self.modrinth_sidebar_open = !self.modrinth_sidebar_open;
                 }
             });
 
@@ -4000,6 +4023,23 @@ impl App for LauncherApp {
                         self.handle_launch();
                     }
                 });
+
+            if self.modrinth_sidebar_open {
+                SidePanel::right("modrinth_right_sidebar")
+                    .exact_width(crate::shells::modrinth::RIGHT_SIDEBAR_WIDTH)
+                    .resizable(false)
+                    .frame(egui::Frame::none())
+                    .show(ctx, |ui| {
+                        let action = crate::shells::modrinth::show_right_sidebar(
+                            ui,
+                            lang,
+                            acc_name.as_deref(),
+                        );
+                        if action.login {
+                            self.login_modal.is_open = true;
+                        }
+                    });
+            }
         } else {
             let slide_t = ctx.animate_bool_responsive(pro_slide_id, true);
             let slide_px = (1.0 - slide_t) * topbar::TOPBAR_HEIGHT;

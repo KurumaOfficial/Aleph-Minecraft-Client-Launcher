@@ -3,13 +3,16 @@ use crate::theme::{
     TEXT_MUTED, TEXT_PRIMARY,
 };
 use crate::widgets::icons::{self, Icon};
-use egui::{pos2, vec2, Color32, Pos2, Rect, Response, Sense, Stroke, Ui, ViewportCommand};
+use egui::{
+    pos2, vec2, Color32, Pos2, Rect, Response, Rounding, Sense, Stroke, Ui, ViewportCommand,
+};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TitleBarResponse {
     pub console_clicked: bool,
     pub gallery_clicked: bool,
     pub downloads_clicked: bool,
+    pub sidebar_toggle: bool,
 }
 
 pub struct TitleBar;
@@ -128,6 +131,333 @@ impl TitleBar {
         // Advance cursor
         ui.advance_cursor_after_rect(bar_rect);
         response
+    }
+
+    /// Modrinth App-style frameless title bar (reference: 48 px raised
+    /// strip with a wordmark, history arrows, breadcrumb, running pill,
+    /// quiet action icons, sidebar toggle and window controls).
+    pub fn show_modrinth(
+        ui: &mut Ui,
+        lang: amc_core::Language,
+        breadcrumb: &str,
+        sidebar_open: bool,
+        launching: bool,
+    ) -> TitleBarResponse {
+        let mut response = TitleBarResponse::default();
+        let height = 48.0;
+        let rect = ui.available_rect_before_wrap();
+        let bar = Rect::from_min_size(rect.min, vec2(rect.width(), height));
+        let painter = ui.painter().clone();
+
+        painter.rect_filled(bar, Rounding::ZERO, crate::theme::MODRINTH_SURFACE);
+        painter.line_segment(
+            [bar.left_bottom(), bar.right_bottom()],
+            Stroke::new(1.0_f32, crate::theme::MODRINTH_SURFACE_HIGH),
+        );
+
+        // Left brand mark + wordmark.
+        let mark = Rect::from_min_size(
+            pos2(bar.left() + 14.0, bar.center().y - 12.0),
+            vec2(24.0, 24.0),
+        );
+        painter.rect_filled(mark, Rounding::same(6.0), crate::theme::MODRINTH_GREEN);
+        let diamond = Rect::from_center_size(mark.center(), vec2(10.0, 10.0));
+        painter.add(egui::Shape::convex_polygon(
+            vec![
+                diamond.center_top(),
+                diamond.right_center(),
+                diamond.center_bottom(),
+                diamond.left_center(),
+            ],
+            Color32::from_white_alpha(235),
+            Stroke::NONE,
+        ));
+        let brand = painter.layout_no_wrap(
+            "ALEPH".to_owned(),
+            crate::theme::display(13.0),
+            crate::theme::MODRINTH_TEXT_CONTRAST,
+        );
+        let brand_x = mark.right() + 8.0;
+        painter.galley(
+            pos2(brand_x, bar.center().y - brand.size().y / 2.0),
+            brand.clone(),
+            crate::theme::MODRINTH_TEXT_CONTRAST,
+        );
+
+        // Disabled browser-style history arrows (the app has no route stack).
+        let mut x = brand_x + brand.size().x + 14.0;
+        for (idx, icon) in [Icon::ChevronLeft, Icon::ChevronRight]
+            .into_iter()
+            .enumerate()
+        {
+            let arrow = Rect::from_min_size(pos2(x, bar.center().y - 14.0), vec2(28.0, 28.0));
+            let resp = ui.interact(
+                arrow,
+                ui.id().with(("modrinth_title_history", idx)),
+                Sense::hover(),
+            );
+            painter.rect_stroke(
+                arrow,
+                Rounding::same(8.0),
+                Stroke::new(1.0_f32, crate::theme::MODRINTH_SURFACE_HIGH),
+            );
+            icons::draw(
+                &painter,
+                icon,
+                arrow.shrink(7.0),
+                with_alpha(crate::theme::MODRINTH_MUTED, 90),
+                1.35,
+            );
+            if idx == 0 {
+                resp.on_hover_text(lang.modrinth_title_back());
+            } else {
+                resp.on_hover_text(lang.modrinth_title_forward());
+            }
+            x += 32.0;
+        }
+
+        let crumb = painter.layout_no_wrap(
+            breadcrumb.to_owned(),
+            egui::FontId::proportional(13.0),
+            crate::theme::MODRINTH_TEXT,
+        );
+        let crumb_x = x + 8.0;
+        painter.galley(
+            pos2(crumb_x, bar.center().y - crumb.size().y / 2.0),
+            crumb.clone(),
+            crate::theme::MODRINTH_TEXT,
+        );
+
+        // Window controls, pinned to the right edge.
+        let win_w = 36.0;
+        let win_h = 32.0;
+        let win_gap = 2.0;
+        let edge = 6.0;
+        let close_rect = Rect::from_min_size(
+            pos2(bar.right() - edge - win_w, bar.center().y - win_h / 2.0),
+            vec2(win_w, win_h),
+        );
+        let max_rect = close_rect.translate(vec2(-(win_w + win_gap), 0.0));
+        let min_rect = max_rect.translate(vec2(-(win_w + win_gap), 0.0));
+
+        // Right-sidebar toggle.
+        let toggle = Rect::from_min_size(
+            pos2(min_rect.left() - 10.0 - 32.0, bar.center().y - 16.0),
+            vec2(32.0, 32.0),
+        );
+
+        // Quiet actions: download, console, gallery (matching the reference's
+        // top-right icon cluster).
+        let util_w = 32.0;
+        let util_gap = 4.0;
+        let util_left = toggle.left() - 10.0 - (util_w * 3.0 + util_gap * 2.0);
+        let gallery =
+            Rect::from_min_size(pos2(util_left, bar.center().y - 16.0), vec2(util_w, util_w));
+        let console = gallery.translate(vec2(util_w + util_gap, 0.0));
+        let downloads = console.translate(vec2(util_w + util_gap, 0.0));
+
+        // Running-instance status pill.
+        let status = if launching {
+            lang.bottom_btn_launching()
+        } else {
+            lang.modrinth_no_running()
+        };
+        let status_galley = painter.layout_no_wrap(
+            status.to_owned(),
+            egui::FontId::proportional(11.5),
+            crate::theme::MODRINTH_TEXT_SECONDARY,
+        );
+        let pill_w = (status_galley.size().x + 30.0).min(190.0);
+        let pill = Rect::from_min_size(
+            pos2(util_left - 10.0 - pill_w, bar.center().y - 15.0),
+            vec2(pill_w, 30.0),
+        );
+        if pill.left() > crumb_x + crumb.size().x + 16.0 {
+            painter.rect_filled(
+                pill,
+                Rounding::same(10.0),
+                crate::theme::MODRINTH_SURFACE_HOVER,
+            );
+            painter.rect_stroke(
+                pill,
+                Rounding::same(10.0),
+                Stroke::new(1.0_f32, crate::theme::MODRINTH_SURFACE_HIGH),
+            );
+            let dot = if launching {
+                crate::theme::MODRINTH_GREEN
+            } else {
+                crate::theme::MODRINTH_MUTED
+            };
+            painter.circle_filled(pos2(pill.left() + 12.0, pill.center().y), 3.0, dot);
+            painter.galley(
+                pos2(
+                    pill.left() + 22.0,
+                    pill.center().y - status_galley.size().y / 2.0,
+                ),
+                status_galley.clone(),
+                crate::theme::MODRINTH_TEXT_SECONDARY,
+            );
+        }
+
+        // Empty stretch acts as the drag region (buttons stay clickable).
+        let drag_left = crumb_x + crumb.size().x + 12.0;
+        if drag_left < pill.left() - 12.0 {
+            let drag_rect = Rect::from_min_max(
+                pos2(drag_left, bar.top()),
+                pos2(pill.left() - 12.0, bar.bottom()),
+            );
+            let drag = ui.interact(
+                drag_rect,
+                ui.id().with("modrinth_titlebar_drag"),
+                Sense::click_and_drag(),
+            );
+            if drag.dragged() {
+                ui.ctx().send_viewport_cmd(ViewportCommand::StartDrag);
+            }
+            if drag.double_clicked() {
+                let is_maximized = ui.input(|i| i.viewport().maximized.unwrap_or(false));
+                ui.ctx()
+                    .send_viewport_cmd(ViewportCommand::Maximized(!is_maximized));
+            }
+        }
+
+        let toggle_resp = Self::draw_modrinth_quiet_button(
+            ui,
+            toggle,
+            if sidebar_open {
+                Icon::ChevronRight
+            } else {
+                Icon::ChevronLeft
+            },
+            "modrinth_sidebar_toggle",
+        );
+        if toggle_resp
+            .on_hover_text(lang.modrinth_toggle_sidebar())
+            .clicked()
+        {
+            response.sidebar_toggle = true;
+        }
+
+        let gallery_resp =
+            Self::draw_modrinth_quiet_button(ui, gallery, Icon::Gallery, "modrinth_title_gallery");
+        if gallery_resp.on_hover_text(lang.screens_title()).clicked() {
+            response.gallery_clicked = true;
+        }
+        let console_resp =
+            Self::draw_modrinth_quiet_button(ui, console, Icon::Console, "modrinth_title_console");
+        if console_resp
+            .on_hover_text(lang.titlebar_console_tooltip())
+            .clicked()
+        {
+            response.console_clicked = true;
+        }
+        let downloads_resp = Self::draw_modrinth_quiet_button(
+            ui,
+            downloads,
+            Icon::Download,
+            "modrinth_title_downloads",
+        );
+        if downloads_resp.on_hover_text(lang.dlman_title()).clicked() {
+            response.downloads_clicked = true;
+        }
+
+        let is_maximized = ui.input(|i| i.viewport().maximized.unwrap_or(false));
+        if Self::draw_modrinth_window_button(ui, min_rect, Icon::Minimize, false, "min").clicked() {
+            ui.ctx().send_viewport_cmd(ViewportCommand::Minimized(true));
+        }
+        if Self::draw_modrinth_window_button(
+            ui,
+            max_rect,
+            if is_maximized {
+                Icon::Restore
+            } else {
+                Icon::Maximize
+            },
+            false,
+            "max",
+        )
+        .clicked()
+        {
+            ui.ctx()
+                .send_viewport_cmd(ViewportCommand::Maximized(!is_maximized));
+        }
+        if Self::draw_modrinth_window_button(ui, close_rect, Icon::Close, true, "close").clicked() {
+            ui.ctx().send_viewport_cmd(ViewportCommand::Close);
+        }
+
+        ui.advance_cursor_after_rect(bar);
+        response
+    }
+
+    fn draw_modrinth_quiet_button(ui: &mut Ui, rect: Rect, icon: Icon, id: &str) -> Response {
+        let resp = ui.interact(rect, ui.id().with(id), Sense::click());
+        let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+        if hover > 0.02 {
+            ui.painter().rect_filled(
+                rect,
+                Rounding::same(8.0),
+                crate::theme::lerp_color(
+                    Color32::TRANSPARENT,
+                    crate::theme::MODRINTH_SURFACE_HIGH,
+                    hover,
+                ),
+            );
+        }
+        icons::draw(
+            ui.painter(),
+            icon,
+            rect.shrink(9.0),
+            crate::theme::lerp_color(
+                crate::theme::MODRINTH_TEXT,
+                crate::theme::MODRINTH_TEXT_CONTRAST,
+                hover,
+            ),
+            1.35,
+        );
+        if resp.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+        resp
+    }
+
+    fn draw_modrinth_window_button(
+        ui: &mut Ui,
+        rect: Rect,
+        icon: Icon,
+        is_close: bool,
+        id: &str,
+    ) -> Response {
+        let resp = ui.interact(rect, ui.id().with(("modrinth_window", id)), Sense::click());
+        let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+        if hover > 0.02 {
+            let fill = if is_close {
+                with_alpha(DANGER, (hover * 210.0) as u8)
+            } else {
+                crate::theme::lerp_color(
+                    Color32::TRANSPARENT,
+                    crate::theme::MODRINTH_SURFACE_HIGH,
+                    hover,
+                )
+            };
+            ui.painter().rect_filled(rect, Rounding::same(8.0), fill);
+        }
+        let color = if is_close {
+            crate::theme::lerp_color(crate::theme::MODRINTH_TEXT, Color32::WHITE, hover)
+        } else {
+            crate::theme::lerp_color(
+                crate::theme::MODRINTH_TEXT,
+                crate::theme::MODRINTH_TEXT_CONTRAST,
+                hover,
+            )
+        };
+        icons::draw(
+            ui.painter(),
+            icon,
+            rect.shrink2(vec2(11.0, 9.0)),
+            color,
+            1.35,
+        );
+        resp
     }
 
     /// Millida-style frameless title bar: 44 px tall with the brand centred

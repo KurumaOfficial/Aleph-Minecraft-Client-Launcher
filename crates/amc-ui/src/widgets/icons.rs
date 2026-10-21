@@ -31,6 +31,7 @@ pub enum Icon {
     CaretDown,
     CaretUp,
     CaretRight,
+    ChevronLeft,
     ChevronRight,
     // Actions
     Search,
@@ -108,6 +109,7 @@ impl Icon {
         Icon::CaretDown,
         Icon::CaretUp,
         Icon::CaretRight,
+        Icon::ChevronLeft,
         Icon::ChevronRight,
         Icon::Search,
         Icon::Sort,
@@ -322,6 +324,9 @@ pub fn draw(painter: &Painter, icon: Icon, rect: Rect, color: impl Into<Color32>
         }
         Icon::CaretDown => {
             line(&[vec2(-0.62, -0.28), vec2(0.0, 0.34), vec2(0.62, -0.28)]);
+        }
+        Icon::ChevronLeft => {
+            line(&[vec2(0.32, -0.62), vec2(-0.32, 0.0), vec2(0.32, 0.62)]);
         }
         Icon::ChevronRight => {
             line(&[vec2(-0.32, -0.62), vec2(0.32, 0.0), vec2(-0.32, 0.62)]);
