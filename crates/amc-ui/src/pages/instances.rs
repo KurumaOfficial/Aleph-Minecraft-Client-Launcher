@@ -2633,28 +2633,28 @@ impl InstancesPage {
                 }
             });
 
-        /// Framed group strip (rounded top corners, 1px line) with a
-        /// collapse square and the group name at 60% text alpha; the
-        /// ungrouped instances show a blank header, like the reference.
+        /// Framed group strip (reference: top rule with short fading side
+        /// rules, a collapse square and the bold group name at 60% alpha).
         fn multimc_group_header(ui: &mut Ui, name: &str, collapsed: bool) -> bool {
             let h = 26.0;
             let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), h), Sense::hover());
             let painter = ui.painter();
             let line = with_alpha(TEXT_PRIMARY, 90);
-            let frame = Rect::from_min_max(
-                pos2(rect.left() + 3.0, rect.top()),
-                pos2(rect.right() - 3.0, rect.bottom()),
-            );
-            painter.rect_stroke(
-                frame,
-                Rounding {
-                    nw: 4.0,
-                    ne: 4.0,
-                    sw: 0.0,
-                    se: 0.0,
-                },
+            let top = rect.top() + 0.5;
+            painter.line_segment(
+                [pos2(rect.left() + 5.0, top), pos2(rect.right() - 5.0, top)],
                 Stroke::new(1.0_f32, line),
             );
+            // The reference fades the side rules out over roughly one text
+            // line instead of closing the group into a full box.
+            for x in [rect.left() + 3.5, rect.right() - 3.5] {
+                for (offset, alpha) in [(0.0, 90), (4.0, 64), (8.0, 38), (12.0, 16)] {
+                    painter.line_segment(
+                        [pos2(x, top + 2.0 + offset), pos2(x, top + 6.0 + offset)],
+                        Stroke::new(1.0_f32, with_alpha(TEXT_PRIMARY, alpha)),
+                    );
+                }
+            }
             let square =
                 Rect::from_min_size(pos2(rect.left() + 9.0, rect.top() + 6.0), vec2(13.0, 13.0));
             painter.rect_stroke(square, Rounding::ZERO, Stroke::new(1.0_f32, line));
@@ -2674,7 +2674,7 @@ impl InstancesPage {
                     pos2(square.right() + 7.0, rect.center().y),
                     Align2::LEFT_CENTER,
                     name,
-                    egui::FontId::proportional(12.5),
+                    crate::theme::display(12.5),
                     with_alpha(TEXT_PRIMARY, 153),
                 );
             }
