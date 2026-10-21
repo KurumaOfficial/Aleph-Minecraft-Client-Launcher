@@ -1,0 +1,230 @@
+# AMC Launcher — Style/Shell Handoff
+
+Состояние на 2026-10-21. Этот файл — точка входа для продолжения работы над
+визуальными оболочками на другом устройстве.
+
+## Цель
+
+Сделать оболочки AMC Launcher визуально неотличимыми от оригиналов:
+
+- MultiMC / Prism;
+- Legacy (Mojang Launcher);
+- Millida;
+- Modrinth.
+
+При этом `Ultra`, `Simple` и `Professional` должны оставаться в стиле Aleph и
+визуально не меняться.
+
+Допустимо повторять композицию, размеры, отступы, поведение и палитру.
+Пользователь явно разрешил переносить ассеты из референсов (иконки, логотипы,
+картинки). Код и шрифты референсов по-прежнему не копируются: реализация
+пишется на Rust/egui, ассеты подключаются как файлы.
+
+## Репозиторий и ветка
+
+- Remote: `https://github.com/KurumaOfficial/Aleph-Minecraft-Client-Launcher.git`
+- Branch: `main`
+- Последний коммит на момент передачи: `184ebb1` (`feat(shell/modrinth): rebuild skin selector`)
+- Все изменения запушены, рабочее дерево чистое.
+- Локальный release, выложенный в `dist`, имеет SHA-256
+  `118AB91DA724719DAC918F4FC36D598E4C4E2E3F7EBBDC342AA155A5C7D9442C`
+  (сам `dist` не хранится в git; на другом устройстве пересобрать).
+
+## Обязательные правила
+
+1. Каждый шаг — отдельный conventional commit, затем `git push origin main`.
+2. После каждого изменения:
+   - `cargo fmt --all`
+   - `cargo test --workspace --locked`
+   - `cargo clippy --workspace --all-targets --locked -- -D warnings`
+   - `cargo doc --no-deps`
+3. Весь пользовательский текст — через `crates/amc-core/src/i18n.rs` с
+   вариантами EN/RU/UK. Добавлять новые ключи в тест покрытия.
+4. Иконки: либо векторные через `painter`/`icons.rs`, либо реальные ассеты.
+   Не использовать emoji/tofu.
+5. Сохранять совместимость `config.json`, `instances.json`, аккаунтов и
+   существующих настроек. Не менять формат без миграции.
+6. Не удалять пользовательские данные. Тестовые `instances.json` удалять после
+   проверки, конфиг восстанавливать.
+7. `unsafe` — только с `// SAFETY:`.
+8. Новые зависимости — только при необходимости.
+9. `Ultra`/`Simple`/`Professional` не должны менять внешний вид. Общие фиксы
+   допустимы, если это исправление явного бага, но проверяй регрессии.
+
+## Текущее состояние оболочек
+
+### Modrinth — самая проработанная
+
+Уже сделано:
+
+- левый навбар 190 px, зелёный акцент, палитра Modrinth;
+- правый rail 300 px: «Вы играете как», карточка аккаунта, «Друзья»,
+  «Новости», переключатель панели в titlebar;
+- кастомный titlebar 48 px с официальным wordmark Modrinth, disabled
+  history-стрелками, хлебными крошками, статус-пилюлей, quiet-кнопками,
+  переключателем rail и кнопками окна;
+- библиотека: сортировка, группировка, фильтры, сворачивание секций,
+  карточки, hover-Play, выбор, контекстное меню, модалка новой группы;
+- страница модов: Modrinth-заголовок, табы-пилюли, пустое состояние,
+  выбранная сборка в подзаголовке, обход обрезания поисковой строки;
+- страница скинов: двухколоночный layout, превью, переключатель модели,
+  активный скин, стандартные Steve/Alex, пустой список сохранённых скинов,
+  кнопки загрузки/сброса;
+- официальные ассеты Modrinth: wordmark, instance-icons, steve.png.
+
+Известные ограничения Modrinth:
+
+- страница `Profile` всё ещё использует общий Aleph-layout;
+- страница `Settings` тоже общая;
+- «Друзья» и «Новости» — локальные заглушки, без Modrinth API;
+- скин-превью 2D (композит из текстуры), не 3D;
+- нет сохранённой библиотеки скинов и cape-менеджера;
+- поиск модов не полностью повторяет BrowsePage оригинала, но заголовок и
+  основные контролы уже приведены к стилю;
+- ассеты лежат в `assets/modrinth/`, источник/лицензия — в
+  `assets/modrinth/README.md` (Modrinth App, GPL-3.0).
+
+### MultiMC
+
+- toolbar, центральный instance view, правый instance toolbar, news/status bar;
+- иконки-плитки 100 px, группы, выделение;
+- заголовки групп приведены к `VisualGroup`: верхняя линия и короткие
+  затухающие боковые штрихи, жирное имя;
+- правый toolbar расширен до 176 px, длинные подписи не режутся;
+- общий titlebar теперь заливается цветом палитры.
+
+Возможные следующие шаги:
+
+- проверить список с большим количеством инстансов и все действия toolbar;
+- сверить news/status bar и мелкую типографику с исходником;
+- внутренние страницы (моды, настройки) всё ещё общие.
+
+### Legacy
+
+- светлая палитра, верхние текстовые табы, нижний profile/version bar,
+  зелёная Play-кнопка;
+- titlebar теперь светлый и читаемый;
+- контент Home по-прежнему общий Aleph hero, а не отдельная Legacy-страница.
+
+### Millida
+
+- lobby с пиксельными тайлами, центральным пьедесталом, промо-карточкой,
+  нижним блоком «Сегодня играем»;
+- classic rail для остальных страниц;
+- titlebar 44 px с центрированным брендом;
+- внутренние страницы остаются общими.
+
+## Ключевые файлы
+
+- `crates/amc-ui/src/theme.rs` — палитры `PaletteId`, токены, шрифты,
+  `rounding()`, `display()`, `apply_*_theme`.
+- `crates/amc-ui/src/app.rs` — сборка окна, titlebar, side-панели, вызовы
+  страниц, действия над инстансами.
+- `crates/amc-ui/src/shells/modrinth.rs` — левый/правый rail Modrinth.
+- `crates/amc-ui/src/widgets/titlebar.rs` — общий, Millida и Modrinth titlebar.
+- `crates/amc-ui/src/widgets/modrinth_assets.rs` — кэш PNG-ассетов Modrinth.
+- `crates/amc-ui/src/pages/instances.rs` — библиотеки `Instance`, `Modrinth`,
+  `Multimc`, карточки, модалки, фильтры, контекстное меню.
+- `crates/amc-ui/src/pages/mods.rs` — общая страница модов + `ModsSkin`.
+- `crates/amc-ui/src/pages/skins.rs` — общая страница скинов + `SkinsSkin`,
+  композит скина, Steve/Alex, ассет Steve.
+- `crates/amc-ui/src/pages/instance_manage.rs` — управление сборкой.
+- `crates/amc-core/src/i18n.rs` — EN/RU/UK.
+- `assets/modrinth/` — wordmark, instance icons, steve.png, README.
+
+## Референсы
+
+- `refs/modrinth` — исходники Modrinth App (Tauri/Vue), включая:
+  - `apps/app-frontend/src/components/ui/library/`;
+  - `apps/app-frontend/src/pages/Skins.vue`;
+  - `apps/app-frontend/src/pages/Browse.vue`;
+  - `packages/ui/src/components/base/NavTabs.vue`;
+  - `packages/ui/src/layouts/shared/browse-tab/`;
+  - `packages/assets/branding/logo.svg`;
+  - `packages/assets/icons/`;
+  - `apps/app-frontend/src/assets/instance-icons/`;
+  - `apps/app-frontend/src/assets/skins/steve.png`.
+- `refs/multimc` — MultiMC source, особенно
+  `launcher/ui/instanceview/InstanceView.cpp`,
+  `launcher/ui/instanceview/VisualGroup.cpp`,
+  `launcher/ui/MainWindow.cpp`.
+- `refs/prism` — Prism reference.
+- `refs/millida` — Millida reference.
+- Legacy папки референса нет; используются публичные скриншоты и текущая
+  реализация.
+
+## Ассеты: как подключать
+
+1. Класть PNG в `assets/modrinth/...` (или другую папку по оболочке).
+2. Для Modrinth использовать `widgets/modrinth_assets.rs`:
+   - `loader_texture(ctx, loader)`;
+   - `wordmark_texture(ctx)`;
+   - кэш — в `ctx.data_mut`.
+3. Для произвольных картинок — `include_bytes!` + `image::load_from_memory` +
+   `ctx.load_texture`. Кэшировать, не грузить каждую frame.
+4. SVG из референсов можно растеризовать заранее headless Chrome:
+   - извлечь валидный SVG (убрать Vue `:class`);
+   - сделать HTML с нужным фоном;
+   - `chrome --headless=new --screenshot=... --window-size=W,H`;
+   - PNG положить в assets и подключить.
+5. Wordmark Modrinth растрирован на фоне `#27292e` (цвет titlebar), поэтому
+   он рисуется как непрозрачная картинка без шва.
+
+## Локальный запуск и проверка
+
+- Рабочая директория проекта:
+  `C:\Projects\Wettea\AMC_Launcher\Aleph-Minecraft-Client-Launcher`.
+- Debug exe: `target\debug\amc-launcher.exe`.
+- Release exe: `target\release\amc-launcher.exe`.
+- Deploy: `C:\Projects\Wettea\AMC_Launcher\dist\amc-launcher.exe`.
+- Перед деплоем делать бэкап `amc-launcher.exe.bak-YYYYMMDD-HHMM`.
+- Окно проверки: 1400×875 physical / 1120×700 logical при 1.25 DPI.
+- Пользовательские данные: `%APPDATA%\AlephLauncher\`.
+  - `config.json`;
+  - `instances.json` (в тестах создаётся временно и удаляется).
+- Для тестовых инстансов loader в JSON — `"neoforge"`, `"forge"`, `"fabric"`,
+  `"vanilla"` (lowercase).
+- Не оставлять тестовые инстансы и изменённый конфиг после проверки.
+- В `%TEMP%\opencode` на исходной машине есть скрипты
+  `amc-capture.ps1`, `amc-click.ps1`, `amc-hover.ps1` для скриншотов/кликов.
+  На другом устройстве их нужно пересоздать; окно DPI-aware.
+
+## Рекомендуемый следующий шаг
+
+1. **Modrinth Profile** — привести к композиции оригинала:
+   - аватар/голова, ник, тип аккаунта, кнопки управления;
+   - убрать общий Aleph-layout, сохранить правый rail.
+2. **Modrinth Settings** — аналогично, с секциями и Modrinth-контролами.
+3. Затем пройтись по **Millida / MultiMC / Legacy** внутренним страницам,
+   которые всё ещё используют общий Aleph-контент.
+4. После каждого шага — скриншот, проверки, commit, push, release deploy.
+
+## Готовый мастер-промт
+
+Скопировать в новый чат:
+
+> Ты продолжаешь разработку AMC Launcher в репозитории
+> `https://github.com/KurumaOfficial/Aleph-Minecraft-Client-Launcher` (ветка
+> `main`). Сначала прочитай `docs/STYLE-SHELL-HANDOFF.md` и последние коммиты.
+>
+> Цель: довести визуальные оболочки MultiMC/Prism, Legacy, Millida и Modrinth
+> до состояния «1 в 1» с оригиналами по композиции, поведению, метрикам и
+> палитре. `Ultra`, `Simple` и `Professional` должны оставаться в стиле Aleph
+> и визуально не меняться. Пользователь разрешил переносить ассеты из
+> референсов (иконки, логотипы, изображения); код и шрифты не копировать,
+> реализация — на Rust/egui.
+>
+> Обязательно: весь текст через `crates/amc-core/src/i18n.rs` (EN/RU/UK);
+> иконки — векторные или реальные ассеты; сохранять совместимость config,
+> instances, аккаунтов; после каждого изменения запускать `cargo fmt --all`,
+> `cargo test --workspace --locked`,
+> `cargo clippy --workspace --all-targets --locked -- -D warnings`,
+> `cargo doc --no-deps`; делать отдельный conventional commit и пушить в
+> `origin/main`; собирать release и обновлять
+> `C:\Projects\Wettea\AMC_Launcher\dist\amc-launcher.exe` с бэкапом.
+>
+> Начни с аудита текущего состояния и продолжи с ближайшего незакрытого
+> участка: страница Modrinth Profile, затем Settings, затем внутренние
+> страницы Millida/MultiMC/Legacy. Не оставляй тестовые instances.json и
+> изменённый пользовательский config. Работай автономно, проверяй визуально
+> скриншотами, не задавай лишних вопросов, если можешь проверить сам.
