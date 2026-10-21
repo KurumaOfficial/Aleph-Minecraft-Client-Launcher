@@ -134,6 +134,12 @@
 
 ## Референсы
 
+Важно: каталог `refs/` находится **вне git-репозитория** —
+`C:\Projects\Wettea\AMC_Launcher\refs`. На новое устройство его нужно
+перенести отдельно (или заново склонировать исходники Modrinth/MultiMC/Prism/
+Millida). Собранные ассеты, которые уже используются приложением, лежат внутри
+репозитория в `assets/` и доступны после обычного `git clone`.
+
 - `refs/modrinth` — исходники Modrinth App (Tauri/Vue), включая:
   - `apps/app-frontend/src/components/ui/library/`;
   - `apps/app-frontend/src/pages/Skins.vue`;
@@ -206,6 +212,9 @@
 > Ты продолжаешь разработку AMC Launcher в репозитории
 > `https://github.com/KurumaOfficial/Aleph-Minecraft-Client-Launcher` (ветка
 > `main`). Сначала прочитай `docs/STYLE-SHELL-HANDOFF.md` и последние коммиты.
+> Учти: папка `refs/` с исходниками референсов лежит вне git-репозитория; если
+> её нет на устройстве, запроси/перенеси её отдельно (используемые ассеты уже
+> лежат в `assets/`).
 >
 > Цель: довести визуальные оболочки MultiMC/Prism, Legacy, Millida и Modrinth
 > до состояния «1 в 1» с оригиналами по композиции, поведению, метрикам и
