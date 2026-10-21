@@ -335,6 +335,7 @@ impl TitleBar {
                 Icon::ChevronLeft
             },
             "modrinth_sidebar_toggle",
+            sidebar_open,
         );
         if toggle_resp
             .on_hover_text(lang.modrinth_toggle_sidebar())
@@ -343,13 +344,23 @@ impl TitleBar {
             response.sidebar_toggle = true;
         }
 
-        let gallery_resp =
-            Self::draw_modrinth_quiet_button(ui, gallery, Icon::Gallery, "modrinth_title_gallery");
+        let gallery_resp = Self::draw_modrinth_quiet_button(
+            ui,
+            gallery,
+            Icon::Gallery,
+            "modrinth_title_gallery",
+            false,
+        );
         if gallery_resp.on_hover_text(lang.screens_title()).clicked() {
             response.gallery_clicked = true;
         }
-        let console_resp =
-            Self::draw_modrinth_quiet_button(ui, console, Icon::Console, "modrinth_title_console");
+        let console_resp = Self::draw_modrinth_quiet_button(
+            ui,
+            console,
+            Icon::Console,
+            "modrinth_title_console",
+            false,
+        );
         if console_resp
             .on_hover_text(lang.titlebar_console_tooltip())
             .clicked()
@@ -361,6 +372,7 @@ impl TitleBar {
             downloads,
             Icon::Download,
             "modrinth_title_downloads",
+            false,
         );
         if downloads_resp.on_hover_text(lang.dlman_title()).clicked() {
             response.downloads_clicked = true;
@@ -394,10 +406,22 @@ impl TitleBar {
         response
     }
 
-    fn draw_modrinth_quiet_button(ui: &mut Ui, rect: Rect, icon: Icon, id: &str) -> Response {
+    fn draw_modrinth_quiet_button(
+        ui: &mut Ui,
+        rect: Rect,
+        icon: Icon,
+        id: &str,
+        active: bool,
+    ) -> Response {
         let resp = ui.interact(rect, ui.id().with(id), Sense::click());
         let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
-        if hover > 0.02 {
+        if active {
+            ui.painter().rect_filled(
+                rect,
+                Rounding::same(8.0),
+                crate::theme::MODRINTH_SURFACE_HIGH,
+            );
+        } else if hover > 0.02 {
             ui.painter().rect_filled(
                 rect,
                 Rounding::same(8.0),
@@ -408,17 +432,16 @@ impl TitleBar {
                 ),
             );
         }
-        icons::draw(
-            ui.painter(),
-            icon,
-            rect.shrink(9.0),
+        let color = if active {
+            crate::theme::MODRINTH_TEXT_CONTRAST
+        } else {
             crate::theme::lerp_color(
                 crate::theme::MODRINTH_TEXT,
                 crate::theme::MODRINTH_TEXT_CONTRAST,
                 hover,
-            ),
-            1.35,
-        );
+            )
+        };
+        icons::draw(ui.painter(), icon, rect.shrink(9.0), color, 1.35);
         if resp.hovered() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
         }
