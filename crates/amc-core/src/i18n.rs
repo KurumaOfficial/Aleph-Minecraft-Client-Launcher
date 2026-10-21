@@ -416,6 +416,222 @@ impl Language {
         }
     }
 
+    /// Modrinth library: sort option (reference: "Last played").
+    pub fn inst_sort_last_played(&self) -> &'static str {
+        match self {
+            Self::English => "Last played",
+            Self::Russian => "Последняя игра",
+            Self::Ukrainian => "Остання гра",
+        }
+    }
+
+    /// Modrinth library: sort option (reference: "Hours played").
+    pub fn inst_sort_hours_played(&self) -> &'static str {
+        match self {
+            Self::English => "Hours played",
+            Self::Russian => "Наиграно часов",
+            Self::Ukrainian => "Награно годин",
+        }
+    }
+
+    /// Modrinth library: sort option (reference: "Date created").
+    pub fn inst_sort_date_created(&self) -> &'static str {
+        match self {
+            Self::English => "Date created",
+            Self::Russian => "Дата создания",
+            Self::Ukrainian => "Дата створення",
+        }
+    }
+
+    /// Modrinth library: loader word used by sorting/grouping/filtering.
+    pub fn inst_word_loader(&self) -> &'static str {
+        match self {
+            Self::English => "Loader",
+            Self::Russian => "Загрузчик",
+            Self::Ukrainian => "Завантажувач",
+        }
+    }
+
+    /// Modrinth library: game version word used by grouping/filtering.
+    pub fn inst_word_game_version(&self) -> &'static str {
+        match self {
+            Self::English => "Game version",
+            Self::Russian => "Версия игры",
+            Self::Ukrainian => "Версія гри",
+        }
+    }
+
+    /// Modrinth library: group-by value for user-created folders.
+    pub fn inst_group_custom(&self) -> &'static str {
+        match self {
+            Self::English => "Custom group",
+            Self::Russian => "Своя группа",
+            Self::Ukrainian => "Власна група",
+        }
+    }
+
+    /// Modrinth library: group-by combobox heading (reference: "Group by").
+    pub fn inst_group_by(&self) -> &'static str {
+        match self {
+            Self::English => "Group by",
+            Self::Russian => "Группировать по",
+            Self::Ukrainian => "Групувати за",
+        }
+    }
+
+    /// Modrinth library: header for instances without a custom group.
+    pub fn inst_group_ungrouped(&self) -> &'static str {
+        match self {
+            Self::English => "Ungrouped",
+            Self::Russian => "Без группы",
+            Self::Ukrainian => "Без групи",
+        }
+    }
+
+    /// Modrinth library: New group modal title and create button.
+    pub fn inst_group_create(&self) -> &'static str {
+        match self {
+            Self::English => "Create group",
+            Self::Russian => "Создать группу",
+            Self::Ukrainian => "Створити групу",
+        }
+    }
+
+    /// Modrinth library: New group modal name field label.
+    pub fn inst_group_name(&self) -> &'static str {
+        match self {
+            Self::English => "Group name",
+            Self::Russian => "Название группы",
+            Self::Ukrainian => "Назва групи",
+        }
+    }
+
+    /// Modrinth library: New group modal name placeholder.
+    pub fn inst_group_name_hint(&self) -> &'static str {
+        match self {
+            Self::English => "Enter group name",
+            Self::Russian => "Введите название группы",
+            Self::Ukrainian => "Введіть назву групи",
+        }
+    }
+
+    /// Modrinth library: New group modal instance search placeholder.
+    pub fn inst_group_search(&self) -> &'static str {
+        match self {
+            Self::English => "Search instance",
+            Self::Russian => "Поиск сборки",
+            Self::Ukrainian => "Пошук збірки",
+        }
+    }
+
+    /// Modrinth library: New group modal empty search result.
+    pub fn inst_group_empty(&self) -> &'static str {
+        match self {
+            Self::English => "No instances found",
+            Self::Russian => "Сборки не найдены",
+            Self::Ukrainian => "Збірки не знайдено",
+        }
+    }
+
+    /// Modrinth library: New group modal add-to-selection action.
+    pub fn inst_group_add(&self) -> &'static str {
+        match self {
+            Self::English => "Add",
+            Self::Russian => "Добавить",
+            Self::Ukrainian => "Додати",
+        }
+    }
+
+    /// Modrinth library: New group modal already-selected action.
+    pub fn inst_group_added(&self) -> &'static str {
+        match self {
+            Self::English => "Added",
+            Self::Russian => "Добавлено",
+            Self::Ukrainian => "Додано",
+        }
+    }
+
+    /// Modrinth library: New group modal cancel button.
+    pub fn inst_group_cancel(&self) -> &'static str {
+        match self {
+            Self::English => "Cancel",
+            Self::Russian => "Отмена",
+            Self::Ukrainian => "Скасувати",
+        }
+    }
+
+    /// Modrinth library: filter popup clear action.
+    pub fn inst_filter_clear(&self) -> &'static str {
+        match self {
+            Self::English => "Clear filters",
+            Self::Russian => "Сбросить фильтры",
+            Self::Ukrainian => "Скинути фільтри",
+        }
+    }
+
+    /// Modrinth library: card context-menu play action.
+    pub fn inst_ctx_play(&self) -> &'static str {
+        match self {
+            Self::English => "Play",
+            Self::Russian => "Играть",
+            Self::Ukrainian => "Грати",
+        }
+    }
+
+    /// Modrinth library: card context-menu edit action.
+    pub fn inst_ctx_edit(&self) -> &'static str {
+        match self {
+            Self::English => "Edit",
+            Self::Russian => "Настроить",
+            Self::Ukrainian => "Налаштувати",
+        }
+    }
+
+    /// Modrinth library: card context-menu duplicate action.
+    pub fn inst_ctx_duplicate(&self) -> &'static str {
+        match self {
+            Self::English => "Duplicate instance",
+            Self::Russian => "Дублировать сборку",
+            Self::Ukrainian => "Дублювати збірку",
+        }
+    }
+
+    /// Modrinth library: card context-menu manage action.
+    pub fn inst_ctx_manage(&self) -> &'static str {
+        match self {
+            Self::English => "Manage",
+            Self::Russian => "Управление",
+            Self::Ukrainian => "Керування",
+        }
+    }
+
+    /// Modrinth library: card context-menu desktop shortcut action.
+    pub fn inst_ctx_shortcut(&self) -> &'static str {
+        match self {
+            Self::English => "Create shortcut",
+            Self::Russian => "Создать ярлык",
+            Self::Ukrainian => "Створити ярлик",
+        }
+    }
+
+    /// Modrinth library: card context-menu open-folder action.
+    pub fn inst_ctx_folder(&self) -> &'static str {
+        match self {
+            Self::English => "Open folder",
+            Self::Russian => "Открыть папку",
+            Self::Ukrainian => "Відкрити папку",
+        }
+    }
+
+    /// Modrinth library: card context-menu delete action.
+    pub fn inst_ctx_delete(&self) -> &'static str {
+        match self {
+            Self::English => "Delete",
+            Self::Russian => "Удалить",
+            Self::Ukrainian => "Видалити",
+        }
+    }
+
     pub fn inst_empty(&self) -> &'static str {
         match self {
             Self::English => "No instances created yet. Click '+ CREATE INSTANCE' to add one!",
@@ -4544,6 +4760,30 @@ mod tests {
             assert!(!lang.inst_btn_new_instance().is_empty());
             assert!(!lang.inst_group_none().is_empty());
             assert!(!lang.inst_filter_by().is_empty());
+            assert!(!lang.inst_sort_last_played().is_empty());
+            assert!(!lang.inst_sort_hours_played().is_empty());
+            assert!(!lang.inst_sort_date_created().is_empty());
+            assert!(!lang.inst_word_loader().is_empty());
+            assert!(!lang.inst_word_game_version().is_empty());
+            assert!(!lang.inst_group_custom().is_empty());
+            assert!(!lang.inst_group_by().is_empty());
+            assert!(!lang.inst_group_ungrouped().is_empty());
+            assert!(!lang.inst_group_create().is_empty());
+            assert!(!lang.inst_group_name().is_empty());
+            assert!(!lang.inst_group_name_hint().is_empty());
+            assert!(!lang.inst_group_search().is_empty());
+            assert!(!lang.inst_group_empty().is_empty());
+            assert!(!lang.inst_group_add().is_empty());
+            assert!(!lang.inst_group_added().is_empty());
+            assert!(!lang.inst_group_cancel().is_empty());
+            assert!(!lang.inst_filter_clear().is_empty());
+            assert!(!lang.inst_ctx_play().is_empty());
+            assert!(!lang.inst_ctx_edit().is_empty());
+            assert!(!lang.inst_ctx_duplicate().is_empty());
+            assert!(!lang.inst_ctx_manage().is_empty());
+            assert!(!lang.inst_ctx_shortcut().is_empty());
+            assert!(!lang.inst_ctx_folder().is_empty());
+            assert!(!lang.inst_ctx_delete().is_empty());
             assert!(!lang.shell_folders().is_empty());
             assert!(!lang.shell_view_instance_folder().is_empty());
             assert!(!lang.shell_view_central_mods().is_empty());

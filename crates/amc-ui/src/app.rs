@@ -4365,6 +4365,24 @@ impl App for LauncherApp {
                                 }
                                 self.handle_launch();
                             }
+                            InstanceAction::GroupCreated(name) => {
+                                let inserted =
+                                    if let std::collections::hash_map::Entry::Vacant(entry) =
+                                        self.config.instance_groups.entry(name)
+                                    {
+                                        entry.insert(Default::default());
+                                        true
+                                    } else {
+                                        false
+                                    };
+                                if inserted {
+                                    if let Err(e) =
+                                        self.config.save_to_path(&self.paths.config_file())
+                                    {
+                                        tracing::warn!("config save failed: {e}");
+                                    }
+                                }
+                            }
                             InstanceAction::None => {}
                         }
                         // Discover trending packs (CONCEPT P4).

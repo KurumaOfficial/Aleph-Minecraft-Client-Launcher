@@ -13,7 +13,7 @@ use amc_core::types::{Instance, InstanceIcon, InstanceTemplate, LoaderType};
 use amc_core::Language;
 use amc_mods::ModSearchResult;
 use egui::{pos2, vec2, Align2, Color32, Rect, Rounding, ScrollArea, Sense, Stroke, TextEdit, Ui};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
@@ -31,6 +31,8 @@ pub enum InstanceAction {
     /// Duplicate with an optional worlds copy (CONCEPT P2).
     Cloned(Uuid, bool),
     Launch(Uuid),
+    /// Modrinth library: a new empty custom group was created.
+    GroupCreated(String),
 }
 
 /// Visual skin of the instance list. `Amc` is the launcher's own card grid;
@@ -113,16 +115,31 @@ pub struct InstancesPage {
     // Organization (CONCEPT, P2): tag filter, sort, icon texture cache.
     pub active_tag: Option<String>,
     pub sort_mode: InstanceSort,
+    /// Modrinth library: card grouping mode.
+    pub group_by: LibraryGroupBy,
+    /// Modrinth library: loader/version checkboxes.
+    modrinth_filters: ModrinthFilters,
+    /// Modrinth library: collapsed section keys (`"Loader:Fabric"`).
+    modrinth_collapsed: HashSet<String>,
     icon_textures: HashMap<Uuid, egui::TextureHandle>,
     icon_failed: std::collections::HashSet<Uuid>,
     /// Memoized filter+sort (per-frame `to_lowercase`/`sort` avoided):
-    /// recomputed only when query/tag/sort or instance revision changes.
+    /// recomputed only when query/tag/sort/filters or instance revision changes.
     filter_cache: Vec<usize>,
-    filter_key: Option<(String, Option<String>, InstanceSort, u64)>,
+    filter_key: Option<InstanceFilterKey>,
     tags_cache: Vec<String>,
     tags_rev: u64,
     trash_cache: Vec<amc_core::TrashedInstance>,
     trash_at: Option<std::time::Instant>,
+
+    // Modrinth library: New group modal.
+    show_new_group_modal: bool,
+    new_group_name: String,
+    new_group_search: String,
+    new_group_selected: HashSet<Uuid>,
+    // Modrinth library: right-click card menu (instance, pointer position).
+    modrinth_menu: Option<(Uuid, egui::Pos2)>,
+    modrinth_menu_fresh: bool,
 
     // Per-instance management (worlds / configs / health modal).
     manage: InstanceManage,
@@ -184,6 +201,9 @@ impl Default for InstancesPage {
             local_badges: HashMap::new(),
             active_tag: None,
             sort_mode: InstanceSort::default(),
+            group_by: LibraryGroupBy::default(),
+            modrinth_filters: ModrinthFilters::default(),
+            modrinth_collapsed: HashSet::new(),
             icon_textures: HashMap::new(),
             icon_failed: std::collections::HashSet::new(),
             filter_cache: Vec::new(),
@@ -192,6 +212,12 @@ impl Default for InstancesPage {
             tags_rev: 0,
             trash_cache: Vec::new(),
             trash_at: None,
+            show_new_group_modal: false,
+            new_group_name: String::new(),
+            new_group_search: String::new(),
+            new_group_selected: HashSet::new(),
+            modrinth_menu: None,
+            modrinth_menu_fresh: false,
             manage: InstanceManage::default(),
             discover_open: true,
             discover: Vec::new(),
@@ -255,10 +281,25 @@ pub enum InstanceSort {
     Name,
     Created,
     Playtime,
+    /// Modrinth library: loader label, ascending.
+    Loader,
+    /// Modrinth library: numeric-aware game version, ascending.
+    GameVersion,
 }
 
 impl InstanceSort {
+    /// Aleph (AMC) sort choices. Kept small so the shared page is unchanged.
     pub const ALL: [Self; 4] = [Self::Recent, Self::Name, Self::Created, Self::Playtime];
+
+    /// Modrinth library ordering, matching the reference menu order.
+    pub const MODRINTH_ALL: [Self; 6] = [
+        Self::Name,
+        Self::Recent,
+        Self::Playtime,
+        Self::Created,
+        Self::Loader,
+        Self::GameVersion,
+    ];
 
     pub fn label(&self, lang: Language) -> &'static str {
         match self {
@@ -266,16 +307,104 @@ impl InstanceSort {
             Self::Name => lang.inst_sort_name(),
             Self::Created => lang.inst_sort_created(),
             Self::Playtime => lang.inst_sort_played(),
+            Self::Loader => lang.inst_word_loader(),
+            Self::GameVersion => lang.inst_word_game_version(),
+        }
+    }
+
+    /// Reference wording for the Modrinth library menu.
+    pub fn modrinth_label(&self, lang: Language) -> &'static str {
+        match self {
+            Self::Recent => lang.inst_sort_last_played(),
+            Self::Name => lang.inst_sort_name(),
+            Self::Created => lang.inst_sort_date_created(),
+            Self::Playtime => lang.inst_sort_hours_played(),
+            Self::Loader => lang.inst_word_loader(),
+            Self::GameVersion => lang.inst_word_game_version(),
         }
     }
 }
 
-/// Search + tag predicate for the instance list (pure, unit-tested).
-fn matches_filter(inst: &Instance, query: &str, active_tag: Option<&str>) -> bool {
+/// Modrinth library card grouping (reference `sort-menu.vue`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LibraryGroupBy {
+    #[default]
+    Group,
+    Loader,
+    GameVersion,
+    None,
+}
+
+impl LibraryGroupBy {
+    pub const MODRINTH_ALL: [Self; 4] = [Self::Group, Self::Loader, Self::GameVersion, Self::None];
+
+    pub fn label(&self, lang: Language) -> &'static str {
+        match self {
+            Self::Group => lang.inst_group_custom(),
+            Self::Loader => lang.inst_word_loader(),
+            Self::GameVersion => lang.inst_word_game_version(),
+            Self::None => lang.inst_group_none(),
+        }
+    }
+}
+
+/// Modrinth library filter selections (reference `filters` in `use-library.ts`).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct ModrinthFilters {
+    loaders: Vec<LoaderType>,
+    versions: Vec<String>,
+}
+
+impl ModrinthFilters {
+    fn is_empty(&self) -> bool {
+        self.loaders.is_empty() && self.versions.is_empty()
+    }
+
+    fn toggle_loader(&mut self, loader: LoaderType) {
+        if let Some(pos) = self.loaders.iter().position(|l| *l == loader) {
+            self.loaders.remove(pos);
+        } else {
+            self.loaders.push(loader);
+        }
+    }
+
+    fn toggle_version(&mut self, version: &str) {
+        if let Some(pos) = self.versions.iter().position(|v| v == version) {
+            self.versions.remove(pos);
+        } else {
+            self.versions.push(version.to_string());
+        }
+    }
+}
+
+/// Memoization key for the Modrinth/Aleph filtered instance indices.
+#[derive(Debug, PartialEq, Eq)]
+struct InstanceFilterKey {
+    query: String,
+    tag: Option<String>,
+    sort: InstanceSort,
+    loaders: Vec<LoaderType>,
+    versions: Vec<String>,
+    rev: u64,
+}
+
+/// Search + tag + loader/version predicate for the instance list (pure).
+fn matches_filter(
+    inst: &Instance,
+    query: &str,
+    active_tag: Option<&str>,
+    filters: &ModrinthFilters,
+) -> bool {
     if let Some(tag) = active_tag {
         if !inst.tags.iter().any(|t| t == tag) {
             return false;
         }
+    }
+    if !filters.loaders.is_empty() && !filters.loaders.contains(&inst.loader) {
+        return false;
+    }
+    if !filters.versions.is_empty() && !filters.versions.iter().any(|v| v == &inst.game_version) {
+        return false;
     }
     if query.is_empty() {
         return true;
@@ -283,6 +412,29 @@ fn matches_filter(inst: &Instance, query: &str, active_tag: Option<&str>) -> boo
     inst.name.to_lowercase().contains(query)
         || inst.game_version.to_lowercase().contains(query)
         || inst.loader.as_str().to_lowercase().contains(query)
+}
+
+/// Numeric-aware Minecraft version comparison (`1.9` < `1.10`).
+fn natural_version_cmp(a: &str, b: &str) -> std::cmp::Ordering {
+    use std::cmp::Ordering;
+    let mut a_parts = a.split(['.', '-', '+', '_']);
+    let mut b_parts = b.split(['.', '-', '+', '_']);
+    loop {
+        match (a_parts.next(), b_parts.next()) {
+            (Some(x), Some(y)) => {
+                let ord = match (x.parse::<u64>(), y.parse::<u64>()) {
+                    (Ok(xn), Ok(yn)) => xn.cmp(&yn),
+                    _ => x.to_ascii_lowercase().cmp(&y.to_ascii_lowercase()),
+                };
+                if ord != Ordering::Equal {
+                    return ord;
+                }
+            }
+            (None, Some(_)) => return Ordering::Less,
+            (Some(_), None) => return Ordering::Greater,
+            (None, None) => return Ordering::Equal,
+        }
+    }
 }
 
 /// Pinned instances float above the rest, then the sort mode applies.
@@ -298,11 +450,19 @@ fn compare_instances(a: &Instance, b: &Instance, mode: InstanceSort) -> std::cmp
         InstanceSort::Recent => b.last_played.cmp(&a.last_played),
         InstanceSort::Created => b.created_at.cmp(&a.created_at),
         InstanceSort::Playtime => b.total_played_minutes.cmp(&a.total_played_minutes),
+        InstanceSort::Loader => a
+            .loader
+            .as_str()
+            .to_ascii_lowercase()
+            .cmp(&b.loader.as_str().to_ascii_lowercase())
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())),
+        InstanceSort::GameVersion => natural_version_cmp(&a.game_version, &b.game_version)
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())),
     }
 }
 
 /// Cheap revision of the instance list for cache invalidation (no alloc).
-/// Any rename/version/loader/pin/play/tag change flips the revision.
+/// Any rename/version/loader/pin/play/tag/group change flips the revision.
 fn instances_rev(instances: &[Instance]) -> u64 {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash, Hasher};
@@ -315,6 +475,11 @@ fn instances_rev(instances: &[Instance]) -> u64 {
         inst.game_version.hash(&mut hasher);
         inst.loader.as_str().hash(&mut hasher);
         inst.total_played_minutes.hash(&mut hasher);
+        inst.created_at.timestamp_millis().hash(&mut hasher);
+        inst.last_played
+            .map(|dt| dt.timestamp_millis())
+            .hash(&mut hasher);
+        inst.group.hash(&mut hasher);
         inst.tags.len().hash(&mut hasher);
         for tag in &inst.tags {
             tag.hash(&mut hasher);
@@ -356,6 +521,18 @@ fn m_button_width(ui: &Ui, icon: Option<Icon>, label: &str, height: f32) -> f32 
 /// Modrinth-style toolbar button (reference `ButtonFrame`: 36px tall,
 /// rounded-xl, secondary gray or brand green with black content).
 fn m_button(ui: &mut Ui, icon: Option<Icon>, label: &str, brand: bool, height: f32) -> bool {
+    m_button_enabled(ui, icon, label, brand, height, true)
+}
+
+/// `m_button` with the reference's disabled state (50% content).
+fn m_button_enabled(
+    ui: &mut Ui,
+    icon: Option<Icon>,
+    label: &str,
+    brand: bool,
+    height: f32,
+    enabled: bool,
+) -> bool {
     let text_size = if height > 34.0 { 15.0 } else { 13.5 };
     let galley = ui.painter().layout_no_wrap(
         label.to_owned(),
@@ -364,7 +541,11 @@ fn m_button(ui: &mut Ui, icon: Option<Icon>, label: &str, brand: bool, height: f
     );
     let width = 20.0 + galley.size().x + if icon.is_some() { 24.0 } else { 0.0 };
     let (rect, resp) = ui.allocate_exact_size(vec2(width, height), Sense::click());
-    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+    let hover = if enabled {
+        ui.ctx().animate_bool_responsive(resp.id, resp.hovered())
+    } else {
+        0.0
+    };
     let (base, hot) = if brand {
         (MODRINTH_GREEN, m_brightness(MODRINTH_GREEN, 1.1))
     } else {
@@ -374,12 +555,22 @@ fn m_button(ui: &mut Ui, icon: Option<Icon>, label: &str, brand: bool, height: f
         )
     };
     let radius = Rounding::same(12.0);
-    ui.painter()
-        .rect_filled(rect, radius, lerp_color(base, hot, hover));
-    let content = if brand {
-        Color32::BLACK
+    let fill = if enabled {
+        lerp_color(base, hot, hover)
     } else {
+        with_alpha(base, 128)
+    };
+    ui.painter().rect_filled(rect, radius, fill);
+    let content = if brand {
+        if enabled {
+            Color32::BLACK
+        } else {
+            with_alpha(Color32::BLACK, 128)
+        }
+    } else if enabled {
         MODRINTH_TEXT_CONTRAST
+    } else {
+        with_alpha(MODRINTH_TEXT, 128)
     };
     if brand {
         // Reference colored buttons carry a soft top highlight.
@@ -391,8 +582,13 @@ fn m_button(ui: &mut Ui, icon: Option<Icon>, label: &str, brand: bool, height: f
             Stroke::new(1.0_f32, with_alpha(Color32::WHITE, 70)),
         );
     } else {
+        let stroke = if enabled {
+            MODRINTH_SURFACE_HIGH
+        } else {
+            with_alpha(MODRINTH_SURFACE_HIGH, 150)
+        };
         ui.painter()
-            .rect_stroke(rect, radius, Stroke::new(1.0_f32, MODRINTH_SURFACE_HIGH));
+            .rect_stroke(rect, radius, Stroke::new(1.0_f32, stroke));
     }
     let icon_w = if icon.is_some() { 18.0 } else { 0.0 };
     let icon_gap = if icon.is_some() { 6.0 } else { 0.0 };
@@ -418,10 +614,10 @@ fn m_button(ui: &mut Ui, icon: Option<Icon>, label: &str, brand: bool, height: f
         galley,
         content,
     );
-    if resp.hovered() {
+    if enabled && resp.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
-    resp.clicked()
+    enabled && resp.clicked()
 }
 
 /// Modrinth-style combobox button: leading icon, current value, caret.
@@ -473,6 +669,459 @@ fn m_combo(ui: &mut Ui, icon: Icon, label: &str) -> egui::Response {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
     resp
+}
+
+/// Toggle one library combobox popup and close the other ones.
+fn toggle_library_popup(ui: &Ui, id: egui::Id) {
+    let open = ui.memory(|mem| mem.is_popup_open(id));
+    ui.memory_mut(|mem| mem.close_popup());
+    if !open {
+        ui.memory_mut(|mem| mem.open_popup(id));
+    }
+}
+
+/// Show a Modrinth-styled popup under a toolbar widget (reference surface-4
+/// menu: 14px radius, surface-5 border, soft drop shadow).
+fn modrinth_popup<R>(
+    ui: &mut Ui,
+    id: egui::Id,
+    response: &egui::Response,
+    add_contents: impl FnOnce(&mut Ui) -> R,
+) -> Option<R> {
+    let old_fill = ui.style().visuals.window_fill;
+    let old_stroke = ui.style().visuals.window_stroke;
+    let old_rounding = ui.style().visuals.window_rounding;
+    let old_shadow = ui.style().visuals.window_shadow;
+    {
+        let visuals = &mut ui.style_mut().visuals;
+        visuals.window_fill = MODRINTH_SURFACE_HOVER;
+        visuals.window_stroke = Stroke::new(1.0_f32, MODRINTH_SURFACE_HIGH);
+        visuals.window_rounding = Rounding::same(14.0);
+        visuals.window_shadow = egui::epaint::Shadow {
+            offset: vec2(0.0, 8.0),
+            blur: 24.0,
+            spread: 0.0,
+            color: Color32::from_black_alpha(110),
+        };
+    }
+    let result = egui::popup::popup_below_widget(
+        ui,
+        id,
+        response,
+        egui::popup::PopupCloseBehavior::CloseOnClickOutside,
+        add_contents,
+    );
+    {
+        let visuals = &mut ui.style_mut().visuals;
+        visuals.window_fill = old_fill;
+        visuals.window_stroke = old_stroke;
+        visuals.window_rounding = old_rounding;
+        visuals.window_shadow = old_shadow;
+    }
+    result
+}
+
+/// One row in a Modrinth combobox popup (reference option: semibold 15px,
+/// selected row gets the green text and a faint green wash).
+fn modrinth_menu_option(ui: &mut Ui, label: &str, selected: bool) -> bool {
+    modrinth_menu_option_enabled(ui, label, selected, true)
+}
+
+/// `modrinth_menu_option` with a disabled state (used by "Clear filters").
+fn modrinth_menu_option_enabled(ui: &mut Ui, label: &str, selected: bool, enabled: bool) -> bool {
+    let width = ui.available_width().max(150.0);
+    let (rect, _) = ui.allocate_exact_size(vec2(width, 40.0), Sense::hover());
+    let resp = ui.interact(rect, ui.id().with(label), Sense::click());
+    let hover = enabled && resp.hovered();
+    if selected {
+        ui.painter().rect_filled(
+            rect.shrink2(vec2(2.0, 1.0)),
+            Rounding::same(10.0),
+            with_alpha(MODRINTH_GREEN, 28),
+        );
+    } else if hover {
+        ui.painter().rect_filled(
+            rect.shrink2(vec2(2.0, 1.0)),
+            Rounding::same(10.0),
+            MODRINTH_SURFACE_HIGH,
+        );
+    }
+    let color = if !enabled {
+        with_alpha(MODRINTH_TEXT, 120)
+    } else if selected {
+        MODRINTH_GREEN
+    } else {
+        MODRINTH_TEXT_CONTRAST
+    };
+    ui.painter().text(
+        pos2(rect.left() + 14.0, rect.center().y),
+        Align2::LEFT_CENTER,
+        label,
+        egui::FontId::proportional(15.0),
+        color,
+    );
+    if enabled && resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    enabled && resp.clicked()
+}
+
+/// One checkbox row in the library filter popup; the box sits on the right
+/// like the reference `DropdownFilterBar` submenu.
+fn modrinth_check_option(ui: &mut Ui, label: &str, checked: bool, id: egui::Id) -> bool {
+    let width = ui.available_width().max(160.0);
+    let (rect, _) = ui.allocate_exact_size(vec2(width, 32.0), Sense::hover());
+    let resp = ui.interact(rect, id, Sense::click());
+    if resp.hovered() {
+        ui.painter().rect_filled(
+            rect.shrink2(vec2(2.0, 1.0)),
+            Rounding::same(8.0),
+            MODRINTH_SURFACE_HIGH,
+        );
+    }
+    ui.painter().text(
+        pos2(rect.left() + 12.0, rect.center().y),
+        Align2::LEFT_CENTER,
+        label,
+        egui::FontId::proportional(14.0),
+        MODRINTH_TEXT_CONTRAST,
+    );
+    let box_rect =
+        Rect::from_center_size(pos2(rect.right() - 12.0, rect.center().y), vec2(18.0, 18.0));
+    if checked {
+        ui.painter()
+            .rect_filled(box_rect, Rounding::same(5.0), MODRINTH_GREEN);
+        icons::draw(
+            ui.painter(),
+            Icon::Check,
+            box_rect.shrink(4.0),
+            Color32::BLACK,
+            2.0,
+        );
+    } else {
+        ui.painter().rect_stroke(
+            box_rect,
+            Rounding::same(5.0),
+            Stroke::new(1.5_f32, MODRINTH_SURFACE_HIGH),
+        );
+    }
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp.clicked()
+}
+
+/// Reference `InstanceGroup` header: 40px row, bottom border, caret, semibold
+/// name and a count chip. Returns true when clicked (collapse/expand).
+fn modrinth_group_header(ui: &mut Ui, title: &str, count: usize, collapsed: bool) -> bool {
+    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 40.0), Sense::click());
+    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+    ui.painter().line_segment(
+        [
+            pos2(rect.left(), rect.bottom() - 0.5),
+            pos2(rect.right(), rect.bottom() - 0.5),
+        ],
+        Stroke::new(1.0_f32, MODRINTH_SURFACE_HIGH),
+    );
+    let caret = if collapsed {
+        Icon::CaretRight
+    } else {
+        Icon::CaretDown
+    };
+    icons::draw(
+        ui.painter(),
+        caret,
+        Rect::from_center_size(pos2(rect.left() + 10.0, rect.center().y), vec2(16.0, 16.0)),
+        lerp_color(MODRINTH_TEXT_SECONDARY, MODRINTH_TEXT_CONTRAST, hover),
+        1.6,
+    );
+    let title_pos = pos2(rect.left() + 34.0, rect.center().y);
+    let title_color = lerp_color(MODRINTH_TEXT, MODRINTH_TEXT_CONTRAST, hover);
+    let galley = ui.painter().layout_no_wrap(
+        title.to_owned(),
+        egui::FontId::proportional(16.0),
+        title_color,
+    );
+    let text_w = galley.size().x;
+    ui.painter().galley(
+        pos2(title_pos.x, title_pos.y - galley.size().y / 2.0),
+        galley,
+        title_color,
+    );
+    if count > 0 {
+        let count_text = count.to_string();
+        let count_galley = ui.painter().layout_no_wrap(
+            count_text,
+            egui::FontId::proportional(12.0),
+            MODRINTH_TEXT_SECONDARY,
+        );
+        let chip = Rect::from_min_size(
+            pos2(title_pos.x + text_w + 8.0, rect.center().y - 10.0),
+            vec2(count_galley.size().x + 14.0, 20.0),
+        );
+        ui.painter()
+            .rect_filled(chip, Rounding::same(6.0), MODRINTH_SURFACE);
+        ui.painter().rect_stroke(
+            chip,
+            Rounding::same(6.0),
+            Stroke::new(1.0_f32, MODRINTH_SURFACE_HIGH),
+        );
+        ui.painter().galley(
+            pos2(
+                chip.center().x - count_galley.size().x / 2.0,
+                chip.center().y - count_galley.size().y / 2.0,
+            ),
+            count_galley,
+            MODRINTH_TEXT_SECONDARY,
+        );
+    }
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp.clicked()
+}
+
+/// One rendered library section (reference `InstanceGroup`).
+struct LibrarySection {
+    key: String,
+    title: String,
+    indices: Vec<usize>,
+}
+
+/// Build the sections for the selected Modrinth grouping mode. Custom groups
+/// sort alphabetically with "Ungrouped" last; loaders follow the reference
+/// Fabric → Forge → NeoForge priority, versions are newest first.
+fn modrinth_sections(
+    instances: &[Instance],
+    filtered: &[usize],
+    group_by: LibraryGroupBy,
+    known_groups: &[String],
+    lang: Language,
+) -> Vec<LibrarySection> {
+    match group_by {
+        LibraryGroupBy::None => {
+            if filtered.is_empty() {
+                Vec::new()
+            } else {
+                vec![LibrarySection {
+                    key: "None".to_string(),
+                    title: String::new(),
+                    indices: filtered.to_vec(),
+                }]
+            }
+        }
+        LibraryGroupBy::Group => {
+            let mut map: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+            for &idx in filtered {
+                let name = instances[idx].group.clone().unwrap_or_default();
+                map.entry(name).or_default().push(idx);
+            }
+            for name in known_groups {
+                if !name.trim().is_empty() {
+                    map.entry(name.clone()).or_default();
+                }
+            }
+            map.entry(String::new()).or_default();
+
+            let ungrouped = map.remove("").unwrap_or_default();
+            let mut sections: Vec<LibrarySection> = map
+                .into_iter()
+                .map(|(name, indices)| LibrarySection {
+                    key: format!("Group:{name}"),
+                    title: name,
+                    indices,
+                })
+                .collect();
+            sections.sort_by_key(|s| s.title.to_ascii_lowercase());
+            sections.push(LibrarySection {
+                key: "Group:".to_string(),
+                title: lang.inst_group_ungrouped().to_string(),
+                indices: ungrouped,
+            });
+            sections
+        }
+        LibraryGroupBy::Loader => {
+            let mut map: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+            for &idx in filtered {
+                map.entry(instances[idx].loader.as_str().to_string())
+                    .or_default()
+                    .push(idx);
+            }
+            let mut keys: Vec<String> = map.keys().cloned().collect();
+            keys.sort_by(|a, b| {
+                loader_group_priority(a)
+                    .cmp(&loader_group_priority(b))
+                    .then_with(|| a.to_ascii_lowercase().cmp(&b.to_ascii_lowercase()))
+            });
+            keys.into_iter()
+                .map(|name| {
+                    let indices = map.remove(&name).unwrap_or_default();
+                    LibrarySection {
+                        key: format!("Loader:{name}"),
+                        title: name,
+                        indices,
+                    }
+                })
+                .collect()
+        }
+        LibraryGroupBy::GameVersion => {
+            let mut map: BTreeMap<String, Vec<usize>> = BTreeMap::new();
+            for &idx in filtered {
+                map.entry(instances[idx].game_version.clone())
+                    .or_default()
+                    .push(idx);
+            }
+            let mut keys: Vec<String> = map.keys().cloned().collect();
+            keys.sort_by(|a, b| natural_version_cmp(b, a));
+            keys.into_iter()
+                .map(|version| {
+                    let indices = map.remove(&version).unwrap_or_default();
+                    LibrarySection {
+                        key: format!("Game version:{version}"),
+                        title: version,
+                        indices,
+                    }
+                })
+                .collect()
+        }
+    }
+}
+
+/// Reference `libraryLoaderPriority`, then alphabetical for other loaders.
+fn loader_group_priority(loader: &str) -> u8 {
+    match loader.to_ascii_lowercase().as_str() {
+        "fabric" => 0,
+        "forge" => 1,
+        "neoforge" => 2,
+        _ => 3,
+    }
+}
+
+/// Modrinth `InputFrame`: rounded-xl, surface-4 fill, surface-5 border,
+/// optional leading icon. Returns the frame response.
+fn modrinth_input(
+    ui: &mut Ui,
+    text: &mut String,
+    id: egui::Id,
+    width: f32,
+    height: f32,
+    hint: &str,
+    icon: Option<Icon>,
+) -> egui::Response {
+    let (rect, resp) = ui.allocate_exact_size(vec2(width, height), Sense::click());
+    let radius = Rounding::same(12.0);
+    ui.painter().rect_filled(rect, radius, MODRINTH_FIELD);
+    let text_left = if icon.is_some() {
+        if let Some(icon) = icon {
+            icons::draw(
+                ui.painter(),
+                icon,
+                Rect::from_center_size(pos2(rect.left() + 22.0, rect.center().y), vec2(18.0, 18.0)),
+                MODRINTH_TEXT_SECONDARY,
+                1.5,
+            );
+        }
+        rect.left() + 38.0
+    } else {
+        rect.left() + 14.0
+    };
+    let text_rect = Rect::from_min_max(
+        pos2(text_left, rect.top() + 9.0),
+        pos2(rect.right() - 12.0, rect.bottom() - 9.0),
+    );
+    ui.scope_builder(
+        egui::UiBuilder::new()
+            .max_rect(text_rect)
+            .layout(egui::Layout::left_to_right(egui::Align::Center)),
+        |ui| {
+            ui.style_mut().visuals.override_text_color = Some(MODRINTH_TEXT_CONTRAST);
+            ui.style_mut().visuals.selection.bg_fill = with_alpha(MODRINTH_GREEN, 90);
+            ui.add(
+                TextEdit::singleline(text)
+                    .id(id)
+                    .frame(false)
+                    .desired_width(text_rect.width())
+                    .hint_text(egui::RichText::new(hint).color(MODRINTH_TEXT_SECONDARY)),
+            );
+        },
+    );
+    if resp.clicked() {
+        ui.memory_mut(|mem| mem.request_focus(id));
+    }
+    let focused = ui.memory(|mem| mem.has_focus(id));
+    let border = if focused {
+        MODRINTH_GREEN
+    } else {
+        MODRINTH_SURFACE_HIGH
+    };
+    ui.painter()
+        .rect_stroke(rect, radius, Stroke::new(1.0_f32, border));
+    if resp.hovered() || focused {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::Text);
+    }
+    resp
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ContextChoice {
+    Play,
+    Edit,
+    Duplicate,
+    Manage,
+    Shortcut,
+    Folder,
+    Delete,
+}
+
+/// One row of the reference card context menu (36px, icon + 14px label).
+fn context_menu_item(ui: &mut Ui, icon: Icon, label: &str, danger: bool) -> bool {
+    let width = ui.available_width();
+    let (rect, _) = ui.allocate_exact_size(vec2(width, 36.0), Sense::hover());
+    let resp = ui.interact(
+        rect,
+        ui.id().with(("modrinth_context_item", label)),
+        Sense::click(),
+    );
+    if resp.hovered() {
+        ui.painter().rect_filled(
+            rect.shrink2(vec2(1.0, 1.0)),
+            Rounding::same(8.0),
+            MODRINTH_SURFACE_HIGH,
+        );
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    let color = if danger {
+        Color32::from_rgb(0xE8, 0x20, 0x0D)
+    } else {
+        MODRINTH_TEXT_CONTRAST
+    };
+    icons::draw(
+        ui.painter(),
+        icon,
+        Rect::from_center_size(pos2(rect.left() + 20.0, rect.center().y), vec2(17.0, 17.0)),
+        if danger { color } else { MODRINTH_TEXT },
+        1.6,
+    );
+    ui.painter().text(
+        pos2(rect.left() + 40.0, rect.center().y),
+        Align2::LEFT_CENTER,
+        label,
+        egui::FontId::proportional(14.0),
+        color,
+    );
+    resp.clicked()
+}
+
+/// Reference context-menu divider (1px surface-5, 4px vertical air).
+fn context_menu_divider(ui: &mut Ui) {
+    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 9.0), Sense::hover());
+    ui.painter().line_segment(
+        [
+            pos2(rect.left() + 6.0, rect.center().y),
+            pos2(rect.right() - 6.0, rect.center().y),
+        ],
+        Stroke::new(1.0_f32, MODRINTH_SURFACE_HIGH),
+    );
 }
 
 impl InstancesPage {
@@ -592,16 +1241,18 @@ impl InstancesPage {
     }
 
     /// Memoized filter+sort of the instance list (per-frame `to_lowercase`
-    /// and `sort` avoided: recomputed only when query/tag/sort or the
+    /// and `sort` avoided: recomputed only when query/tag/sort/filters or the
     /// instance revision changes).
     fn filtered_indices(&mut self, instances: &[Instance]) -> Vec<usize> {
         let rev = instances_rev(instances);
         let cache_valid = match &self.filter_key {
-            Some((q, t, s, r)) => {
-                *q == self.search_query
-                    && *t == self.active_tag
-                    && *s == self.sort_mode
-                    && *r == rev
+            Some(key) => {
+                key.query == self.search_query
+                    && key.tag == self.active_tag
+                    && key.sort == self.sort_mode
+                    && key.loaders == self.modrinth_filters.loaders
+                    && key.versions == self.modrinth_filters.versions
+                    && key.rev == rev
             }
             None => false,
         };
@@ -610,18 +1261,27 @@ impl InstancesPage {
             let mut indices: Vec<usize> = instances
                 .iter()
                 .enumerate()
-                .filter(|(_, inst)| matches_filter(inst, &query, self.active_tag.as_deref()))
+                .filter(|(_, inst)| {
+                    matches_filter(
+                        inst,
+                        &query,
+                        self.active_tag.as_deref(),
+                        &self.modrinth_filters,
+                    )
+                })
                 .map(|(idx, _)| idx)
                 .collect();
             let sort_mode = self.sort_mode;
             indices.sort_by(|&a, &b| compare_instances(&instances[a], &instances[b], sort_mode));
             self.filter_cache = indices;
-            self.filter_key = Some((
-                self.search_query.clone(),
-                self.active_tag.clone(),
-                self.sort_mode,
+            self.filter_key = Some(InstanceFilterKey {
+                query: self.search_query.clone(),
+                tag: self.active_tag.clone(),
+                sort: self.sort_mode,
+                loaders: self.modrinth_filters.loaders.clone(),
+                versions: self.modrinth_filters.versions.clone(),
                 rev,
-            ));
+            });
         }
         // Small index vec clone per frame (tens of ids max); the expensive
         // filter+sort+lowercase above runs only on miss.
@@ -635,7 +1295,7 @@ impl InstancesPage {
     fn show_modrinth_library(
         &mut self,
         ui: &mut Ui,
-        instances: &[Instance],
+        instances: &mut [Instance],
         selected_instance: &mut Option<Uuid>,
         ctx: &InstancesContext,
         lang: Language,
@@ -657,10 +1317,16 @@ impl InstancesPage {
             let new_w = m_button_width(ui, Some(Icon::Plus), lang.inst_btn_new_instance(), 36.0);
             let field_w = (ui.available_width() - group_w - new_w - 16.0).max(160.0);
             self.modrinth_search_field(ui, field_w, lang);
-            // "New group" opens a group modal in the reference; groups are
-            // managed from the instance editor here, so the button is
-            // visual-only for now.
-            m_button(ui, Some(Icon::Plus), lang.inst_btn_new_group(), false, 36.0);
+            if m_button(ui, Some(Icon::Plus), lang.inst_btn_new_group(), false, 36.0) {
+                self.show_new_group_modal = true;
+                self.new_group_name.clear();
+                self.new_group_search.clear();
+                self.new_group_selected.clear();
+                self.modrinth_menu = None;
+                ui.ctx().memory_mut(|mem| {
+                    mem.request_focus(egui::Id::new("modrinth_new_group_name"));
+                });
+            }
             if m_button(
                 ui,
                 Some(Icon::Plus),
@@ -673,22 +1339,80 @@ impl InstancesPage {
             }
         });
 
-        // Toolbar row 2: sort and group comboboxes, divider, filter bar.
+        // Toolbar row 2: sort and group comboboxes, divider, filter.
         ui.add_space(8.0);
+        let sort_id = ui.id().with("modrinth_sort_popup");
+        let group_id = ui.id().with("modrinth_group_popup");
+        let filter_id = ui.id().with("modrinth_filter_popup");
+        let mut sort_resp = None;
+        let mut group_resp = None;
+        let mut filter_resp = None;
         ui.horizontal(|ui| {
             ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
-            let _ = m_combo(ui, Icon::Sort, self.sort_mode.label(lang));
-            let _ = m_combo(ui, Icon::Grid, lang.inst_group_none());
+            let sort = m_combo(ui, Icon::Sort, self.sort_mode.modrinth_label(lang));
+            if sort.clicked() {
+                toggle_library_popup(ui, sort_id);
+            }
+            sort_resp = Some(sort);
+
+            let group = m_combo(ui, Icon::Grid, self.group_by.label(lang));
+            if group.clicked() {
+                toggle_library_popup(ui, group_id);
+            }
+            group_resp = Some(group);
+
             ui.add_space(8.0);
             let (divider, _) = ui.allocate_exact_size(vec2(1.0, 24.0), Sense::hover());
             ui.painter()
                 .rect_filled(divider, Rounding::ZERO, MODRINTH_SURFACE_HIGH);
             ui.add_space(8.0);
-            let _ = m_combo(ui, Icon::Filter, lang.inst_filter_by());
+            let filter = m_combo(ui, Icon::Filter, lang.inst_filter_by());
+            if filter.clicked() {
+                toggle_library_popup(ui, filter_id);
+            }
+            filter_resp = Some(filter);
         });
+
+        if let Some(sort) = sort_resp {
+            modrinth_popup(ui, sort_id, &sort, |ui| {
+                ui.set_min_width(204.0);
+                for mode in InstanceSort::MODRINTH_ALL {
+                    if modrinth_menu_option(ui, mode.modrinth_label(lang), self.sort_mode == mode) {
+                        self.sort_mode = mode;
+                        self.filter_key = None;
+                        ui.memory_mut(|mem| mem.close_popup());
+                    }
+                }
+            });
+        }
+        if let Some(group) = group_resp {
+            modrinth_popup(ui, group_id, &group, |ui| {
+                ui.set_min_width(204.0);
+                for mode in LibraryGroupBy::MODRINTH_ALL {
+                    if modrinth_menu_option(ui, mode.label(lang), self.group_by == mode) {
+                        self.group_by = mode;
+                        ui.memory_mut(|mem| mem.close_popup());
+                    }
+                }
+            });
+        }
+        if let Some(filter) = filter_resp {
+            modrinth_popup(ui, filter_id, &filter, |ui| {
+                self.modrinth_filter_menu(ui, instances, lang);
+            });
+        }
+
         ui.add_space(12.0);
 
         let filtered = self.filtered_indices(instances);
+        let sections = if instances.is_empty() {
+            Vec::new()
+        } else {
+            modrinth_sections(instances, &filtered, self.group_by, &ctx.group_names, lang)
+        };
+        let show_headers = sections.len() > 1;
+        let searching = !self.search_query.trim().is_empty();
+
         ScrollArea::vertical()
             .auto_shrink([false, false])
             .show(ui, |ui| {
@@ -725,30 +1449,175 @@ impl InstancesPage {
                     });
                     return;
                 }
-                // Reference grid: cards of at least 160px, 12px gaps
-                // (`gap-3`); card height = width + 54px (two 12px paddings,
-                // the square icon, the name line and the loader line).
-                let avail = ui.available_width();
-                let cols = (((avail + 12.0) / 172.0).floor() as usize).max(1);
-                let card_w = (avail - 12.0 * cols.saturating_sub(1) as f32) / cols as f32;
-                let card_h = card_w + 54.0;
-                for chunk in filtered.chunks(cols) {
-                    ui.horizontal(|ui| {
-                        ui.spacing_mut().item_spacing = vec2(12.0, 12.0);
-                        for &idx in chunk {
-                            let inst = &instances[idx];
-                            self.modrinth_card(
-                                ui,
-                                inst,
-                                vec2(card_w, card_h),
-                                selected_instance,
-                                ctx.instances_dir,
-                                action,
-                            );
+
+                for (section_idx, section) in sections.iter().enumerate() {
+                    if section_idx > 0 {
+                        ui.add_space(12.0);
+                    }
+                    if show_headers {
+                        let collapsed =
+                            !searching && self.modrinth_collapsed.contains(&section.key);
+                        if modrinth_group_header(
+                            ui,
+                            &section.title,
+                            section.indices.len(),
+                            collapsed,
+                        ) {
+                            if collapsed {
+                                self.modrinth_collapsed.remove(&section.key);
+                            } else {
+                                self.modrinth_collapsed.insert(section.key.clone());
+                            }
                         }
-                    });
+                        ui.add_space(10.0);
+                    }
+                    let collapsed = show_headers
+                        && !searching
+                        && self.modrinth_collapsed.contains(&section.key);
+                    if collapsed {
+                        continue;
+                    }
+                    self.modrinth_card_grid(
+                        ui,
+                        instances,
+                        &section.indices,
+                        selected_instance,
+                        ctx.instances_dir,
+                        action,
+                    );
                 }
             });
+
+        // Right-click menu is an overlay so it is not clipped by the scroll area.
+        self.modrinth_context_menu(ui.ctx(), instances, ctx.instances_dir, lang, action);
+        // New group modal lives above the library content.
+        if let Some(next) =
+            self.modrinth_new_group_modal(ui.ctx(), instances, ctx.instances_dir, lang)
+        {
+            *action = next;
+        }
+    }
+
+    /// Grid of cards for one library section (reference `InstanceGroup`).
+    fn modrinth_card_grid(
+        &mut self,
+        ui: &mut Ui,
+        instances: &[Instance],
+        indices: &[usize],
+        selected_instance: &mut Option<Uuid>,
+        instances_dir: &Path,
+        action: &mut InstanceAction,
+    ) {
+        if indices.is_empty() {
+            return;
+        }
+        // Reference grid: cards of at least 160px, 12px gaps (`gap-3`);
+        // card height = width + 54px (two 12px paddings, the square icon,
+        // the name line and the loader line).
+        let avail = ui.available_width();
+        let cols = (((avail + 12.0) / 172.0).floor() as usize).max(1);
+        let card_w = (avail - 12.0 * cols.saturating_sub(1) as f32) / cols as f32;
+        let card_h = card_w + 54.0;
+        for (row_idx, chunk) in indices.chunks(cols).enumerate() {
+            if row_idx > 0 {
+                ui.add_space(12.0);
+            }
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing = vec2(12.0, 12.0);
+                for &idx in chunk {
+                    let inst = &instances[idx];
+                    self.modrinth_card(
+                        ui,
+                        inst,
+                        vec2(card_w, card_h),
+                        selected_instance,
+                        instances_dir,
+                        action,
+                    );
+                }
+            });
+        }
+    }
+
+    /// Filter popup contents: loader/version checkboxes and a clear action.
+    fn modrinth_filter_menu(&mut self, ui: &mut Ui, instances: &[Instance], lang: Language) {
+        ui.set_min_width(232.0);
+        ui.set_max_width(280.0);
+        let mut loaders: Vec<LoaderType> = instances.iter().map(|inst| inst.loader).collect();
+        loaders.sort_by_key(|l| l.as_str().to_ascii_lowercase());
+        loaders.dedup();
+        let mut versions: Vec<String> = instances
+            .iter()
+            .map(|inst| inst.game_version.clone())
+            .collect();
+        versions.sort_by(|a, b| natural_version_cmp(b, a));
+        versions.dedup();
+
+        let mut changed = false;
+        ScrollArea::vertical()
+            .max_height(360.0)
+            .auto_shrink([false, true])
+            .show(ui, |ui| {
+                if !loaders.is_empty() {
+                    ui.label(
+                        egui::RichText::new(lang.inst_word_loader())
+                            .font(egui::FontId::proportional(13.0))
+                            .strong()
+                            .color(MODRINTH_TEXT_SECONDARY),
+                    );
+                    ui.add_space(3.0);
+                    for loader in loaders {
+                        let checked = self.modrinth_filters.loaders.contains(&loader);
+                        if modrinth_check_option(
+                            ui,
+                            loader.as_str(),
+                            checked,
+                            egui::Id::new(("modrinth_filter_loader", loader.as_str())),
+                        ) {
+                            self.modrinth_filters.toggle_loader(loader);
+                            changed = true;
+                        }
+                    }
+                }
+                if !versions.is_empty() {
+                    if !self.modrinth_filters.loaders.is_empty() {
+                        ui.add_space(8.0);
+                    }
+                    ui.label(
+                        egui::RichText::new(lang.inst_word_game_version())
+                            .font(egui::FontId::proportional(13.0))
+                            .strong()
+                            .color(MODRINTH_TEXT_SECONDARY),
+                    );
+                    ui.add_space(3.0);
+                    for version in versions {
+                        let checked = self.modrinth_filters.versions.contains(&version);
+                        if modrinth_check_option(
+                            ui,
+                            &version,
+                            checked,
+                            egui::Id::new(("modrinth_filter_version", version.as_str())),
+                        ) {
+                            self.modrinth_filters.toggle_version(&version);
+                            changed = true;
+                        }
+                    }
+                }
+            });
+
+        let active = !self.modrinth_filters.is_empty();
+        ui.add_space(6.0);
+        let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 1.0), Sense::hover());
+        ui.painter()
+            .rect_filled(rect, Rounding::ZERO, MODRINTH_SURFACE_HIGH);
+        ui.add_space(3.0);
+        if modrinth_menu_option_enabled(ui, lang.inst_filter_clear(), false, active) && active {
+            self.modrinth_filters = ModrinthFilters::default();
+            changed = true;
+        }
+        if changed {
+            self.filter_key = None;
+        }
     }
 
     /// One Modrinth library card: square icon, name, loader + version and
@@ -870,14 +1739,14 @@ impl InstancesPage {
 
         // Selection disc in the top-right corner (reference overlay).
         if hover_t > 0.01 || is_selected {
-            let center = pos2(rect.right() - 24.0, rect.top() + 24.0);
+            let center = pos2(rect.right() - 33.0, rect.top() + 34.0);
             let alpha = if is_selected {
                 255
             } else {
                 (hover_t * 255.0) as u8
             };
             let sel = ui.interact(
-                Rect::from_center_size(center, vec2(30.0, 30.0)),
+                Rect::from_center_size(center, vec2(44.0, 44.0)),
                 resp.id.with("select"),
                 Sense::click(),
             );
@@ -908,9 +1777,691 @@ impl InstancesPage {
             *selected_instance = Some(inst_id);
             *action = InstanceAction::Selected(inst_id);
         }
+        if resp.secondary_clicked() {
+            let pos = ui
+                .ctx()
+                .pointer_interact_pos()
+                .unwrap_or_else(|| resp.rect.center());
+            self.modrinth_menu = Some((inst_id, pos));
+            self.modrinth_menu_fresh = true;
+            ui.memory_mut(|mem| mem.close_popup());
+        }
         if resp.hovered() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
         }
+    }
+
+    /// Reference `ContextMenu` for an instance card: Play, Edit, Duplicate,
+    /// Manage, shortcut, folder, Delete — same order and icon placement.
+    fn modrinth_context_menu(
+        &mut self,
+        ctx: &egui::Context,
+        instances: &[Instance],
+        instances_dir: &Path,
+        lang: Language,
+        action: &mut InstanceAction,
+    ) {
+        let Some((inst_id, pointer)) = self.modrinth_menu else {
+            return;
+        };
+        let Some(inst) = instances.iter().find(|inst| inst.id == inst_id) else {
+            self.modrinth_menu = None;
+            return;
+        };
+
+        let screen = ctx.screen_rect();
+        let width = 248.0;
+        let height = 290.0;
+        let pos = pos2(
+            pointer
+                .x
+                .min(screen.right() - width - 8.0)
+                .max(screen.left() + 8.0),
+            pointer
+                .y
+                .min(screen.bottom() - height - 8.0)
+                .max(screen.top() + 8.0),
+        );
+
+        let mut choice: Option<ContextChoice> = None;
+        let mut close = false;
+        egui::Area::new(egui::Id::new("modrinth_context_backdrop"))
+            .order(egui::Order::Foreground)
+            .fixed_pos(screen.min)
+            .show(ctx, |ui| {
+                let (rect, resp) = ui.allocate_exact_size(screen.size(), Sense::click());
+                let _ = rect;
+                if resp.clicked()
+                    || (resp.secondary_clicked() && !self.modrinth_menu_fresh)
+                    || ui.input(|i| i.key_pressed(egui::Key::Escape))
+                {
+                    close = true;
+                }
+            });
+
+        egui::Area::new(egui::Id::new("modrinth_context_menu"))
+            .order(egui::Order::Tooltip)
+            .fixed_pos(pos)
+            .show(ctx, |ui| {
+                egui::Frame::none()
+                    .fill(MODRINTH_SURFACE_HOVER)
+                    .stroke(Stroke::new(1.0_f32, MODRINTH_SURFACE_HIGH))
+                    .rounding(Rounding::same(14.0))
+                    .shadow(egui::epaint::Shadow {
+                        offset: vec2(0.0, 8.0),
+                        blur: 24.0,
+                        spread: 0.0,
+                        color: Color32::from_black_alpha(110),
+                    })
+                    .inner_margin(egui::Margin::same(6.0))
+                    .show(ui, |ui| {
+                        ui.set_width(236.0);
+                        ui.spacing_mut().item_spacing = vec2(0.0, 0.0);
+                        if context_menu_item(ui, Icon::Play, lang.inst_ctx_play(), false) {
+                            choice = Some(ContextChoice::Play);
+                        }
+                        context_menu_divider(ui);
+                        if context_menu_item(ui, Icon::Wrench, lang.inst_ctx_edit(), false) {
+                            choice = Some(ContextChoice::Edit);
+                        }
+                        if context_menu_item(ui, Icon::Clipboard, lang.inst_ctx_duplicate(), false)
+                        {
+                            choice = Some(ContextChoice::Duplicate);
+                        }
+                        if context_menu_item(ui, Icon::List, lang.inst_ctx_manage(), false) {
+                            choice = Some(ContextChoice::Manage);
+                        }
+                        if context_menu_item(ui, Icon::Link, lang.inst_ctx_shortcut(), false) {
+                            choice = Some(ContextChoice::Shortcut);
+                        }
+                        if context_menu_item(ui, Icon::Folder, lang.inst_ctx_folder(), false) {
+                            choice = Some(ContextChoice::Folder);
+                        }
+                        context_menu_divider(ui);
+                        if context_menu_item(ui, Icon::Trash, lang.inst_ctx_delete(), true) {
+                            choice = Some(ContextChoice::Delete);
+                        }
+                    });
+            });
+
+        self.modrinth_menu_fresh = false;
+        if close {
+            self.modrinth_menu = None;
+            return;
+        }
+        match choice {
+            Some(ContextChoice::Play) => {
+                *action = InstanceAction::Launch(inst_id);
+                self.modrinth_menu = None;
+            }
+            Some(ContextChoice::Edit) => {
+                self.open_edit_modal(inst);
+                self.modrinth_menu = None;
+            }
+            Some(ContextChoice::Duplicate) => {
+                self.clone_instance_id = Some(inst_id);
+                self.clone_with_saves = true;
+                self.show_clone_modal = true;
+                self.modrinth_menu = None;
+            }
+            Some(ContextChoice::Manage) => {
+                self.open_manage(inst_id);
+                self.modrinth_menu = None;
+            }
+            Some(ContextChoice::Shortcut) => {
+                self.shortcut_request = Some(inst_id);
+                self.modrinth_menu = None;
+            }
+            Some(ContextChoice::Folder) => {
+                let dir = inst.get_game_dir(instances_dir);
+                let _ = std::fs::create_dir_all(&dir);
+                let _ = open::that(dir);
+                self.modrinth_menu = None;
+            }
+            Some(ContextChoice::Delete) => {
+                *action = InstanceAction::Trashed(inst_id);
+                self.modrinth_menu = None;
+            }
+            None => {}
+        }
+    }
+
+    /// Reference `new-group-modal.vue`: 560px modal, name field, 400px
+    /// scrollable instance list with Add/Added, Cancel/Create group.
+    fn modrinth_new_group_modal(
+        &mut self,
+        ctx: &egui::Context,
+        instances: &mut [Instance],
+        instances_dir: &Path,
+        lang: Language,
+    ) -> Option<InstanceAction> {
+        if !self.show_new_group_modal {
+            return None;
+        }
+
+        let screen = ctx.screen_rect();
+        let modal_w = 560.0;
+        let content_w = modal_w - 48.0;
+        let body_h = (screen.height() - 300.0).clamp(240.0, 400.0);
+        let modal_h = body_h + 282.0;
+        let modal_pos = pos2(
+            screen.center().x - modal_w / 2.0,
+            (screen.center().y - modal_h / 2.0).max(screen.top() + 8.0),
+        );
+
+        let mut close = false;
+        let mut create = false;
+
+        egui::Area::new(egui::Id::new("modrinth_group_backdrop"))
+            .order(egui::Order::Middle)
+            .fixed_pos(screen.min)
+            .show(ctx, |ui| {
+                let (rect, _) = ui.allocate_exact_size(screen.size(), Sense::click());
+                ui.painter()
+                    .rect_filled(rect, Rounding::ZERO, Color32::from_black_alpha(145));
+            });
+
+        egui::Area::new(egui::Id::new("modrinth_new_group_modal"))
+            .order(egui::Order::Foreground)
+            .fixed_pos(modal_pos)
+            .show(ctx, |ui| {
+                egui::Frame::none()
+                    .fill(MODRINTH_SURFACE)
+                    .stroke(Stroke::new(1.0_f32, MODRINTH_SURFACE_HIGH))
+                    .rounding(Rounding::same(16.0))
+                    .shadow(egui::epaint::Shadow {
+                        offset: vec2(0.0, 12.0),
+                        blur: 32.0,
+                        spread: 0.0,
+                        color: Color32::from_black_alpha(150),
+                    })
+                    .inner_margin(egui::Margin::same(24.0))
+                    .show(ui, |ui| {
+                        ui.set_width(content_w);
+
+                        // Title + close.
+                        let (header, _) =
+                            ui.allocate_exact_size(vec2(content_w, 32.0), Sense::hover());
+                        ui.painter().text(
+                            pos2(header.left(), header.center().y),
+                            Align2::LEFT_CENTER,
+                            lang.inst_group_create(),
+                            egui::FontId::proportional(24.0),
+                            MODRINTH_TEXT_CONTRAST,
+                        );
+                        let close_rect = Rect::from_center_size(
+                            pos2(header.right() - 14.0, header.center().y),
+                            vec2(32.0, 32.0),
+                        );
+                        let close_resp = ui.interact(
+                            close_rect,
+                            egui::Id::new("modrinth_group_close"),
+                            Sense::click(),
+                        );
+                        if close_resp.hovered() {
+                            ui.painter().rect_filled(
+                                close_rect,
+                                Rounding::same(8.0),
+                                with_alpha(MODRINTH_TEXT_CONTRAST, 16),
+                            );
+                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                        }
+                        icons::draw(
+                            ui.painter(),
+                            Icon::Close,
+                            close_rect.shrink(9.0),
+                            MODRINTH_TEXT,
+                            1.7,
+                        );
+                        if close_resp.clicked() {
+                            close = true;
+                        }
+
+                        ui.add_space(18.0);
+                        ui.label(
+                            egui::RichText::new(lang.inst_group_name())
+                                .font(egui::FontId::proportional(15.0))
+                                .strong()
+                                .color(MODRINTH_TEXT_CONTRAST),
+                        );
+                        ui.add_space(8.0);
+                        modrinth_input(
+                            ui,
+                            &mut self.new_group_name,
+                            egui::Id::new("modrinth_new_group_name"),
+                            content_w,
+                            40.0,
+                            lang.inst_group_name_hint(),
+                            None,
+                        );
+
+                        ui.add_space(20.0);
+                        let (divider, _) =
+                            ui.allocate_exact_size(vec2(content_w, 1.0), Sense::hover());
+                        ui.painter().rect_filled(
+                            divider.expand2(vec2(24.0, 0.0)),
+                            Rounding::ZERO,
+                            MODRINTH_SURFACE_HIGH,
+                        );
+
+                        // Reference list body: `h-[400px] bg-surface-2` with
+                        // 16px vertical padding, a search field and 4px rows.
+                        let (body_rect, _) =
+                            ui.allocate_exact_size(vec2(content_w, body_h), Sense::hover());
+                        ui.painter().rect_filled(
+                            body_rect.expand2(vec2(24.0, 0.0)),
+                            Rounding::ZERO,
+                            MODRINTH_SURFACE,
+                        );
+
+                        let add_w = {
+                            let font = egui::FontId::proportional(14.0);
+                            let add = ui.painter().layout_no_wrap(
+                                lang.inst_group_add().to_owned(),
+                                font.clone(),
+                                Color32::WHITE,
+                            );
+                            let added = ui.painter().layout_no_wrap(
+                                lang.inst_group_added().to_owned(),
+                                font,
+                                Color32::WHITE,
+                            );
+                            (add.size().x.max(16.0 + 6.0 + added.size().x) + 24.0).max(88.0)
+                        };
+
+                        ui.scope_builder(
+                            egui::UiBuilder::new()
+                                .max_rect(body_rect)
+                                .layout(egui::Layout::top_down(egui::Align::Min)),
+                            |ui| {
+                                ui.add_space(16.0);
+                                ui.horizontal(|ui| {
+                                    modrinth_input(
+                                        ui,
+                                        &mut self.new_group_search,
+                                        egui::Id::new("modrinth_new_group_search"),
+                                        content_w,
+                                        40.0,
+                                        lang.inst_group_search(),
+                                        Some(Icon::Search),
+                                    );
+                                });
+                                ui.add_space(12.0);
+
+                                let mut rows: Vec<usize> = instances
+                                    .iter()
+                                    .enumerate()
+                                    .filter(|(_, inst)| {
+                                        let query = self.new_group_search.trim().to_lowercase();
+                                        query.is_empty()
+                                            || inst.name.to_lowercase().contains(&query)
+                                    })
+                                    .map(|(idx, _)| idx)
+                                    .collect();
+                                rows.sort_by_key(|&idx| {
+                                    (
+                                        instances[idx]
+                                            .group
+                                            .as_deref()
+                                            .is_some_and(|g| !g.is_empty()),
+                                        instances[idx].name.to_lowercase(),
+                                    )
+                                });
+
+                                let list_h = body_h - 16.0 - 40.0 - 12.0 - 16.0;
+                                ui.allocate_ui_with_layout(
+                                    vec2(content_w, list_h),
+                                    egui::Layout::top_down(egui::Align::Min),
+                                    |ui| {
+                                        ScrollArea::vertical()
+                                            .max_height(list_h)
+                                            .auto_shrink([false, false])
+                                            .show(ui, |ui| {
+                                                if rows.is_empty() {
+                                                    ui.add_space(48.0);
+                                                    ui.vertical_centered(|ui| {
+                                                        ui.label(
+                                                            egui::RichText::new(
+                                                                lang.inst_group_empty(),
+                                                            )
+                                                            .font(egui::FontId::proportional(15.0))
+                                                            .color(MODRINTH_TEXT_SECONDARY),
+                                                        );
+                                                    });
+                                                    return;
+                                                }
+                                                for (row_index, idx) in rows.into_iter().enumerate()
+                                                {
+                                                    if row_index > 0 {
+                                                        ui.add_space(4.0);
+                                                    }
+                                                    let inst = &instances[idx];
+                                                    let inst_id = inst.id;
+                                                    let selected =
+                                                        self.new_group_selected.contains(&inst_id);
+                                                    let (row, row_resp) = ui.allocate_exact_size(
+                                                        vec2(content_w, 44.0),
+                                                        Sense::hover(),
+                                                    );
+                                                    let btn_rect = Rect::from_min_size(
+                                                        pos2(
+                                                            row.right() - add_w,
+                                                            row.center().y - 18.0,
+                                                        ),
+                                                        vec2(add_w, 36.0),
+                                                    );
+                                                    let btn_resp = ui.interact(
+                                                        btn_rect,
+                                                        egui::Id::new((
+                                                            "modrinth_group_add",
+                                                            inst_id,
+                                                        )),
+                                                        Sense::click(),
+                                                    );
+                                                    if row_resp.hovered() || btn_resp.hovered() {
+                                                        ui.painter().rect_filled(
+                                                            row.expand2(vec2(24.0, 0.0)),
+                                                            Rounding::ZERO,
+                                                            MODRINTH_SURFACE_HOVER,
+                                                        );
+                                                    }
+
+                                                    let fade = if selected { 150 } else { 255 };
+                                                    let icon_rect = Rect::from_min_size(
+                                                        pos2(row.left(), row.top() + 6.0),
+                                                        vec2(32.0, 32.0),
+                                                    );
+                                                    match self.instance_icon_texture(
+                                                        ui.ctx(),
+                                                        inst_id,
+                                                        &inst.get_game_dir(instances_dir),
+                                                    ) {
+                                                        Some(tex) => {
+                                                            ui.painter().image(
+                                                                tex.id(),
+                                                                icon_rect,
+                                                                Rect::from_min_max(
+                                                                    pos2(0.0, 0.0),
+                                                                    pos2(1.0, 1.0),
+                                                                ),
+                                                                with_alpha(Color32::WHITE, fade),
+                                                            );
+                                                        }
+                                                        None => {
+                                                            let badge = match inst
+                                                                .icon
+                                                                .as_deref()
+                                                                .and_then(icons::instance_preset)
+                                                            {
+                                                                Some(preset) => preset,
+                                                                None => {
+                                                                    icons::loader_badge(inst.loader)
+                                                                }
+                                                            };
+                                                            ui.painter().rect_filled(
+                                                                icon_rect,
+                                                                Rounding::same(8.0),
+                                                                MODRINTH_SURFACE_HOVER,
+                                                            );
+                                                            icons::draw_centered(
+                                                                ui.painter(),
+                                                                badge,
+                                                                icon_rect.center(),
+                                                                14.0,
+                                                                with_alpha(MODRINTH_TEXT, fade),
+                                                            );
+                                                        }
+                                                    }
+
+                                                    let group = inst
+                                                        .group
+                                                        .as_deref()
+                                                        .filter(|g| !g.is_empty());
+                                                    let name_color =
+                                                        with_alpha(MODRINTH_TEXT_CONTRAST, fade);
+                                                    let name_limit =
+                                                        if group.is_some() { 30 } else { 42 };
+                                                    let name_galley = ui.painter().layout_no_wrap(
+                                                        truncate_name(&inst.name, name_limit),
+                                                        egui::FontId::proportional(15.0),
+                                                        name_color,
+                                                    );
+                                                    let name_pos = pos2(
+                                                        icon_rect.right() + 10.0,
+                                                        row.center().y - name_galley.size().y / 2.0,
+                                                    );
+                                                    let name_w = name_galley.size().x;
+                                                    ui.painter().galley(
+                                                        name_pos,
+                                                        name_galley,
+                                                        name_color,
+                                                    );
+                                                    if let Some(group) = group {
+                                                        let tag_text = truncate_name(group, 24);
+                                                        let tag_galley =
+                                                            ui.painter().layout_no_wrap(
+                                                                tag_text,
+                                                                egui::FontId::proportional(12.0),
+                                                                with_alpha(
+                                                                    MODRINTH_TEXT_SECONDARY,
+                                                                    fade,
+                                                                ),
+                                                            );
+                                                        let tag = Rect::from_min_size(
+                                                            pos2(
+                                                                name_pos.x + name_w + 8.0,
+                                                                row.center().y - 10.0,
+                                                            ),
+                                                            vec2(tag_galley.size().x + 14.0, 20.0),
+                                                        );
+                                                        ui.painter().rect_filled(
+                                                            tag,
+                                                            Rounding::same(4.0),
+                                                            with_alpha(
+                                                                MODRINTH_SURFACE_HOVER,
+                                                                fade,
+                                                            ),
+                                                        );
+                                                        ui.painter().rect_stroke(
+                                                            tag,
+                                                            Rounding::same(4.0),
+                                                            Stroke::new(
+                                                                1.0_f32,
+                                                                with_alpha(
+                                                                    MODRINTH_SURFACE_HIGH,
+                                                                    fade,
+                                                                ),
+                                                            ),
+                                                        );
+                                                        ui.painter().galley(
+                                                            pos2(
+                                                                tag.center().x
+                                                                    - tag_galley.size().x / 2.0,
+                                                                tag.center().y
+                                                                    - tag_galley.size().y / 2.0,
+                                                            ),
+                                                            tag_galley,
+                                                            with_alpha(
+                                                                MODRINTH_TEXT_SECONDARY,
+                                                                fade,
+                                                            ),
+                                                        );
+                                                    }
+
+                                                    let btn_hover =
+                                                        ui.ctx().animate_bool_responsive(
+                                                            btn_resp.id,
+                                                            btn_resp.hovered(),
+                                                        );
+                                                    let (btn_bg, btn_border, btn_text) = if selected
+                                                    {
+                                                        (
+                                                            Color32::TRANSPARENT,
+                                                            MODRINTH_SURFACE_HIGH,
+                                                            MODRINTH_TEXT,
+                                                        )
+                                                    } else {
+                                                        (
+                                                            lerp_color(
+                                                                MODRINTH_SURFACE_HOVER,
+                                                                m_brightness(
+                                                                    MODRINTH_SURFACE_HOVER,
+                                                                    1.1,
+                                                                ),
+                                                                btn_hover,
+                                                            ),
+                                                            MODRINTH_SURFACE_HIGH,
+                                                            MODRINTH_TEXT_CONTRAST,
+                                                        )
+                                                    };
+                                                    ui.painter().rect_filled(
+                                                        btn_rect,
+                                                        Rounding::same(10.0),
+                                                        btn_bg,
+                                                    );
+                                                    ui.painter().rect_stroke(
+                                                        btn_rect,
+                                                        Rounding::same(10.0),
+                                                        Stroke::new(1.0_f32, btn_border),
+                                                    );
+                                                    let label = if selected {
+                                                        lang.inst_group_added()
+                                                    } else {
+                                                        lang.inst_group_add()
+                                                    };
+                                                    let galley = ui.painter().layout_no_wrap(
+                                                        label.to_owned(),
+                                                        egui::FontId::proportional(14.0),
+                                                        btn_text,
+                                                    );
+                                                    let content_w = if selected {
+                                                        16.0 + 6.0 + galley.size().x
+                                                    } else {
+                                                        galley.size().x
+                                                    };
+                                                    let content_left =
+                                                        btn_rect.center().x - content_w / 2.0;
+                                                    if selected {
+                                                        icons::draw(
+                                                            ui.painter(),
+                                                            Icon::Check,
+                                                            Rect::from_center_size(
+                                                                pos2(
+                                                                    content_left + 8.0,
+                                                                    btn_rect.center().y,
+                                                                ),
+                                                                vec2(14.0, 14.0),
+                                                            ),
+                                                            MODRINTH_TEXT,
+                                                            1.8,
+                                                        );
+                                                    }
+                                                    let text_left = content_left
+                                                        + if selected { 22.0 } else { 0.0 };
+                                                    ui.painter().galley(
+                                                        pos2(
+                                                            text_left,
+                                                            btn_rect.center().y
+                                                                - galley.size().y / 2.0,
+                                                        ),
+                                                        galley,
+                                                        btn_text,
+                                                    );
+                                                    if btn_resp.hovered() {
+                                                        ui.ctx().set_cursor_icon(
+                                                            egui::CursorIcon::PointingHand,
+                                                        );
+                                                    }
+                                                    if btn_resp.clicked() {
+                                                        if selected {
+                                                            self.new_group_selected
+                                                                .remove(&inst_id);
+                                                        } else {
+                                                            self.new_group_selected.insert(inst_id);
+                                                        }
+                                                    }
+                                                }
+                                            });
+                                    },
+                                );
+                            },
+                        );
+
+                        let (footer_divider, _) =
+                            ui.allocate_exact_size(vec2(content_w, 1.0), Sense::hover());
+                        ui.painter().rect_filled(
+                            footer_divider.expand2(vec2(24.0, 0.0)),
+                            Rounding::ZERO,
+                            MODRINTH_SURFACE_HIGH,
+                        );
+                        ui.add_space(16.0);
+                        let can_create = !self.new_group_name.trim().is_empty();
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if m_button_enabled(
+                                ui,
+                                Some(Icon::Plus),
+                                lang.inst_group_create(),
+                                true,
+                                40.0,
+                                can_create,
+                            ) {
+                                create = true;
+                            }
+                            ui.add_space(8.0);
+                            if m_button(
+                                ui,
+                                Some(Icon::Close),
+                                lang.inst_group_cancel(),
+                                false,
+                                40.0,
+                            ) {
+                                close = true;
+                            }
+                        });
+                    });
+            });
+
+        if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+            close = true;
+        }
+
+        if create {
+            let name: String = self
+                .new_group_name
+                .trim()
+                .chars()
+                .take(256)
+                .collect::<String>();
+            if !name.is_empty() {
+                let selected = self.new_group_selected.clone();
+                for inst in instances.iter_mut() {
+                    if selected.contains(&inst.id) {
+                        inst.group = Some(name.clone());
+                    }
+                }
+                let first = instances
+                    .iter()
+                    .find(|inst| selected.contains(&inst.id))
+                    .cloned();
+                self.show_new_group_modal = false;
+                self.new_group_fresh_reset();
+                return Some(match first {
+                    Some(inst) => InstanceAction::Updated(inst),
+                    None => InstanceAction::GroupCreated(name),
+                });
+            }
+        }
+        if close {
+            self.show_new_group_modal = false;
+            self.new_group_fresh_reset();
+        }
+        None
+    }
+
+    fn new_group_fresh_reset(&mut self) {
+        self.new_group_name.clear();
+        self.new_group_search.clear();
+        self.new_group_selected.clear();
     }
 
     /// Modrinth-style search input (reference `InputFrame`: rounded-xl,
@@ -2034,310 +3585,346 @@ impl InstancesPage {
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, vec2(0.0, 0.0))
-                .min_width(420.0)
+                .min_width(440.0)
                 .show(ui.ctx(), |ui| {
-                    ui.add_space(8.0);
-                    ui.label(egui::RichText::new(lang.inst_modal_name()).color(TEXT_PRIMARY));
-                    ui.add(TextEdit::singleline(&mut self.edit_instance_name).desired_width(400.0));
-
-                    ui.add_space(10.0);
-                    ui.label(egui::RichText::new(lang.inst_modal_version()).color(TEXT_PRIMARY));
-                    ui.add(
-                        TextEdit::singleline(&mut self.edit_instance_version).desired_width(400.0),
-                    );
-
-                    ui.add_space(10.0);
-                    ui.label(egui::RichText::new(lang.inst_modal_loader()).color(TEXT_PRIMARY));
-                    egui::ComboBox::from_id_salt("edit_loader_select")
-                        .selected_text(self.edit_instance_loader.as_str())
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(
-                                &mut self.edit_instance_loader,
-                                LoaderType::Vanilla,
-                                "Vanilla",
-                            );
-                            ui.selectable_value(
-                                &mut self.edit_instance_loader,
-                                LoaderType::Fabric,
-                                "Fabric",
-                            );
-                            ui.selectable_value(
-                                &mut self.edit_instance_loader,
-                                LoaderType::Quilt,
-                                "Quilt",
-                            );
-                            ui.selectable_value(
-                                &mut self.edit_instance_loader,
-                                LoaderType::Forge,
-                                "Forge",
-                            );
-                            ui.selectable_value(
-                                &mut self.edit_instance_loader,
-                                LoaderType::NeoForge,
-                                "NeoForge",
-                            );
-                            ui.selectable_value(
-                                &mut self.edit_instance_loader,
-                                LoaderType::OptiFine,
-                                "OptiFine",
-                            );
-                        });
-                    if self.edit_instance_loader == LoaderType::Forge
-                        && amc_minecraft::loaders::forge::is_legacy_unsafe_line(
-                            &self.edit_instance_version,
-                        )
-                    {
-                        ui.label(
-                            egui::RichText::new(lang.inst_warn_legacy_forge())
-                                .font(egui::FontId::proportional(12.0))
-                                .color(WARNING),
-                        );
-                    }
-                    // Pinned loader version (reproducible launches): reset
-                    // returns to latest on the next launch.
-                    if let Some(pin) = self.edit_loader_pin.clone() {
-                        ui.horizontal(|ui| {
+                    let scroll_h = (ui.ctx().screen_rect().height() - 150.0).max(260.0);
+                    ScrollArea::vertical()
+                        .max_height(scroll_h)
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            ui.add_space(8.0);
                             ui.label(
-                                egui::RichText::new(lang.loader_pinned(&pin))
-                                    .font(egui::FontId::proportional(12.0))
-                                    .color(TEXT_MUTED),
+                                egui::RichText::new(lang.inst_modal_name()).color(TEXT_PRIMARY),
                             );
-                            if ui.button(lang.loader_pin_reset()).clicked() {
-                                if let Some(id) = self.edit_instance_id {
-                                    self.loader_pin_reset = Some(id);
-                                }
-                                self.edit_loader_pin = None;
-                            }
-                        });
-                    }
+                            ui.add(
+                                TextEdit::singleline(&mut self.edit_instance_name)
+                                    .desired_width(400.0),
+                            );
 
-                    ui.add_space(10.0);
-                    ui.label(
-                        egui::RichText::new(format!(
-                            "{}: {} MB",
-                            lang.inst_modal_ram(),
-                            self.edit_instance_ram
-                        ))
-                        .color(TEXT_PRIMARY),
-                    );
-                    ui.add(
-                        egui::Slider::new(&mut self.edit_instance_ram, 1024..=32768).step_by(512.0),
-                    );
+                            ui.add_space(10.0);
+                            ui.label(
+                                egui::RichText::new(lang.inst_modal_version()).color(TEXT_PRIMARY),
+                            );
+                            ui.add(
+                                TextEdit::singleline(&mut self.edit_instance_version)
+                                    .desired_width(400.0),
+                            );
 
-                    ui.add_space(10.0);
-                    ui.label(egui::RichText::new(lang.inst_icon_title()).color(TEXT_PRIMARY));
-                    ui.horizontal_wrapped(|ui| {
-                        ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
-                        for (key, _) in InstanceIcon::ALL {
-                            let active = self.edit_instance_icon.as_deref() == Some(key);
-                            let (rect, resp) =
-                                ui.allocate_exact_size(vec2(40.0, 40.0), Sense::click());
-                            let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
-                            let bg = lerp_color(BG_CARD, BG_HOVER, hover_t);
-                            let stroke_col = if active {
-                                RUBY_LIGHT.into()
-                            } else {
-                                lerp_color(BORDER_DEFAULT, RUBY, hover_t)
-                            };
-                            ui.painter().rect_filled(rect, crate::theme::rounding(), bg);
-                            ui.painter().rect_stroke(
-                                rect,
-                                crate::theme::rounding(),
-                                Stroke::new(1.0_f32, stroke_col),
+                            ui.add_space(10.0);
+                            ui.label(
+                                egui::RichText::new(lang.inst_modal_loader()).color(TEXT_PRIMARY),
                             );
-                            icons::draw_centered(
-                                ui.painter(),
-                                icons::instance_preset(key).unwrap_or(Icon::Grid),
-                                rect.center(),
-                                20.0,
-                                TEXT_PRIMARY,
-                            );
-                            if resp.clicked() {
-                                self.edit_instance_icon = Some(key.to_string());
-                            }
-                        }
-                    });
-                    ui.horizontal(|ui| {
-                        if ui.button(lang.inst_icon_custom()).clicked() {
-                            if let Some(path) = rfd::FileDialog::new()
-                                .add_filter("PNG image", &["png"])
-                                .pick_file()
+                            egui::ComboBox::from_id_salt("edit_loader_select")
+                                .selected_text(self.edit_instance_loader.as_str())
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(
+                                        &mut self.edit_instance_loader,
+                                        LoaderType::Vanilla,
+                                        "Vanilla",
+                                    );
+                                    ui.selectable_value(
+                                        &mut self.edit_instance_loader,
+                                        LoaderType::Fabric,
+                                        "Fabric",
+                                    );
+                                    ui.selectable_value(
+                                        &mut self.edit_instance_loader,
+                                        LoaderType::Quilt,
+                                        "Quilt",
+                                    );
+                                    ui.selectable_value(
+                                        &mut self.edit_instance_loader,
+                                        LoaderType::Forge,
+                                        "Forge",
+                                    );
+                                    ui.selectable_value(
+                                        &mut self.edit_instance_loader,
+                                        LoaderType::NeoForge,
+                                        "NeoForge",
+                                    );
+                                    ui.selectable_value(
+                                        &mut self.edit_instance_loader,
+                                        LoaderType::OptiFine,
+                                        "OptiFine",
+                                    );
+                                });
+                            if self.edit_instance_loader == LoaderType::Forge
+                                && amc_minecraft::loaders::forge::is_legacy_unsafe_line(
+                                    &self.edit_instance_version,
+                                )
                             {
-                                if let Some(target_id) = self.edit_instance_id {
-                                    if let Some(inst) = instances.iter().find(|i| i.id == target_id)
-                                    {
-                                        let dest = inst
-                                            .get_game_dir(instances_dir)
-                                            .join(InstanceIcon::CUSTOM_ICON_FILE);
-                                        if let Some(parent) = dest.parent() {
-                                            let _ = std::fs::create_dir_all(parent);
+                                ui.label(
+                                    egui::RichText::new(lang.inst_warn_legacy_forge())
+                                        .font(egui::FontId::proportional(12.0))
+                                        .color(WARNING),
+                                );
+                            }
+                            // Pinned loader version (reproducible launches): reset
+                            // returns to latest on the next launch.
+                            if let Some(pin) = self.edit_loader_pin.clone() {
+                                ui.horizontal(|ui| {
+                                    ui.label(
+                                        egui::RichText::new(lang.loader_pinned(&pin))
+                                            .font(egui::FontId::proportional(12.0))
+                                            .color(TEXT_MUTED),
+                                    );
+                                    if ui.button(lang.loader_pin_reset()).clicked() {
+                                        if let Some(id) = self.edit_instance_id {
+                                            self.loader_pin_reset = Some(id);
                                         }
-                                        let _ = std::fs::copy(&path, &dest);
-                                        self.icon_failed.remove(&target_id);
-                                        self.icon_textures.remove(&target_id);
+                                        self.edit_loader_pin = None;
+                                    }
+                                });
+                            }
+
+                            ui.add_space(10.0);
+                            ui.label(
+                                egui::RichText::new(format!(
+                                    "{}: {} MB",
+                                    lang.inst_modal_ram(),
+                                    self.edit_instance_ram
+                                ))
+                                .color(TEXT_PRIMARY),
+                            );
+                            ui.add(
+                                egui::Slider::new(&mut self.edit_instance_ram, 1024..=32768)
+                                    .step_by(512.0),
+                            );
+
+                            ui.add_space(10.0);
+                            ui.label(
+                                egui::RichText::new(lang.inst_icon_title()).color(TEXT_PRIMARY),
+                            );
+                            ui.horizontal_wrapped(|ui| {
+                                ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
+                                for (key, _) in InstanceIcon::ALL {
+                                    let active = self.edit_instance_icon.as_deref() == Some(key);
+                                    let (rect, resp) =
+                                        ui.allocate_exact_size(vec2(40.0, 40.0), Sense::click());
+                                    let hover_t =
+                                        ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+                                    let bg = lerp_color(BG_CARD, BG_HOVER, hover_t);
+                                    let stroke_col = if active {
+                                        RUBY_LIGHT.into()
+                                    } else {
+                                        lerp_color(BORDER_DEFAULT, RUBY, hover_t)
+                                    };
+                                    ui.painter().rect_filled(rect, crate::theme::rounding(), bg);
+                                    ui.painter().rect_stroke(
+                                        rect,
+                                        crate::theme::rounding(),
+                                        Stroke::new(1.0_f32, stroke_col),
+                                    );
+                                    icons::draw_centered(
+                                        ui.painter(),
+                                        icons::instance_preset(key).unwrap_or(Icon::Grid),
+                                        rect.center(),
+                                        20.0,
+                                        TEXT_PRIMARY,
+                                    );
+                                    if resp.clicked() {
+                                        self.edit_instance_icon = Some(key.to_string());
                                     }
                                 }
+                            });
+                            ui.horizontal(|ui| {
+                                if ui.button(lang.inst_icon_custom()).clicked() {
+                                    if let Some(path) = rfd::FileDialog::new()
+                                        .add_filter("PNG image", &["png"])
+                                        .pick_file()
+                                    {
+                                        if let Some(target_id) = self.edit_instance_id {
+                                            if let Some(inst) =
+                                                instances.iter().find(|i| i.id == target_id)
+                                            {
+                                                let dest = inst
+                                                    .get_game_dir(instances_dir)
+                                                    .join(InstanceIcon::CUSTOM_ICON_FILE);
+                                                if let Some(parent) = dest.parent() {
+                                                    let _ = std::fs::create_dir_all(parent);
+                                                }
+                                                let _ = std::fs::copy(&path, &dest);
+                                                self.icon_failed.remove(&target_id);
+                                                self.icon_textures.remove(&target_id);
+                                            }
+                                        }
+                                    }
+                                }
+                                if ui.button(lang.inst_icon_none()).clicked() {
+                                    self.edit_instance_icon = None;
+                                }
+                                if ui.button(lang.inst_icon_remove()).clicked() {
+                                    if let Some(target_id) = self.edit_instance_id {
+                                        if let Some(inst) =
+                                            instances.iter().find(|i| i.id == target_id)
+                                        {
+                                            let _ = std::fs::remove_file(
+                                                inst.get_game_dir(instances_dir)
+                                                    .join(InstanceIcon::CUSTOM_ICON_FILE),
+                                            );
+                                            self.icon_failed.remove(&target_id);
+                                            self.icon_textures.remove(&target_id);
+                                        }
+                                    }
+                                }
+                            });
+
+                            ui.add_space(10.0);
+                            ui.label(
+                                egui::RichText::new(lang.inst_tags_label()).color(TEXT_PRIMARY),
+                            );
+                            ui.add(
+                                TextEdit::singleline(&mut self.edit_instance_tags)
+                                    .hint_text(lang.inst_tags_hint())
+                                    .desired_width(400.0),
+                            );
+                            ui.add_space(6.0);
+                            ui.checkbox(&mut self.edit_instance_pinned, lang.inst_pin_label());
+
+                            ui.add_space(10.0);
+                            ui.label(
+                                egui::RichText::new(lang.inst_account_label()).color(TEXT_PRIMARY),
+                            );
+                            egui::ComboBox::from_id_salt("edit_account_select")
+                                .selected_text(
+                                    self.edit_instance_account
+                                        .and_then(|id| accounts.iter().find(|a| a.id == id))
+                                        .map(|a| a.username.clone())
+                                        .unwrap_or_else(|| lang.inst_account_default().to_string()),
+                                )
+                                .show_ui(ui, |ui| {
+                                    if ui
+                                        .selectable_label(
+                                            self.edit_instance_account.is_none(),
+                                            lang.inst_account_default(),
+                                        )
+                                        .clicked()
+                                    {
+                                        self.edit_instance_account = None;
+                                    }
+                                    for acc in accounts {
+                                        if ui
+                                            .selectable_label(
+                                                self.edit_instance_account == Some(acc.id),
+                                                &acc.username,
+                                            )
+                                            .clicked()
+                                        {
+                                            self.edit_instance_account = Some(acc.id);
+                                        }
+                                    }
+                                });
+
+                            ui.add_space(10.0);
+                            ui.label(
+                                egui::RichText::new(lang.inst_group_label()).color(TEXT_PRIMARY),
+                            );
+                            ui.add(
+                                TextEdit::singleline(&mut self.edit_instance_group)
+                                    .hint_text(lang.inst_group_hint())
+                                    .desired_width(400.0),
+                            );
+                            if !ctx.group_names.is_empty() {
+                                ui.label(
+                                    egui::RichText::new(ctx.group_names.join(" • "))
+                                        .font(egui::FontId::proportional(11.0))
+                                        .color(TEXT_MUTED),
+                                );
                             }
-                        }
-                        if ui.button(lang.inst_icon_none()).clicked() {
-                            self.edit_instance_icon = None;
-                        }
-                        if ui.button(lang.inst_icon_remove()).clicked() {
-                            if let Some(target_id) = self.edit_instance_id {
-                                if let Some(inst) = instances.iter().find(|i| i.id == target_id) {
-                                    let _ = std::fs::remove_file(
-                                        inst.get_game_dir(instances_dir)
-                                            .join(InstanceIcon::CUSTOM_ICON_FILE),
+
+                            ui.add_space(10.0);
+                            ui.checkbox(&mut self.edit_use_custom_size, lang.inst_res_custom());
+                            if self.edit_use_custom_size {
+                                ui.horizontal(|ui| {
+                                    ui.label(
+                                        egui::RichText::new(format!("W: {}", self.edit_window_w))
+                                            .color(TEXT_PRIMARY),
                                     );
-                                    self.icon_failed.remove(&target_id);
-                                    self.icon_textures.remove(&target_id);
-                                }
+                                    ui.add(
+                                        egui::Slider::new(&mut self.edit_window_w, 640..=3840)
+                                            .step_by(10.0),
+                                    );
+                                    ui.label(
+                                        egui::RichText::new(format!("H: {}", self.edit_window_h))
+                                            .color(TEXT_PRIMARY),
+                                    );
+                                    ui.add(
+                                        egui::Slider::new(&mut self.edit_window_h, 480..=2160)
+                                            .step_by(10.0),
+                                    );
+                                });
                             }
-                        }
-                    });
+                            ui.add_space(4.0);
+                            ui.label(egui::RichText::new(lang.inst_res_mode()).color(TEXT_PRIMARY));
+                            egui::ComboBox::from_id_salt("edit_display_mode_select")
+                                .selected_text(match self.edit_fullscreen {
+                                    None => lang.inst_res_default(),
+                                    Some(false) => lang.inst_res_windowed(),
+                                    Some(true) => lang.inst_res_fullscreen(),
+                                })
+                                .show_ui(ui, |ui| {
+                                    if ui
+                                        .selectable_label(
+                                            self.edit_fullscreen.is_none(),
+                                            lang.inst_res_default(),
+                                        )
+                                        .clicked()
+                                    {
+                                        self.edit_fullscreen = None;
+                                    }
+                                    if ui
+                                        .selectable_label(
+                                            self.edit_fullscreen == Some(false),
+                                            lang.inst_res_windowed(),
+                                        )
+                                        .clicked()
+                                    {
+                                        self.edit_fullscreen = Some(false);
+                                    }
+                                    if ui
+                                        .selectable_label(
+                                            self.edit_fullscreen == Some(true),
+                                            lang.inst_res_fullscreen(),
+                                        )
+                                        .clicked()
+                                    {
+                                        self.edit_fullscreen = Some(true);
+                                    }
+                                });
 
-                    ui.add_space(10.0);
-                    ui.label(egui::RichText::new(lang.inst_tags_label()).color(TEXT_PRIMARY));
-                    ui.add(
-                        TextEdit::singleline(&mut self.edit_instance_tags)
-                            .hint_text(lang.inst_tags_hint())
-                            .desired_width(400.0),
-                    );
-                    ui.add_space(6.0);
-                    ui.checkbox(&mut self.edit_instance_pinned, lang.inst_pin_label());
-
-                    ui.add_space(10.0);
-                    ui.label(egui::RichText::new(lang.inst_account_label()).color(TEXT_PRIMARY));
-                    egui::ComboBox::from_id_salt("edit_account_select")
-                        .selected_text(
-                            self.edit_instance_account
-                                .and_then(|id| accounts.iter().find(|a| a.id == id))
-                                .map(|a| a.username.clone())
-                                .unwrap_or_else(|| lang.inst_account_default().to_string()),
-                        )
-                        .show_ui(ui, |ui| {
-                            if ui
-                                .selectable_label(
-                                    self.edit_instance_account.is_none(),
-                                    lang.inst_account_default(),
-                                )
-                                .clicked()
-                            {
-                                self.edit_instance_account = None;
-                            }
-                            for acc in accounts {
-                                if ui
-                                    .selectable_label(
-                                        self.edit_instance_account == Some(acc.id),
-                                        &acc.username,
-                                    )
-                                    .clicked()
-                                {
-                                    self.edit_instance_account = Some(acc.id);
-                                }
-                            }
-                        });
-
-                    ui.add_space(10.0);
-                    ui.label(egui::RichText::new(lang.inst_group_label()).color(TEXT_PRIMARY));
-                    ui.add(
-                        TextEdit::singleline(&mut self.edit_instance_group)
-                            .hint_text(lang.inst_group_hint())
-                            .desired_width(400.0),
-                    );
-                    if !ctx.group_names.is_empty() {
-                        ui.label(
-                            egui::RichText::new(ctx.group_names.join(" • "))
-                                .font(egui::FontId::proportional(11.0))
-                                .color(TEXT_MUTED),
-                        );
-                    }
-
-                    ui.add_space(10.0);
-                    ui.checkbox(&mut self.edit_use_custom_size, lang.inst_res_custom());
-                    if self.edit_use_custom_size {
-                        ui.horizontal(|ui| {
+                            ui.add_space(10.0);
                             ui.label(
-                                egui::RichText::new(format!("W: {}", self.edit_window_w))
-                                    .color(TEXT_PRIMARY),
+                                egui::RichText::new(lang.inst_notes_label()).color(TEXT_PRIMARY),
                             );
                             ui.add(
-                                egui::Slider::new(&mut self.edit_window_w, 640..=3840)
-                                    .step_by(10.0),
+                                TextEdit::singleline(&mut self.edit_instance_notes)
+                                    .hint_text(lang.inst_notes_hint())
+                                    .desired_width(400.0),
                             );
+                            ui.add_space(10.0);
                             ui.label(
-                                egui::RichText::new(format!("H: {}", self.edit_window_h))
-                                    .color(TEXT_PRIMARY),
+                                egui::RichText::new(lang.inst_pre_label()).color(TEXT_PRIMARY),
                             );
                             ui.add(
-                                egui::Slider::new(&mut self.edit_window_h, 480..=2160)
-                                    .step_by(10.0),
+                                TextEdit::singleline(&mut self.edit_instance_pre)
+                                    .hint_text(lang.inst_cmd_hint())
+                                    .desired_width(400.0)
+                                    .font(egui::FontId::monospace(12.0)),
+                            );
+                            ui.add_space(6.0);
+                            ui.label(
+                                egui::RichText::new(lang.inst_post_label()).color(TEXT_PRIMARY),
+                            );
+                            ui.add(
+                                TextEdit::singleline(&mut self.edit_instance_post)
+                                    .hint_text(lang.inst_cmd_hint())
+                                    .desired_width(400.0)
+                                    .font(egui::FontId::monospace(12.0)),
                             );
                         });
-                    }
-                    ui.add_space(4.0);
-                    ui.label(egui::RichText::new(lang.inst_res_mode()).color(TEXT_PRIMARY));
-                    egui::ComboBox::from_id_salt("edit_display_mode_select")
-                        .selected_text(match self.edit_fullscreen {
-                            None => lang.inst_res_default(),
-                            Some(false) => lang.inst_res_windowed(),
-                            Some(true) => lang.inst_res_fullscreen(),
-                        })
-                        .show_ui(ui, |ui| {
-                            if ui
-                                .selectable_label(
-                                    self.edit_fullscreen.is_none(),
-                                    lang.inst_res_default(),
-                                )
-                                .clicked()
-                            {
-                                self.edit_fullscreen = None;
-                            }
-                            if ui
-                                .selectable_label(
-                                    self.edit_fullscreen == Some(false),
-                                    lang.inst_res_windowed(),
-                                )
-                                .clicked()
-                            {
-                                self.edit_fullscreen = Some(false);
-                            }
-                            if ui
-                                .selectable_label(
-                                    self.edit_fullscreen == Some(true),
-                                    lang.inst_res_fullscreen(),
-                                )
-                                .clicked()
-                            {
-                                self.edit_fullscreen = Some(true);
-                            }
-                        });
-
                     ui.add_space(10.0);
-                    ui.label(egui::RichText::new(lang.inst_notes_label()).color(TEXT_PRIMARY));
-                    ui.add(
-                        TextEdit::singleline(&mut self.edit_instance_notes)
-                            .hint_text(lang.inst_notes_hint())
-                            .desired_width(400.0),
-                    );
-                    ui.add_space(10.0);
-                    ui.label(egui::RichText::new(lang.inst_pre_label()).color(TEXT_PRIMARY));
-                    ui.add(
-                        TextEdit::singleline(&mut self.edit_instance_pre)
-                            .hint_text(lang.inst_cmd_hint())
-                            .desired_width(400.0)
-                            .font(egui::FontId::monospace(12.0)),
-                    );
+                    ui.separator();
                     ui.add_space(6.0);
-                    ui.label(egui::RichText::new(lang.inst_post_label()).color(TEXT_PRIMARY));
-                    ui.add(
-                        TextEdit::singleline(&mut self.edit_instance_post)
-                            .hint_text(lang.inst_cmd_hint())
-                            .desired_width(400.0)
-                            .font(egui::FontId::monospace(12.0)),
-                    );
-
-                    ui.add_space(18.0);
                     ui.horizontal(|ui| {
                         if ui
                             .button(
@@ -2492,12 +4079,114 @@ mod tests {
     #[test]
     fn test_matches_filter_query_and_tag() {
         let inst = tagged("Survival Friends", &["smp", "vanilla"], false, 0);
-        assert!(matches_filter(&inst, "", None));
-        assert!(matches_filter(&inst, "surv", None));
-        assert!(!matches_filter(&inst, "creative", None));
-        assert!(matches_filter(&inst, "", Some("smp")));
-        assert!(!matches_filter(&inst, "", Some("modded")));
-        assert!(!matches_filter(&inst, "surv", Some("modded")));
+        let none = ModrinthFilters::default();
+        assert!(matches_filter(&inst, "", None, &none));
+        assert!(matches_filter(&inst, "surv", None, &none));
+        assert!(!matches_filter(&inst, "creative", None, &none));
+        assert!(matches_filter(&inst, "", Some("smp"), &none));
+        assert!(!matches_filter(&inst, "", Some("modded"), &none));
+        assert!(!matches_filter(&inst, "surv", Some("modded"), &none));
+    }
+
+    #[test]
+    fn test_matches_filter_loader_and_version() {
+        let mut inst = Instance::new("Pack", "1.20.1", LoaderType::Fabric);
+        let mut filters = ModrinthFilters::default();
+        filters.toggle_loader(LoaderType::Fabric);
+        assert!(matches_filter(&inst, "", None, &filters));
+        filters.toggle_loader(LoaderType::Forge);
+        filters.toggle_loader(LoaderType::Fabric);
+        assert!(!matches_filter(&inst, "", None, &filters));
+        filters.toggle_loader(LoaderType::Forge);
+        filters.toggle_version("1.20.1");
+        assert!(matches_filter(&inst, "", None, &filters));
+        inst.game_version = "1.21.1".to_string();
+        assert!(!matches_filter(&inst, "", None, &filters));
+    }
+
+    #[test]
+    fn test_natural_version_order() {
+        assert_eq!(natural_version_cmp("1.9", "1.10"), std::cmp::Ordering::Less);
+        assert_eq!(
+            natural_version_cmp("1.21.1", "1.21"),
+            std::cmp::Ordering::Greater
+        );
+        assert_eq!(
+            natural_version_cmp("1.20.1", "1.20.1"),
+            std::cmp::Ordering::Equal
+        );
+    }
+
+    #[test]
+    fn test_modrinth_sort_game_version_is_numeric() {
+        let mut old = tagged("Old", &[], false, 0);
+        old.game_version = "1.9".to_string();
+        let mut new = tagged("New", &[], false, 0);
+        new.game_version = "1.10".to_string();
+        assert_eq!(
+            compare_instances(&old, &new, InstanceSort::GameVersion),
+            std::cmp::Ordering::Less
+        );
+    }
+
+    #[test]
+    fn test_modrinth_custom_group_sections() {
+        let mut alpha = tagged("Alpha instance", &[], false, 0);
+        alpha.group = Some("Alpha".to_string());
+        let mut zeta = tagged("Zeta instance", &[], false, 0);
+        zeta.group = Some("Zeta".to_string());
+        let ungrouped = tagged("Ungrouped instance", &[], false, 0);
+        let instances = vec![alpha, zeta, ungrouped];
+        let filtered: Vec<usize> = (0..instances.len()).collect();
+        let sections = modrinth_sections(
+            &instances,
+            &filtered,
+            LibraryGroupBy::Group,
+            &["Empty".to_string()],
+            Language::English,
+        );
+        let titles: Vec<&str> = sections.iter().map(|s| s.title.as_str()).collect();
+        assert_eq!(titles, vec!["Alpha", "Empty", "Zeta", "Ungrouped"]);
+        assert_eq!(sections[0].indices, vec![0]);
+        assert!(sections[1].indices.is_empty());
+        assert_eq!(sections[2].indices, vec![1]);
+        assert_eq!(sections[3].indices, vec![2]);
+    }
+
+    #[test]
+    fn test_modrinth_loader_and_version_sections() {
+        let mut fabric_old = tagged("Fabric old", &[], false, 0);
+        fabric_old.game_version = "1.9".to_string();
+        fabric_old.loader = LoaderType::Fabric;
+        let mut forge = tagged("Forge", &[], false, 0);
+        forge.game_version = "1.10".to_string();
+        forge.loader = LoaderType::Forge;
+        let mut fabric_new = tagged("Fabric new", &[], false, 0);
+        fabric_new.game_version = "1.21".to_string();
+        fabric_new.loader = LoaderType::Fabric;
+        let instances = vec![fabric_old, forge, fabric_new];
+        let filtered: Vec<usize> = (0..instances.len()).collect();
+
+        let loaders = modrinth_sections(
+            &instances,
+            &filtered,
+            LibraryGroupBy::Loader,
+            &[],
+            Language::English,
+        );
+        assert_eq!(loaders[0].title, "Fabric");
+        assert_eq!(loaders[0].indices, vec![0, 2]);
+        assert_eq!(loaders[1].title, "Forge");
+
+        let versions = modrinth_sections(
+            &instances,
+            &filtered,
+            LibraryGroupBy::GameVersion,
+            &[],
+            Language::English,
+        );
+        let titles: Vec<&str> = versions.iter().map(|s| s.title.as_str()).collect();
+        assert_eq!(titles, vec!["1.21", "1.10", "1.9"]);
     }
 
     #[test]
