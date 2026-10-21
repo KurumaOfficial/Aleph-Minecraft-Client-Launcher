@@ -271,6 +271,30 @@ fn top_cut_plate(
     paint(rect.shrink(outline_w), fill);
 }
 
+/// Soft radial halo built from a triangle fan (vertex colours fade to zero
+/// alpha at the rim), so atmospheric light reads as a gradient instead of
+/// nested opaque circles.
+fn radial_glow(painter: &egui::Painter, center: egui::Pos2, radius: f32, color: Color32) {
+    if radius <= 0.0 || color.a() == 0 {
+        return;
+    }
+    let segments = 48;
+    let mut mesh = egui::Mesh::default();
+    mesh.colored_vertex(center, color);
+    for index in 0..segments {
+        let angle = index as f32 / segments as f32 * std::f32::consts::TAU;
+        mesh.colored_vertex(
+            center + vec2(angle.cos(), angle.sin()) * radius,
+            Color32::TRANSPARENT,
+        );
+    }
+    for index in 1..=segments {
+        let next = if index == segments { 1 } else { index + 1 };
+        mesh.add_triangle(0, index as u32, next as u32);
+    }
+    painter.add(egui::Shape::mesh(mesh));
+}
+
 /// Pointer target with a pointing-hand cursor.
 fn hit(ui: &mut Ui, rect: Rect, key: impl std::hash::Hash) -> Response {
     let resp = ui.interact(rect, ui.id().with(key), Sense::click());
@@ -651,9 +675,7 @@ fn draw_scene(painter: &egui::Painter, stage: Rect) {
         theme::with_alpha(theme::ACCENT, 28),
     );
     let sun = pos2(stage.center().x + stage.width() * 0.12, horizon - 36.0);
-    painter.circle_filled(sun, 220.0, theme::with_alpha(theme::ACCENT, 6));
-    painter.circle_filled(sun, 130.0, theme::with_alpha(theme::ACCENT, 8));
-    painter.circle_filled(sun, 64.0, theme::with_alpha(theme::ACCENT, 12));
+    radial_glow(painter, sun, 260.0, theme::with_alpha(theme::ACCENT, 22));
 
     // Ground checker (very faint; reads as pixel grass up close).
     let cell = 34.0;
@@ -717,9 +739,7 @@ fn draw_centerpiece(ui: &mut Ui, stage: Rect, ctx: &LobbyCtx<'_>) {
     let base_y = stage.bottom() - DOCK_H - 16.0;
     let cx = stage.center().x;
     let glow = pos2(cx, base_y - 118.0);
-    painter.circle_filled(glow, 190.0, theme::with_alpha(theme::ACCENT, 8));
-    painter.circle_filled(glow, 130.0, theme::with_alpha(theme::ACCENT, 10));
-    painter.circle_filled(glow, 78.0, theme::with_alpha(theme::ACCENT, 14));
+    radial_glow(&painter, glow, 210.0, theme::with_alpha(theme::ACCENT, 34));
 
     painter.rect_filled(
         Rect::from_center_size(pos2(cx, base_y), vec2(210.0, 10.0)),
@@ -1131,8 +1151,8 @@ fn draw_promo(ui: &mut Ui, stage: Rect, lang: Language) {
     );
 
     let art = pos2(rect.right() - 66.0, rect.top() + 66.0);
-    painter.circle_filled(art, 52.0, theme::with_alpha(theme::ACCENT, 24));
-    painter.circle_filled(art, 34.0, theme::with_alpha(theme::ACCENT, 34));
+    radial_glow(&painter, art, 72.0, theme::with_alpha(theme::ACCENT, 42));
+    painter.circle_filled(art, 34.0, theme::with_alpha(theme::ACCENT, 30));
     icons::draw(
         &painter,
         Icon::Sword,
@@ -1295,20 +1315,20 @@ fn draw_dock(
     let title = ctx
         .instance
         .as_ref()
-        .map(|instance| short_name(instance.name, 18))
+        .map(|instance| short_name(instance.name, 11))
         .unwrap_or_else(|| lang.shell_mode_empty().to_string());
     painter.text(
         pos2(text_x + 1.0, mode_rect.top() + 58.0),
         Align2::LEFT_CENTER,
         &title,
-        theme::display(30.0),
+        theme::display(26.0),
         Color32::from_black_alpha(80),
     );
     painter.text(
         pos2(text_x, mode_rect.top() + 56.0),
         Align2::LEFT_CENTER,
         &title,
-        theme::display(30.0),
+        theme::display(26.0),
         Color32::WHITE,
     );
     let meta = match ctx.instance.as_ref() {
