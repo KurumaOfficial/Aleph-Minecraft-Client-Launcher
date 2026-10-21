@@ -72,6 +72,22 @@ pub struct ShellAction {
     pub login: bool,
     /// Close the launcher window.
     pub exit: bool,
+    /// Open the create-instance dialog (MultiMC "Add Instance").
+    pub new_instance: bool,
+    /// Open the edit dialog of the selected instance (MultiMC instance
+    /// toolbar: the icon button, the name button, Change Group, Edit
+    /// Instance and Edit Notes all open it in the reference).
+    pub edit_instance: bool,
+    /// Open the manage view of the selected instance (worlds, screenshots).
+    pub manage: bool,
+    /// Move the selected instance to the trash.
+    pub delete_instance: bool,
+    /// Clone the selected instance together with its worlds.
+    pub clone_instance: bool,
+    /// Create a desktop shortcut for the selected instance.
+    pub shortcut_instance: bool,
+    /// Switch the active account (MultiMC accounts menu).
+    pub account: Option<uuid::Uuid>,
 }
 
 impl ShellAction {
@@ -80,9 +96,18 @@ impl ShellAction {
         if self.tab.is_none() {
             self.tab = other.tab;
         }
+        if self.account.is_none() {
+            self.account = other.account;
+        }
         self.launch |= other.launch;
         self.login |= other.login;
         self.exit |= other.exit;
+        self.new_instance |= other.new_instance;
+        self.edit_instance |= other.edit_instance;
+        self.manage |= other.manage;
+        self.delete_instance |= other.delete_instance;
+        self.clone_instance |= other.clone_instance;
+        self.shortcut_instance |= other.shortcut_instance;
     }
 }
 
@@ -108,16 +133,22 @@ mod tests {
     #[test]
     fn test_shell_action_merge_fills_empty_fields() {
         let mut base = ShellAction::default();
+        let account = uuid::Uuid::new_v4();
         base.merge(ShellAction {
             tab: Some(NavTab::Modpacks),
             login: true,
             exit: true,
+            new_instance: true,
+            account: Some(account),
             ..ShellAction::default()
         });
         assert_eq!(base.tab, Some(NavTab::Modpacks));
+        assert_eq!(base.account, Some(account));
         assert!(base.login);
         assert!(base.exit);
+        assert!(base.new_instance);
         assert!(!base.launch);
+        assert!(!base.delete_instance);
     }
 
     #[test]

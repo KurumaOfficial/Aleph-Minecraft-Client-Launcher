@@ -2147,6 +2147,230 @@ impl Language {
         }
     }
 
+    pub fn shell_folders(&self) -> &'static str {
+        match self {
+            Self::English => "Folders",
+            Self::Russian => "Папки",
+            Self::Ukrainian => "Папки",
+        }
+    }
+
+    pub fn shell_view_instance_folder(&self) -> &'static str {
+        match self {
+            Self::English => "View Instance Folder",
+            Self::Russian => "Открыть папку сборки",
+            Self::Ukrainian => "Відкрити теку збірки",
+        }
+    }
+
+    pub fn shell_view_central_mods(&self) -> &'static str {
+        match self {
+            Self::English => "View Central Mods Folder",
+            Self::Russian => "Открыть папку общих модов",
+            Self::Ukrainian => "Відкрити теку спільних модів",
+        }
+    }
+
+    pub fn shell_help(&self) -> &'static str {
+        match self {
+            Self::English => "Help",
+            Self::Russian => "Справка",
+            Self::Ukrainian => "Довідка",
+        }
+    }
+
+    pub fn shell_help_report_bug(&self) -> &'static str {
+        match self {
+            Self::English => "Report a Bug",
+            Self::Russian => "Сообщить об ошибке",
+            Self::Ukrainian => "Повідомити про помилку",
+        }
+    }
+
+    pub fn shell_help_github(&self) -> &'static str {
+        match self {
+            Self::English => "GitHub",
+            Self::Russian => "GitHub",
+            Self::Ukrainian => "GitHub",
+        }
+    }
+
+    pub fn shell_update(&self) -> &'static str {
+        match self {
+            Self::English => "Update",
+            Self::Russian => "Обновление",
+            Self::Ukrainian => "Оновлення",
+        }
+    }
+
+    pub fn shell_support(&self) -> &'static str {
+        match self {
+            Self::English => "Support",
+            Self::Russian => "Поддержать",
+            Self::Ukrainian => "Підтримати",
+        }
+    }
+
+    pub fn shell_meow(&self) -> &'static str {
+        match self {
+            Self::English => "Meow",
+            Self::Russian => "Мяу",
+            Self::Ukrainian => "Няв",
+        }
+    }
+
+    pub fn shell_accounts(&self) -> &'static str {
+        match self {
+            Self::English => "Accounts",
+            Self::Russian => "Аккаунты",
+            Self::Ukrainian => "Акаунти",
+        }
+    }
+
+    pub fn shell_manage_accounts(&self) -> &'static str {
+        match self {
+            Self::English => "Manage Accounts",
+            Self::Russian => "Управление аккаунтами",
+            Self::Ukrainian => "Керування акаунтами",
+        }
+    }
+
+    pub fn shell_status_no_instance(&self) -> &'static str {
+        match self {
+            Self::English => "No instance selected",
+            Self::Russian => "Сборка не выбрана",
+            Self::Ukrainian => "Збірку не вибрано",
+        }
+    }
+
+    pub fn shell_total_playtime(&self) -> &'static str {
+        match self {
+            Self::English => "Total playtime",
+            Self::Russian => "Общее время в игре",
+            Self::Ukrainian => "Загальний час у грі",
+        }
+    }
+
+    pub fn shell_news_none(&self) -> &'static str {
+        match self {
+            Self::English => "No news available.",
+            Self::Russian => "Новостей нет.",
+            Self::Ukrainian => "Новин немає.",
+        }
+    }
+
+    pub fn shell_more_news(&self) -> &'static str {
+        match self {
+            Self::English => "More news…",
+            Self::Russian => "Ещё новости…",
+            Self::Ukrainian => "Більше новин…",
+        }
+    }
+
+    pub fn shell_change_group(&self) -> &'static str {
+        match self {
+            Self::English => "Change Group",
+            Self::Russian => "Сменить группу",
+            Self::Ukrainian => "Змінити групу",
+        }
+    }
+
+    pub fn shell_launch_offline(&self) -> &'static str {
+        match self {
+            Self::English => "Launch Offline",
+            Self::Russian => "Запуск без сети",
+            Self::Ukrainian => "Запуск без мережі",
+        }
+    }
+
+    pub fn shell_edit_instance(&self) -> &'static str {
+        match self {
+            Self::English => "Edit Instance",
+            Self::Russian => "Изменить сборку",
+            Self::Ukrainian => "Змінити збірку",
+        }
+    }
+
+    pub fn shell_edit_notes(&self) -> &'static str {
+        match self {
+            Self::English => "Edit Notes",
+            Self::Russian => "Изменить заметки",
+            Self::Ukrainian => "Змінити нотатки",
+        }
+    }
+
+    pub fn shell_view_worlds(&self) -> &'static str {
+        match self {
+            Self::English => "View Worlds",
+            Self::Russian => "Просмотр миров",
+            Self::Ukrainian => "Перегляд світів",
+        }
+    }
+
+    pub fn shell_manage_screenshots(&self) -> &'static str {
+        match self {
+            Self::English => "Manage Screenshots",
+            Self::Russian => "Управление скриншотами",
+            Self::Ukrainian => "Керування скриншотами",
+        }
+    }
+
+    pub fn shell_folder_minecraft(&self) -> &'static str {
+        match self {
+            Self::English => "Minecraft Folder",
+            Self::Russian => "Папка Minecraft",
+            Self::Ukrainian => "Тека Minecraft",
+        }
+    }
+
+    pub fn shell_folder_config(&self) -> &'static str {
+        match self {
+            Self::English => "Config Folder",
+            Self::Russian => "Папка конфигурации",
+            Self::Ukrainian => "Тека конфігурації",
+        }
+    }
+
+    pub fn shell_folder_instance(&self) -> &'static str {
+        match self {
+            Self::English => "Instance Folder",
+            Self::Russian => "Папка сборки",
+            Self::Ukrainian => "Тека збірки",
+        }
+    }
+
+    pub fn shell_create_shortcut(&self) -> &'static str {
+        match self {
+            Self::English => "Create Shortcut",
+            Self::Russian => "Создать ярлык",
+            Self::Ukrainian => "Створити ярлик",
+        }
+    }
+
+    pub fn shell_export_instance(&self) -> &'static str {
+        match self {
+            Self::English => "Export Instance",
+            Self::Russian => "Экспорт сборки",
+            Self::Ukrainian => "Експорт збірки",
+        }
+    }
+
+    pub fn shell_delete(&self) -> &'static str {
+        match self {
+            Self::English => "Delete",
+            Self::Russian => "Удалить",
+            Self::Ukrainian => "Видалити",
+        }
+    }
+
+    pub fn shell_copy_instance(&self) -> &'static str {
+        match self {
+            Self::English => "Copy Instance",
+            Self::Russian => "Копировать сборку",
+            Self::Ukrainian => "Копіювати збірку",
+        }
+    }
+
     // ==========================================
     // First-run wizard (ROADMAP P1)
     // ==========================================
@@ -4170,6 +4394,34 @@ mod tests {
             assert!(!lang.inst_btn_new_instance().is_empty());
             assert!(!lang.inst_group_none().is_empty());
             assert!(!lang.inst_filter_by().is_empty());
+            assert!(!lang.shell_folders().is_empty());
+            assert!(!lang.shell_view_instance_folder().is_empty());
+            assert!(!lang.shell_view_central_mods().is_empty());
+            assert!(!lang.shell_help().is_empty());
+            assert!(!lang.shell_help_report_bug().is_empty());
+            assert!(!lang.shell_help_github().is_empty());
+            assert!(!lang.shell_update().is_empty());
+            assert!(!lang.shell_support().is_empty());
+            assert!(!lang.shell_meow().is_empty());
+            assert!(!lang.shell_accounts().is_empty());
+            assert!(!lang.shell_manage_accounts().is_empty());
+            assert!(!lang.shell_status_no_instance().is_empty());
+            assert!(!lang.shell_total_playtime().is_empty());
+            assert!(!lang.shell_news_none().is_empty());
+            assert!(!lang.shell_more_news().is_empty());
+            assert!(!lang.shell_change_group().is_empty());
+            assert!(!lang.shell_launch_offline().is_empty());
+            assert!(!lang.shell_edit_instance().is_empty());
+            assert!(!lang.shell_edit_notes().is_empty());
+            assert!(!lang.shell_view_worlds().is_empty());
+            assert!(!lang.shell_manage_screenshots().is_empty());
+            assert!(!lang.shell_folder_minecraft().is_empty());
+            assert!(!lang.shell_folder_config().is_empty());
+            assert!(!lang.shell_folder_instance().is_empty());
+            assert!(!lang.shell_create_shortcut().is_empty());
+            assert!(!lang.shell_export_instance().is_empty());
+            assert!(!lang.shell_delete().is_empty());
+            assert!(!lang.shell_copy_instance().is_empty());
             assert!(!lang.mods_cat_mods().is_empty());
             assert!(!lang.mods_cat_resourcepacks().is_empty());
             assert!(!lang.mods_cat_shaders().is_empty());

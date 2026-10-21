@@ -18,6 +18,7 @@ use egui::{CentralPanel, Context, SidePanel, TopBottomPanel, ViewportCommand};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{mpsc, watch};
+use uuid::Uuid;
 
 use crate::modals::{
     ConsoleModal, DownloadManager, DownloadOverlay, HwNoticeAction, IdentityPicker, LoginModal,
@@ -1828,6 +1829,73 @@ impl LauncherApp {
                 attempts -= 1;
             }
         });
+    }
+
+    /// Move an instance to the trash and persist the list (shared by the
+    /// card action and the MultiMC instance toolbar).
+    fn trash_instance(&mut self, id: Uuid) {
+        if let Some(inst) = self.instances.iter().find(|i| i.id == id).cloned() {
+            if let Err(e) = amc_core::trash_instance(
+                &self.paths.instances_dir(),
+                &self.paths.trash_dir(),
+                &inst,
+            ) {
+                tracing::error!("Move to trash failed: {e}");
+            }
+        }
+        self.instances.retain(|i| i.id != id);
+        if self.selected_instance == Some(id) {
+            self.selected_instance = self.instances.first().map(|i| i.id);
+        }
+        if let Err(e) = Instance::save_all(&self.paths.instances_file(), &self.instances) {
+            tracing::warn!("instances save failed: {e}");
+        }
+    }
+
+    /// Clone an instance (optionally with its worlds) and persist the list.
+    fn clone_instance_with_worlds(&mut self, id: Uuid, copy_saves: bool) {
+        if let Some(inst) = self.instances.iter().find(|i| i.id == id).cloned() {
+            let copy_name = self.config.ui.language().inst_copy_name(&inst.name);
+            if let Ok(cloned) =
+                inst.clone_instance(&copy_name, &self.paths.instances_dir(), copy_saves)
+            {
+                let new_id = cloned.id;
+                self.instances.push(cloned);
+                self.selected_instance = Some(new_id);
+                if let Err(e) = Instance::save_all(&self.paths.instances_file(), &self.instances) {
+                    tracing::warn!("instances save failed: {e}");
+                }
+            }
+        }
+    }
+
+    /// Create the desktop shortcut of an instance and toast the result
+    /// (`amc --launch <id>`, CONCEPT P11/P14).
+    fn create_instance_shortcut(&mut self, id: Uuid) {
+        let lang = self.config.ui.language();
+        if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
+            let note = match std::env::current_exe() {
+                Ok(exe) => {
+                    let shortcut = amc_core::InstanceShortcut::new(
+                        &inst.name,
+                        &inst.id.to_string(),
+                        exe,
+                        self.paths.root_dir.clone(),
+                    );
+                    match shortcut.create() {
+                        Ok(path) => path.to_string_lossy().to_string(),
+                        Err(e) => lang.err_shortcut_failed(&e.to_string()),
+                    }
+                }
+                Err(e) => lang.err_shortcut_failed(&e.to_string()),
+            };
+            push_toast(
+                &mut self.toasts,
+                &self.config.notifications,
+                ToastKind::Launcher,
+                note,
+            );
+        }
     }
 
     fn handle_launch(&mut self) {
@@ -3663,40 +3731,140 @@ impl App for LauncherApp {
                     }
                 });
         } else if shell == amc_core::config::ShellKind::Multimc {
-            // MultiMC/Prism: main toolbar on top, status bar at the bottom,
-            // shared pages (opening on the instance list) in the middle.
+            // MultiMC: main toolbar on top, news strip + status bar at the
+            // bottom, the text-only instance toolbar on the right, shared
+            // pages in the middle (this mode opens on the instance list).
             ctx.animate_bool_responsive(pro_slide_id, false);
+            let mut shell_action = crate::shells::ShellAction::default();
+
+            // Status bar: instance description + total playtime on the right.
+            let selected_status: Option<(String, String)> = self
+                .selected_instance
+                .and_then(|id| self.instances.iter().find(|i| i.id == id))
+                .map(|i| (i.game_version.clone(), i.loader.as_str().to_string()));
+            let total_minutes: u64 = self.instances.iter().map(|i| i.total_played_minutes).sum();
             TopBottomPanel::bottom("multimc_status")
                 .exact_height(crate::shells::multimc::STATUS_HEIGHT)
                 .frame(egui::Frame::none())
                 .show(ctx, |ui| {
-                    crate::shells::multimc::show_status_bar(ui, lang, env!("CARGO_PKG_VERSION"));
+                    crate::shells::multimc::show_status_bar(
+                        ui,
+                        lang,
+                        selected_status
+                            .as_ref()
+                            .map(|(version, loader)| (version.as_str(), loader.as_str())),
+                        total_minutes,
+                    );
                 });
-            let acc_name: Option<String> = self
-                .account_mgr
-                .active_account()
-                .map(|a| a.username.clone());
+
+            // News strip above the status bar.
+            TopBottomPanel::bottom("multimc_news")
+                .exact_height(crate::shells::multimc::NEWS_HEIGHT)
+                .frame(egui::Frame::none())
+                .show(ctx, |ui| {
+                    crate::shells::multimc::show_news_bar(ui, lang);
+                });
+
+            // Right instance toolbar (disabled while nothing is selected).
+            let sel = self.selected_instance.and_then(|id| {
+                self.instances.iter().find(|i| i.id == id).map(|inst| {
+                    let badge = match inst
+                        .icon
+                        .as_deref()
+                        .and_then(crate::widgets::icons::instance_preset)
+                    {
+                        Some(preset) => preset,
+                        None => crate::widgets::icons::loader_badge(inst.loader),
+                    };
+                    crate::shells::multimc::InstanceSel {
+                        name: inst.name.clone(),
+                        badge,
+                        badge_color: crate::pages::instances::loader_color(inst.loader),
+                        game_dir: inst.get_game_dir(&self.paths.instances_dir()),
+                    }
+                })
+            });
+            let launching = self.is_launching;
+            SidePanel::right("multimc_instance_bar")
+                .exact_width(crate::shells::multimc::INSTANCE_BAR_WIDTH)
+                .resizable(false)
+                .frame(egui::Frame::none())
+                .show(ctx, |ui| {
+                    let action = crate::shells::multimc::show_instance_bar(
+                        ui,
+                        lang,
+                        sel.as_ref(),
+                        launching,
+                    );
+                    shell_action.merge(action);
+                });
+
+            // Main toolbar.
+            let accounts: Vec<amc_auth::Account> = self.account_mgr.accounts().to_vec();
+            let active_id = self.account_mgr.active_account().map(|a| a.id);
+            let instances_dir = self.paths.instances_dir();
+            let central_mods_dir = self.paths.root_dir.join("mods");
             TopBottomPanel::top("multimc_toolbar")
                 .exact_height(crate::shells::multimc::TOOLBAR_HEIGHT)
                 .frame(egui::Frame::none())
                 .show(ctx, |ui| {
-                    let action = crate::shells::multimc::show_toolbar(
-                        ui,
-                        lang,
-                        self.current_tab,
-                        acc_name.as_deref(),
-                        self.is_launching,
-                    );
-                    if let Some(tab) = action.tab {
-                        self.current_tab = tab;
-                    }
-                    if action.login {
-                        self.login_modal.is_open = true;
-                    }
-                    if action.launch {
-                        self.handle_launch();
-                    }
+                    let toolbar_ctx = crate::shells::multimc::ToolbarCtx {
+                        accounts: &accounts,
+                        active_account: active_id,
+                        launching,
+                        instances_dir: &instances_dir,
+                        central_mods_dir: &central_mods_dir,
+                    };
+                    let action = crate::shells::multimc::show_toolbar(ui, lang, &toolbar_ctx);
+                    shell_action.merge(action);
                 });
+
+            if let Some(tab) = shell_action.tab {
+                self.current_tab = tab;
+            }
+            if shell_action.new_instance {
+                self.current_tab = NavTab::Modpacks;
+                self.instances_page.new_instance_ram = self.hw_suggested_ram;
+                self.instances_page.show_create_modal = true;
+            }
+            if shell_action.login {
+                self.login_modal.is_open = true;
+            }
+            if shell_action.edit_instance {
+                if let Some(id) = self.selected_instance {
+                    if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
+                        self.instances_page.open_edit_modal(inst);
+                    }
+                }
+            }
+            if shell_action.manage {
+                if let Some(id) = self.selected_instance {
+                    self.instances_page.open_manage(id);
+                }
+            }
+            if shell_action.delete_instance {
+                if let Some(id) = self.selected_instance {
+                    self.trash_instance(id);
+                }
+            }
+            if shell_action.clone_instance {
+                if let Some(id) = self.selected_instance {
+                    self.clone_instance_with_worlds(id, true);
+                }
+            }
+            if shell_action.shortcut_instance {
+                if let Some(id) = self.selected_instance {
+                    self.create_instance_shortcut(id);
+                }
+            }
+            if let Some(account_id) = shell_action.account {
+                if let Err(e) = self.account_mgr.set_active(account_id) {
+                    tracing::warn!("set active account failed: {e}");
+                }
+            }
+            if shell_action.launch {
+                self.handle_launch();
+            }
         } else if shell == amc_core::config::ShellKind::Ultra {
             // Ultra: a slim centered icon dock; the Home tab itself is the
             // minimal screen drawn in the central panel.
@@ -4064,12 +4232,14 @@ impl App for LauncherApp {
                                 &self.instances,
                             ),
                             suggested_ram_mb: self.hw_suggested_ram,
-                            skin: if self.config.app_mode.shell()
-                                == amc_core::config::ShellKind::Modrinth
-                            {
-                                crate::pages::instances::LibrarySkin::Modrinth
-                            } else {
-                                crate::pages::instances::LibrarySkin::Amc
+                            skin: match self.config.app_mode.shell() {
+                                amc_core::config::ShellKind::Modrinth => {
+                                    crate::pages::instances::LibrarySkin::Modrinth
+                                }
+                                amc_core::config::ShellKind::Multimc => {
+                                    crate::pages::instances::LibrarySkin::Multimc
+                                }
+                                _ => crate::pages::instances::LibrarySkin::Amc,
                             },
                         };
                         let action = self.instances_page.show(
@@ -4108,50 +4278,9 @@ impl App for LauncherApp {
                                 }
                             }
                             InstanceAction::Cloned(id, copy_saves) => {
-                                if let Some(inst) =
-                                    self.instances.iter().find(|i| i.id == id).cloned()
-                                {
-                                    let copy_name = lang.inst_copy_name(&inst.name);
-                                    if let Ok(cloned) = inst.clone_instance(
-                                        &copy_name,
-                                        &self.paths.instances_dir(),
-                                        copy_saves,
-                                    ) {
-                                        let new_id = cloned.id;
-                                        self.instances.push(cloned);
-                                        self.selected_instance = Some(new_id);
-                                        if let Err(e) = Instance::save_all(
-                                            &self.paths.instances_file(),
-                                            &self.instances,
-                                        ) {
-                                            tracing::warn!("instances save failed: {e}");
-                                        }
-                                    }
-                                }
+                                self.clone_instance_with_worlds(id, copy_saves);
                             }
-                            InstanceAction::Trashed(id) => {
-                                if let Some(inst) =
-                                    self.instances.iter().find(|i| i.id == id).cloned()
-                                {
-                                    if let Err(e) = amc_core::trash_instance(
-                                        &self.paths.instances_dir(),
-                                        &self.paths.trash_dir(),
-                                        &inst,
-                                    ) {
-                                        tracing::error!("Move to trash failed: {e}");
-                                    }
-                                }
-                                self.instances.retain(|i| i.id != id);
-                                if self.selected_instance == Some(id) {
-                                    self.selected_instance = self.instances.first().map(|i| i.id);
-                                }
-                                if let Err(e) = Instance::save_all(
-                                    &self.paths.instances_file(),
-                                    &self.instances,
-                                ) {
-                                    tracing::warn!("instances save failed: {e}");
-                                }
-                            }
+                            InstanceAction::Trashed(id) => self.trash_instance(id),
                             InstanceAction::Restored(id) => {
                                 match amc_core::restore_instance(
                                     &self.paths.instances_dir(),
@@ -4235,30 +4364,7 @@ impl App for LauncherApp {
                         // Desktop shortcut for direct instance launch
                         // (`amc --launch <id>`, CONCEPT P11/P14).
                         if let Some(id) = self.instances_page.shortcut_request.take() {
-                            let lang = self.config.ui.language();
-                            if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
-                                let note = match std::env::current_exe() {
-                                    Ok(exe) => {
-                                        let shortcut = amc_core::InstanceShortcut::new(
-                                            &inst.name,
-                                            &inst.id.to_string(),
-                                            exe,
-                                            self.paths.root_dir.clone(),
-                                        );
-                                        match shortcut.create() {
-                                            Ok(path) => path.to_string_lossy().to_string(),
-                                            Err(e) => lang.err_shortcut_failed(&e.to_string()),
-                                        }
-                                    }
-                                    Err(e) => lang.err_shortcut_failed(&e.to_string()),
-                                };
-                                push_toast(
-                                    &mut self.toasts,
-                                    &self.config.notifications,
-                                    ToastKind::Launcher,
-                                    note,
-                                );
-                            }
+                            self.create_instance_shortcut(id);
                         }
                     }
                     NavTab::Mods => {

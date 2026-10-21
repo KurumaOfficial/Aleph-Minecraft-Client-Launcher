@@ -266,36 +266,38 @@ pub const MODRINTH_GREEN_LIGHT: Color32 = Color32::from_rgb(0x43, 0xE4, 0x88);
 /// Brand green, disabled/launching.
 pub const MODRINTH_GREEN_DIM: Color32 = Color32::from_rgb(0x12, 0x8A, 0x45);
 
-/// MultiMC / Prism palette (Qt light gray, selection blue); values follow
-/// the default Qt Fusion look the launcher ships with.
+/// MultiMC / Prism palette (Qt Fusion "Bright" theme the launcher ships
+/// with: window `#eff0f1`, base `#fcfcfc`, text `#31363b`, highlight
+/// `#3daee9`, link `#2980b9`). Rounding is zero — Fusion draws sharp
+/// rectangles.
 const MULTIMC: Palette = Palette {
-    bg: Color32::from_rgb(0xEF, 0xEF, 0xEF),
-    card: Color32::from_rgb(0xFF, 0xFF, 0xFF),
-    card_hover: Color32::from_rgb(0xE5, 0xF3, 0xFF),
-    field: Color32::from_rgb(0xFF, 0xFF, 0xFF),
+    bg: Color32::from_rgb(0xEF, 0xF0, 0xF1),
+    card: Color32::from_rgb(0xEF, 0xF0, 0xF1),
+    card_hover: Color32::from_rgb(0xDA, 0xEC, 0xF9),
+    field: Color32::from_rgb(0xFC, 0xFC, 0xFC),
     bg_card: Color32::from_rgb(0xE6, 0xE6, 0xE6),
-    bg_active: Color32::from_rgb(0xDC, 0xE9, 0xF5),
+    bg_active: Color32::from_rgb(0xCF, 0xE8, 0xFA),
     border: Color32::from_rgb(0xB8, 0xB8, 0xB8),
-    border_soft: Color32::from_rgb(0xD6, 0xD6, 0xD6),
+    border_soft: Color32::from_rgb(0xDC, 0xDC, 0xDC),
     border_strong: Color32::from_rgb(0x9A, 0x9A, 0x9A),
-    border_subtle: tint(Color32::from_rgb(0x30, 0x8C, 0xC6), 40),
-    border_default: tint(Color32::from_rgb(0x30, 0x8C, 0xC6), 70),
-    border_accent: tint(Color32::from_rgb(0x30, 0x8C, 0xC6), 130),
-    text: Color32::from_rgb(0x1A, 0x1A, 0x1A),
-    head: Color32::from_rgb(0x00, 0x00, 0x00),
+    border_subtle: Color32::from_rgb(0xDC, 0xDC, 0xDC),
+    border_default: Color32::from_rgb(0xAD, 0xAD, 0xAD),
+    border_accent: Color32::from_rgb(0x3D, 0xAE, 0xE9),
+    text: Color32::from_rgb(0x31, 0x36, 0x3B),
+    head: Color32::from_rgb(0x31, 0x36, 0x3B),
     muted: Color32::from_rgb(0x5E, 0x5E, 0x5E),
     muted_dim: Color32::from_rgb(0x80, 0x80, 0x80),
     text_dim: Color32::from_rgb(0x6E, 0x6E, 0x6E),
-    accent: Color32::from_rgb(0x30, 0x8C, 0xC6),
-    accent_light: Color32::from_rgb(0x3F, 0xA3, 0xDE),
-    accent_dim: Color32::from_rgb(0x2A, 0x6E, 0x9C),
-    accent_soft: Color32::from_rgb(0xDC, 0xE9, 0xF5),
+    accent: Color32::from_rgb(0x3D, 0xAE, 0xE9),
+    accent_light: Color32::from_rgb(0x66, 0xC1, 0xEF),
+    accent_dim: Color32::from_rgb(0x29, 0x80, 0xB9),
+    accent_soft: Color32::from_rgb(0xD9, 0xEE, 0xFB),
     danger: Color32::from_rgb(0xC0, 0x39, 0x2B),
     success: Color32::from_rgb(0x3C, 0x8E, 0x3C),
     warn: Color32::from_rgb(0xC0, 0x7A, 0x30),
-    info: Color32::from_rgb(0x30, 0x8C, 0xC6),
+    info: Color32::from_rgb(0x29, 0x80, 0xB9),
     hover_stroke: Color32::from_rgb(0x9A, 0x9A, 0x9A),
-    rounding: 2.0,
+    rounding: 0.0,
 };
 /// Legacy Mojang launcher palette (light gray chrome, green primary button);
 /// values follow the launcher's public screenshots.

@@ -35,12 +35,27 @@ pub enum InstanceAction {
 
 /// Visual skin of the instance list. `Amc` is the launcher's own card grid;
 /// `Modrinth` replicates the library page of the Modrinth App (big cards
-/// with a hover Play button under the search toolbar).
+/// with a hover Play button under the search toolbar); `Multimc` is the
+/// icon-grid instance view of MultiMC (grouped 100px cells).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum LibrarySkin {
     #[default]
     Amc,
     Modrinth,
+    Multimc,
+}
+
+/// Loader accent shared by the card strip, the MultiMC icon tiles and the
+/// app's instance toolbar.
+pub fn loader_color(loader: LoaderType) -> Color32 {
+    match loader {
+        LoaderType::Vanilla => Color32::from_rgb(0x38, 0x8E, 0x3C),
+        LoaderType::Fabric => RUBY_LIGHT.into(),
+        LoaderType::Quilt => Color32::from_rgb(0x9C, 0x27, 0xB0),
+        LoaderType::Forge => Color32::from_rgb(0xE6, 0x51, 0x00),
+        LoaderType::NeoForge => Color32::from_rgb(0xFF, 0x6D, 0x00),
+        LoaderType::OptiFine => Color32::from_rgb(0x00, 0x83, 0x8F),
+    }
 }
 
 /// Ambient data for the instances page, bundled so `show` stays under
@@ -128,6 +143,8 @@ pub struct InstancesPage {
     pub clone_with_saves: bool,
     /// Desktop shortcut request for the app shell (CONCEPT P11/P14).
     pub shortcut_request: Option<Uuid>,
+    /// Collapsed MultiMC group headers (reference `VisualGroup` collapse).
+    multimc_collapsed: std::collections::HashSet<String>,
 }
 
 impl Default for InstancesPage {
@@ -186,6 +203,7 @@ impl Default for InstancesPage {
             clone_instance_id: None,
             clone_with_saves: true,
             shortcut_request: None,
+            multimc_collapsed: std::collections::HashSet::new(),
         }
     }
 }
@@ -941,6 +959,278 @@ impl InstancesPage {
         }
     }
 
+    /// Fill the edit dialog from `inst` and open it (shared by the card's
+    /// gear button and the shell instance toolbar).
+    pub fn open_edit_modal(&mut self, inst: &Instance) {
+        self.edit_instance_id = Some(inst.id);
+        self.edit_instance_name = inst.name.clone();
+        self.edit_instance_version = inst.game_version.clone();
+        self.edit_instance_loader = inst.loader;
+        self.edit_loader_pin = inst.loader_version.clone();
+        self.edit_instance_ram = inst.ram_mb.unwrap_or(4096);
+        self.edit_instance_icon = inst.icon.clone();
+        self.edit_instance_tags = inst.tags.join(", ");
+        self.edit_instance_pinned = inst.pinned;
+        self.edit_instance_account = inst.default_account;
+        self.edit_instance_group = inst.group.clone().unwrap_or_default();
+        self.edit_use_custom_size = inst.window_size.is_some();
+        self.edit_window_w = inst.window_size.map(|(w, _)| w).unwrap_or(1280);
+        self.edit_window_h = inst.window_size.map(|(_, h)| h).unwrap_or(720);
+        self.edit_fullscreen = inst.fullscreen;
+        self.edit_instance_notes = inst.notes.clone();
+        self.edit_instance_pre = inst.pre_launch_cmd.clone();
+        self.edit_instance_post = inst.post_exit_cmd.clone();
+        self.show_edit_modal = true;
+    }
+
+    /// Open the manage dialog (worlds / configs / health) of an instance.
+    pub fn open_manage(&mut self, id: Uuid) {
+        self.manage.open_for(id);
+    }
+
+    /// MultiMC shell: the reference instance view — 100px cells with a 48px
+    /// icon and the name plate below, grouped under framed headers with a
+    /// collapse square. Metrics follow `ui/instanceview/InstanceDelegate`
+    /// and `VisualGroup`: 5px margins and spacing, 105px cell pitch.
+    fn show_multimc_view(
+        &mut self,
+        ui: &mut Ui,
+        instances: &[Instance],
+        selected_instance: &mut Option<Uuid>,
+        ctx: &InstancesContext,
+        lang: Language,
+        action: &mut InstanceAction,
+    ) {
+        if instances.is_empty() {
+            ui.add_space(40.0);
+            ui.vertical_centered(|ui| {
+                ui.label(
+                    egui::RichText::new(lang.inst_empty())
+                        .font(egui::FontId::proportional(13.0))
+                        .color(TEXT_MUTED),
+                );
+            });
+            return;
+        }
+
+        // Proxy-model grouping of the reference: the empty group sorts
+        // first, then the named groups; instances sort by name inside.
+        let mut groups: std::collections::BTreeMap<String, Vec<usize>> =
+            std::collections::BTreeMap::new();
+        for (idx, inst) in instances.iter().enumerate() {
+            groups
+                .entry(inst.group.clone().unwrap_or_default())
+                .or_default()
+                .push(idx);
+        }
+        for indices in groups.values_mut() {
+            indices.sort_by_key(|&i| instances[i].name.to_lowercase());
+        }
+
+        ScrollArea::vertical()
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.spacing_mut().item_spacing = vec2(5.0, 5.0);
+                ui.add_space(3.0);
+                for (group, indices) in &groups {
+                    let collapsed = self.multimc_collapsed.contains(group);
+                    if multimc_group_header(ui, group, collapsed) {
+                        if collapsed {
+                            self.multimc_collapsed.remove(group);
+                        } else {
+                            self.multimc_collapsed.insert(group.clone());
+                        }
+                    }
+                    if collapsed {
+                        continue;
+                    }
+                    let avail = ui.available_width();
+                    let cols = (((avail - 10.0) / 105.0).floor() as usize).max(1);
+                    for row in indices.chunks(cols) {
+                        let text_h = row
+                            .iter()
+                            .map(|&idx| {
+                                ui.painter()
+                                    .layout(
+                                        instances[idx].name.clone(),
+                                        egui::FontId::proportional(12.0),
+                                        Color32::PLACEHOLDER,
+                                        94.0,
+                                    )
+                                    .size()
+                                    .y
+                            })
+                            .fold(0.0_f32, f32::max);
+                        let cell_h = 48.0 + 5.0 + text_h + 6.0;
+                        ui.horizontal(|ui| {
+                            ui.spacing_mut().item_spacing = vec2(5.0, 5.0);
+                            ui.add_space(5.0);
+                            for &idx in row {
+                                multimc_cell(
+                                    self,
+                                    ui,
+                                    &instances[idx],
+                                    cell_h,
+                                    selected_instance,
+                                    ctx.instances_dir,
+                                    action,
+                                );
+                            }
+                        });
+                    }
+                    ui.add_space(3.0);
+                }
+            });
+
+        /// Framed group strip (rounded top corners, 1px line) with a
+        /// collapse square and the group name at 60% text alpha; the
+        /// ungrouped instances show a blank header, like the reference.
+        fn multimc_group_header(ui: &mut Ui, name: &str, collapsed: bool) -> bool {
+            let h = 26.0;
+            let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), h), Sense::hover());
+            let painter = ui.painter();
+            let line = with_alpha(TEXT_PRIMARY, 90);
+            let frame = Rect::from_min_max(
+                pos2(rect.left() + 3.0, rect.top()),
+                pos2(rect.right() - 3.0, rect.bottom()),
+            );
+            painter.rect_stroke(
+                frame,
+                Rounding {
+                    nw: 4.0,
+                    ne: 4.0,
+                    sw: 0.0,
+                    se: 0.0,
+                },
+                Stroke::new(1.0_f32, line),
+            );
+            let square =
+                Rect::from_min_size(pos2(rect.left() + 9.0, rect.top() + 6.0), vec2(13.0, 13.0));
+            painter.rect_stroke(square, Rounding::ZERO, Stroke::new(1.0_f32, line));
+            let c = square.center();
+            painter.line_segment(
+                [pos2(c.x - 3.5, c.y), pos2(c.x + 3.5, c.y)],
+                Stroke::new(1.0_f32, line),
+            );
+            if collapsed {
+                painter.line_segment(
+                    [pos2(c.x, c.y - 3.5), pos2(c.x, c.y + 3.5)],
+                    Stroke::new(1.0_f32, line),
+                );
+            }
+            if !name.is_empty() {
+                painter.text(
+                    pos2(square.right() + 7.0, rect.center().y),
+                    Align2::LEFT_CENTER,
+                    name,
+                    egui::FontId::proportional(12.5),
+                    with_alpha(TEXT_PRIMARY, 153),
+                );
+            }
+            // The reference hit area is the square plus its margins.
+            let hit = Rect::from_min_size(
+                pos2(rect.left() + 2.0, rect.top() + 2.0),
+                vec2(h - 4.0, h - 4.0),
+            );
+            ui.interact(hit, ui.id().with(("multimc_group", name)), Sense::click())
+                .clicked()
+        }
+
+        /// One instance cell: 48px icon (custom texture or the default
+        /// tile with the loader/preset badge), name plate below (window
+        /// color at 160 alpha, or the highlight when selected).
+        fn multimc_cell(
+            page: &mut InstancesPage,
+            ui: &mut Ui,
+            inst: &Instance,
+            cell_h: f32,
+            selected_instance: &mut Option<Uuid>,
+            instances_dir: &Path,
+            action: &mut InstanceAction,
+        ) {
+            let inst_id = inst.id;
+            let is_selected = selected_instance.as_ref() == Some(&inst_id);
+            let (rect, resp) = ui.allocate_exact_size(vec2(100.0, cell_h), Sense::click());
+            let icon_rect =
+                Rect::from_center_size(pos2(rect.center().x, rect.top() + 24.0), vec2(48.0, 48.0));
+            match page.instance_icon_texture(ui.ctx(), inst_id, &inst.get_game_dir(instances_dir)) {
+                Some(tex) => {
+                    ui.painter().image(
+                        tex.id(),
+                        icon_rect,
+                        egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
+                        Color32::WHITE,
+                    );
+                    ui.painter().rect_stroke(
+                        icon_rect,
+                        Rounding::ZERO,
+                        Stroke::new(1.0_f32, BORDER_DEFAULT),
+                    );
+                }
+                None => {
+                    // Default icon tile: the reference icon art is a light
+                    // square; the badge stands in for it.
+                    ui.painter().rect_filled(
+                        icon_rect,
+                        Rounding::ZERO,
+                        with_alpha(Color32::WHITE, 170),
+                    );
+                    ui.painter().rect_stroke(
+                        icon_rect,
+                        Rounding::ZERO,
+                        Stroke::new(1.0_f32, BORDER_DEFAULT),
+                    );
+                    let badge = match inst.icon.as_deref().and_then(icons::instance_preset) {
+                        Some(preset) => preset,
+                        None => icons::loader_badge(inst.loader),
+                    };
+                    icons::draw_centered(
+                        ui.painter(),
+                        badge,
+                        icon_rect.center(),
+                        30.0,
+                        loader_color(inst.loader),
+                    );
+                }
+            }
+            let plate = Rect::from_min_max(
+                pos2(rect.left(), icon_rect.bottom() + 5.0),
+                pos2(rect.right(), rect.bottom()),
+            );
+            if is_selected {
+                ui.painter()
+                    .rect_filled(plate, Rounding::ZERO, crate::theme::ACCENT);
+            } else {
+                ui.painter()
+                    .rect_filled(plate, Rounding::ZERO, with_alpha(crate::theme::BG, 160));
+            }
+            let galley = ui.painter().layout(
+                inst.name.clone(),
+                egui::FontId::proportional(12.0),
+                Color32::PLACEHOLDER,
+                94.0,
+            );
+            let color = if is_selected {
+                Color32::from_rgb(0xEF, 0xF0, 0xF1)
+            } else {
+                TEXT_PRIMARY.into()
+            };
+            ui.painter().galley(
+                pos2(rect.center().x - galley.size().x / 2.0, plate.top() + 3.0),
+                galley,
+                color,
+            );
+            if resp.clicked() {
+                *selected_instance = Some(inst_id);
+                *action = InstanceAction::Selected(inst_id);
+            }
+            if resp.double_clicked() {
+                *action = InstanceAction::Launch(inst_id);
+            }
+            let _ = resp.on_hover_text(inst.get_game_dir(instances_dir).display().to_string());
+        }
+    }
+
     pub fn show(
         &mut self,
         ui: &mut Ui,
@@ -954,261 +1244,283 @@ impl InstancesPage {
         let accounts = ctx.accounts;
         self.poll_disk_sizes(instances, instances_dir);
 
-        if ctx.skin == LibrarySkin::Modrinth {
-            // Modrinth shell: the shared "Modpacks" page renders the
-            // reference app's library (heading, toolbar, card grid).
-            self.show_modrinth_library(ui, instances, selected_instance, ctx, lang, &mut action);
-        } else {
-            ui.add_space(20.0);
+        match ctx.skin {
+            LibrarySkin::Modrinth => {
+                // Modrinth shell: the shared "Modpacks" page renders the
+                // reference app's library (heading, toolbar, card grid).
+                self.show_modrinth_library(
+                    ui,
+                    instances,
+                    selected_instance,
+                    ctx,
+                    lang,
+                    &mut action,
+                );
+            }
+            LibrarySkin::Multimc => {
+                // MultiMC shell: the shared page renders the reference's
+                // icon-grid instance view instead of the card list.
+                self.show_multimc_view(ui, instances, selected_instance, ctx, lang, &mut action);
+            }
+            LibrarySkin::Amc => {
+                ui.add_space(20.0);
 
-            // Header
-            ui.label(
-                egui::RichText::new(lang.inst_title())
-                    .font(egui::FontId::proportional(26.0))
-                    .strong()
-                    .color(TEXT_HEADING),
-            );
-
-            ui.add_space(14.0);
-
-            // Control Row
-            ui.horizontal(|ui| {
-                let search_width = (ui.available_width() - 180.0).max(200.0);
-                ui.add(
-                    TextEdit::singleline(&mut self.search_query)
-                        .hint_text(egui::RichText::new(lang.inst_search_hint()).color(TEXT_MUTED))
-                        .desired_width(search_width)
-                        .font(egui::FontId::proportional(14.0)),
+                // Header
+                ui.label(
+                    egui::RichText::new(lang.inst_title())
+                        .font(egui::FontId::proportional(26.0))
+                        .strong()
+                        .color(TEXT_HEADING),
                 );
 
-                ui.add_space(10.0);
+                ui.add_space(14.0);
 
-                let (cr_rect, cr_resp) = ui.allocate_exact_size(vec2(160.0, 36.0), Sense::click());
-                let cr_hover = ui
-                    .ctx()
-                    .animate_bool_responsive(cr_resp.id, cr_resp.hovered());
-                let cr_bg = lerp_color(RUBY, RUBY_LIGHT, cr_hover);
-                let cr_stroke = lerp_color(RUBY_LIGHT, Color32::WHITE, cr_hover);
+                // Control Row
+                ui.horizontal(|ui| {
+                    let search_width = (ui.available_width() - 180.0).max(200.0);
+                    ui.add(
+                        TextEdit::singleline(&mut self.search_query)
+                            .hint_text(
+                                egui::RichText::new(lang.inst_search_hint()).color(TEXT_MUTED),
+                            )
+                            .desired_width(search_width)
+                            .font(egui::FontId::proportional(14.0)),
+                    );
 
-                ui.painter()
-                    .rect_filled(cr_rect, crate::theme::rounding(), cr_bg);
-                ui.painter().rect_stroke(
-                    cr_rect,
-                    crate::theme::rounding(),
-                    Stroke::new(1.0_f32, cr_stroke),
-                );
-                ui.painter().text(
-                    cr_rect.center(),
-                    egui::Align2::CENTER_CENTER,
-                    lang.inst_btn_create(),
-                    egui::FontId::proportional(12.0),
-                    Color32::WHITE,
-                );
+                    ui.add_space(10.0);
 
-                if cr_resp.clicked() {
-                    self.new_instance_ram = ctx.suggested_ram_mb;
-                    self.show_create_modal = true;
-                }
-            });
+                    let (cr_rect, cr_resp) =
+                        ui.allocate_exact_size(vec2(160.0, 36.0), Sense::click());
+                    let cr_hover = ui
+                        .ctx()
+                        .animate_bool_responsive(cr_resp.id, cr_resp.hovered());
+                    let cr_bg = lerp_color(RUBY, RUBY_LIGHT, cr_hover);
+                    let cr_stroke = lerp_color(RUBY_LIGHT, Color32::WHITE, cr_hover);
 
-            ui.add_space(14.0);
+                    ui.painter()
+                        .rect_filled(cr_rect, crate::theme::rounding(), cr_bg);
+                    ui.painter().rect_stroke(
+                        cr_rect,
+                        crate::theme::rounding(),
+                        Stroke::new(1.0_f32, cr_stroke),
+                    );
+                    ui.painter().text(
+                        cr_rect.center(),
+                        egui::Align2::CENTER_CENTER,
+                        lang.inst_btn_create(),
+                        egui::FontId::proportional(12.0),
+                        Color32::WHITE,
+                    );
 
-            // Tag filter chips + sort selector (memoized: O(T) hash check,
-            // rebuild only when the instance set changes).
-            let rev = instances_rev(instances);
-            if rev != self.tags_rev {
-                let mut seen = std::collections::HashSet::new();
-                let mut tags: Vec<String> = Vec::new();
-                for inst in instances.iter() {
-                    for t in &inst.tags {
-                        if seen.insert(t.clone()) {
-                            tags.push(t.clone());
+                    if cr_resp.clicked() {
+                        self.new_instance_ram = ctx.suggested_ram_mb;
+                        self.show_create_modal = true;
+                    }
+                });
+
+                ui.add_space(14.0);
+
+                // Tag filter chips + sort selector (memoized: O(T) hash check,
+                // rebuild only when the instance set changes).
+                let rev = instances_rev(instances);
+                if rev != self.tags_rev {
+                    let mut seen = std::collections::HashSet::new();
+                    let mut tags: Vec<String> = Vec::new();
+                    for inst in instances.iter() {
+                        for t in &inst.tags {
+                            if seen.insert(t.clone()) {
+                                tags.push(t.clone());
+                            }
                         }
                     }
+                    tags.sort();
+                    self.tags_cache = tags;
+                    self.tags_rev = rev;
                 }
-                tags.sort();
-                self.tags_cache = tags;
-                self.tags_rev = rev;
-            }
-            if let Some(active) = self.active_tag.clone() {
-                if !self.tags_cache.contains(&active) {
-                    self.active_tag = None;
-                }
-            }
-            let mut tag_pick: Option<Option<String>> = None;
-            ui.horizontal_wrapped(|ui| {
-                ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
-                if tag(ui, lang.inst_tag_all(), self.active_tag.is_none()).clicked() {
-                    tag_pick = Some(None);
-                }
-                for t in &self.tags_cache {
-                    let is_active = self.active_tag.as_deref() == Some(t.as_str());
-                    if tag(ui, t, is_active).clicked() {
-                        tag_pick = Some(if is_active { None } else { Some(t.clone()) });
+                if let Some(active) = self.active_tag.clone() {
+                    if !self.tags_cache.contains(&active) {
+                        self.active_tag = None;
                     }
                 }
-            });
-            if let Some(pick) = tag_pick {
-                self.active_tag = pick;
-            }
-
-            ui.add_space(8.0);
-
-            ui.horizontal_wrapped(|ui| {
-                ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
-                ui.label(
-                    egui::RichText::new(lang.inst_sort_title())
-                        .font(egui::FontId::proportional(12.0))
-                        .color(TEXT_MUTED),
-                );
-                for mode in InstanceSort::ALL {
-                    if tag(ui, mode.label(lang), self.sort_mode == mode).clicked() {
-                        self.sort_mode = mode;
+                let mut tag_pick: Option<Option<String>> = None;
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
+                    if tag(ui, lang.inst_tag_all(), self.active_tag.is_none()).clicked() {
+                        tag_pick = Some(None);
                     }
+                    for t in &self.tags_cache {
+                        let is_active = self.active_tag.as_deref() == Some(t.as_str());
+                        if tag(ui, t, is_active).clicked() {
+                            tag_pick = Some(if is_active { None } else { Some(t.clone()) });
+                        }
+                    }
+                });
+                if let Some(pick) = tag_pick {
+                    self.active_tag = pick;
                 }
-            });
 
-            ui.add_space(8.0);
+                ui.add_space(8.0);
 
-            // Discover trending modpacks (CONCEPT P4): inside the instances
-            // tab, never on the home screen.
-            ui.horizontal(|ui| {
-                let caret = if self.discover_open {
-                    Icon::CaretDown
-                } else {
-                    Icon::CaretRight
-                };
-                let fill = ui.visuals().widgets.inactive.weak_bg_fill;
-                if icons::icon_text_button(
-                    ui,
-                    Icon::Flame,
-                    Some(caret),
-                    lang.discover_title(),
-                    TEXT_HEADING,
-                    egui::FontId::proportional(14.0),
-                    fill,
-                )
-                .clicked()
-                {
-                    self.discover_open = !self.discover_open;
-                }
-                if self.discover_open
-                    && !self.discover_loading
-                    && ui.button(lang.discover_refresh()).clicked()
-                {
-                    self.discover_requested = true;
-                    self.discover_loading = true;
-                }
-            });
-            if self.discover_open {
-                if self.discover.is_empty() && !self.discover_loading {
-                    // First paint fetches once; refresh reuses the button above.
-                    self.discover_requested = true;
-                    self.discover_loading = true;
-                }
-                if self.discover_loading && self.discover.is_empty() {
-                    ui.horizontal(|ui| {
-                        ui.spinner();
-                    });
-                }
-                let mut install: Option<String> = None;
-                for pack in &self.discover {
-                    ui.horizontal(|ui| {
-                        ui.label(
-                            egui::RichText::new(truncate_name(&pack.title, 34))
-                                .font(egui::FontId::proportional(12.0))
-                                .strong()
-                                .color(TEXT_PRIMARY),
-                        );
-                        icons::icon_label(
-                            ui,
-                            Icon::Download,
-                            &pack.downloads.to_string(),
-                            TEXT_MUTED,
-                            egui::FontId::proportional(11.0),
-                        );
-                        if pack.rating > 0 {
+                ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
+                    ui.label(
+                        egui::RichText::new(lang.inst_sort_title())
+                            .font(egui::FontId::proportional(12.0))
+                            .color(TEXT_MUTED),
+                    );
+                    for mode in InstanceSort::ALL {
+                        if tag(ui, mode.label(lang), self.sort_mode == mode).clicked() {
+                            self.sort_mode = mode;
+                        }
+                    }
+                });
+
+                ui.add_space(8.0);
+
+                // Discover trending modpacks (CONCEPT P4): inside the instances
+                // tab, never on the home screen.
+                ui.horizontal(|ui| {
+                    let caret = if self.discover_open {
+                        Icon::CaretDown
+                    } else {
+                        Icon::CaretRight
+                    };
+                    let fill = ui.visuals().widgets.inactive.weak_bg_fill;
+                    if icons::icon_text_button(
+                        ui,
+                        Icon::Flame,
+                        Some(caret),
+                        lang.discover_title(),
+                        TEXT_HEADING,
+                        egui::FontId::proportional(14.0),
+                        fill,
+                    )
+                    .clicked()
+                    {
+                        self.discover_open = !self.discover_open;
+                    }
+                    if self.discover_open
+                        && !self.discover_loading
+                        && ui.button(lang.discover_refresh()).clicked()
+                    {
+                        self.discover_requested = true;
+                        self.discover_loading = true;
+                    }
+                });
+                if self.discover_open {
+                    if self.discover.is_empty() && !self.discover_loading {
+                        // First paint fetches once; refresh reuses the button above.
+                        self.discover_requested = true;
+                        self.discover_loading = true;
+                    }
+                    if self.discover_loading && self.discover.is_empty() {
+                        ui.horizontal(|ui| {
+                            ui.spinner();
+                        });
+                    }
+                    let mut install: Option<String> = None;
+                    for pack in &self.discover {
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                egui::RichText::new(truncate_name(&pack.title, 34))
+                                    .font(egui::FontId::proportional(12.0))
+                                    .strong()
+                                    .color(TEXT_PRIMARY),
+                            );
                             icons::icon_label(
                                 ui,
-                                Icon::Star,
-                                &pack.rating.to_string(),
+                                Icon::Download,
+                                &pack.downloads.to_string(),
                                 TEXT_MUTED,
                                 egui::FontId::proportional(11.0),
                             );
+                            if pack.rating > 0 {
+                                icons::icon_label(
+                                    ui,
+                                    Icon::Star,
+                                    &pack.rating.to_string(),
+                                    TEXT_MUTED,
+                                    egui::FontId::proportional(11.0),
+                                );
+                            }
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    if ui.button(lang.discover_install()).clicked() {
+                                        install = Some(pack.id.clone());
+                                    }
+                                },
+                            );
+                        });
+                    }
+                    if let Some(slug) = install {
+                        self.discover_install = Some(slug);
+                    }
+                    ui.add_space(8.0);
+                }
+
+                // Filter + sort instances (memoized — see `filtered_indices`).
+                let filtered_indices = self.filtered_indices(instances);
+
+                // Instances list
+                ScrollArea::vertical()
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        ui.spacing_mut().item_spacing = vec2(0.0, 8.0);
+
+                        if instances.is_empty() {
+                            ui.add_space(50.0);
+                            ui.vertical_centered(|ui| {
+                                ui.label(
+                                    egui::RichText::new(lang.inst_empty())
+                                        .font(egui::FontId::proportional(16.0))
+                                        .color(TEXT_MUTED),
+                                );
+                                ui.add_space(10.0);
+                                if ui
+                                    .button(
+                                        egui::RichText::new(lang.inst_btn_create())
+                                            .color(RUBY_LIGHT),
+                                    )
+                                    .clicked()
+                                {
+                                    self.new_instance_ram = ctx.suggested_ram_mb;
+                                    self.show_create_modal = true;
+                                }
+                            });
+                            return;
                         }
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui.button(lang.discover_install()).clicked() {
-                                install = Some(pack.id.clone());
+
+                        if filtered_indices.is_empty() {
+                            ui.add_space(30.0);
+                            ui.vertical_centered(|ui| {
+                                ui.label(
+                                    egui::RichText::new(lang.home_empty())
+                                        .font(egui::FontId::proportional(14.0))
+                                        .color(TEXT_MUTED),
+                                );
+                            });
+                            return;
+                        }
+
+                        // Full-style card grid: fixed 270px cards, auto-fill rows.
+                        ui.horizontal_wrapped(|ui| {
+                            ui.spacing_mut().item_spacing = vec2(12.0, 12.0);
+                            for &idx in &filtered_indices {
+                                let inst = &instances[idx];
+                                instance_card(
+                                    self,
+                                    ui,
+                                    inst,
+                                    selected_instance,
+                                    instances_dir,
+                                    lang,
+                                    &mut action,
+                                );
                             }
                         });
                     });
-                }
-                if let Some(slug) = install {
-                    self.discover_install = Some(slug);
-                }
-                ui.add_space(8.0);
             }
-
-            // Filter + sort instances (memoized — see `filtered_indices`).
-            let filtered_indices = self.filtered_indices(instances);
-
-            // Instances list
-            ScrollArea::vertical()
-                .auto_shrink([false, false])
-                .show(ui, |ui| {
-                    ui.spacing_mut().item_spacing = vec2(0.0, 8.0);
-
-                    if instances.is_empty() {
-                        ui.add_space(50.0);
-                        ui.vertical_centered(|ui| {
-                            ui.label(
-                                egui::RichText::new(lang.inst_empty())
-                                    .font(egui::FontId::proportional(16.0))
-                                    .color(TEXT_MUTED),
-                            );
-                            ui.add_space(10.0);
-                            if ui
-                                .button(
-                                    egui::RichText::new(lang.inst_btn_create()).color(RUBY_LIGHT),
-                                )
-                                .clicked()
-                            {
-                                self.new_instance_ram = ctx.suggested_ram_mb;
-                                self.show_create_modal = true;
-                            }
-                        });
-                        return;
-                    }
-
-                    if filtered_indices.is_empty() {
-                        ui.add_space(30.0);
-                        ui.vertical_centered(|ui| {
-                            ui.label(
-                                egui::RichText::new(lang.home_empty())
-                                    .font(egui::FontId::proportional(14.0))
-                                    .color(TEXT_MUTED),
-                            );
-                        });
-                        return;
-                    }
-
-                    // Full-style card grid: fixed 270px cards, auto-fill rows.
-                    ui.horizontal_wrapped(|ui| {
-                        ui.spacing_mut().item_spacing = vec2(12.0, 12.0);
-                        for &idx in &filtered_indices {
-                            let inst = &instances[idx];
-                            instance_card(
-                                self,
-                                ui,
-                                inst,
-                                selected_instance,
-                                instances_dir,
-                                lang,
-                                &mut action,
-                            );
-                        }
-                    });
-                });
         }
 
         /// Full-style instance card: loader accent strip, icon, name, meta,
@@ -1242,14 +1554,7 @@ impl InstancesPage {
             ui.painter().rect_filled(rect, crate::theme::rounding(), bg);
 
             // Loader accent strip on top (Square motif from aleph.icu)
-            let loader_color = match inst.loader {
-                LoaderType::Vanilla => Color32::from_rgb(0x38, 0x8E, 0x3C),
-                LoaderType::Fabric => RUBY_LIGHT.into(),
-                LoaderType::Quilt => Color32::from_rgb(0x9C, 0x27, 0xB0),
-                LoaderType::Forge => Color32::from_rgb(0xE6, 0x51, 0x00),
-                LoaderType::NeoForge => Color32::from_rgb(0xFF, 0x6D, 0x00),
-                LoaderType::OptiFine => Color32::from_rgb(0x00, 0x83, 0x8F),
-            };
+            let loader_color = loader_color(inst.loader);
             ui.painter().rect_filled(
                 egui::Rect::from_min_max(
                     rect.left_top(),
@@ -1427,25 +1732,7 @@ impl InstancesPage {
                     .on_hover_text(lang.inst_btn_edit())
                     .clicked()
                 {
-                    page.edit_instance_id = Some(inst_id);
-                    page.edit_instance_name = inst.name.clone();
-                    page.edit_instance_version = inst.game_version.clone();
-                    page.edit_instance_loader = inst.loader;
-                    page.edit_loader_pin = inst.loader_version.clone();
-                    page.edit_instance_ram = inst.ram_mb.unwrap_or(4096);
-                    page.edit_instance_icon = inst.icon.clone();
-                    page.edit_instance_tags = inst.tags.join(", ");
-                    page.edit_instance_pinned = inst.pinned;
-                    page.edit_instance_account = inst.default_account;
-                    page.edit_instance_group = inst.group.clone().unwrap_or_default();
-                    page.edit_use_custom_size = inst.window_size.is_some();
-                    page.edit_window_w = inst.window_size.map(|(w, _)| w).unwrap_or(1280);
-                    page.edit_window_h = inst.window_size.map(|(_, h)| h).unwrap_or(720);
-                    page.edit_fullscreen = inst.fullscreen;
-                    page.edit_instance_notes = inst.notes.clone();
-                    page.edit_instance_pre = inst.pre_launch_cmd.clone();
-                    page.edit_instance_post = inst.post_exit_cmd.clone();
-                    page.show_edit_modal = true;
+                    page.open_edit_modal(inst);
                 }
                 if icon_button(ui, Icon::Clipboard, TEXT_PRIMARY)
                     .on_hover_text(lang.inst_btn_clone())
@@ -1515,7 +1802,7 @@ impl InstancesPage {
         // Trash (CONCEPT "Корзина", P2): soft-deleted instances wait here
         // for restore or permanent deletion. FS scan throttled to 2s —
         // never per frame. The Modrinth library skin has no trash section.
-        if ctx.skin != LibrarySkin::Modrinth {
+        if !matches!(ctx.skin, LibrarySkin::Modrinth | LibrarySkin::Multimc) {
             let trash_stale = match self.trash_at {
                 Some(at) => at.elapsed() > std::time::Duration::from_secs(2),
                 None => true,
