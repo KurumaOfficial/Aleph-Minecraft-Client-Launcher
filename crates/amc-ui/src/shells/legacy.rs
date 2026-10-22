@@ -4,12 +4,11 @@
 //! - Legacy Minecraft Launcher (Mojang Studios, proprietary): the layout is
 //!   reconstructed from public screenshots only; no assets or code reused.
 //!
-//! Layout reference: a strip of classic folder tabs on top (the active tab
-//! is a white sheet merged with the page, the launcher wordmark fills the
-//! logo slot on the right), a bottom bar with the "Profile" / "Version"
-//! comboboxes and the green Play button, and a white page canvas between
-//! them. Metrics follow the 2013 launcher: 32px tabs, 24px comboboxes,
-//! 48px bottom bar.
+//! Layout reference (1.6.94): a light text-menu strip on top (Update Notes /
+//! Launcher Log / Profile Editor in the original), the news canvas in the
+//! middle, and a bottom bar with the profile picker, New/Edit Profile on the
+//! left, a large white Play button in the centre and the account welcome plus
+//! Switch User on the right.
 
 use crate::shells::{short_name, tab_label, ShellAction};
 use crate::theme;
@@ -18,14 +17,14 @@ use crate::widgets::icons::{self, Icon};
 use crate::widgets::NavTab;
 use amc_core::types::Instance;
 use amc_core::Language;
-use egui::{pos2, vec2, Align2, Color32, Rect, Response, Rounding, ScrollArea, Sense, Stroke, Ui};
+use egui::{pos2, vec2, Align2, Color32, Rect, Rounding, ScrollArea, Sense, Stroke, Ui};
 use uuid::Uuid;
 
-/// Tab strip height (reference: folder tabs above the white page).
-pub const TABS_HEIGHT: f32 = 32.0;
-/// Bottom bar height (reference: profile/version combos + Play).
+/// Top text-menu strip height (reference: a slim light-gray menu bar).
+pub const TABS_HEIGHT: f32 = 30.0;
+/// Bottom bar height (reference: profile picker + Play + account block).
 pub const PLAY_HEIGHT: f32 = 48.0;
-const PAD: f32 = 12.0;
+const PAD: f32 = 10.0;
 const COMBO_H: f32 = 24.0;
 /// Selection blue of the native menus of the era.
 const MENU_SELECTION: Color32 = Color32::from_rgb(0x31, 0x6A, 0xC5);
@@ -46,6 +45,10 @@ pub struct PlayBarCtx<'a> {
     pub instances: &'a [Instance],
     /// Currently selected instance.
     pub selected: Option<Uuid>,
+    /// Launch version shown in the "Ready to play" line.
+    pub version: Option<&'a str>,
+    /// Active account name shown in the welcome line.
+    pub account: Option<&'a str>,
 }
 
 /// What the profile combobox menu returned.
@@ -56,14 +59,14 @@ enum ComboPick {
     New,
 }
 
-/// Top strip: classic folder tabs; the active one is a white sheet that
-/// merges with the page canvas below, the rest sit flat on the window gray.
+/// Top strip: plain text menu links, exactly like the reference's
+/// Update Notes / Launcher Log / Profile Editor row, plus the AMC identity
+/// in the logo slot on the right.
 pub fn show_tabs(ui: &mut Ui, lang: Language, current_tab: NavTab) -> ShellAction {
     let mut action = ShellAction::default();
     let bar = ui.max_rect();
     let painter = ui.painter();
-    painter.rect_filled(bar, Rounding::ZERO, theme::BG);
-    // Baseline under the inactive tabs; the active sheet paints over it.
+    painter.rect_filled(bar, Rounding::ZERO, theme::CARD);
     painter.line_segment(
         [
             pos2(bar.left(), bar.bottom() - 0.5),
@@ -72,94 +75,77 @@ pub fn show_tabs(ui: &mut Ui, lang: Language, current_tab: NavTab) -> ShellActio
         Stroke::new(1.0_f32, theme::BORDER),
     );
 
-    ui.horizontal(|ui| {
-        ui.spacing_mut().item_spacing = vec2(1.0, 0.0);
-        for tab in TABS {
-            let active = tab == current_tab;
-            let label = tab_label(tab, lang);
-            let galley = ui.painter().layout_no_wrap(
-                label.to_owned(),
-                egui::FontId::proportional(12.5),
-                Color32::PLACEHOLDER,
+    let mut x = bar.left() + PAD;
+    for (idx, tab) in TABS.into_iter().enumerate() {
+        let active = tab == current_tab;
+        let label = tab_label(tab, lang);
+        let galley = ui.painter().layout_no_wrap(
+            label.to_owned(),
+            egui::FontId::proportional(12.5),
+            Color32::PLACEHOLDER,
+        );
+        let rect = Rect::from_min_size(
+            pos2(x, bar.top()),
+            vec2(galley.size().x + 20.0, bar.height()),
+        );
+        let resp = ui.interact(rect, ui.id().with(("legacy_menu", idx)), Sense::click());
+        let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+        if active {
+            painter.rect_filled(
+                Rect::from_min_max(
+                    pos2(rect.left() + 10.0, rect.bottom() - 2.0),
+                    pos2(rect.right() - 10.0, rect.bottom()),
+                ),
+                Rounding::ZERO,
+                theme::ACCENT,
             );
-            let (rect, resp) =
-                ui.allocate_exact_size(vec2(galley.size().x + 26.0, bar.height()), Sense::click());
-            let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
-            let sheet = Rect::from_min_max(
-                pos2(rect.left(), rect.top() + 4.0),
-                pos2(rect.right(), rect.bottom()),
-            );
-            if active {
-                let rounding = Rounding {
-                    nw: 2.0,
-                    ne: 2.0,
-                    sw: 0.0,
-                    se: 0.0,
-                };
-                ui.painter().rect_filled(sheet, rounding, theme::FIELD);
-                ui.painter()
-                    .rect_stroke(sheet, rounding, Stroke::new(1.0_f32, theme::BORDER));
-                // Erase the baseline under the sheet so it merges with the
-                // white page canvas.
-                ui.painter().line_segment(
-                    [
-                        pos2(sheet.left() + 1.0, sheet.bottom() - 0.5),
-                        pos2(sheet.right() - 1.0, sheet.bottom() - 0.5),
-                    ],
-                    Stroke::new(1.0_f32, theme::FIELD),
-                );
-            } else if hover > 0.02 {
-                ui.painter().rect_filled(
-                    sheet,
-                    Rounding::ZERO,
-                    theme::with_alpha(theme::FIELD, (hover * 80.0) as u8),
-                );
-            }
-            let color = if active {
-                theme::HEAD.into()
-            } else {
-                theme::lerp_color(theme::MUTED, theme::TEXT, hover)
-            };
-            let text_y = sheet.top() + (sheet.height() - galley.size().y) / 2.0;
-            ui.painter().galley(
-                pos2(rect.center().x - galley.size().x / 2.0, text_y),
-                galley,
-                color,
-            );
-            if resp.clicked() {
-                action.tab = Some(tab);
-            }
         }
+        let color = if active {
+            theme::HEAD.into()
+        } else {
+            theme::lerp_color(theme::TEXT, theme::INFO, hover)
+        };
+        painter.text(
+            rect.center(),
+            Align2::CENTER_CENTER,
+            label,
+            egui::FontId::proportional(12.5),
+            color,
+        );
+        if resp.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+        if resp.clicked() {
+            action.tab = Some(tab);
+        }
+        x = rect.right();
+    }
 
-        // AMC identity in the reference logo slot.
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.add_space(PAD);
-            let galley = ui.painter().layout_no_wrap(
-                brand::APP_NAME_UPPER.to_owned(),
-                theme::display(14.0),
-                Color32::PLACEHOLDER,
-            );
-            let (rect, _) =
-                ui.allocate_exact_size(vec2(12.0 + 7.0 + galley.size().x, 14.0), Sense::hover());
-            let mark =
-                Rect::from_min_size(pos2(rect.left(), rect.center().y - 6.0), vec2(12.0, 12.0));
-            brand::hollow_square(ui.painter(), mark, brand::BRAND_RED);
-            ui.painter().galley(
-                pos2(mark.right() + 7.0, rect.center().y - galley.size().y / 2.0),
-                galley,
-                theme::HEAD.into(),
-            );
-        });
-    });
+    // AMC identity in the reference logo slot.
+    let galley = ui.painter().layout_no_wrap(
+        brand::APP_NAME_UPPER.to_owned(),
+        theme::display(13.0),
+        Color32::PLACEHOLDER,
+    );
+    let right = bar.right() - PAD;
+    let text_left = right - galley.size().x;
+    let mark = Rect::from_min_size(
+        pos2(text_left - 19.0, bar.center().y - 5.0),
+        vec2(10.0, 10.0),
+    );
+    brand::hollow_square(ui.painter(), mark, brand::BRAND_RED);
+    ui.painter().galley(
+        pos2(text_left, bar.center().y - galley.size().y / 2.0),
+        galley,
+        theme::HEAD.into(),
+    );
 
     action
 }
 
-/// Classic combobox of the era: white field, 1px border, a right cell with
-/// the drop-down triangle; returns the field rect and its response.
-fn combo_frame(ui: &mut Ui, text: &str, width: f32, leading: Option<Icon>) -> (Rect, Response) {
-    let (rect, resp) = ui.allocate_exact_size(vec2(width, COMBO_H), Sense::click());
-    let painter = ui.painter();
+/// Paints the classic combobox of the era: white field, 1px border, a right
+/// cell with the drop-down triangle.
+fn paint_combo(painter: &egui::Painter, rect: Rect, text: &str, leading: Option<Icon>) {
     painter.rect_filled(rect, Rounding::ZERO, theme::FIELD);
     painter.rect_stroke(rect, Rounding::ZERO, Stroke::new(1.0_f32, theme::BORDER));
     let arrow = Rect::from_min_max(
@@ -197,31 +183,36 @@ fn combo_frame(ui: &mut Ui, text: &str, width: f32, leading: Option<Icon>) -> (R
     }
     let avail = (arrow.left() - x - 4.0).max(10.0);
     let max_chars = ((avail / 6.2).floor() as usize).max(4);
-    let galley = ui.painter().layout_no_wrap(
+    let galley = painter.layout_no_wrap(
         short_name(text, max_chars),
         egui::FontId::proportional(12.5),
         Color32::PLACEHOLDER,
     );
-    ui.painter().galley(
+    painter.galley(
         pos2(x, rect.center().y - galley.size().y / 2.0),
         galley,
         theme::TEXT.into(),
     );
-    (rect, resp)
 }
 
 /// Profile combobox: lists the instances like the reference profile picker
 /// (checked row = current profile) plus a "New profile…" entry; the popup
 /// opens upward because the combobox sits in the bottom bar.
-fn profile_combo(ui: &mut Ui, ctx: &PlayBarCtx<'_>, lang: Language) -> Option<ComboPick> {
+fn profile_combo_at(
+    ui: &mut Ui,
+    rect: Rect,
+    ctx: &PlayBarCtx<'_>,
+    lang: Language,
+) -> Option<ComboPick> {
     let selected = ctx
         .selected
         .and_then(|id| ctx.instances.iter().find(|i| i.id == id));
     let text = selected
         .map(|i| i.name.as_str())
         .unwrap_or_else(|| lang.shell_no_profile());
-    let (rect, resp) = combo_frame(ui, text, 210.0, Some(Icon::Person));
+    paint_combo(ui.painter(), rect, text, Some(Icon::Person));
 
+    let resp = ui.interact(rect, ui.id().with("legacy_profile_combo"), Sense::click());
     let open_id = resp.id.with("open");
     let mut open: bool = ui.ctx().data_mut(|d| *d.get_temp_mut_or(open_id, false));
     if resp.clicked() {
@@ -332,8 +323,7 @@ fn profile_combo(ui: &mut Ui, ctx: &PlayBarCtx<'_>, lang: Language) -> Option<Co
         }
         if ui.ctx().input(|i| i.pointer.any_click()) {
             let pos = ui.ctx().input(|i| i.pointer.interact_pos());
-            let inside =
-                pos.is_some_and(|p| resp.rect.contains(p) || menu.response.rect.contains(p));
+            let inside = pos.is_some_and(|p| rect.contains(p) || menu.response.rect.contains(p));
             if !inside {
                 open = false;
             }
@@ -343,8 +333,9 @@ fn profile_combo(ui: &mut Ui, ctx: &PlayBarCtx<'_>, lang: Language) -> Option<Co
     picked
 }
 
-/// Bottom bar: "Profile" + combobox, "Version" + combobox, Play on the
-/// right — the reference's picker row.
+/// Bottom bar: profile picker and New/Edit Profile on the left, the large
+/// white Play button in the centre, and the account welcome plus Switch User
+/// on the right — the 1.6.94 composition.
 pub fn show_play_bar(
     ui: &mut Ui,
     lang: Language,
@@ -354,7 +345,7 @@ pub fn show_play_bar(
     let mut action = ShellAction::default();
     let bar = ui.max_rect();
     let painter = ui.painter();
-    painter.rect_filled(bar, Rounding::ZERO, theme::BG);
+    painter.rect_filled(bar, Rounding::ZERO, theme::CARD);
     painter.line_segment(
         [
             pos2(bar.left(), bar.top() + 0.5),
@@ -363,96 +354,178 @@ pub fn show_play_bar(
         Stroke::new(1.0_f32, theme::BORDER),
     );
 
-    ui.horizontal_centered(|ui| {
-        ui.spacing_mut().item_spacing = vec2(6.0, 0.0);
-        ui.add_space(PAD);
-
-        bar_label(ui, lang.shell_profile_label());
-        if let Some(pick) = profile_combo(ui, ctx, lang) {
-            match pick {
-                ComboPick::Entry(idx) => action.select_instance = Some(ctx.instances[idx].id),
-                ComboPick::New => action.new_instance = true,
-            }
+    let cy = bar.center().y;
+    let left = bar.left() + PAD;
+    let profile_w = (bar.width() * 0.14).clamp(130.0, 190.0);
+    let profile_rect =
+        Rect::from_min_size(pos2(left, cy - COMBO_H / 2.0), vec2(profile_w, COMBO_H));
+    if let Some(pick) = profile_combo_at(ui, profile_rect, ctx, lang) {
+        match pick {
+            ComboPick::Entry(idx) => action.select_instance = Some(ctx.instances[idx].id),
+            ComboPick::New => action.new_instance = true,
         }
+    }
 
-        ui.add_space(12.0);
-        bar_label(ui, lang.shell_version_label());
-        let selected = ctx
-            .selected
-            .and_then(|id| ctx.instances.iter().find(|i| i.id == id));
-        let version = selected
-            .map(|i| format!("{} ({})", i.game_version, i.loader.as_str()))
-            .unwrap_or_else(|| lang.shell_use_latest().to_string());
-        let (_, version_resp) = combo_frame(ui, &version, 168.0, None);
-        if version_resp.clicked() {
-            action.tab = Some(NavTab::Modpacks);
-        }
+    let gap = 5.0;
+    let new_label = lang.legacy_new_profile();
+    let new_rect = Rect::from_min_size(
+        pos2(profile_rect.right() + gap, cy - COMBO_H / 2.0),
+        vec2(bar_button_width(ui, new_label).max(84.0), COMBO_H),
+    );
+    if bar_button(ui, new_rect, new_label, true) {
+        action.new_instance = true;
+    }
+    let edit_label = lang.shell_edit_profile();
+    let edit_rect = Rect::from_min_size(
+        pos2(new_rect.right() + gap, cy - COMBO_H / 2.0),
+        vec2(bar_button_width(ui, edit_label).max(92.0), COMBO_H),
+    );
+    if bar_button(ui, edit_rect, edit_label, ctx.selected.is_some()) && ctx.selected.is_some() {
+        action.edit_instance = true;
+    }
 
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.add_space(PAD);
-            let label = if launching {
-                lang.bottom_btn_launching()
-            } else {
-                lang.bottom_btn_play()
-            };
-            if play_button(ui, label, launching) {
-                action.launch = true;
-            }
-        });
-    });
+    let play_w = (bar.width() * 0.22).clamp(190.0, 280.0);
+    let play_rect = Rect::from_center_size(pos2(bar.center().x, cy), vec2(play_w, 32.0));
+    let play_label = if launching {
+        lang.legacy_launching()
+    } else {
+        lang.legacy_play()
+    };
+    if play_button_at(ui, play_rect, play_label, launching) {
+        action.launch = true;
+    }
+
+    let switch_label = lang.legacy_switch_user();
+    let switch_w = bar_button_width(ui, switch_label).max(104.0);
+    let switch_rect = Rect::from_min_size(
+        pos2(bar.right() - PAD - switch_w, cy - COMBO_H / 2.0),
+        vec2(switch_w, COMBO_H),
+    );
+    if bar_button(ui, switch_rect, switch_label, true) {
+        action.login = true;
+    }
+
+    // Welcome block sits just left of Switch User. It disappears on very
+    // narrow windows rather than colliding with the centred Play button.
+    let text_right = switch_rect.left() - 10.0;
+    if text_right > play_rect.right() + 12.0 {
+        let account = ctx.account.unwrap_or_else(|| lang.legacy_guest());
+        let welcome = lang.legacy_welcome(account);
+        let version = ctx.version.unwrap_or_else(|| lang.shell_use_latest());
+        let ready = lang.legacy_ready(version);
+        let ready = short_name(&ready, 42);
+        ui.painter().text(
+            pos2(text_right, cy - 8.0),
+            Align2::RIGHT_CENTER,
+            short_name(&welcome, 30),
+            egui::FontId::proportional(11.5),
+            theme::HEAD.into(),
+        );
+        ui.painter().text(
+            pos2(text_right, cy + 8.0),
+            Align2::RIGHT_CENTER,
+            ready,
+            egui::FontId::proportional(10.0),
+            theme::MUTED.into(),
+        );
+    }
 
     action
 }
 
-/// Small "Profile:" / "Version:" label with its colon.
-fn bar_label(ui: &mut Ui, text: &str) {
-    let galley = ui.painter().layout_no_wrap(
-        format!("{text}:"),
-        egui::FontId::proportional(12.5),
-        Color32::PLACEHOLDER,
-    );
-    let (rect, _) = ui.allocate_exact_size(galley.size(), Sense::hover());
-    ui.painter().galley(
-        pos2(rect.left(), rect.center().y - galley.size().y / 2.0),
-        galley,
-        theme::TEXT.into(),
-    );
+fn bar_button_width(ui: &Ui, label: &str) -> f32 {
+    ui.painter()
+        .layout_no_wrap(
+            label.to_owned(),
+            egui::FontId::proportional(10.5),
+            Color32::PLACEHOLDER,
+        )
+        .size()
+        .x
+        + 16.0
 }
 
-/// The classic green Play button (flat fill, 1px darker border, white
-/// label, no icon).
-fn play_button(ui: &mut Ui, label: &str, launching: bool) -> bool {
-    let (rect, resp) = ui.allocate_exact_size(vec2(132.0, 30.0), Sense::click());
-    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
-    let fill: Color32 = if launching {
-        theme::ACCENT_DIM.into()
-    } else {
-        theme::lerp_color(theme::ACCENT, theme::ACCENT_LIGHT, hover * 0.55)
-    };
-    ui.painter()
-        .rect_filled(rect, crate::theme::rounding(), fill);
-    ui.painter().rect_stroke(
+/// Flat classic button: white field, 1px border, dark label; disabled buttons
+/// keep the frame but dim the text.
+fn bar_button(ui: &mut Ui, rect: Rect, label: &str, enabled: bool) -> bool {
+    let resp = ui.interact(
         rect,
-        crate::theme::rounding(),
-        Stroke::new(1.0_f32, theme::ACCENT_DIM),
+        ui.id().with(("legacy_bar_button", label)),
+        Sense::click(),
     );
-    let galley = ui.painter().layout_no_wrap(
-        label.to_owned(),
-        egui::FontId::proportional(14.0),
-        Color32::PLACEHOLDER,
+    let hover = if enabled {
+        ui.ctx().animate_bool_responsive(resp.id, resp.hovered())
+    } else {
+        0.0
+    };
+    let painter = ui.painter();
+    painter.rect_filled(rect, Rounding::ZERO, theme::FIELD);
+    painter.rect_stroke(
+        rect,
+        Rounding::ZERO,
+        Stroke::new(1.0_f32, theme::BORDER_STRONG),
     );
-    ui.painter().galley(
-        pos2(
-            rect.center().x - galley.size().x / 2.0,
-            rect.center().y - galley.size().y / 2.0,
-        ),
-        galley,
-        Color32::WHITE,
+    if hover > 0.02 {
+        painter.rect_filled(
+            rect,
+            Rounding::ZERO,
+            theme::with_alpha(theme::BG_HOVER, (hover * 210.0) as u8),
+        );
+    }
+    painter.text(
+        rect.center(),
+        Align2::CENTER_CENTER,
+        label,
+        egui::FontId::proportional(10.5),
+        if enabled {
+            theme::TEXT.into()
+        } else {
+            theme::MUTED_DIM.into()
+        },
     );
-    if resp.hovered() {
+    if enabled && resp.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
-    resp.clicked() && !launching
+    enabled && resp.clicked()
+}
+
+/// The reference's large white Play button: flat white fill, gray border,
+/// dark label, no icon.
+fn play_button_at(ui: &mut Ui, rect: Rect, label: &str, launching: bool) -> bool {
+    let resp = ui.interact(rect, ui.id().with("legacy_play_button"), Sense::click());
+    let enabled = !launching;
+    let hover = if enabled {
+        ui.ctx().animate_bool_responsive(resp.id, resp.hovered())
+    } else {
+        0.0
+    };
+    let painter = ui.painter();
+    let fill: Color32 = if launching {
+        theme::CARD.into()
+    } else {
+        theme::lerp_color(theme::FIELD, theme::BG_HOVER, hover * 0.7)
+    };
+    painter.rect_filled(rect, crate::theme::rounding(), fill);
+    painter.rect_stroke(
+        rect,
+        crate::theme::rounding(),
+        Stroke::new(1.0_f32, theme::BORDER_STRONG),
+    );
+    painter.text(
+        rect.center(),
+        Align2::CENTER_CENTER,
+        label,
+        egui::FontId::proportional(14.0),
+        if enabled {
+            theme::HEAD.into()
+        } else {
+            theme::MUTED.into()
+        },
+    );
+    if enabled && resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    enabled && resp.clicked()
 }
 
 #[cfg(test)]

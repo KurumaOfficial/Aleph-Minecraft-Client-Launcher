@@ -23,8 +23,8 @@
 //!   accent, custom title bar.
 //! - Millida: hero banner plus a lobby grid of tiles, content opens from a
 //!   tile.
-//! - Legacy: a row of plain text tabs on top and a Play panel at the bottom
-//!   with the version selector.
+//! - Legacy: a light text-menu strip on top, the news canvas in the middle and
+//!   a bottom panel with the profile picker, Play and the account block.
 
 pub mod legacy;
 pub mod millida;

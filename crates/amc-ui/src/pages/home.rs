@@ -2,6 +2,7 @@ use crate::theme::{
     lerp_color, ACCENT_DIM, BG_CARD, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, BORDER_STRONG, RUBY,
     RUBY_DIM, RUBY_LIGHT, SUCCESS, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
+use crate::widgets::brand;
 use crate::widgets::draw_custom_badge;
 use crate::widgets::full::{ghost_link, image_cover, kicker, red_button, red_square_deco, tag};
 use crate::widgets::icons::{self, Icon};
@@ -99,6 +100,8 @@ pub struct HomeContext<'a> {
     pub versions_dir: &'a Path,
     pub instances_count: usize,
     pub memory_mb: u32,
+    /// Legacy shells render the 1.6.94 news page instead of the Aleph hero.
+    pub legacy: bool,
 }
 
 impl HomePage {
@@ -111,6 +114,10 @@ impl HomePage {
         favorites: &mut Vec<FavoriteServerEntry>,
         lang: amc_core::Language,
     ) {
+        if ctx_data.legacy {
+            self.show_legacy_news(ui, lang);
+            return;
+        }
         self.refresh_installed(versions, ctx_data.versions_dir);
         self.ensure_hero_texture(ui.ctx());
         self.show_hero(
@@ -679,6 +686,183 @@ impl HomePage {
 
     /// Full-style hero: cover art, red-square deco, display titles,
     /// big Play + ghost pick link, stats row.
+    /// Legacy 1.6.94 news page: dark parchment-like canvas, a wide news
+    /// column with blue article headings and the classic links sidebar.
+    fn show_legacy_news(&mut self, ui: &mut Ui, lang: amc_core::Language) {
+        const NEWS_BG: Color32 = Color32::from_rgb(0x1D, 0x1D, 0x1D);
+        const NEWS_PANEL: Color32 = Color32::from_rgb(0x27, 0x27, 0x27);
+        const NEWS_TEXT: Color32 = Color32::from_rgb(0xC8, 0xC8, 0xC8);
+        const NEWS_MUTED: Color32 = Color32::from_rgb(0x8F, 0x8F, 0x8F);
+        const NEWS_LINK: Color32 = Color32::from_rgb(0x70, 0x9F, 0xE8);
+        const NEWS_RULE: Color32 = Color32::from_rgb(0x3A, 0x3A, 0x3A);
+
+        let area = ui.available_rect_before_wrap();
+        ui.painter()
+            .rect_filled(area, egui::Rounding::ZERO, NEWS_BG);
+        let inner = area.shrink2(vec2(20.0, 16.0));
+        ui.allocate_new_ui(
+            egui::UiBuilder::new()
+                .max_rect(inner)
+                .layout(egui::Layout::top_down(egui::Align::Min)),
+            |ui| {
+                ScrollArea::vertical()
+                    .id_salt("legacy_news_scroll")
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        ui.set_min_width(inner.width());
+                        ui.horizontal_top(|ui| {
+                            let total = ui.available_width();
+                            let sidebar = 250.0;
+                            let gap = 28.0;
+                            let left = (total - sidebar - gap).max(360.0);
+
+                            ui.vertical(|ui| {
+                                ui.set_width(left);
+                                ui.horizontal(|ui| {
+                                    ui.label(
+                                        egui::RichText::new(lang.legacy_news_title())
+                                            .font(egui::FontId::proportional(27.0))
+                                            .strong()
+                                            .color(Color32::from_rgb(0xEE, 0xEE, 0xEE)),
+                                    );
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Center),
+                                        |ui| {
+                                            ui.label(
+                                                egui::RichText::new(lang.legacy_powered())
+                                                    .font(egui::FontId::proportional(11.0))
+                                                    .color(NEWS_MUTED),
+                                            );
+                                        },
+                                    );
+                                });
+                                let (rule, _) = ui.allocate_exact_size(
+                                    vec2(ui.available_width(), 1.0),
+                                    Sense::hover(),
+                                );
+                                ui.painter()
+                                    .rect_filled(rule, egui::Rounding::ZERO, NEWS_RULE);
+                                ui.add_space(16.0);
+
+                                for (title, body) in [
+                                    (
+                                        lang.legacy_news_updates_title(),
+                                        lang.legacy_news_updates_body(),
+                                    ),
+                                    (
+                                        lang.legacy_news_community_title(),
+                                        lang.legacy_news_community_body(),
+                                    ),
+                                    (
+                                        lang.legacy_news_catalog_title(),
+                                        lang.legacy_news_catalog_body(),
+                                    ),
+                                    (
+                                        lang.legacy_news_profiles_title(),
+                                        lang.legacy_news_profiles_body(),
+                                    ),
+                                    (
+                                        lang.legacy_news_accounts_title(),
+                                        lang.legacy_news_accounts_body(),
+                                    ),
+                                ] {
+                                    legacy_news_link_title(ui, title, NEWS_LINK);
+                                    ui.add_space(4.0);
+                                    ui.label(
+                                        egui::RichText::new(body)
+                                            .font(egui::FontId::proportional(12.5))
+                                            .color(NEWS_TEXT),
+                                    );
+                                    ui.add_space(15.0);
+                                    let (rule, _) = ui.allocate_exact_size(
+                                        vec2(ui.available_width(), 1.0),
+                                        Sense::hover(),
+                                    );
+                                    ui.painter()
+                                        .rect_filled(rule, egui::Rounding::ZERO, NEWS_RULE);
+                                    ui.add_space(15.0);
+                                }
+                            });
+
+                            ui.add_space(gap);
+                            ui.vertical(|ui| {
+                                ui.set_width(sidebar);
+                                ui.label(
+                                    egui::RichText::new(lang.legacy_official_links())
+                                        .font(egui::FontId::proportional(15.0))
+                                        .strong()
+                                        .color(Color32::from_rgb(0xEE, 0xEE, 0xEE)),
+                                );
+                                ui.add_space(7.0);
+                                legacy_news_link(ui, lang.legacy_link_github(), PROJECT_URL);
+                                legacy_news_link(
+                                    ui,
+                                    lang.legacy_link_modrinth(),
+                                    "https://modrinth.com",
+                                );
+                                legacy_news_link(
+                                    ui,
+                                    lang.legacy_link_wiki(),
+                                    "https://minecraft.wiki",
+                                );
+
+                                ui.add_space(18.0);
+                                ui.label(
+                                    egui::RichText::new(lang.legacy_other_projects())
+                                        .font(egui::FontId::proportional(15.0))
+                                        .strong()
+                                        .color(Color32::from_rgb(0xEE, 0xEE, 0xEE)),
+                                );
+                                ui.add_space(7.0);
+                                egui::Frame::none()
+                                    .fill(NEWS_PANEL)
+                                    .stroke(Stroke::new(1.0_f32, NEWS_RULE))
+                                    .inner_margin(egui::Margin::same(12.0))
+                                    .show(ui, |ui| {
+                                        ui.set_width(sidebar - 26.0);
+                                        ui.horizontal(|ui| {
+                                            let (mark, _) = ui.allocate_exact_size(
+                                                vec2(16.0, 16.0),
+                                                Sense::hover(),
+                                            );
+                                            brand::hollow_square(
+                                                ui.painter(),
+                                                mark,
+                                                brand::BRAND_RED,
+                                            );
+                                            ui.label(
+                                                egui::RichText::new(brand::APP_NAME)
+                                                    .font(crate::theme::display(14.0))
+                                                    .color(Color32::from_rgb(0xEE, 0xEE, 0xEE)),
+                                            );
+                                        });
+                                    });
+
+                                ui.add_space(18.0);
+                                ui.label(
+                                    egui::RichText::new(lang.legacy_community_links())
+                                        .font(egui::FontId::proportional(15.0))
+                                        .strong()
+                                        .color(Color32::from_rgb(0xEE, 0xEE, 0xEE)),
+                                );
+                                ui.add_space(7.0);
+                                legacy_news_link(
+                                    ui,
+                                    lang.legacy_link_issues(),
+                                    &format!("{PROJECT_URL}/issues"),
+                                );
+                                legacy_news_link(
+                                    ui,
+                                    lang.legacy_link_support(),
+                                    &format!("{PROJECT_URL}/issues"),
+                                );
+                            });
+                        });
+                    });
+            },
+        );
+    }
+
     fn show_hero(
         &mut self,
         ui: &mut Ui,
@@ -971,6 +1155,45 @@ impl HomePage {
             self.active_filter = tab;
         }
     }
+}
+
+/// Public project page used by the Legacy news sidebar.
+const PROJECT_URL: &str = "https://github.com/KurumaOfficial/Aleph-Minecraft-Client-Launcher";
+
+fn legacy_news_link_title(ui: &mut Ui, title: &str, color: Color32) {
+    ui.label(
+        egui::RichText::new(title)
+            .font(egui::FontId::proportional(16.5))
+            .strong()
+            .color(color),
+    );
+}
+
+fn legacy_news_link(ui: &mut Ui, label: &str, url: &str) {
+    let resp = ui.add(
+        egui::Label::new(
+            egui::RichText::new(label)
+                .font(egui::FontId::proportional(12.5))
+                .color(Color32::from_rgb(0x70, 0x9F, 0xE8)),
+        )
+        .sense(Sense::click()),
+    );
+    if resp.hovered() {
+        ui.painter().line_segment(
+            [
+                egui::pos2(resp.rect.left(), resp.rect.bottom() - 1.0),
+                egui::pos2(resp.rect.right(), resp.rect.bottom() - 1.0),
+            ],
+            Stroke::new(1.0_f32, Color32::from_rgb(0x70, 0x9F, 0xE8)),
+        );
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    if resp.clicked() {
+        if let Err(err) = open::that(url) {
+            tracing::warn!("Legacy news link failed: {err}");
+        }
+    }
+    ui.add_space(3.0);
 }
 
 #[cfg(test)]

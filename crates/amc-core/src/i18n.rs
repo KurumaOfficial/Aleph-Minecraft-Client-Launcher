@@ -3150,6 +3150,252 @@ impl Language {
         }
     }
 
+    pub fn shell_edit_profile(&self) -> &'static str {
+        match self {
+            Self::English => "Edit Profile",
+            Self::Russian => "Изменить профиль",
+            Self::Ukrainian => "Змінити профіль",
+        }
+    }
+
+    pub fn legacy_new_profile(&self) -> &'static str {
+        match self {
+            Self::English => "New Profile",
+            Self::Russian => "Новый профиль",
+            Self::Ukrainian => "Новий профіль",
+        }
+    }
+
+    pub fn legacy_play(&self) -> &'static str {
+        match self {
+            Self::English => "Play",
+            Self::Russian => "Играть",
+            Self::Ukrainian => "Грати",
+        }
+    }
+
+    pub fn legacy_launching(&self) -> &'static str {
+        match self {
+            Self::English => "Launching…",
+            Self::Russian => "Запуск…",
+            Self::Ukrainian => "Запуск…",
+        }
+    }
+
+    pub fn legacy_guest(&self) -> &'static str {
+        match self {
+            Self::English => "Player",
+            Self::Russian => "Игрок",
+            Self::Ukrainian => "Гравець",
+        }
+    }
+
+    pub fn legacy_welcome(&self, name: &str) -> String {
+        match self {
+            Self::English => format!("Welcome, {name}"),
+            Self::Russian => format!("Добро пожаловать, {name}"),
+            Self::Ukrainian => format!("Вітаємо, {name}"),
+        }
+    }
+
+    pub fn legacy_ready(&self, version: &str) -> String {
+        match self {
+            Self::English => format!("Ready to update & play Minecraft {version}"),
+            Self::Russian => format!("Готово к запуску Minecraft {version}"),
+            Self::Ukrainian => format!("Готово до запуску Minecraft {version}"),
+        }
+    }
+
+    pub fn legacy_switch_user(&self) -> &'static str {
+        match self {
+            Self::English => "Switch User",
+            Self::Russian => "Сменить пользователя",
+            Self::Ukrainian => "Змінити користувача",
+        }
+    }
+
+    pub fn legacy_news_title(&self) -> &'static str {
+        match self {
+            Self::English => "Minecraft News",
+            Self::Russian => "Новости Minecraft",
+            Self::Ukrainian => "Новини Minecraft",
+        }
+    }
+
+    pub fn legacy_powered(&self) -> &'static str {
+        match self {
+            Self::English => "Powered by AMC",
+            Self::Russian => "Работает на AMC",
+            Self::Ukrainian => "Працює на AMC",
+        }
+    }
+
+    pub fn legacy_official_links(&self) -> &'static str {
+        match self {
+            Self::English => "Official links:",
+            Self::Russian => "Официальные ссылки:",
+            Self::Ukrainian => "Офіційні посилання:",
+        }
+    }
+
+    pub fn legacy_community_links(&self) -> &'static str {
+        match self {
+            Self::English => "Community links:",
+            Self::Russian => "Ссылки сообщества:",
+            Self::Ukrainian => "Посилання спільноти:",
+        }
+    }
+
+    pub fn legacy_other_projects(&self) -> &'static str {
+        match self {
+            Self::English => "Our projects:",
+            Self::Russian => "Наши проекты:",
+            Self::Ukrainian => "Наші проєкти:",
+        }
+    }
+
+    pub fn legacy_news_updates_title(&self) -> &'static str {
+        match self {
+            Self::English => "Launcher update",
+            Self::Russian => "Обновление лаунчера",
+            Self::Ukrainian => "Оновлення лаунчера",
+        }
+    }
+
+    pub fn legacy_news_updates_body(&self) -> &'static str {
+        match self {
+            Self::English => {
+                "AMC Launcher keeps the classic launcher composition: profiles, versions, news and a fast native renderer."
+            }
+            Self::Russian => {
+                "AMC Launcher сохраняет композицию классического лаунчера: профили, версии, новости и быстрый нативный рендер."
+            }
+            Self::Ukrainian => {
+                "AMC Launcher зберігає композицію класичного лаунчера: профілі, версії, новини та швидкий нативний рендер."
+            }
+        }
+    }
+
+    pub fn legacy_news_community_title(&self) -> &'static str {
+        match self {
+            Self::English => "Community update",
+            Self::Russian => "Обновление сообщества",
+            Self::Ukrainian => "Оновлення спільноти",
+        }
+    }
+
+    pub fn legacy_news_community_body(&self) -> &'static str {
+        match self {
+            Self::English => {
+                "Share your builds, skins and modpacks. Community news will appear here as the launcher grows."
+            }
+            Self::Russian => {
+                "Делитесь сборками, скинами и модпаками. Новости сообщества появятся здесь по мере развития лаунчера."
+            }
+            Self::Ukrainian => {
+                "Діліться збірками, скінами та модпаками. Новини спільноти з'являться тут у міру розвитку лаунчера."
+            }
+        }
+    }
+
+    pub fn legacy_news_catalog_title(&self) -> &'static str {
+        match self {
+            Self::English => "Mods and modpacks",
+            Self::Russian => "Моды и сборки",
+            Self::Ukrainian => "Моди та збірки",
+        }
+    }
+
+    pub fn legacy_news_catalog_body(&self) -> &'static str {
+        match self {
+            Self::English => {
+                "Browse the catalog, install builds and manage local mods from one place."
+            }
+            Self::Russian => {
+                "Каталог, установка сборок и управление локальными модами — в одном месте."
+            }
+            Self::Ukrainian => {
+                "Каталог, встановлення збірок і керування локальними модами — в одному місці."
+            }
+        }
+    }
+
+    pub fn legacy_news_profiles_title(&self) -> &'static str {
+        match self {
+            Self::English => "Profiles and versions",
+            Self::Russian => "Профили и версии",
+            Self::Ukrainian => "Профілі та версії",
+        }
+    }
+
+    pub fn legacy_news_profiles_body(&self) -> &'static str {
+        match self {
+            Self::English => {
+                "Create a profile, choose a version and keep each world, mod set and memory preset separate."
+            }
+            Self::Russian => {
+                "Создайте профиль, выберите версию и храните миры, набор модов и объём памяти отдельно."
+            }
+            Self::Ukrainian => {
+                "Створіть профіль, виберіть версію та зберігайте світи, набір модів і обсяг пам'яті окремо."
+            }
+        }
+    }
+
+    pub fn legacy_news_accounts_title(&self) -> &'static str {
+        match self {
+            Self::English => "Accounts and safety",
+            Self::Russian => "Аккаунты и безопасность",
+            Self::Ukrainian => "Акаунти та безпека",
+        }
+    }
+
+    pub fn legacy_news_accounts_body(&self) -> &'static str {
+        match self {
+            Self::English => {
+                "Sign in once, switch identities from the bottom bar and keep launcher data on your own machine."
+            }
+            Self::Russian => {
+                "Войдите один раз, переключайте аккаунты на нижней панели — данные лаунчера остаются на вашем компьютере."
+            }
+            Self::Ukrainian => {
+                "Увійдіть один раз, перемикайте акаунти на нижній панелі — дані лаунчера залишаються на вашому комп'ютері."
+            }
+        }
+    }
+
+    pub fn legacy_link_github(&self) -> &'static str {
+        "GitHub"
+    }
+
+    pub fn legacy_link_modrinth(&self) -> &'static str {
+        "Modrinth"
+    }
+
+    pub fn legacy_link_wiki(&self) -> &'static str {
+        match self {
+            Self::English => "Minecraft Wiki",
+            Self::Russian => "Minecraft Wiki",
+            Self::Ukrainian => "Minecraft Wiki",
+        }
+    }
+
+    pub fn legacy_link_issues(&self) -> &'static str {
+        match self {
+            Self::English => "Bug tracker",
+            Self::Russian => "Баг-трекер",
+            Self::Ukrainian => "Баг-трекер",
+        }
+    }
+
+    pub fn legacy_link_support(&self) -> &'static str {
+        match self {
+            Self::English => "Support",
+            Self::Russian => "Поддержка",
+            Self::Ukrainian => "Підтримка",
+        }
+    }
+
     pub fn shell_use_latest(&self) -> &'static str {
         match self {
             Self::English => "Use latest version",
@@ -5274,6 +5520,34 @@ mod tests {
             assert!(!lang.shell_version_label().is_empty());
             assert!(!lang.shell_new_profile().is_empty());
             assert!(!lang.shell_no_profile().is_empty());
+            assert!(!lang.shell_edit_profile().is_empty());
+            assert!(!lang.legacy_new_profile().is_empty());
+            assert!(!lang.legacy_play().is_empty());
+            assert!(!lang.legacy_launching().is_empty());
+            assert!(!lang.legacy_guest().is_empty());
+            assert!(!lang.legacy_welcome("AMC").is_empty());
+            assert!(!lang.legacy_ready("1.21").is_empty());
+            assert!(!lang.legacy_switch_user().is_empty());
+            assert!(!lang.legacy_news_title().is_empty());
+            assert!(!lang.legacy_powered().is_empty());
+            assert!(!lang.legacy_official_links().is_empty());
+            assert!(!lang.legacy_community_links().is_empty());
+            assert!(!lang.legacy_other_projects().is_empty());
+            assert!(!lang.legacy_news_updates_title().is_empty());
+            assert!(!lang.legacy_news_updates_body().is_empty());
+            assert!(!lang.legacy_news_community_title().is_empty());
+            assert!(!lang.legacy_news_community_body().is_empty());
+            assert!(!lang.legacy_news_catalog_title().is_empty());
+            assert!(!lang.legacy_news_catalog_body().is_empty());
+            assert!(!lang.legacy_news_profiles_title().is_empty());
+            assert!(!lang.legacy_news_profiles_body().is_empty());
+            assert!(!lang.legacy_news_accounts_title().is_empty());
+            assert!(!lang.legacy_news_accounts_body().is_empty());
+            assert!(!lang.legacy_link_github().is_empty());
+            assert!(!lang.legacy_link_modrinth().is_empty());
+            assert!(!lang.legacy_link_wiki().is_empty());
+            assert!(!lang.legacy_link_issues().is_empty());
+            assert!(!lang.legacy_link_support().is_empty());
             assert!(!lang.shell_use_latest().is_empty());
             assert!(!lang.shell_rail_play().is_empty());
             assert!(!lang.shell_rail_builds().is_empty());

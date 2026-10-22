@@ -3913,12 +3913,20 @@ impl App for LauncherApp {
                     }
                 });
         } else if shell == amc_core::config::ShellKind::Legacy {
-            // Legacy launcher: folder tabs on top (white active sheet), a
-            // bottom bar with the Profile / Version combos and the green
-            // Play button; the shared pages render on the white canvas.
+            // Legacy launcher (1.6.94): text menu strip on top, news canvas
+            // in the middle and the profile / Play / account bar below.
             ctx.animate_bool_responsive(pro_slide_id, false);
             let mut shell_action = crate::shells::ShellAction::default();
             let launching = self.is_launching;
+            let account_name: Option<String> = self
+                .account_mgr
+                .active_account()
+                .map(|a| a.username.clone());
+            let launch_version: Option<String> = self
+                .selected_instance
+                .and_then(|id| self.instances.iter().find(|i| i.id == id))
+                .map(|inst| inst.game_version.clone())
+                .or_else(|| self.selected_version.clone());
             TopBottomPanel::bottom("legacy_play")
                 .exact_height(crate::shells::legacy::PLAY_HEIGHT)
                 .frame(egui::Frame::none())
@@ -3926,6 +3934,8 @@ impl App for LauncherApp {
                     let bar_ctx = crate::shells::legacy::PlayBarCtx {
                         instances: &self.instances,
                         selected: self.selected_instance,
+                        version: launch_version.as_deref(),
+                        account: account_name.as_deref(),
                     };
                     let action =
                         crate::shells::legacy::show_play_bar(ui, lang, &bar_ctx, launching);
@@ -3945,6 +3955,16 @@ impl App for LauncherApp {
                 self.current_tab = NavTab::Modpacks;
                 self.instances_page.new_instance_ram = self.hw_suggested_ram;
                 self.instances_page.show_create_modal = true;
+            }
+            if shell_action.edit_instance {
+                if let Some(id) = self.selected_instance {
+                    if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
+                        self.instances_page.open_edit_modal(inst);
+                    }
+                }
+            }
+            if shell_action.login {
+                self.login_modal.is_open = true;
             }
             if let Some(id) = shell_action.select_instance {
                 self.selected_instance = Some(id);
@@ -4089,8 +4109,10 @@ impl App for LauncherApp {
                 // all content padding on the play screen); other pages keep
                 // the shared breathing room.
                 let available = ui.available_rect_before_wrap();
-                let edge_to_edge = shell == amc_core::config::ShellKind::Millida
-                    && self.current_tab == NavTab::Home;
+                let edge_to_edge = (shell == amc_core::config::ShellKind::Millida
+                    && self.current_tab == NavTab::Home)
+                    || (shell == amc_core::config::ShellKind::Legacy
+                        && self.current_tab == NavTab::Home);
                 let inner_rect = if edge_to_edge {
                     available
                 } else {
@@ -4272,6 +4294,7 @@ impl App for LauncherApp {
                             versions_dir: &self.paths.versions_dir(),
                             instances_count: self.instances.len(),
                             memory_mb: self.config.default_launch_options.memory_max_mb,
+                            legacy: shell == amc_core::config::ShellKind::Legacy,
                         };
                         self.home_page.show(
                             &mut content_ui,
