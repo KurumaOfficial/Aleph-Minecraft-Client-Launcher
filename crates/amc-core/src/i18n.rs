@@ -987,6 +987,24 @@ impl Language {
         }
     }
 
+    /// Millida shell: catalog page heading.
+    pub fn millida_mods_title(&self) -> &'static str {
+        match self {
+            Self::English => "Mod catalog",
+            Self::Russian => "Каталог модов",
+            Self::Ukrainian => "Каталог модів",
+        }
+    }
+
+    /// Millida shell: catalog result counter.
+    pub fn millida_mods_count(&self, count: usize) -> String {
+        match self {
+            Self::English => format!("{count} mods"),
+            Self::Russian => format!("{count} модов"),
+            Self::Ukrainian => format!("{count} модів"),
+        }
+    }
+
     /// Modrinth shell: local list empty state.
     pub fn mods_empty_title(&self) -> &'static str {
         match self {
@@ -5157,6 +5175,8 @@ mod tests {
             assert!(!lang.mods_open_folder_plain().is_empty());
             assert!(!lang.mods_empty_title().is_empty());
             assert!(!lang.mods_empty_hint().is_empty());
+            assert!(!lang.millida_mods_title().is_empty());
+            assert!(!lang.millida_mods_count(3).is_empty());
             assert!(!lang.mods_browse_action().is_empty());
             assert!(!lang.skins_title().is_empty());
             assert!(!lang.skins_selector_title().is_empty());

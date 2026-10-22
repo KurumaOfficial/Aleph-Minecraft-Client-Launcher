@@ -1,3 +1,4 @@
+use crate::theme;
 use crate::theme::{
     lerp_color, BG_CARD, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT, SUCCESS,
     TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
@@ -5,7 +6,7 @@ use crate::theme::{
 use crate::widgets::icons::{self, icon_button, Icon};
 use amc_core::Language;
 use amc_mods::types::{LocalMod, ModCategory, ModSearchResult, ModSource, SearchSort};
-use egui::{vec2, Color32, ScrollArea, Sense, Stroke, TextEdit, Ui};
+use egui::{pos2, vec2, Color32, ScrollArea, Sense, Stroke, TextEdit, Ui};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
@@ -23,6 +24,7 @@ pub enum ModsSkin {
     #[default]
     Amc,
     Modrinth,
+    Millida,
 }
 
 /// Outcome of one update check (CONCEPT P4): the fresh local scan
@@ -205,22 +207,36 @@ impl ModsPage {
         S: FnOnce(String, ModSource, ModCategory, SearchSort),
         I: FnOnce(ModSearchResult),
     {
-        ui.add_space(20.0);
+        ui.add_space(if skin == ModsSkin::Millida {
+            14.0
+        } else {
+            20.0
+        });
 
         // Header
+        let millida = skin == ModsSkin::Millida;
         let title_size = if skin == ModsSkin::Modrinth {
             24.0
+        } else if millida {
+            28.0
         } else {
             26.0
         };
         let title = if skin == ModsSkin::Modrinth {
             lang.nav_mods()
+        } else if millida {
+            lang.millida_mods_title()
         } else {
             lang.mods_title()
         };
+        let title_font = if millida {
+            crate::theme::display(title_size)
+        } else {
+            egui::FontId::proportional(title_size)
+        };
         ui.label(
             egui::RichText::new(title)
-                .font(egui::FontId::proportional(title_size))
+                .font(title_font)
                 .strong()
                 .color(TEXT_HEADING),
         );
@@ -233,9 +249,32 @@ impl ModsPage {
                         .color(crate::theme::MODRINTH_TEXT_SECONDARY),
                 );
             }
+        } else if millida {
+            let count = match self.sub_tab {
+                ModsSubTab::Local => self.local_mods.len(),
+                ModsSubTab::Search => self.search_results.len(),
+            };
+            ui.add_space(5.0);
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 8.0;
+                let (mark, _) = ui.allocate_exact_size(vec2(10.0, 10.0), Sense::hover());
+                ui.painter().rect_filled(mark, egui::Rounding::ZERO, RUBY);
+                ui.label(
+                    egui::RichText::new(lang.millida_mods_count(count))
+                        .font(egui::FontId::proportional(12.5))
+                        .color(TEXT_MUTED),
+                );
+                if let Some(meta) = instance_meta {
+                    ui.label(
+                        egui::RichText::new(meta)
+                            .font(egui::FontId::proportional(12.0))
+                            .color(TEXT_MUTED),
+                    );
+                }
+            });
         }
 
-        ui.add_space(14.0);
+        ui.add_space(if millida { 12.0 } else { 14.0 });
 
         // Status banner if present
         if let Some((msg, is_ok)) = &self.status_message {
@@ -249,6 +288,8 @@ impl ModsPage {
         // Subtabs: Local / Search
         if skin == ModsSkin::Modrinth {
             self.show_modrinth_tabs(ui, lang, mods_dir);
+        } else if millida {
+            self.show_millida_tabs(ui, lang, mods_dir);
         } else {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing = vec2(8.0, 0.0);
@@ -369,6 +410,92 @@ impl ModsPage {
                 actions.on_install,
             ),
         }
+    }
+
+    /// Millida catalog header: cut-corner tabs with the shell's mint active
+    /// plate and a matched folder action.
+    fn show_millida_tabs(&mut self, ui: &mut Ui, lang: Language, mods_dir: &Path) {
+        let font = egui::FontId::new(12.0, egui::FontFamily::Name("bold".into()));
+        let installed = lang.mods_tab_installed_plain().to_owned();
+        let search = lang.mods_tab_search_plain().to_owned();
+        let folder = lang.mods_open_folder_plain().to_owned();
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
+            for (idx, (label, active)) in [
+                (installed, self.sub_tab == ModsSubTab::Local),
+                (search, self.sub_tab == ModsSubTab::Search),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let galley =
+                    ui.painter()
+                        .layout_no_wrap(label.clone(), font.clone(), Color32::PLACEHOLDER);
+                let width = (galley.size().x + 32.0).max(122.0);
+                let (rect, resp) = ui.allocate_exact_size(vec2(width, 34.0), Sense::click());
+                let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+                let fill = if active {
+                    theme::ACCENT.into()
+                } else {
+                    theme::lerp_color(theme::BG_CARD, theme::BG_HOVER, hover)
+                };
+                let outline = if active {
+                    theme::ACCENT_LIGHT.into()
+                } else {
+                    theme::BORDER_STRONG.into()
+                };
+                millida_pixel_plate(ui.painter(), rect, 5.0, fill, outline);
+                ui.painter().galley(
+                    pos2(
+                        rect.center().x - galley.size().x / 2.0,
+                        rect.center().y - galley.size().y / 2.0,
+                    ),
+                    galley,
+                    if active {
+                        theme::BG.into()
+                    } else {
+                        theme::TEXT_PRIMARY.into()
+                    },
+                );
+                if resp.clicked() {
+                    self.sub_tab = if idx == 0 {
+                        ModsSubTab::Local
+                    } else {
+                        ModsSubTab::Search
+                    };
+                }
+            }
+
+            let galley = ui
+                .painter()
+                .layout_no_wrap(folder, font, Color32::PLACEHOLDER);
+            let width = (galley.size().x + 48.0).max(156.0);
+            let (rect, resp) = ui.allocate_exact_size(vec2(width, 34.0), Sense::click());
+            let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+            millida_pixel_plate(
+                ui.painter(),
+                rect,
+                5.0,
+                theme::lerp_color(theme::BG_CARD, theme::BG_HOVER, hover),
+                theme::BORDER_STRONG.into(),
+            );
+            icons::draw_centered(
+                ui.painter(),
+                Icon::Folder,
+                pos2(rect.left() + 18.0, rect.center().y),
+                15.0,
+                theme::lerp_color(theme::ACCENT, theme::ACCENT_LIGHT, hover),
+            );
+            ui.painter().galley(
+                pos2(rect.left() + 32.0, rect.center().y - galley.size().y / 2.0),
+                galley,
+                theme::TEXT_PRIMARY.into(),
+            );
+            if resp.clicked() {
+                let _ = std::fs::create_dir_all(mods_dir);
+                let _ = open::that(mods_dir);
+            }
+        });
     }
 
     /// Reference `NavTabs` treatment for the Modrinth shell: a rounded
@@ -515,6 +642,87 @@ impl ModsPage {
         });
     }
 
+    fn show_millida_empty(&mut self, ui: &mut Ui, lang: Language) {
+        ui.add_space(22.0);
+        let width = ui.available_width();
+        let (card, _) = ui.allocate_exact_size(vec2(width, 222.0), Sense::hover());
+        millida_pixel_plate(
+            ui.painter(),
+            card,
+            10.0,
+            theme::BG_CARD.into(),
+            theme::BORDER_DEFAULT.into(),
+        );
+        let icon = egui::Rect::from_center_size(
+            pos2(card.center().x, card.top() + 58.0),
+            vec2(58.0, 58.0),
+        );
+        millida_pixel_plate(
+            ui.painter(),
+            icon,
+            8.0,
+            theme::BG_CARD.into(),
+            theme::ACCENT.into(),
+        );
+        icons::draw_centered(
+            ui.painter(),
+            Icon::Puzzle,
+            icon.center(),
+            27.0,
+            theme::ACCENT,
+        );
+        let title = ui.painter().layout_no_wrap(
+            lang.mods_empty_title().to_owned(),
+            crate::theme::display(17.0),
+            theme::TEXT_HEADING.into(),
+        );
+        ui.painter().galley(
+            pos2(card.center().x - title.size().x / 2.0, card.top() + 100.0),
+            title,
+            theme::TEXT_HEADING.into(),
+        );
+        let hint = ui.painter().layout(
+            lang.mods_empty_hint().to_owned(),
+            egui::FontId::proportional(12.5),
+            theme::MUTED.into(),
+            (width - 56.0).max(120.0),
+        );
+        ui.painter().galley(
+            pos2(card.center().x - hint.size().x / 2.0, card.top() + 126.0),
+            hint,
+            theme::MUTED.into(),
+        );
+
+        let action = egui::Rect::from_center_size(
+            pos2(card.center().x, card.bottom() - 38.0),
+            vec2(168.0, 36.0),
+        );
+        let resp = ui
+            .interact(action, ui.id().with("millida_browse_mods"), Sense::click())
+            .on_hover_text(lang.mods_browse_action());
+        let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+        millida_pixel_plate(
+            ui.painter(),
+            action,
+            5.0,
+            theme::lerp_color(theme::ACCENT, theme::ACCENT_LIGHT, hover),
+            theme::ACCENT_LIGHT.into(),
+        );
+        ui.painter().text(
+            action.center(),
+            egui::Align2::CENTER_CENTER,
+            lang.mods_browse_action(),
+            egui::FontId::new(12.0, egui::FontFamily::Name("bold".into())),
+            theme::BG.into(),
+        );
+        if resp.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+        if resp.clicked() {
+            self.sub_tab = ModsSubTab::Search;
+        }
+    }
+
     fn show_local_mods(
         &mut self,
         ui: &mut Ui,
@@ -523,6 +731,10 @@ impl ModsPage {
         update_install: &mut Option<(ModSearchResult, String)>,
     ) {
         if self.local_mods.is_empty() {
+            if skin == ModsSkin::Millida {
+                self.show_millida_empty(ui, lang);
+                return;
+            }
             if skin == ModsSkin::Modrinth {
                 ui.add_space(36.0);
                 ui.vertical_centered(|ui| {
@@ -1385,6 +1597,48 @@ impl ModsPage {
                 }
             });
     }
+}
+
+fn millida_pixel_rect(painter: &egui::Painter, rect: egui::Rect, cut: f32, fill: Color32) {
+    let c = cut
+        .min(rect.width() * 0.5)
+        .min(rect.height() * 0.5)
+        .max(0.0);
+    painter.rect_filled(
+        egui::Rect::from_min_max(
+            pos2(rect.left() + c, rect.top()),
+            pos2(rect.right() - c, rect.top() + c),
+        ),
+        egui::Rounding::ZERO,
+        fill,
+    );
+    painter.rect_filled(
+        egui::Rect::from_min_max(
+            pos2(rect.left(), rect.top() + c),
+            pos2(rect.right(), rect.bottom() - c),
+        ),
+        egui::Rounding::ZERO,
+        fill,
+    );
+    painter.rect_filled(
+        egui::Rect::from_min_max(
+            pos2(rect.left() + c, rect.bottom() - c),
+            pos2(rect.right() - c, rect.bottom()),
+        ),
+        egui::Rounding::ZERO,
+        fill,
+    );
+}
+
+fn millida_pixel_plate(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    cut: f32,
+    fill: Color32,
+    outline: Color32,
+) {
+    millida_pixel_rect(painter, rect, cut, outline);
+    millida_pixel_rect(painter, rect.shrink(1.0), cut, fill);
 }
 
 #[cfg(test)]

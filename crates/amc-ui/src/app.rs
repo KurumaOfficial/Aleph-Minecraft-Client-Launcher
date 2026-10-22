@@ -4594,6 +4594,8 @@ impl App for LauncherApp {
                         let mut update_install = None;
                         let mods_skin = if shell == amc_core::config::ShellKind::Modrinth {
                             ModsSkin::Modrinth
+                        } else if shell == amc_core::config::ShellKind::Millida {
+                            ModsSkin::Millida
                         } else {
                             ModsSkin::Amc
                         };

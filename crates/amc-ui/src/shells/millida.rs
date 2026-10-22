@@ -382,11 +382,18 @@ pub fn show_rail(
     let mark = Rect::from_min_size(pos2(bar.left() + 16.0, bar.top() + 18.0), vec2(26.0, 26.0));
     brand::hollow_square(&painter, mark, brand::BRAND_RED);
     painter.text(
-        pos2(mark.right() + 10.0, mark.center().y),
+        pos2(mark.right() + 10.0, mark.center().y - 6.0),
         Align2::LEFT_CENTER,
-        brand::APP_NAME_UPPER,
-        theme::display(13.0),
+        "AMC",
+        theme::display(15.0),
         theme::HEAD.into(),
+    );
+    painter.text(
+        pos2(mark.right() + 10.0, mark.center().y + 8.0),
+        Align2::LEFT_CENTER,
+        "LAUNCHER",
+        theme::mono(8.0),
+        theme::with_alpha(theme::HEAD, 170),
     );
 
     let util_y = bar.top() + 17.0;
