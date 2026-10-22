@@ -743,7 +743,7 @@ impl HomePage {
                 ui.label(
                     egui::RichText::new("AMC")
                         .font(crate::theme::display(54.0))
-                        .color(TEXT_HEADING),
+                        .color(Color32::from_rgb(0xEA, 0xE2, 0xDC)),
                 );
                 ui.add_space(10.0);
                 kicker(ui, lang.home_hero_kicker());
