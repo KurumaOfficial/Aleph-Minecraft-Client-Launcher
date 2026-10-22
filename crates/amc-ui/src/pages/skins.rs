@@ -1,3 +1,4 @@
+use crate::theme;
 use crate::theme::{
     lerp_color, BG_CARD, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, BORDER_STRONG, RUBY, RUBY_LIGHT,
     TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
@@ -16,6 +17,7 @@ pub enum SkinsSkin {
     #[default]
     Amc,
     Modrinth,
+    Millida,
 }
 
 pub struct SkinsPage {
@@ -54,6 +56,10 @@ impl SkinsPage {
     ) {
         if skin == SkinsSkin::Modrinth {
             self.show_modrinth(ui, account, lang);
+            return;
+        }
+        if skin == SkinsSkin::Millida {
+            self.show_millida(ui, account, lang);
             return;
         }
         ui.add_space(20.0);
@@ -346,6 +352,382 @@ impl SkinsPage {
                 self.avatar_dirty = true;
             }
         }
+    }
+
+    /// Millida wardrobe: native 3D preview on a cut-corner stage with the
+    /// skin library in a pixel plate rail.
+    fn show_millida(&mut self, ui: &mut Ui, account: Option<&Account>, lang: amc_core::Language) {
+        self.ensure_preview_texture(ui.ctx());
+
+        ui.add_space(14.0);
+        ui.horizontal(|ui| {
+            let (mark, _) = ui.allocate_exact_size(vec2(14.0, 14.0), Sense::hover());
+            millida_pixel_plate(
+                ui.painter(),
+                mark,
+                3.0,
+                theme::ACCENT.into(),
+                theme::ACCENT_LIGHT.into(),
+            );
+            ui.label(
+                egui::RichText::new(lang.skins_selector_title())
+                    .font(theme::display(26.0))
+                    .color(theme::HEAD),
+            );
+        });
+        ui.add_space(12.0);
+
+        let available = ui.available_width();
+        let gap = 16.0;
+        let left_w = (available * 0.46).clamp(280.0, 350.0);
+        let right_w = (available - left_w - gap).max(240.0);
+        let panel_h = (ui.available_height() - 4.0).max(420.0);
+
+        ui.horizontal_top(|ui| {
+            ui.allocate_ui_with_layout(
+                vec2(left_w, panel_h),
+                egui::Layout::top_down(egui::Align::Min),
+                |ui| self.show_millida_preview(ui, account, lang, left_w, panel_h),
+            );
+            ui.add_space(gap);
+            ui.allocate_ui_with_layout(
+                vec2(right_w, panel_h),
+                egui::Layout::top_down(egui::Align::Min),
+                |ui| {
+                    egui::ScrollArea::vertical()
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| self.show_millida_skin_list(ui, lang, right_w));
+                },
+            );
+        });
+    }
+
+    fn show_millida_preview(
+        &mut self,
+        ui: &mut Ui,
+        account: Option<&Account>,
+        lang: amc_core::Language,
+        width: f32,
+        panel_h: f32,
+    ) {
+        let preview_h = (panel_h - 154.0).max(250.0);
+        let (card, _) = ui.allocate_exact_size(vec2(width, preview_h), Sense::hover());
+        millida_pixel_plate(
+            ui.painter(),
+            card,
+            12.0,
+            theme::BG_CARD.into(),
+            theme::BORDER_STRONG.into(),
+        );
+        ui.painter().circle_filled(
+            pos2(card.center().x, card.center().y + 8.0),
+            preview_h * 0.33,
+            theme::with_alpha(theme::ACCENT, 20),
+        );
+
+        let viewer = card.shrink2(vec2(12.0, 26.0));
+        self.skin3d
+            .show(ui, viewer, self.skin_image.as_ref(), self.is_slim_model);
+        ui.painter().text(
+            pos2(card.center().x, card.bottom() - 15.0),
+            egui::Align2::CENTER_CENTER,
+            lang.skins_drag_rotate(),
+            egui::FontId::proportional(10.5),
+            theme::MUTED.into(),
+        );
+
+        let chip = egui::Rect::from_min_size(
+            pos2(card.left() + 14.0, card.top() + 14.0),
+            vec2(98.0, 24.0),
+        );
+        millida_pixel_plate(
+            ui.painter(),
+            chip,
+            4.0,
+            theme::with_alpha(theme::BG, 220),
+            theme::ACCENT.into(),
+        );
+        ui.painter().text(
+            chip.center(),
+            egui::Align2::CENTER_CENTER,
+            if self.is_slim_model {
+                lang.skins_model_slim()
+            } else {
+                lang.skins_model_classic()
+            },
+            egui::FontId::proportional(10.5),
+            theme::TEXT.into(),
+        );
+
+        ui.add_space(10.0);
+        let (tray, _) = ui.allocate_exact_size(vec2(width, 36.0), Sense::hover());
+        millida_pixel_plate(
+            ui.painter(),
+            tray,
+            5.0,
+            theme::BG.into(),
+            theme::BORDER_STRONG.into(),
+        );
+        let segment_w = (tray.width() - 8.0) / 2.0;
+        for (idx, (label, active, slim)) in [
+            (lang.skins_model_classic(), !self.is_slim_model, false),
+            (lang.skins_model_slim(), self.is_slim_model, true),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let seg = egui::Rect::from_min_size(
+                pos2(tray.left() + 4.0 + idx as f32 * segment_w, tray.top() + 4.0),
+                vec2(segment_w, 28.0),
+            );
+            let resp = ui.interact(seg, ui.id().with(("millida_model", idx)), Sense::click());
+            if active {
+                millida_pixel_rect(ui.painter(), seg, 4.0, theme::ACCENT.into());
+            }
+            ui.painter().text(
+                seg.center(),
+                egui::Align2::CENTER_CENTER,
+                label,
+                egui::FontId::new(11.5, egui::FontFamily::Name("bold".into())),
+                if active {
+                    theme::BG.into()
+                } else {
+                    theme::TEXT.into()
+                },
+            );
+            if resp.clicked() && self.is_slim_model != slim {
+                self.is_slim_model = slim;
+                self.dirty = true;
+                self.avatar_dirty = true;
+            }
+        }
+
+        ui.add_space(8.0);
+        let button_w = ((width - 8.0) / 2.0).max(110.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing = vec2(8.0, 0.0);
+            if millida_skin_button(ui, Icon::Folder, lang.skins_load_skin(), true, button_w) {
+                self.load_skin_dialog(lang);
+            }
+            let reset = if self.is_slim_model {
+                lang.skins_btn_reset_alex()
+            } else {
+                lang.skins_btn_reset_steve()
+            };
+            if millida_skin_button(ui, Icon::Refresh, reset, false, button_w) {
+                self.skin_image = None;
+                self.custom_skin_path = None;
+                self.active_skin_name = if self.is_slim_model {
+                    "Alex".to_string()
+                } else {
+                    "Steve".to_string()
+                };
+                self.dirty = true;
+                self.avatar_dirty = true;
+            }
+        });
+
+        ui.add_space(8.0);
+        let status = match account {
+            Some(acc) => format!(
+                "{}: {} ({})",
+                lang.skins_account_label(),
+                acc.username,
+                acc.account_type.as_str()
+            ),
+            None => lang.skins_demo_notice().to_string(),
+        };
+        ui.label(
+            egui::RichText::new(status)
+                .font(egui::FontId::proportional(11.0))
+                .color(theme::MUTED),
+        );
+    }
+
+    fn show_millida_skin_list(&mut self, ui: &mut Ui, lang: amc_core::Language, _width: f32) {
+        let width = ui.available_width();
+        ui.horizontal(|ui| {
+            ui.label(
+                egui::RichText::new(lang.nav_skins())
+                    .font(theme::display(16.0))
+                    .color(theme::HEAD),
+            );
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if millida_skin_button(
+                    ui,
+                    Icon::Plus,
+                    lang.skins_add(),
+                    true,
+                    (width * 0.43).clamp(108.0, 154.0),
+                ) {
+                    self.load_skin_dialog(lang);
+                }
+            });
+        });
+        ui.add_space(10.0);
+
+        let (card, _) = ui.allocate_exact_size(vec2(width, 74.0), Sense::hover());
+        millida_pixel_plate(
+            ui.painter(),
+            card,
+            8.0,
+            theme::BG_CARD.into(),
+            theme::BORDER_STRONG.into(),
+        );
+        let head = egui::Rect::from_min_size(
+            pos2(card.left() + 12.0, card.top() + 12.0),
+            vec2(50.0, 50.0),
+        );
+        millida_pixel_plate(
+            ui.painter(),
+            head,
+            6.0,
+            theme::BG.into(),
+            theme::BORDER_DEFAULT.into(),
+        );
+        if let Some(tex) = &self.texture_handle {
+            ui.painter().image(
+                tex.id(),
+                head.shrink(5.0),
+                egui::Rect::from_min_max(pos2(0.25, 0.0), pos2(0.75, 0.25)),
+                Color32::WHITE,
+            );
+        }
+        ui.painter().text(
+            pos2(card.left() + 74.0, card.center().y - 9.0),
+            egui::Align2::LEFT_CENTER,
+            truncate_skin_name(&self.active_skin_name, 24),
+            egui::FontId::new(13.0, egui::FontFamily::Name("bold".into())),
+            theme::HEAD.into(),
+        );
+        ui.painter().text(
+            pos2(card.left() + 74.0, card.center().y + 11.0),
+            egui::Align2::LEFT_CENTER,
+            if self.is_slim_model {
+                lang.skins_model_slim()
+            } else {
+                lang.skins_model_classic()
+            },
+            egui::FontId::proportional(11.0),
+            theme::MUTED.into(),
+        );
+        let badge = egui::Rect::from_min_size(
+            pos2(card.right() - 78.0, card.center().y - 11.0),
+            vec2(66.0, 22.0),
+        );
+        millida_pixel_plate(
+            ui.painter(),
+            badge,
+            4.0,
+            theme::BG.into(),
+            theme::ACCENT.into(),
+        );
+        ui.painter().text(
+            badge.center(),
+            egui::Align2::CENTER_CENTER,
+            lang.skins_active_badge(),
+            egui::FontId::proportional(10.0),
+            theme::ACCENT_LIGHT.into(),
+        );
+
+        ui.add_space(16.0);
+        ui.label(
+            egui::RichText::new(lang.skins_defaults())
+                .font(egui::FontId::proportional(12.0))
+                .strong()
+                .color(theme::MUTED),
+        );
+        ui.add_space(8.0);
+        let tile_gap = 8.0;
+        let tile_w = ((width - tile_gap) / 2.0).max(90.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing = vec2(tile_gap, 0.0);
+            for (slim, label, tex) in [
+                (false, "Steve", default_head_texture(ui.ctx(), false)),
+                (true, "Alex", default_head_texture(ui.ctx(), true)),
+            ] {
+                let (tile, resp) = ui.allocate_exact_size(vec2(tile_w, 96.0), Sense::click());
+                let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+                let active = self.skin_image.is_none() && self.is_slim_model == slim;
+                millida_pixel_plate(
+                    ui.painter(),
+                    tile,
+                    8.0,
+                    theme::lerp_color(theme::BG_CARD, theme::BG_HOVER, hover),
+                    if active {
+                        theme::ACCENT.into()
+                    } else {
+                        theme::BORDER_STRONG.into()
+                    },
+                );
+                let head = egui::Rect::from_center_size(
+                    pos2(tile.center().x, tile.top() + 36.0),
+                    vec2(46.0, 46.0),
+                );
+                millida_pixel_plate(
+                    ui.painter(),
+                    head,
+                    5.0,
+                    theme::BG.into(),
+                    theme::BORDER_DEFAULT.into(),
+                );
+                ui.painter().image(
+                    tex.id(),
+                    head.shrink(5.0),
+                    egui::Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                    Color32::WHITE,
+                );
+                ui.painter().text(
+                    pos2(tile.center().x, tile.bottom() - 16.0),
+                    egui::Align2::CENTER_CENTER,
+                    label,
+                    egui::FontId::proportional(11.5),
+                    theme::TEXT.into(),
+                );
+                if resp.hovered() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
+                if resp.clicked() {
+                    self.is_slim_model = slim;
+                    self.skin_image = None;
+                    self.custom_skin_path = None;
+                    self.active_skin_name = label.to_string();
+                    self.dirty = true;
+                    self.avatar_dirty = true;
+                }
+            }
+        });
+
+        ui.add_space(16.0);
+        ui.label(
+            egui::RichText::new(lang.skins_saved_title())
+                .font(egui::FontId::proportional(12.0))
+                .strong()
+                .color(theme::MUTED),
+        );
+        ui.add_space(8.0);
+        let (empty, _) = ui.allocate_exact_size(vec2(width, 58.0), Sense::hover());
+        millida_pixel_plate(
+            ui.painter(),
+            empty,
+            6.0,
+            theme::with_alpha(theme::BG_CARD, 150),
+            theme::BORDER_DEFAULT.into(),
+        );
+        icons::draw_centered(
+            ui.painter(),
+            Icon::Plus,
+            pos2(empty.left() + 24.0, empty.center().y),
+            14.0,
+            theme::MUTED,
+        );
+        ui.painter().text(
+            pos2(empty.left() + 42.0, empty.center().y),
+            egui::Align2::LEFT_CENTER,
+            lang.skins_no_saved(),
+            egui::FontId::proportional(12.0),
+            theme::MUTED.into(),
+        );
     }
 
     /// Modrinth reference composition: a sticky preview column and a skin
@@ -1402,6 +1784,90 @@ fn push_face(faces: &mut Vec<SkinFace>, verts: [V3; 4], normal: V3, uv: UvRect) 
         uv: uv.corners(),
         normal,
     });
+}
+
+fn millida_pixel_rect(painter: &egui::Painter, rect: Rect, cut: f32, fill: Color32) {
+    let c = cut
+        .min(rect.width() * 0.5)
+        .min(rect.height() * 0.5)
+        .max(0.0);
+    painter.rect_filled(
+        Rect::from_min_max(
+            pos2(rect.left() + c, rect.top()),
+            pos2(rect.right() - c, rect.top() + c),
+        ),
+        egui::Rounding::ZERO,
+        fill,
+    );
+    painter.rect_filled(
+        Rect::from_min_max(
+            pos2(rect.left(), rect.top() + c),
+            pos2(rect.right(), rect.bottom() - c),
+        ),
+        egui::Rounding::ZERO,
+        fill,
+    );
+    painter.rect_filled(
+        Rect::from_min_max(
+            pos2(rect.left() + c, rect.bottom() - c),
+            pos2(rect.right() - c, rect.bottom()),
+        ),
+        egui::Rounding::ZERO,
+        fill,
+    );
+}
+
+fn millida_pixel_plate(
+    painter: &egui::Painter,
+    rect: Rect,
+    cut: f32,
+    fill: Color32,
+    outline: Color32,
+) {
+    millida_pixel_rect(painter, rect, cut, outline);
+    millida_pixel_rect(painter, rect.shrink(1.0), cut, fill);
+}
+
+fn millida_skin_button(ui: &mut Ui, icon: Icon, label: &str, primary: bool, width: f32) -> bool {
+    let (rect, resp) = ui.allocate_exact_size(vec2(width, 34.0), Sense::click());
+    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+    let (fill, outline, text) = if primary {
+        (
+            theme::lerp_color(theme::ACCENT, theme::ACCENT_LIGHT, hover),
+            theme::ACCENT_LIGHT.into(),
+            theme::BG.into(),
+        )
+    } else {
+        (
+            theme::lerp_color(theme::BG_CARD, theme::BG_HOVER, hover),
+            theme::BORDER_STRONG.into(),
+            theme::TEXT.into(),
+        )
+    };
+    millida_pixel_plate(ui.painter(), rect, 5.0, fill, outline);
+    let galley = ui.painter().layout_no_wrap(
+        label.to_owned(),
+        egui::FontId::new(11.5, egui::FontFamily::Name("bold".into())),
+        Color32::PLACEHOLDER,
+    );
+    let total = 16.0 + 8.0 + galley.size().x;
+    let left = rect.center().x - total / 2.0;
+    icons::draw_centered(
+        ui.painter(),
+        icon,
+        pos2(left + 8.0, rect.center().y),
+        15.0,
+        text,
+    );
+    ui.painter().galley(
+        pos2(left + 24.0, rect.center().y - galley.size().y / 2.0),
+        galley,
+        text,
+    );
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp.clicked()
 }
 
 pub fn extract_head_avatar(skin: Option<&RgbaImage>, is_slim: bool) -> egui::ColorImage {

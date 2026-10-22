@@ -4730,6 +4730,8 @@ impl App for LauncherApp {
                         let acc = self.account_mgr.active_account();
                         let skins_skin = if shell == amc_core::config::ShellKind::Modrinth {
                             SkinsSkin::Modrinth
+                        } else if shell == amc_core::config::ShellKind::Millida {
+                            SkinsSkin::Millida
                         } else {
                             SkinsSkin::Amc
                         };
