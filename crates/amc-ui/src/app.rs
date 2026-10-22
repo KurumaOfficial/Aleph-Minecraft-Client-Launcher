@@ -28,7 +28,7 @@ use crate::modals::{
 use crate::pages::{
     icon_cache_file, icon_key, HomeContext, HomePage, InstanceAction, InstancesContext,
     InstancesPage, ModUpdateResult, ModsActions, ModsPage, ModsSkin, ProfileAction, ProfilePage,
-    SettingsPage, SkinsPage, SkinsSkin,
+    ProfileSkin, SettingsPage, SettingsSubTab, SkinsPage, SkinsSkin,
 };
 use crate::theme::{apply_aleph_theme, BG};
 use crate::widgets::{
@@ -4737,16 +4737,29 @@ impl App for LauncherApp {
                         let acc = self.account_mgr.active_account();
                         let slim = self.skins_page.is_slim_model;
                         let skin = self.skins_page.skin_image.as_ref();
-                        match self
-                            .profile_page
-                            .show(&mut content_ui, acc, skin, slim, lang)
-                        {
+                        let profile_skin = if shell == amc_core::config::ShellKind::Modrinth {
+                            ProfileSkin::Modrinth
+                        } else {
+                            ProfileSkin::Amc
+                        };
+                        match self.profile_page.show(
+                            &mut content_ui,
+                            acc,
+                            skin,
+                            slim,
+                            lang,
+                            profile_skin,
+                        ) {
                             ProfileAction::None => {}
                             ProfileAction::OpenSkins => {
                                 self.current_tab = NavTab::Skins;
                             }
                             ProfileAction::OpenLogin => {
                                 self.login_modal.is_open = true;
+                            }
+                            ProfileAction::OpenAccounts => {
+                                self.current_tab = NavTab::Settings;
+                                self.settings_page.sub_tab = SettingsSubTab::Accounts;
                             }
                         }
                     }

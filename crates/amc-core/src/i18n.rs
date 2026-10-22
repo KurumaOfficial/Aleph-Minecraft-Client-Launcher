@@ -2284,6 +2284,97 @@ impl Language {
         }
     }
 
+    /// Modrinth profile: signed-in account state.
+    pub fn modrinth_profile_status_signed_in(&self) -> &'static str {
+        match self {
+            Self::English => "Signed in and ready to play",
+            Self::Russian => "Вы вошли и готовы играть",
+            Self::Ukrainian => "Ви увійшли й готові грати",
+        }
+    }
+
+    /// Modrinth profile: offline identity state.
+    pub fn modrinth_profile_status_offline(&self) -> &'static str {
+        match self {
+            Self::English => "Offline profile · stored on this device",
+            Self::Russian => "Офлайн-профиль · хранится на этом устройстве",
+            Self::Ukrainian => "Офлайн-профіль · зберігається на цьому пристрої",
+        }
+    }
+
+    /// Modrinth profile: no account state.
+    pub fn modrinth_profile_status_signed_out(&self) -> &'static str {
+        match self {
+            Self::English => "Sign in to sync your Minecraft profile.",
+            Self::Russian => "Войдите, чтобы синхронизировать профиль Minecraft.",
+            Self::Ukrainian => "Увійдіть, щоб синхронізувати профіль Minecraft.",
+        }
+    }
+
+    pub fn modrinth_profile_details(&self) -> &'static str {
+        match self {
+            Self::English => "Account details",
+            Self::Russian => "Данные аккаунта",
+            Self::Ukrainian => "Дані акаунта",
+        }
+    }
+
+    pub fn modrinth_profile_player_uuid(&self) -> &'static str {
+        match self {
+            Self::English => "Player UUID",
+            Self::Russian => "UUID игрока",
+            Self::Ukrainian => "UUID гравця",
+        }
+    }
+
+    pub fn modrinth_profile_skin_model(&self) -> &'static str {
+        match self {
+            Self::English => "Skin model",
+            Self::Russian => "Модель скина",
+            Self::Ukrainian => "Модель скіна",
+        }
+    }
+
+    pub fn modrinth_profile_change_skin(&self) -> &'static str {
+        match self {
+            Self::English => "Change skin",
+            Self::Russian => "Сменить скин",
+            Self::Ukrainian => "Змінити скін",
+        }
+    }
+
+    pub fn modrinth_profile_manage_account(&self) -> &'static str {
+        match self {
+            Self::English => "Manage account",
+            Self::Russian => "Управление аккаунтом",
+            Self::Ukrainian => "Керування акаунтом",
+        }
+    }
+
+    pub fn modrinth_profile_copy_uuid(&self) -> &'static str {
+        match self {
+            Self::English => "Copy UUID",
+            Self::Russian => "Скопировать UUID",
+            Self::Ukrainian => "Копіювати UUID",
+        }
+    }
+
+    pub fn modrinth_profile_copied(&self) -> &'static str {
+        match self {
+            Self::English => "Copied",
+            Self::Russian => "Скопировано",
+            Self::Ukrainian => "Скопійовано",
+        }
+    }
+
+    pub fn modrinth_profile_no_uuid(&self) -> &'static str {
+        match self {
+            Self::English => "No UUID available",
+            Self::Russian => "UUID недоступен",
+            Self::Ukrainian => "UUID недоступний",
+        }
+    }
+
     // ---- Mod compatibility & friends (CONCEPT, P4) ----
     pub fn compat_ok(&self, mc: &str, loader: &str) -> String {
         match self {
@@ -5337,6 +5428,17 @@ mod tests {
             assert!(!lang.profile_title().is_empty());
             assert!(!lang.profile_nickname().is_empty());
             assert!(!lang.profile_cape_none().is_empty());
+            assert!(!lang.modrinth_profile_status_signed_in().is_empty());
+            assert!(!lang.modrinth_profile_status_offline().is_empty());
+            assert!(!lang.modrinth_profile_status_signed_out().is_empty());
+            assert!(!lang.modrinth_profile_details().is_empty());
+            assert!(!lang.modrinth_profile_player_uuid().is_empty());
+            assert!(!lang.modrinth_profile_skin_model().is_empty());
+            assert!(!lang.modrinth_profile_change_skin().is_empty());
+            assert!(!lang.modrinth_profile_manage_account().is_empty());
+            assert!(!lang.modrinth_profile_copy_uuid().is_empty());
+            assert!(!lang.modrinth_profile_copied().is_empty());
+            assert!(!lang.modrinth_profile_no_uuid().is_empty());
             assert!(!lang.compat_ok("1.20", "Fabric").is_empty());
             assert!(!lang.compat_unknown().is_empty());
             assert!(!lang.compat_none("1.20").is_empty());

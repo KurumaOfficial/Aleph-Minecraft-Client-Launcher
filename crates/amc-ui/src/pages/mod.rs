@@ -12,6 +12,6 @@ pub use instances::{InstanceAction, InstancesContext, InstancesPage};
 pub use mods::{
     icon_cache_file, icon_key, ModUpdateResult, ModsActions, ModsPage, ModsSkin, UpdateOffer,
 };
-pub use profile::{ProfileAction, ProfilePage};
-pub use settings::SettingsPage;
+pub use profile::{ProfileAction, ProfilePage, ProfileSkin};
+pub use settings::{SettingsPage, SettingsSubTab};
 pub use skins::{SkinsPage, SkinsSkin};
