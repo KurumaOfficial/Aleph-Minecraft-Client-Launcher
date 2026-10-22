@@ -28,7 +28,7 @@ use crate::modals::{
 use crate::pages::{
     icon_cache_file, icon_key, HomeContext, HomePage, InstanceAction, InstancesContext,
     InstancesPage, ModUpdateResult, ModsActions, ModsPage, ModsSkin, ProfileAction, ProfilePage,
-    ProfileSkin, SettingsPage, SettingsSubTab, SkinsPage, SkinsSkin,
+    ProfileSkin, SettingsPage, SettingsSkin, SettingsSubTab, SkinsPage, SkinsSkin,
 };
 use crate::theme::{apply_aleph_theme, BG};
 use crate::widgets::{
@@ -4765,6 +4765,11 @@ impl App for LauncherApp {
                     }
                     NavTab::Settings => {
                         let server_running = self.server_child.is_some();
+                        let settings_skin = if shell == amc_core::config::ShellKind::Modrinth {
+                            SettingsSkin::Modrinth
+                        } else {
+                            SettingsSkin::Amc
+                        };
                         self.settings_page.show(
                             &mut content_ui,
                             &mut self.config,
@@ -4772,6 +4777,7 @@ impl App for LauncherApp {
                             &self.paths,
                             server_running,
                             &self.server_status,
+                            settings_skin,
                         );
                         // Auto-save configuration changes, but only on
                         // actual change — never a per-frame FS write.

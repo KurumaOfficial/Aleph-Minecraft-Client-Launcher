@@ -1,14 +1,28 @@
 use crate::theme::{
-    lerp_color, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, RUBY, RUBY_LIGHT, TEXT_HEADING, TEXT_MUTED,
-    TEXT_PRIMARY,
+    lerp_color, with_alpha, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, MODRINTH_BG, MODRINTH_GREEN,
+    MODRINTH_SURFACE, MODRINTH_SURFACE_HIGH, MODRINTH_SURFACE_HOVER, MODRINTH_TEXT_CONTRAST,
+    MODRINTH_TEXT_SECONDARY, RUBY, RUBY_LIGHT, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
 use crate::widgets::choice_chip;
 use crate::widgets::icons::{icon_button, Icon};
+use crate::widgets::modrinth_ui;
 use amc_auth::AccountManager;
 use amc_core::config::{AppMode, LauncherConfig};
 use amc_core::paths::LauncherPaths;
 use amc_core::Language;
-use egui::{vec2, Color32, ScrollArea, Sense, Stroke, TextEdit, Ui};
+use egui::{
+    pos2, vec2, Color32, FontFamily, FontId, Rect, Rounding, ScrollArea, Sense, Stroke, TextEdit,
+    Ui,
+};
+
+/// Settings page language. Aleph keeps the original compact composition;
+/// Modrinth uses the reference settings modal's vertical section rail.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SettingsSkin {
+    #[default]
+    Amc,
+    Modrinth,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum SettingsSubTab {
@@ -49,6 +63,7 @@ pub fn mode_labels(lang: Language, mode: AppMode) -> (&'static str, &'static str
 
 pub struct SettingsPage {
     pub sub_tab: SettingsSubTab,
+    skin: SettingsSkin,
     pub custom_jvm_arg_input: String,
     pub custom_game_arg_input: String,
     java_scan: Option<Vec<amc_downloader::SystemJava>>,
@@ -70,6 +85,7 @@ impl Default for SettingsPage {
     fn default() -> Self {
         Self {
             sub_tab: SettingsSubTab::General,
+            skin: SettingsSkin::Amc,
             custom_jvm_arg_input: String::new(),
             custom_game_arg_input: String::new(),
             java_scan: None,
@@ -90,7 +106,40 @@ impl Default for SettingsPage {
 }
 
 impl SettingsPage {
+    #[allow(clippy::too_many_arguments)]
     pub fn show(
+        &mut self,
+        ui: &mut Ui,
+        config: &mut LauncherConfig,
+        account_mgr: &mut AccountManager,
+        paths: &LauncherPaths,
+        server_running: bool,
+        server_status: &Option<String>,
+        skin: SettingsSkin,
+    ) {
+        self.skin = skin;
+        if skin == SettingsSkin::Modrinth {
+            self.show_modrinth(
+                ui,
+                config,
+                account_mgr,
+                paths,
+                server_running,
+                server_status,
+            );
+        } else {
+            self.show_amc(
+                ui,
+                config,
+                account_mgr,
+                paths,
+                server_running,
+                server_status,
+            );
+        }
+    }
+
+    fn show_amc(
         &mut self,
         ui: &mut Ui,
         config: &mut LauncherConfig,
@@ -129,6 +178,141 @@ impl SettingsPage {
                 SettingsSubTab::Java => self.show_java(ui, config, paths),
                 SettingsSubTab::Accounts => self.show_accounts(ui, account_mgr, config, lang),
             });
+    }
+
+    /// Modrinth App settings composition: a vertical section rail beside the
+    /// scrolling form, on the same gray/green surface as the other pages.
+    fn show_modrinth(
+        &mut self,
+        ui: &mut Ui,
+        config: &mut LauncherConfig,
+        account_mgr: &mut AccountManager,
+        paths: &LauncherPaths,
+        server_running: bool,
+        server_status: &Option<String>,
+    ) {
+        let lang = config.ui.language();
+        ui.add_space(6.0);
+        ui.label(
+            egui::RichText::new(lang.settings_title())
+                .font(egui::FontId::proportional(24.0))
+                .strong()
+                .color(MODRINTH_TEXT_CONTRAST),
+        );
+        ui.add_space(14.0);
+
+        let full_w = ui.available_width();
+        let nav_w = (full_w * 0.30).clamp(148.0, 184.0);
+        let content_w = (full_w - nav_w - 29.0).max(220.0);
+        let body_h = ui.available_height().max(260.0);
+
+        ui.horizontal_top(|ui| {
+            ui.spacing_mut().item_spacing.x = 0.0;
+            ui.allocate_ui_with_layout(
+                vec2(nav_w, body_h),
+                egui::Layout::top_down(egui::Align::Min),
+                |ui| {
+                    ui.spacing_mut().item_spacing = vec2(0.0, 4.0);
+                    self.modrinth_nav_item(
+                        ui,
+                        lang.modrinth_settings_general(),
+                        Icon::Gear,
+                        SettingsSubTab::General,
+                    );
+                    self.modrinth_nav_item(
+                        ui,
+                        lang.modrinth_settings_java(),
+                        Icon::Bolt,
+                        SettingsSubTab::Java,
+                    );
+                    self.modrinth_nav_item(
+                        ui,
+                        lang.modrinth_settings_accounts(),
+                        Icon::Person,
+                        SettingsSubTab::Accounts,
+                    );
+                },
+            );
+            ui.add_space(12.0);
+            let (rule, _) = ui.allocate_exact_size(vec2(1.0, body_h), Sense::hover());
+            ui.painter()
+                .rect_filled(rule, Rounding::ZERO, MODRINTH_SURFACE_HIGH);
+            ui.add_space(16.0);
+            ui.allocate_ui_with_layout(
+                vec2(content_w, body_h),
+                egui::Layout::top_down(egui::Align::Min),
+                |ui| {
+                    ScrollArea::vertical()
+                        .id_salt(("modrinth_settings_scroll", self.sub_tab as u8))
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            ui.scope(|ui| {
+                                apply_modrinth_settings_style(ui);
+                                match self.sub_tab {
+                                    SettingsSubTab::General => self.show_general(
+                                        ui,
+                                        config,
+                                        paths,
+                                        server_running,
+                                        server_status,
+                                    ),
+                                    SettingsSubTab::Java => self.show_java(ui, config, paths),
+                                    SettingsSubTab::Accounts => {
+                                        self.show_accounts(ui, account_mgr, config, lang)
+                                    }
+                                }
+                            });
+                            ui.add_space(18.0);
+                        });
+                },
+            );
+        });
+    }
+
+    fn modrinth_nav_item(&mut self, ui: &mut Ui, label: &str, icon: Icon, tab: SettingsSubTab) {
+        let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 36.0), Sense::click());
+        let active = self.sub_tab == tab;
+        let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+        if active || hover > 0.01 {
+            let fill = if active {
+                with_alpha(MODRINTH_GREEN, 28)
+            } else {
+                with_alpha(MODRINTH_SURFACE_HOVER, (hover * 210.0) as u8)
+            };
+            ui.painter().rect_filled(rect, Rounding::same(10.0), fill);
+        }
+        let glyph = if active {
+            MODRINTH_GREEN
+        } else {
+            lerp_color(MODRINTH_TEXT_SECONDARY, MODRINTH_TEXT_CONTRAST, hover)
+        };
+        crate::widgets::icons::draw(
+            ui.painter(),
+            icon,
+            Rect::from_center_size(pos2(rect.left() + 18.0, rect.center().y), vec2(16.0, 16.0)),
+            glyph,
+            1.4,
+        );
+        ui.painter().text(
+            pos2(rect.left() + 34.0, rect.center().y),
+            egui::Align2::LEFT_CENTER,
+            label,
+            FontId::new(
+                13.0,
+                if active {
+                    FontFamily::Name("bold".into())
+                } else {
+                    FontFamily::Proportional
+                },
+            ),
+            glyph,
+        );
+        if resp.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+        if resp.clicked() {
+            self.sub_tab = tab;
+        }
     }
 
     fn subtab_btn(&mut self, ui: &mut Ui, label: &str, tab: SettingsSubTab) {
@@ -172,24 +356,44 @@ impl SettingsPage {
         server_status: &Option<String>,
     ) {
         let lang = config.ui.language();
+        let mr = self.skin == SettingsSkin::Modrinth;
 
         // Language selection group
         ui.group(|ui| {
+            if self.skin == SettingsSkin::Modrinth {
+                ui.set_min_width(ui.available_width());
+            }
             ui.label(
                 egui::RichText::new(lang.settings_language_title())
-                    .font(egui::FontId::proportional(16.0))
+                    .font(egui::FontId::proportional(
+                        if self.skin == SettingsSkin::Modrinth {
+                            18.0
+                        } else {
+                            16.0
+                        },
+                    ))
                     .strong()
                     .color(TEXT_HEADING),
             );
             ui.add_space(8.0);
 
-            ui.horizontal(|ui| {
-                for l in Language::ALL {
-                    if choice_chip(ui, l.display_with_flag(), 130.0, 34.0, 12.0, lang == l) {
-                        config.ui.set_language(l);
+            if mr {
+                ui.horizontal_wrapped(|ui| {
+                    for l in Language::ALL {
+                        if choice_chip(ui, l.display_with_flag(), 112.0, 32.0, 11.5, lang == l) {
+                            config.ui.set_language(l);
+                        }
                     }
-                }
-            });
+                });
+            } else {
+                ui.horizontal(|ui| {
+                    for l in Language::ALL {
+                        if choice_chip(ui, l.display_with_flag(), 130.0, 34.0, 12.0, lang == l) {
+                            config.ui.set_language(l);
+                        }
+                    }
+                });
+            }
         });
 
         ui.add_space(14.0);
@@ -197,9 +401,18 @@ impl SettingsPage {
         // Operation mode group (CONCEPT "Режимы работы", ROADMAP P1).
         // Switchable here at any time; the first-run wizard will ask it once.
         ui.group(|ui| {
+            if self.skin == SettingsSkin::Modrinth {
+                ui.set_min_width(ui.available_width());
+            }
             ui.label(
                 egui::RichText::new(lang.settings_mode_title())
-                    .font(egui::FontId::proportional(16.0))
+                    .font(egui::FontId::proportional(
+                        if self.skin == SettingsSkin::Modrinth {
+                            18.0
+                        } else {
+                            16.0
+                        },
+                    ))
                     .strong()
                     .color(TEXT_HEADING),
             );
@@ -207,12 +420,27 @@ impl SettingsPage {
 
             for mode in AppMode::ALL {
                 let (name, desc) = mode_labels(lang, mode);
-                ui.horizontal(|ui| {
-                    if choice_chip(ui, name, 170.0, 36.0, 12.5, config.app_mode == mode) {
-                        config.app_mode = mode;
-                    }
-                    ui.label(egui::RichText::new(desc).color(TEXT_MUTED));
-                });
+                if mr {
+                    ui.vertical(|ui| {
+                        let chip_w = ui.available_width().min(230.0);
+                        if choice_chip(ui, name, chip_w, 36.0, 12.5, config.app_mode == mode) {
+                            config.app_mode = mode;
+                        }
+                        ui.add_space(2.0);
+                        ui.add(egui::Label::new(
+                            egui::RichText::new(desc)
+                                .font(egui::FontId::proportional(12.0))
+                                .color(TEXT_MUTED),
+                        ));
+                    });
+                } else {
+                    ui.horizontal(|ui| {
+                        if choice_chip(ui, name, 170.0, 36.0, 12.5, config.app_mode == mode) {
+                            config.app_mode = mode;
+                        }
+                        ui.label(egui::RichText::new(desc).color(TEXT_MUTED));
+                    });
+                }
                 ui.add_space(6.0);
             }
         });
@@ -220,9 +448,18 @@ impl SettingsPage {
         ui.add_space(14.0);
 
         ui.group(|ui| {
+            if self.skin == SettingsSkin::Modrinth {
+                ui.set_min_width(ui.available_width());
+            }
             ui.label(
                 egui::RichText::new(lang.settings_behavior_title())
-                    .font(egui::FontId::proportional(16.0))
+                    .font(egui::FontId::proportional(
+                        if self.skin == SettingsSkin::Modrinth {
+                            18.0
+                        } else {
+                            16.0
+                        },
+                    ))
                     .strong()
                     .color(TEXT_HEADING),
             );
@@ -235,7 +472,7 @@ impl SettingsPage {
                     .color(TEXT_HEADING),
             );
             ui.add_space(4.0);
-            ui.horizontal(|ui| {
+            let after_launch_row = |ui: &mut Ui| {
                 for (mode, label) in [
                     (
                         amc_core::config::AfterLaunch::Close,
@@ -253,7 +490,7 @@ impl SettingsPage {
                     if crate::widgets::choice_chip(
                         ui,
                         label,
-                        130.0,
+                        if mr { 110.0 } else { 130.0 },
                         32.0,
                         12.0,
                         config.ui.after_launch == mode,
@@ -261,28 +498,39 @@ impl SettingsPage {
                         config.ui.after_launch = mode;
                     }
                 }
-            });
+            };
+            if mr {
+                ui.horizontal_wrapped(after_launch_row);
+            } else {
+                ui.horizontal(after_launch_row);
+            }
 
             ui.add_space(6.0);
 
-            ui.checkbox(
+            bool_setting(
+                self.skin,
+                ui,
                 &mut config.ui.show_snapshots,
-                egui::RichText::new(lang.settings_show_snapshots()).color(TEXT_PRIMARY),
+                lang.settings_show_snapshots(),
             );
 
             ui.add_space(6.0);
 
-            ui.checkbox(
+            bool_setting(
+                self.skin,
+                ui,
                 &mut config.ui.show_old,
-                egui::RichText::new(lang.settings_show_old()).color(TEXT_PRIMARY),
+                lang.settings_show_old(),
             );
 
             ui.add_space(6.0);
 
             let mut autostart_want = config.ui.autostart;
-            ui.checkbox(
+            bool_setting(
+                self.skin,
+                ui,
                 &mut autostart_want,
-                egui::RichText::new(lang.settings_autostart()).color(TEXT_PRIMARY),
+                lang.settings_autostart(),
             );
             if autostart_want != config.ui.autostart {
                 match amc_core::autostart::set_enabled(autostart_want) {
@@ -295,9 +543,18 @@ impl SettingsPage {
         ui.add_space(14.0);
 
         ui.group(|ui| {
+            if self.skin == SettingsSkin::Modrinth {
+                ui.set_min_width(ui.available_width());
+            }
             ui.label(
                 egui::RichText::new(lang.settings_speed_title())
-                    .font(egui::FontId::proportional(16.0))
+                    .font(egui::FontId::proportional(
+                        if self.skin == SettingsSkin::Modrinth {
+                            18.0
+                        } else {
+                            16.0
+                        },
+                    ))
                     .strong()
                     .color(TEXT_HEADING),
             );
@@ -315,9 +572,18 @@ impl SettingsPage {
         ui.add_space(14.0);
 
         ui.group(|ui| {
+            if self.skin == SettingsSkin::Modrinth {
+                ui.set_min_width(ui.available_width());
+            }
             ui.label(
                 egui::RichText::new(lang.settings_resolution_title())
-                    .font(egui::FontId::proportional(16.0))
+                    .font(egui::FontId::proportional(
+                        if self.skin == SettingsSkin::Modrinth {
+                            18.0
+                        } else {
+                            16.0
+                        },
+                    ))
                     .strong()
                     .color(TEXT_HEADING),
             );
@@ -337,24 +603,35 @@ impl SettingsPage {
             });
 
             ui.add_space(6.0);
-            ui.checkbox(
+            bool_setting(
+                self.skin,
+                ui,
                 &mut config.default_launch_options.fullscreen,
-                egui::RichText::new(lang.settings_fullscreen()).color(TEXT_PRIMARY),
+                lang.settings_fullscreen(),
             );
         });
 
         ui.add_space(14.0);
 
         ui.group(|ui| {
+            if self.skin == SettingsSkin::Modrinth {
+                ui.set_min_width(ui.available_width());
+            }
             ui.label(
                 egui::RichText::new(lang.settings_folders_title())
-                    .font(egui::FontId::proportional(16.0))
+                    .font(egui::FontId::proportional(
+                        if self.skin == SettingsSkin::Modrinth {
+                            18.0
+                        } else {
+                            16.0
+                        },
+                    ))
                     .strong()
                     .color(TEXT_HEADING),
             );
             ui.add_space(8.0);
 
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 if ui.button(lang.settings_folder_root()).clicked() {
                     let _ = open::that(&paths.root_dir);
                 }
@@ -384,9 +661,18 @@ impl SettingsPage {
 
         // World backups folder + schedule (CONCEPT "Управление мирами", P9).
         ui.group(|ui| {
+            if self.skin == SettingsSkin::Modrinth {
+                ui.set_min_width(ui.available_width());
+            }
             ui.label(
                 egui::RichText::new(lang.worlds_title())
-                    .font(egui::FontId::proportional(16.0))
+                    .font(egui::FontId::proportional(
+                        if self.skin == SettingsSkin::Modrinth {
+                            18.0
+                        } else {
+                            16.0
+                        },
+                    ))
                     .strong()
                     .color(TEXT_HEADING),
             );
@@ -397,14 +683,17 @@ impl SettingsPage {
                     .as_ref()
                     .map(|p| p.to_string_lossy().to_string())
                     .unwrap_or_else(|| paths.backups_dir().to_string_lossy().to_string());
-                ui.label(
-                    egui::RichText::new(current)
-                        .font(egui::FontId::proportional(12.0))
-                        .color(TEXT_PRIMARY),
+                ui.add(
+                    egui::Label::new(
+                        egui::RichText::new(current)
+                            .font(egui::FontId::proportional(12.0))
+                            .color(TEXT_PRIMARY),
+                    )
+                    .truncate(),
                 );
             });
             ui.add_space(4.0);
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 if ui.button(lang.world_pick_folder()).clicked() {
                     if let Some(dir) = rfd::FileDialog::new().pick_folder() {
                         config.world_backup_dir = Some(dir);
@@ -427,27 +716,60 @@ impl SettingsPage {
 
         // Notifications per type (CONCEPT "Уведомления").
         ui.group(|ui| {
+            if self.skin == SettingsSkin::Modrinth {
+                ui.set_min_width(ui.available_width());
+            }
             ui.label(
                 egui::RichText::new(lang.notif_title())
-                    .font(egui::FontId::proportional(16.0))
+                    .font(egui::FontId::proportional(
+                        if self.skin == SettingsSkin::Modrinth {
+                            18.0
+                        } else {
+                            16.0
+                        },
+                    ))
                     .strong()
                     .color(TEXT_HEADING),
             );
             ui.add_space(8.0);
-            ui.checkbox(&mut config.notifications.updates, lang.notif_updates());
+            bool_setting(
+                self.skin,
+                ui,
+                &mut config.notifications.updates,
+                lang.notif_updates(),
+            );
             ui.add_space(6.0);
-            ui.checkbox(&mut config.notifications.downloads, lang.notif_downloads());
+            bool_setting(
+                self.skin,
+                ui,
+                &mut config.notifications.downloads,
+                lang.notif_downloads(),
+            );
             ui.add_space(6.0);
-            ui.checkbox(&mut config.notifications.launcher, lang.notif_launcher());
+            bool_setting(
+                self.skin,
+                ui,
+                &mut config.notifications.launcher,
+                lang.notif_launcher(),
+            );
         });
 
         ui.add_space(14.0);
 
         // Rebindable hotkeys (CONCEPT "Горячие клавиши", P10).
         ui.group(|ui| {
+            if self.skin == SettingsSkin::Modrinth {
+                ui.set_min_width(ui.available_width());
+            }
             ui.label(
                 egui::RichText::new(lang.hotkey_title())
-                    .font(egui::FontId::proportional(16.0))
+                    .font(egui::FontId::proportional(
+                        if self.skin == SettingsSkin::Modrinth {
+                            18.0
+                        } else {
+                            16.0
+                        },
+                    ))
                     .strong()
                     .color(TEXT_HEADING),
             );
@@ -494,9 +816,18 @@ impl SettingsPage {
 
         // Launcher updates, crash reports, diagnostics export.
         ui.group(|ui| {
+            if self.skin == SettingsSkin::Modrinth {
+                ui.set_min_width(ui.available_width());
+            }
             ui.label(
                 egui::RichText::new(lang.update_title())
-                    .font(egui::FontId::proportional(16.0))
+                    .font(egui::FontId::proportional(
+                        if self.skin == SettingsSkin::Modrinth {
+                            18.0
+                        } else {
+                            16.0
+                        },
+                    ))
                     .strong()
                     .color(TEXT_HEADING),
             );
@@ -517,7 +848,12 @@ impl SettingsPage {
                     .color(TEXT_HEADING),
             );
             ui.add_space(4.0);
-            ui.checkbox(&mut config.crash_reports, lang.crash_enable());
+            bool_setting(
+                self.skin,
+                ui,
+                &mut config.crash_reports,
+                lang.crash_enable(),
+            );
             ui.add_space(6.0);
             if ui.button(lang.crash_export()).clicked() {
                 self.crash_export_requested = true;
@@ -529,9 +865,18 @@ impl SettingsPage {
         // Manual settings transfer for moving to another PC
         // (CONCEPT "Облачная синхронизация", P10 — no cloud in v1.0).
         ui.group(|ui| {
+            if self.skin == SettingsSkin::Modrinth {
+                ui.set_min_width(ui.available_width());
+            }
             ui.label(
                 egui::RichText::new(lang.transfer_title())
-                    .font(egui::FontId::proportional(16.0))
+                    .font(egui::FontId::proportional(
+                        if self.skin == SettingsSkin::Modrinth {
+                            18.0
+                        } else {
+                            16.0
+                        },
+                    ))
                     .strong()
                     .color(TEXT_HEADING),
             );
@@ -560,9 +905,18 @@ impl SettingsPage {
         // Local dedicated server for the selected instance (CONCEPT P13).
         // Stops with the launcher (kill_on_drop); no LAN tunneling in v1.0.
         ui.group(|ui| {
+            if self.skin == SettingsSkin::Modrinth {
+                ui.set_min_width(ui.available_width());
+            }
             ui.label(
                 egui::RichText::new(lang.server_title())
-                    .font(egui::FontId::proportional(16.0))
+                    .font(egui::FontId::proportional(
+                        if self.skin == SettingsSkin::Modrinth {
+                            18.0
+                        } else {
+                            16.0
+                        },
+                    ))
                     .strong()
                     .color(TEXT_HEADING),
             );
@@ -576,7 +930,12 @@ impl SettingsPage {
                     self.server_stop_requested = true;
                 }
             } else {
-                ui.checkbox(&mut self.server_eula_draft, lang.server_eula());
+                bool_setting(
+                    self.skin,
+                    ui,
+                    &mut self.server_eula_draft,
+                    lang.server_eula(),
+                );
                 ui.add_space(4.0);
                 if ui.button(lang.server_create()).clicked() {
                     self.server_start_requested = true;
@@ -590,11 +949,21 @@ impl SettingsPage {
 
     fn show_java(&mut self, ui: &mut Ui, config: &mut LauncherConfig, paths: &LauncherPaths) {
         let lang = config.ui.language();
+        let mr = self.skin == SettingsSkin::Modrinth;
 
         ui.group(|ui| {
+            if self.skin == SettingsSkin::Modrinth {
+                ui.set_min_width(ui.available_width());
+            }
             ui.label(
                 egui::RichText::new(lang.settings_ram_title())
-                    .font(egui::FontId::proportional(16.0))
+                    .font(egui::FontId::proportional(
+                        if self.skin == SettingsSkin::Modrinth {
+                            18.0
+                        } else {
+                            16.0
+                        },
+                    ))
                     .strong()
                     .color(TEXT_HEADING),
             );
@@ -631,9 +1000,18 @@ impl SettingsPage {
         ui.add_space(14.0);
 
         ui.group(|ui| {
+            if self.skin == SettingsSkin::Modrinth {
+                ui.set_min_width(ui.available_width());
+            }
             ui.label(
                 egui::RichText::new(lang.settings_java_title())
-                    .font(egui::FontId::proportional(16.0))
+                    .font(egui::FontId::proportional(
+                        if self.skin == SettingsSkin::Modrinth {
+                            18.0
+                        } else {
+                            16.0
+                        },
+                    ))
                     .strong()
                     .color(TEXT_HEADING),
             );
@@ -655,16 +1033,28 @@ impl SettingsPage {
             ui.add_space(6.0);
 
             ui.horizontal(|ui| {
-                let btn = egui::Button::new(
-                    egui::RichText::new(lang.settings_btn_select_java())
-                        .font(egui::FontId::proportional(11.0))
-                        .strong()
-                        .color(Color32::WHITE),
-                )
-                .fill(RUBY)
-                .stroke(Stroke::new(1.0_f32, RUBY_LIGHT));
+                let pick_clicked = if mr {
+                    modrinth_ui::button(
+                        ui,
+                        lang.modrinth_settings_select_java(),
+                        Some(Icon::Folder),
+                        modrinth_ui::ModrinthButtonKind::Primary,
+                        0.0,
+                    )
+                    .clicked()
+                } else {
+                    let btn = egui::Button::new(
+                        egui::RichText::new(lang.settings_btn_select_java())
+                            .font(egui::FontId::proportional(11.0))
+                            .strong()
+                            .color(Color32::WHITE),
+                    )
+                    .fill(RUBY)
+                    .stroke(Stroke::new(1.0_f32, RUBY_LIGHT));
+                    ui.add(btn).clicked()
+                };
 
-                if ui.add(btn).clicked() {
+                if pick_clicked {
                     let ext_filter: &[&str] = if cfg!(windows) { &["exe"] } else { &["*"] };
                     if let Some(path) = rfd::FileDialog::new()
                         .add_filter("Java Executable", ext_filter)
@@ -687,9 +1077,18 @@ impl SettingsPage {
         // Shared Java/RAM groups (CONCEPT P2): one edit applies to every
         // member instance at launch. Instances join by name in their card.
         ui.group(|ui| {
+            if self.skin == SettingsSkin::Modrinth {
+                ui.set_min_width(ui.available_width());
+            }
             ui.label(
                 egui::RichText::new(lang.group_title())
-                    .font(egui::FontId::proportional(16.0))
+                    .font(egui::FontId::proportional(
+                        if self.skin == SettingsSkin::Modrinth {
+                            18.0
+                        } else {
+                            16.0
+                        },
+                    ))
                     .strong()
                     .color(TEXT_HEADING),
             );
@@ -793,10 +1192,19 @@ impl SettingsPage {
 
         // Java manager: discovered system runtimes + launcher runtimes.
         ui.group(|ui| {
+            if self.skin == SettingsSkin::Modrinth {
+                ui.set_min_width(ui.available_width());
+            }
             ui.horizontal(|ui| {
                 ui.label(
                     egui::RichText::new(lang.settings_java_found_title())
-                        .font(egui::FontId::proportional(16.0))
+                        .font(egui::FontId::proportional(
+                            if self.skin == SettingsSkin::Modrinth {
+                                18.0
+                            } else {
+                                16.0
+                            },
+                        ))
                         .strong()
                         .color(TEXT_HEADING),
                 );
@@ -887,7 +1295,13 @@ impl SettingsPage {
             ui.add_space(10.0);
             ui.label(
                 egui::RichText::new(lang.settings_runtimes_title())
-                    .font(egui::FontId::proportional(16.0))
+                    .font(egui::FontId::proportional(
+                        if self.skin == SettingsSkin::Modrinth {
+                            18.0
+                        } else {
+                            16.0
+                        },
+                    ))
                     .strong()
                     .color(TEXT_HEADING),
             );
@@ -934,9 +1348,18 @@ impl SettingsPage {
         ui.add_space(14.0);
 
         ui.group(|ui| {
+            if self.skin == SettingsSkin::Modrinth {
+                ui.set_min_width(ui.available_width());
+            }
             ui.label(
                 egui::RichText::new(lang.settings_jvm_args_title())
-                    .font(egui::FontId::proportional(16.0))
+                    .font(egui::FontId::proportional(
+                        if self.skin == SettingsSkin::Modrinth {
+                            18.0
+                        } else {
+                            16.0
+                        },
+                    ))
                     .strong()
                     .color(TEXT_HEADING),
             );
@@ -950,10 +1373,13 @@ impl SettingsPage {
                 .enumerate()
             {
                 ui.horizontal(|ui| {
-                    ui.label(
-                        egui::RichText::new(arg)
-                            .font(egui::FontId::monospace(12.0))
-                            .color(TEXT_PRIMARY),
+                    ui.add(
+                        egui::Label::new(
+                            egui::RichText::new(arg)
+                                .font(egui::FontId::monospace(12.0))
+                                .color(TEXT_PRIMARY),
+                        )
+                        .truncate(),
                     );
                     if icon_button(ui, Icon::Close, TEXT_MUTED).clicked() {
                         to_remove = Some(idx);
@@ -966,11 +1392,16 @@ impl SettingsPage {
             }
 
             ui.add_space(6.0);
+            let input_w = if mr {
+                (ui.available_width() - 104.0).max(140.0)
+            } else {
+                300.0
+            };
             ui.horizontal(|ui| {
                 ui.add(
                     TextEdit::singleline(&mut self.custom_jvm_arg_input)
                         .hint_text("-XX:+...")
-                        .desired_width(300.0),
+                        .desired_width(input_w),
                 );
                 if ui.button(lang.settings_btn_add_arg()).clicked()
                     && !self.custom_jvm_arg_input.trim().is_empty()
@@ -989,7 +1420,7 @@ impl SettingsPage {
                     .font(egui::FontId::proportional(12.0))
                     .color(TEXT_MUTED),
             );
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 if ui
                     .button(lang.settings_btn_preset_g1gc())
                     .on_hover_text(lang.settings_tooltip_preset_g1gc())
@@ -1034,9 +1465,18 @@ impl SettingsPage {
         ui.add_space(14.0);
 
         ui.group(|ui| {
+            if self.skin == SettingsSkin::Modrinth {
+                ui.set_min_width(ui.available_width());
+            }
             ui.label(
                 egui::RichText::new(lang.settings_game_args_title())
-                    .font(egui::FontId::proportional(16.0))
+                    .font(egui::FontId::proportional(
+                        if self.skin == SettingsSkin::Modrinth {
+                            18.0
+                        } else {
+                            16.0
+                        },
+                    ))
                     .strong()
                     .color(TEXT_HEADING),
             );
@@ -1050,10 +1490,13 @@ impl SettingsPage {
                 .enumerate()
             {
                 ui.horizontal(|ui| {
-                    ui.label(
-                        egui::RichText::new(arg)
-                            .font(egui::FontId::monospace(12.0))
-                            .color(TEXT_PRIMARY),
+                    ui.add(
+                        egui::Label::new(
+                            egui::RichText::new(arg)
+                                .font(egui::FontId::monospace(12.0))
+                                .color(TEXT_PRIMARY),
+                        )
+                        .truncate(),
                     );
                     if icon_button(ui, Icon::Close, TEXT_MUTED).clicked() {
                         game_arg_to_remove = Some(idx);
@@ -1066,11 +1509,16 @@ impl SettingsPage {
             }
 
             ui.add_space(6.0);
+            let input_w = if mr {
+                (ui.available_width() - 104.0).max(140.0)
+            } else {
+                300.0
+            };
             ui.horizontal(|ui| {
                 ui.add(
                     TextEdit::singleline(&mut self.custom_game_arg_input)
                         .hint_text("--fullscreen")
-                        .desired_width(300.0),
+                        .desired_width(input_w),
                 );
                 if ui.button(lang.settings_btn_add_arg()).clicked()
                     && !self.custom_game_arg_input.trim().is_empty()
@@ -1092,10 +1540,20 @@ impl SettingsPage {
         config: &mut LauncherConfig,
         lang: Language,
     ) {
+        let mr = self.skin == SettingsSkin::Modrinth;
         ui.group(|ui| {
+            if self.skin == SettingsSkin::Modrinth {
+                ui.set_min_width(ui.available_width());
+            }
             ui.label(
                 egui::RichText::new(lang.settings_accounts_title())
-                    .font(egui::FontId::proportional(16.0))
+                    .font(egui::FontId::proportional(
+                        if self.skin == SettingsSkin::Modrinth {
+                            18.0
+                        } else {
+                            16.0
+                        },
+                    ))
                     .strong()
                     .color(TEXT_HEADING),
             );
@@ -1111,18 +1569,30 @@ impl SettingsPage {
                 let is_active = active_id == Some(acc.id);
 
                 ui.horizontal(|ui| {
-                    let badge = match acc.account_type {
-                        amc_auth::AccountType::Microsoft => "MICROSOFT",
-                        amc_auth::AccountType::WetId => "WETID",
-                        amc_auth::AccountType::Offline => "OFFLINE",
+                    let (badge, accent) = if mr {
+                        match acc.account_type {
+                            amc_auth::AccountType::Microsoft => (lang.account_tag_ms(), true),
+                            amc_auth::AccountType::WetId => (lang.account_tag_wetid(), true),
+                            amc_auth::AccountType::Offline => (lang.account_tag_offline(), false),
+                        }
+                    } else {
+                        match acc.account_type {
+                            amc_auth::AccountType::Microsoft => ("MICROSOFT", true),
+                            amc_auth::AccountType::WetId => ("WETID", true),
+                            amc_auth::AccountType::Offline => ("OFFLINE", false),
+                        }
                     };
 
-                    ui.label(
-                        egui::RichText::new(badge)
-                            .font(egui::FontId::proportional(10.0))
-                            .strong()
-                            .color(RUBY_LIGHT),
-                    );
+                    if mr {
+                        modrinth_ui::pill(ui, badge, accent);
+                    } else {
+                        ui.label(
+                            egui::RichText::new(badge)
+                                .font(egui::FontId::proportional(10.0))
+                                .strong()
+                                .color(RUBY_LIGHT),
+                        );
+                    }
 
                     ui.label(
                         egui::RichText::new(&acc.username)
@@ -1136,15 +1606,39 @@ impl SettingsPage {
                     );
 
                     if is_active {
-                        ui.label(
-                            egui::RichText::new(lang.settings_account_active())
-                                .color(Color32::from_rgb(0x50, 0xB0, 0x50)),
-                        );
+                        if mr {
+                            let (dot, _) = ui.allocate_exact_size(vec2(8.0, 8.0), Sense::hover());
+                            ui.painter()
+                                .circle_filled(dot.center(), 3.5, MODRINTH_GREEN);
+                            ui.label(
+                                egui::RichText::new(lang.modrinth_settings_active())
+                                    .font(egui::FontId::proportional(11.5))
+                                    .color(MODRINTH_GREEN),
+                            );
+                        } else {
+                            ui.label(
+                                egui::RichText::new(lang.settings_account_active())
+                                    .color(Color32::from_rgb(0x50, 0xB0, 0x50)),
+                            );
+                        }
                     } else if ui.button(lang.settings_btn_set_active()).clicked() {
                         set_active_id = Some(acc.id);
                     }
 
-                    if ui
+                    if mr {
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if modrinth_ui::icon_button(
+                                ui,
+                                Icon::Trash,
+                                18.0,
+                                lang.settings_btn_delete_acc(),
+                            )
+                            .clicked()
+                            {
+                                remove_id = Some(acc.id);
+                            }
+                        });
+                    } else if ui
                         .button(
                             egui::RichText::new(lang.settings_btn_delete_acc()).color(TEXT_MUTED),
                         )
@@ -1164,7 +1658,9 @@ impl SettingsPage {
             }
 
             ui.add_space(10.0);
-            ui.checkbox(
+            bool_setting(
+                self.skin,
+                ui,
                 &mut config.ask_identity_each_launch,
                 lang.settings_ask_identity(),
             );
@@ -1175,4 +1671,51 @@ impl SettingsPage {
             }
         });
     }
+}
+
+/// One boolean setting: the reference switch on Modrinth, the original
+/// checkbox elsewhere (so Aleph layouts stay untouched).
+fn bool_setting(skin: SettingsSkin, ui: &mut Ui, value: &mut bool, label: &str) -> egui::Response {
+    if skin == SettingsSkin::Modrinth {
+        modrinth_ui::toggle(ui, value, label)
+    } else {
+        ui.checkbox(value, egui::RichText::new(label).color(TEXT_PRIMARY))
+    }
+}
+
+/// Scoped visuals for the Modrinth settings form. Existing controls keep
+/// their behavior; groups become raised cards and buttons/inputs use the
+/// reference's gray surfaces with the green focus accent.
+fn apply_modrinth_settings_style(ui: &mut Ui) {
+    ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
+    ui.spacing_mut().button_padding = vec2(12.0, 7.0);
+    ui.spacing_mut().slider_width = 190.0;
+    let visuals = ui.visuals_mut();
+    visuals.widgets.noninteractive.bg_fill = MODRINTH_SURFACE;
+    visuals.widgets.noninteractive.weak_bg_fill = MODRINTH_SURFACE;
+    visuals.widgets.noninteractive.bg_stroke = Stroke::new(1.0_f32, MODRINTH_SURFACE_HIGH);
+    visuals.widgets.noninteractive.rounding = Rounding::same(12.0);
+
+    visuals.widgets.inactive.bg_fill = MODRINTH_SURFACE_HOVER;
+    visuals.widgets.inactive.weak_bg_fill = MODRINTH_SURFACE_HOVER;
+    visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, MODRINTH_SURFACE_HIGH);
+    visuals.widgets.inactive.rounding = Rounding::same(8.0);
+
+    visuals.widgets.hovered.bg_fill = with_alpha(MODRINTH_GREEN, 26);
+    visuals.widgets.hovered.weak_bg_fill = with_alpha(MODRINTH_GREEN, 26);
+    visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, with_alpha(MODRINTH_GREEN, 110));
+    visuals.widgets.hovered.rounding = Rounding::same(8.0);
+
+    visuals.widgets.active.bg_fill = with_alpha(MODRINTH_GREEN, 42);
+    visuals.widgets.active.weak_bg_fill = with_alpha(MODRINTH_GREEN, 42);
+    visuals.widgets.active.bg_stroke = Stroke::new(1.0_f32, MODRINTH_GREEN);
+    visuals.widgets.active.rounding = Rounding::same(8.0);
+
+    visuals.selection.bg_fill = with_alpha(MODRINTH_GREEN, 70);
+    visuals.selection.stroke = Stroke::new(1.0_f32, MODRINTH_GREEN);
+    visuals.hyperlink_color = MODRINTH_GREEN;
+    visuals.extreme_bg_color = MODRINTH_BG;
+    visuals.faint_bg_color = MODRINTH_SURFACE;
+    visuals.window_fill = MODRINTH_SURFACE;
+    visuals.panel_fill = MODRINTH_BG;
 }

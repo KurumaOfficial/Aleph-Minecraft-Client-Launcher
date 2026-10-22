@@ -89,6 +89,63 @@ pub fn icon_button(ui: &mut Ui, icon: Icon, size: f32, tooltip: &str) -> Respons
     resp.on_hover_text(tooltip)
 }
 
+/// Full-row Modrinth switch: label on the left, 40×22 track on the right.
+pub fn toggle(ui: &mut Ui, value: &mut bool, label: &str) -> Response {
+    let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), 30.0), Sense::click());
+    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+    let t = ui
+        .ctx()
+        .animate_bool_responsive(resp.id.with("knob"), *value);
+    let text = lerp_color(MODRINTH_TEXT, MODRINTH_TEXT_CONTRAST, hover);
+    let galley = ui.painter().layout_no_wrap(
+        label.to_owned(),
+        egui::FontId::proportional(13.0),
+        Color32::PLACEHOLDER,
+    );
+    ui.painter().galley(
+        pos2(rect.left(), rect.center().y - galley.size().y / 2.0),
+        galley,
+        text,
+    );
+
+    let track =
+        Rect::from_center_size(pos2(rect.right() - 21.0, rect.center().y), vec2(40.0, 22.0));
+    let fill = if *value {
+        lerp_color(MODRINTH_GREEN, theme::MODRINTH_GREEN_LIGHT, hover)
+    } else {
+        lerp_color(MODRINTH_SURFACE_HOVER, MODRINTH_SURFACE_HIGH, hover)
+    };
+    ui.painter().rect_filled(track, Rounding::same(11.0), fill);
+    if !*value {
+        ui.painter().rect_stroke(
+            track,
+            Rounding::same(11.0),
+            Stroke::new(
+                1.0_f32,
+                with_alpha(MODRINTH_TEXT_CONTRAST, hover.mul_add(28.0, 30.0) as u8),
+            ),
+        );
+    }
+    let knob_x = (track.left() + 11.0) + (track.width() - 22.0) * t;
+    let knob = pos2(knob_x, track.center().y);
+    ui.painter().circle_filled(
+        knob,
+        if resp.hovered() { 9.0 } else { 8.0 },
+        if *value {
+            theme::MODRINTH_BG
+        } else {
+            MODRINTH_TEXT
+        },
+    );
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    if resp.clicked() {
+        *value = !*value;
+    }
+    resp
+}
+
 /// Small rounded account-type/status pill.
 pub fn pill(ui: &mut Ui, label: &str, accent: bool) -> Response {
     let font = FontId::new(11.0, FontFamily::Name("bold".into()));

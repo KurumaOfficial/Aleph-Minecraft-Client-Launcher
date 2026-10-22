@@ -1372,6 +1372,48 @@ impl Language {
         }
     }
 
+    /// Modrinth settings rail labels use sentence case, unlike the compact
+    /// uppercase tabs of the Aleph settings page.
+    pub fn modrinth_settings_general(&self) -> &'static str {
+        match self {
+            Self::English => "General",
+            Self::Russian => "Общие",
+            Self::Ukrainian => "Загальні",
+        }
+    }
+
+    pub fn modrinth_settings_java(&self) -> &'static str {
+        match self {
+            Self::English => "Java & memory",
+            Self::Russian => "Java и память",
+            Self::Ukrainian => "Java і пам'ять",
+        }
+    }
+
+    pub fn modrinth_settings_accounts(&self) -> &'static str {
+        match self {
+            Self::English => "Accounts",
+            Self::Russian => "Аккаунты",
+            Self::Ukrainian => "Акаунти",
+        }
+    }
+
+    pub fn modrinth_settings_active(&self) -> &'static str {
+        match self {
+            Self::English => "Active",
+            Self::Russian => "Активен",
+            Self::Ukrainian => "Активний",
+        }
+    }
+
+    pub fn modrinth_settings_select_java(&self) -> &'static str {
+        match self {
+            Self::English => "Select Java executable",
+            Self::Russian => "Выбрать Java",
+            Self::Ukrainian => "Вибрати Java",
+        }
+    }
+
     pub fn settings_language_title(&self) -> &'static str {
         match self {
             Self::English => "Interface Language",
@@ -5093,6 +5135,11 @@ mod tests {
             assert!(!lang.nav_settings().is_empty());
             assert!(!lang.nav_exit().is_empty());
             assert!(!lang.settings_title().is_empty());
+            assert!(!lang.modrinth_settings_general().is_empty());
+            assert!(!lang.modrinth_settings_java().is_empty());
+            assert!(!lang.modrinth_settings_accounts().is_empty());
+            assert!(!lang.modrinth_settings_active().is_empty());
+            assert!(!lang.modrinth_settings_select_java().is_empty());
             assert!(!lang.home_title().is_empty());
             assert!(!lang.inst_title().is_empty());
             assert!(!lang.mods_title().is_empty());

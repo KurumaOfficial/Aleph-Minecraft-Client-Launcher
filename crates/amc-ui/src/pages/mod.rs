@@ -13,5 +13,5 @@ pub use mods::{
     icon_cache_file, icon_key, ModUpdateResult, ModsActions, ModsPage, ModsSkin, UpdateOffer,
 };
 pub use profile::{ProfileAction, ProfilePage, ProfileSkin};
-pub use settings::{SettingsPage, SettingsSubTab};
+pub use settings::{SettingsPage, SettingsSkin, SettingsSubTab};
 pub use skins::{SkinsPage, SkinsSkin};

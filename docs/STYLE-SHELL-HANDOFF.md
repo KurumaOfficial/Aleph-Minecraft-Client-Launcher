@@ -74,11 +74,13 @@
 - страница `Profile`: заголовок в композиции Modrinth (круглая голова 96 px,
   ник, тип и статус аккаунта, кнопки смены скина/управления аккаунтом),
   карточка данных аккаунта с UUID и копированием, переход в скины и счета;
-  правый rail сохранён.
+  правый rail сохранён;
+- страница `Settings`: вертикальный раздел-навигатор в композиции модалки
+  Modrinth, карточки секций, переключатели, зелёные акценты и контролы
+  Modrinth; Aleph-режимы сохраняют прежний вид.
 
 Известные ограничения Modrinth:
 
-- страница `Settings` всё ещё использует общий Aleph-layout;
 - «Друзья» и «Новости» — локальные заглушки, без Modrinth API;
 - скин-превью 2D (композит из текстуры), не 3D;
 - нет сохранённой библиотеки скинов и cape-менеджера;
@@ -126,6 +128,8 @@
 - `crates/amc-ui/src/shells/modrinth.rs` — левый/правый rail Modrinth.
 - `crates/amc-ui/src/widgets/titlebar.rs` — общий, Millida и Modrinth titlebar.
 - `crates/amc-ui/src/widgets/modrinth_assets.rs` — кэш PNG-ассетов Modrinth.
+- `crates/amc-ui/src/widgets/modrinth_ui.rs` — общие кнопки/пилюли/тумблеры
+  Modrinth для Profile и Settings.
 - `crates/amc-ui/src/pages/instances.rs` — библиотеки `Instance`, `Modrinth`,
   `Multimc`, карточки, модалки, фильтры, контекстное меню.
 - `crates/amc-ui/src/pages/mods.rs` — общая страница модов + `ModsSkin`.
@@ -200,13 +204,11 @@ Millida). Собранные ассеты, которые уже использ�
 
 ## Рекомендуемый следующий шаг
 
-1. **Modrinth Settings** — секции и Modrinth-контролы, без общего
-   Aleph-layout.
-2. Затем пройтись по **Millida / MultiMC / Legacy** внутренним страницам,
-   которые всё ещё используют общий Aleph-контент.
-3. Точечная доводка Modrinth: 3D-превью скина, сохранённые скины,
+1. **Внутренние страницы Millida / MultiMC / Legacy** — начать с той, где
+   общий Aleph-заголовок/табы выглядят наиболее чужеродно.
+2. Точечная доводка Modrinth: 3D-превью скина, сохранённые скины,
    cape-менеджер, реальные friends/news — только если не ломает остальное.
-4. После каждого шага — скриншот, проверки, commit, push, release deploy.
+3. После каждого шага — скриншот, проверки, commit, push, release deploy.
 
 ## Готовый мастер-промт
 
