@@ -25,6 +25,7 @@ pub enum SettingsSkin {
     Amc,
     Modrinth,
     Millida,
+    Multimc,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -132,6 +133,15 @@ impl SettingsPage {
             );
         } else if skin == SettingsSkin::Millida {
             self.show_millida(
+                ui,
+                config,
+                account_mgr,
+                paths,
+                server_running,
+                server_status,
+            );
+        } else if skin == SettingsSkin::Multimc {
+            self.show_multimc(
                 ui,
                 config,
                 account_mgr,
@@ -285,6 +295,67 @@ impl SettingsPage {
                     }
                 });
                 ui.add_space(18.0);
+            });
+    }
+
+    /// MultiMC/Prism settings: a Qt-dialog-like page heading, flat push
+    /// tabs and the existing group-box form.
+    fn show_multimc(
+        &mut self,
+        ui: &mut Ui,
+        config: &mut LauncherConfig,
+        account_mgr: &mut AccountManager,
+        paths: &LauncherPaths,
+        server_running: bool,
+        server_status: &Option<String>,
+    ) {
+        let lang = config.ui.language();
+        ui.add_space(14.0);
+        ui.label(
+            egui::RichText::new(lang.settings_title())
+                .font(egui::FontId::proportional(16.0))
+                .strong()
+                .color(TEXT_HEADING),
+        );
+        let (line, _) = ui.allocate_exact_size(vec2(ui.available_width(), 1.0), Sense::hover());
+        ui.painter()
+            .rect_filled(line, egui::Rounding::ZERO, BORDER_DEFAULT);
+        ui.add_space(10.0);
+
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
+            for (tab, label) in [
+                (SettingsSubTab::General, lang.modrinth_settings_general()),
+                (SettingsSubTab::Java, lang.modrinth_settings_java()),
+                (SettingsSubTab::Accounts, lang.modrinth_settings_accounts()),
+            ] {
+                let width = (ui
+                    .painter()
+                    .layout_no_wrap(
+                        label.to_owned(),
+                        egui::FontId::proportional(12.0),
+                        Color32::PLACEHOLDER,
+                    )
+                    .size()
+                    .x
+                    + 32.0)
+                    .max(118.0);
+                if multimc_settings_tab(ui, label, self.sub_tab == tab, width) {
+                    self.sub_tab = tab;
+                }
+            }
+        });
+
+        ui.add_space(12.0);
+        ScrollArea::vertical()
+            .id_salt(("multimc_settings_scroll", self.sub_tab as u8))
+            .auto_shrink([false, false])
+            .show(ui, |ui| match self.sub_tab {
+                SettingsSubTab::General => {
+                    self.show_general(ui, config, paths, server_running, server_status)
+                }
+                SettingsSubTab::Java => self.show_java(ui, config, paths),
+                SettingsSubTab::Accounts => self.show_accounts(ui, account_mgr, config, lang),
             });
     }
 
@@ -1789,6 +1860,41 @@ fn bool_setting(skin: SettingsSkin, ui: &mut Ui, value: &mut bool, label: &str) 
     } else {
         ui.checkbox(value, egui::RichText::new(label).color(TEXT_PRIMARY))
     }
+}
+
+/// Qt-style flat push button used by the MultiMC settings page.
+fn multimc_settings_tab(ui: &mut Ui, label: &str, active: bool, width: f32) -> bool {
+    let (rect, resp) = ui.allocate_exact_size(vec2(width, 28.0), Sense::click());
+    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+    let fill = if active {
+        Color32::from(theme::ACCENT)
+    } else {
+        lerp_color(BG_ELEVATED, BG_HOVER, hover)
+    };
+    let stroke = if active {
+        Color32::from(theme::ACCENT)
+    } else {
+        lerp_color(BORDER_DEFAULT, theme::ACCENT, hover)
+    };
+    ui.painter()
+        .rect_filled(rect, crate::theme::rounding(), fill);
+    ui.painter()
+        .rect_stroke(rect, crate::theme::rounding(), Stroke::new(1.0_f32, stroke));
+    ui.painter().text(
+        rect.center(),
+        egui::Align2::CENTER_CENTER,
+        label,
+        egui::FontId::proportional(12.0),
+        if active {
+            Color32::WHITE
+        } else {
+            Color32::from(theme::TEXT)
+        },
+    );
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp.clicked()
 }
 
 /// Scoped square controls for the Millida settings form.

@@ -4596,6 +4596,8 @@ impl App for LauncherApp {
                             ModsSkin::Modrinth
                         } else if shell == amc_core::config::ShellKind::Millida {
                             ModsSkin::Millida
+                        } else if shell == amc_core::config::ShellKind::Multimc {
+                            ModsSkin::Multimc
                         } else {
                             ModsSkin::Amc
                         };
@@ -4775,6 +4777,8 @@ impl App for LauncherApp {
                             SettingsSkin::Modrinth
                         } else if shell == amc_core::config::ShellKind::Millida {
                             SettingsSkin::Millida
+                        } else if shell == amc_core::config::ShellKind::Multimc {
+                            SettingsSkin::Multimc
                         } else {
                             SettingsSkin::Amc
                         };

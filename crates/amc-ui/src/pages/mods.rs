@@ -25,6 +25,7 @@ pub enum ModsSkin {
     Amc,
     Modrinth,
     Millida,
+    Multimc,
 }
 
 /// Outcome of one update check (CONCEPT P4): the fresh local scan
@@ -215,10 +216,13 @@ impl ModsPage {
 
         // Header
         let millida = skin == ModsSkin::Millida;
+        let multimc = skin == ModsSkin::Multimc;
         let title_size = if skin == ModsSkin::Modrinth {
             24.0
         } else if millida {
             28.0
+        } else if multimc {
+            16.0
         } else {
             26.0
         };
@@ -240,6 +244,11 @@ impl ModsPage {
                 .strong()
                 .color(TEXT_HEADING),
         );
+        if multimc {
+            let (line, _) = ui.allocate_exact_size(vec2(ui.available_width(), 1.0), Sense::hover());
+            ui.painter()
+                .rect_filled(line, egui::Rounding::ZERO, BORDER_DEFAULT);
+        }
         if skin == ModsSkin::Modrinth {
             if let Some(meta) = instance_meta {
                 ui.add_space(4.0);
@@ -290,6 +299,8 @@ impl ModsPage {
             self.show_modrinth_tabs(ui, lang, mods_dir);
         } else if millida {
             self.show_millida_tabs(ui, lang, mods_dir);
+        } else if multimc {
+            self.show_multimc_tabs(ui, lang, mods_dir);
         } else {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing = vec2(8.0, 0.0);
@@ -410,6 +421,50 @@ impl ModsPage {
                 actions.on_install,
             ),
         }
+    }
+
+    /// MultiMC/Prism treatment: flat Qt push buttons with the Fusion blue
+    /// selection and sentence-case labels.
+    fn show_multimc_tabs(&mut self, ui: &mut Ui, lang: Language, mods_dir: &Path) {
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
+            for (idx, (label, active)) in [
+                (
+                    lang.mods_tab_installed_plain(),
+                    self.sub_tab == ModsSubTab::Local,
+                ),
+                (
+                    lang.mods_tab_search_plain(),
+                    self.sub_tab == ModsSubTab::Search,
+                ),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let width = (ui
+                    .painter()
+                    .layout_no_wrap(
+                        label.to_owned(),
+                        egui::FontId::proportional(12.0),
+                        Color32::PLACEHOLDER,
+                    )
+                    .size()
+                    .x
+                    + 30.0)
+                    .max(112.0);
+                if multimc_button(ui, label, active, width) {
+                    self.sub_tab = if idx == 0 {
+                        ModsSubTab::Local
+                    } else {
+                        ModsSubTab::Search
+                    };
+                }
+            }
+            if multimc_button(ui, lang.mods_open_folder_plain(), false, 156.0) {
+                let _ = std::fs::create_dir_all(mods_dir);
+                let _ = open::that(mods_dir);
+            }
+        });
     }
 
     /// Millida catalog header: cut-corner tabs with the shell's mint active
@@ -1597,6 +1652,40 @@ impl ModsPage {
                 }
             });
     }
+}
+
+fn multimc_button(ui: &mut Ui, label: &str, active: bool, width: f32) -> bool {
+    let (rect, resp) = ui.allocate_exact_size(vec2(width, 28.0), Sense::click());
+    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+    let fill = if active {
+        RUBY.into()
+    } else {
+        lerp_color(BG_ELEVATED, BG_HOVER, hover)
+    };
+    let stroke = if active {
+        RUBY.into()
+    } else {
+        lerp_color(BORDER_DEFAULT, RUBY, hover)
+    };
+    ui.painter()
+        .rect_filled(rect, crate::theme::rounding(), fill);
+    ui.painter()
+        .rect_stroke(rect, crate::theme::rounding(), Stroke::new(1.0_f32, stroke));
+    ui.painter().text(
+        rect.center(),
+        egui::Align2::CENTER_CENTER,
+        label,
+        egui::FontId::proportional(12.0),
+        if active {
+            Color32::WHITE
+        } else {
+            TEXT_PRIMARY.into()
+        },
+    );
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp.clicked()
 }
 
 fn millida_pixel_rect(painter: &egui::Painter, rect: egui::Rect, cut: f32, fill: Color32) {
