@@ -6,6 +6,7 @@ pub mod full;
 pub mod icons;
 pub mod modrinth_assets;
 pub mod modrinth_ui;
+pub mod pixel;
 pub mod sidebar;
 pub mod titlebar;
 pub mod toasts;

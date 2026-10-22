@@ -131,7 +131,10 @@ WebGL-встраивание и браузерные движки не испо�
 - страница скинов: 3D-превью на пиксельной сцене, переключатель модели,
   активный скин, Steve/Alex, сохранённые скины и загрузка/сброс в
   cut-corner контролах;
-- внутренние страницы Profile/Settings остаются общими.
+- страница профиля: пиксельная карточка игрока, статус, действия и данные
+  аккаунта с копированием UUID;
+- страница настроек: display-заголовок, cut-corner вкладки и квадратные
+  контролы; выбор языка/режима также переведён на пиксельные чипы.
 
 ## Ключевые файлы
 
@@ -144,6 +147,7 @@ WebGL-встраивание и браузерные движки не испо�
 - `crates/amc-ui/src/widgets/modrinth_assets.rs` — кэш PNG-ассетов Modrinth.
 - `crates/amc-ui/src/widgets/modrinth_ui.rs` — общие кнопки/пилюли/тумблеры
   Modrinth для Profile и Settings.
+- `crates/amc-ui/src/widgets/pixel.rs` — общие cut-corner примитивы Millida.
 - `crates/amc-ui/src/pages/instances.rs` — библиотеки `Instance`, `Modrinth`,
   `Multimc`, карточки, модалки, фильтры, контекстное меню.
 - `crates/amc-ui/src/pages/mods.rs` — общая страница модов + `ModsSkin`.

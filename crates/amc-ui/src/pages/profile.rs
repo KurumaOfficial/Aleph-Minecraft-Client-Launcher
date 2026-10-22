@@ -14,6 +14,7 @@ use crate::theme::{
 };
 use crate::widgets::icons::{self, Icon};
 use crate::widgets::modrinth_ui::{self, ModrinthButtonKind};
+use crate::widgets::pixel;
 
 /// Page language for the player profile. Aleph keeps its compact original
 /// composition; Modrinth follows the reference app's page-header layout.
@@ -22,6 +23,7 @@ pub enum ProfileSkin {
     #[default]
     Amc,
     Modrinth,
+    Millida,
 }
 
 /// Player profile tab (CONCEPT "Профиль игрока", P7): nickname, skin and
@@ -76,6 +78,9 @@ impl ProfilePage {
     ) -> ProfileAction {
         if page_skin == ProfileSkin::Modrinth {
             return self.show_modrinth(ui, account, skin, slim, lang);
+        }
+        if page_skin == ProfileSkin::Millida {
+            return self.show_millida(ui, account, skin, slim, lang);
         }
 
         let mut action = ProfileAction::None;
@@ -159,6 +164,336 @@ impl ProfilePage {
                     .color(TEXT_MUTED),
             );
         }
+
+        action
+    }
+
+    fn show_millida(
+        &mut self,
+        ui: &mut Ui,
+        account: Option<&Account>,
+        skin: Option<&RgbaImage>,
+        slim: bool,
+        lang: Language,
+    ) -> ProfileAction {
+        self.ensure_tex(ui.ctx(), skin, slim, false);
+        let mut action = ProfileAction::None;
+        let now = Instant::now();
+        let copied = self
+            .copied_at
+            .is_some_and(|at| now.duration_since(at) < Duration::from_millis(1500));
+        if self.copied_at.is_some() {
+            ui.ctx().request_repaint_after(Duration::from_millis(250));
+        }
+
+        ScrollArea::vertical()
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.add_space(14.0);
+                ui.horizontal(|ui| {
+                    let (mark, _) = ui.allocate_exact_size(vec2(14.0, 14.0), Sense::hover());
+                    pixel::plate(
+                        ui.painter(),
+                        mark,
+                        3.0,
+                        theme::ACCENT.into(),
+                        theme::ACCENT_LIGHT.into(),
+                    );
+                    ui.label(
+                        egui::RichText::new(lang.profile_title())
+                            .font(theme::display(26.0))
+                            .color(theme::HEAD),
+                    );
+                });
+                ui.add_space(12.0);
+
+                let width = ui.available_width();
+                let (card, _) = ui.allocate_exact_size(vec2(width, 176.0), Sense::hover());
+                pixel::plate(
+                    ui.painter(),
+                    card,
+                    10.0,
+                    theme::BG_CARD.into(),
+                    theme::BORDER_STRONG.into(),
+                );
+                let avatar = Rect::from_min_size(
+                    pos2(card.left() + 20.0, card.top() + 24.0),
+                    vec2(96.0, 96.0),
+                );
+                pixel::plate(
+                    ui.painter(),
+                    avatar,
+                    8.0,
+                    theme::BG.into(),
+                    theme::ACCENT.into(),
+                );
+                if let Some(tex) = &self.tex {
+                    ui.painter().image(
+                        tex.id(),
+                        avatar.shrink(4.0),
+                        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                        Color32::WHITE,
+                    );
+                }
+
+                let text_x = avatar.right() + 20.0;
+                let name = account
+                    .map(|a| a.username.as_str())
+                    .unwrap_or_else(|| lang.modrinth_no_account());
+                ui.painter().text(
+                    pos2(text_x, card.top() + 38.0),
+                    egui::Align2::LEFT_CENTER,
+                    name,
+                    theme::display(24.0),
+                    theme::HEAD.into(),
+                );
+                if let Some(acc) = account {
+                    let label = account_type_label(acc, lang);
+                    let badge_w = 72.0;
+                    let badge = Rect::from_min_size(
+                        pos2(
+                            text_x
+                                + ui.painter()
+                                    .layout_no_wrap(
+                                        name.to_owned(),
+                                        theme::display(24.0),
+                                        Color32::PLACEHOLDER,
+                                    )
+                                    .size()
+                                    .x
+                                + 10.0,
+                            card.top() + 27.0,
+                        ),
+                        vec2(badge_w, 22.0),
+                    );
+                    pixel::plate(
+                        ui.painter(),
+                        badge,
+                        4.0,
+                        theme::BG.into(),
+                        theme::ACCENT.into(),
+                    );
+                    ui.painter().text(
+                        badge.center(),
+                        egui::Align2::CENTER_CENTER,
+                        label,
+                        egui::FontId::proportional(10.0),
+                        theme::ACCENT_LIGHT.into(),
+                    );
+                }
+
+                let (status, dot): (&str, Color32) = match account {
+                    Some(acc) if acc.account_type == AccountType::Offline => {
+                        (lang.modrinth_profile_status_offline(), theme::MUTED.into())
+                    }
+                    Some(_) => (
+                        lang.modrinth_profile_status_signed_in(),
+                        theme::ACCENT.into(),
+                    ),
+                    None => (
+                        lang.modrinth_profile_status_signed_out(),
+                        theme::MUTED.into(),
+                    ),
+                };
+                ui.painter()
+                    .circle_filled(pos2(text_x + 4.0, card.top() + 69.0), 3.5, dot);
+                ui.painter().text(
+                    pos2(text_x + 13.0, card.top() + 69.0),
+                    egui::Align2::LEFT_CENTER,
+                    status,
+                    egui::FontId::proportional(12.0),
+                    theme::MUTED.into(),
+                );
+
+                let primary_label = if account.is_some() {
+                    lang.modrinth_profile_change_skin()
+                } else {
+                    lang.bottom_btn_login()
+                };
+                let secondary_label = if account.is_some() {
+                    lang.modrinth_profile_manage_account()
+                } else {
+                    lang.modrinth_profile_change_skin()
+                };
+                let primary =
+                    Rect::from_min_size(pos2(text_x, card.top() + 104.0), vec2(156.0, 36.0));
+                let secondary = Rect::from_min_size(
+                    pos2(primary.right() + 8.0, card.top() + 104.0),
+                    vec2(196.0, 36.0),
+                );
+                if millida_profile_button(
+                    ui,
+                    primary,
+                    primary_label,
+                    if account.is_some() {
+                        Some(Icon::Palette)
+                    } else {
+                        Some(Icon::Person)
+                    },
+                    true,
+                ) {
+                    action = if account.is_some() {
+                        ProfileAction::OpenSkins
+                    } else {
+                        ProfileAction::OpenLogin
+                    };
+                }
+                if millida_profile_button(
+                    ui,
+                    secondary,
+                    secondary_label,
+                    if account.is_some() {
+                        Some(Icon::Gear)
+                    } else {
+                        Some(Icon::Palette)
+                    },
+                    false,
+                ) {
+                    action = if account.is_some() {
+                        ProfileAction::OpenAccounts
+                    } else {
+                        ProfileAction::OpenSkins
+                    };
+                }
+
+                ui.add_space(18.0);
+                ui.label(
+                    egui::RichText::new(lang.modrinth_profile_details())
+                        .font(theme::display(18.0))
+                        .color(theme::HEAD),
+                );
+                ui.add_space(10.0);
+
+                let row_h = 58.0;
+                let (details, _) = ui.allocate_exact_size(vec2(width, row_h * 3.0), Sense::hover());
+                pixel::plate(
+                    ui.painter(),
+                    details,
+                    10.0,
+                    theme::BG_CARD.into(),
+                    theme::BORDER_STRONG.into(),
+                );
+                let username = account.map(|a| a.username.as_str()).unwrap_or("—");
+                let username_row = Rect::from_min_size(details.min, vec2(width, row_h));
+                paint_millida_detail_row(
+                    ui,
+                    username_row,
+                    Icon::Person,
+                    lang.profile_nickname(),
+                    username,
+                    false,
+                );
+                if let Some(acc) = account {
+                    let label = account_type_label(acc, lang);
+                    let badge = Rect::from_min_size(
+                        pos2(username_row.right() - 88.0, username_row.center().y - 11.0),
+                        vec2(74.0, 22.0),
+                    );
+                    pixel::plate(
+                        ui.painter(),
+                        badge,
+                        4.0,
+                        theme::BG.into(),
+                        theme::ACCENT.into(),
+                    );
+                    ui.painter().text(
+                        badge.center(),
+                        egui::Align2::CENTER_CENTER,
+                        label,
+                        egui::FontId::proportional(10.0),
+                        theme::ACCENT_LIGHT.into(),
+                    );
+                }
+
+                let uuid_row = username_row.translate(vec2(0.0, row_h));
+                paint_millida_row_separator(ui, uuid_row);
+                let uuid = account
+                    .map(|a| a.uuid.as_str())
+                    .filter(|uuid| !uuid.trim().is_empty());
+                paint_millida_detail_row(
+                    ui,
+                    uuid_row,
+                    Icon::Card,
+                    lang.modrinth_profile_player_uuid(),
+                    uuid.unwrap_or_else(|| lang.modrinth_profile_no_uuid()),
+                    true,
+                );
+                if let Some(uuid) = uuid {
+                    let copy_rect = Rect::from_center_size(
+                        pos2(uuid_row.right() - 28.0, uuid_row.center().y),
+                        vec2(32.0, 32.0),
+                    );
+                    let resp = ui
+                        .interact(copy_rect, ui.id().with("millida_copy_uuid"), Sense::click())
+                        .on_hover_text(lang.modrinth_profile_copy_uuid());
+                    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+                    icons::draw(
+                        ui.painter(),
+                        if copied { Icon::Check } else { Icon::Clipboard },
+                        Rect::from_center_size(copy_rect.center(), vec2(15.0, 15.0)),
+                        if copied {
+                            theme::ACCENT.into()
+                        } else {
+                            lerp_color(theme::MUTED, theme::HEAD, hover)
+                        },
+                        1.4,
+                    );
+                    if copied {
+                        ui.painter().text(
+                            pos2(copy_rect.left() - 8.0, copy_rect.center().y),
+                            egui::Align2::RIGHT_CENTER,
+                            lang.modrinth_profile_copied(),
+                            egui::FontId::proportional(10.5),
+                            theme::ACCENT.into(),
+                        );
+                    }
+                    if resp.clicked() {
+                        ui.ctx().copy_text(uuid.to_owned());
+                        self.copied_at = Some(Instant::now());
+                    }
+                }
+
+                let model_row = uuid_row.translate(vec2(0.0, row_h));
+                paint_millida_row_separator(ui, model_row);
+                paint_millida_detail_row(
+                    ui,
+                    model_row,
+                    Icon::Diamond,
+                    lang.modrinth_profile_skin_model(),
+                    if slim {
+                        lang.skins_model_slim()
+                    } else {
+                        lang.skins_model_classic()
+                    },
+                    false,
+                );
+                icons::draw(
+                    ui.painter(),
+                    Icon::ChevronRight,
+                    Rect::from_center_size(
+                        pos2(model_row.right() - 26.0, model_row.center().y),
+                        vec2(14.0, 14.0),
+                    ),
+                    theme::MUTED,
+                    1.4,
+                );
+                let model_resp = ui.interact(
+                    Rect::from_min_max(
+                        pos2(model_row.left(), model_row.top()),
+                        pos2(model_row.right() - 46.0, model_row.bottom()),
+                    ),
+                    ui.id().with("millida_profile_skin_row"),
+                    Sense::click(),
+                );
+                if model_resp.hovered() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
+                if model_resp.clicked() {
+                    action = ProfileAction::OpenSkins;
+                }
+
+                ui.add_space(18.0);
+            });
 
         action
     }
@@ -443,6 +778,107 @@ impl ProfilePage {
 
         action
     }
+}
+
+fn paint_millida_detail_row(
+    ui: &Ui,
+    rect: Rect,
+    icon: Icon,
+    label: &str,
+    value: &str,
+    monospace: bool,
+) {
+    icons::draw(
+        ui.painter(),
+        icon,
+        Rect::from_center_size(pos2(rect.left() + 26.0, rect.center().y), vec2(16.0, 16.0)),
+        theme::ACCENT,
+        1.35,
+    );
+    ui.painter().text(
+        pos2(rect.left() + 48.0, rect.center().y - 10.0),
+        egui::Align2::LEFT_CENTER,
+        label,
+        FontId::proportional(10.5),
+        theme::MUTED.into(),
+    );
+    let font = if monospace {
+        FontId::new(12.0, FontFamily::Monospace)
+    } else {
+        FontId::proportional(13.0)
+    };
+    ui.painter().text(
+        pos2(rect.left() + 48.0, rect.center().y + 10.0),
+        egui::Align2::LEFT_CENTER,
+        value,
+        font,
+        theme::HEAD.into(),
+    );
+}
+
+fn paint_millida_row_separator(ui: &Ui, row: Rect) {
+    ui.painter().line_segment(
+        [
+            pos2(row.left() + 14.0, row.top()),
+            pos2(row.right() - 14.0, row.top()),
+        ],
+        Stroke::new(1.0_f32, theme::BORDER_STRONG),
+    );
+}
+
+fn millida_profile_button(
+    ui: &mut Ui,
+    rect: Rect,
+    label: &str,
+    icon: Option<Icon>,
+    primary: bool,
+) -> bool {
+    let resp = ui.interact(
+        rect,
+        ui.id().with(("millida_profile_btn", label)),
+        Sense::click(),
+    );
+    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+    let (fill, outline, text) = if primary {
+        (
+            theme::lerp_color(theme::ACCENT, theme::ACCENT_LIGHT, hover),
+            theme::ACCENT_LIGHT.into(),
+            theme::BG.into(),
+        )
+    } else {
+        (
+            theme::lerp_color(theme::BG, theme::BG_HOVER, hover),
+            theme::BORDER_STRONG.into(),
+            theme::TEXT.into(),
+        )
+    };
+    pixel::plate(ui.painter(), rect, 5.0, fill, outline);
+    let galley = ui.painter().layout_no_wrap(
+        label.to_owned(),
+        FontId::new(11.5, FontFamily::Name("bold".into())),
+        Color32::PLACEHOLDER,
+    );
+    let icon_space = if icon.is_some() { 22.0 } else { 0.0 };
+    let total = icon_space + galley.size().x;
+    let left = rect.center().x - total / 2.0;
+    if let Some(icon) = icon {
+        icons::draw(
+            ui.painter(),
+            icon,
+            Rect::from_center_size(pos2(left + 8.0, rect.center().y), vec2(15.0, 15.0)),
+            text,
+            1.4,
+        );
+    }
+    ui.painter().galley(
+        pos2(left + icon_space, rect.center().y - galley.size().y / 2.0),
+        galley,
+        text,
+    );
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp.clicked()
 }
 
 fn circular_head(head: &egui::ColorImage) -> egui::ColorImage {

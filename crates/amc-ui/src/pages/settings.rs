@@ -1,3 +1,4 @@
+use crate::theme;
 use crate::theme::{
     lerp_color, with_alpha, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, MODRINTH_BG, MODRINTH_GREEN,
     MODRINTH_SURFACE, MODRINTH_SURFACE_HIGH, MODRINTH_SURFACE_HOVER, MODRINTH_TEXT_CONTRAST,
@@ -6,6 +7,7 @@ use crate::theme::{
 use crate::widgets::choice_chip;
 use crate::widgets::icons::{icon_button, Icon};
 use crate::widgets::modrinth_ui;
+use crate::widgets::pixel;
 use amc_auth::AccountManager;
 use amc_core::config::{AppMode, LauncherConfig};
 use amc_core::paths::LauncherPaths;
@@ -22,6 +24,7 @@ pub enum SettingsSkin {
     #[default]
     Amc,
     Modrinth,
+    Millida,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -127,6 +130,15 @@ impl SettingsPage {
                 server_running,
                 server_status,
             );
+        } else if skin == SettingsSkin::Millida {
+            self.show_millida(
+                ui,
+                config,
+                account_mgr,
+                paths,
+                server_running,
+                server_status,
+            );
         } else {
             self.show_amc(
                 ui,
@@ -177,6 +189,102 @@ impl SettingsPage {
                 }
                 SettingsSubTab::Java => self.show_java(ui, config, paths),
                 SettingsSubTab::Accounts => self.show_accounts(ui, account_mgr, config, lang),
+            });
+    }
+
+    /// Millida settings: display heading, cut-corner section tabs and the
+    /// existing form controls squared off to the pixel language.
+    fn show_millida(
+        &mut self,
+        ui: &mut Ui,
+        config: &mut LauncherConfig,
+        account_mgr: &mut AccountManager,
+        paths: &LauncherPaths,
+        server_running: bool,
+        server_status: &Option<String>,
+    ) {
+        let lang = config.ui.language();
+        ui.add_space(14.0);
+        ui.horizontal(|ui| {
+            let (mark, _) = ui.allocate_exact_size(vec2(14.0, 14.0), Sense::hover());
+            pixel::plate(
+                ui.painter(),
+                mark,
+                3.0,
+                theme::ACCENT.into(),
+                theme::ACCENT_LIGHT.into(),
+            );
+            ui.label(
+                egui::RichText::new(lang.settings_title())
+                    .font(theme::display(26.0))
+                    .color(TEXT_HEADING),
+            );
+        });
+        ui.add_space(12.0);
+
+        ui.horizontal_wrapped(|ui| {
+            ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
+            for (tab, label) in [
+                (SettingsSubTab::General, lang.settings_tab_general()),
+                (SettingsSubTab::Java, lang.settings_tab_java()),
+                (SettingsSubTab::Accounts, lang.settings_tab_accounts()),
+            ] {
+                let active = self.sub_tab == tab;
+                let galley = ui.painter().layout_no_wrap(
+                    label.to_owned(),
+                    egui::FontId::new(11.5, egui::FontFamily::Name("bold".into())),
+                    Color32::PLACEHOLDER,
+                );
+                let width = (galley.size().x + 34.0).max(132.0);
+                let (rect, resp) = ui.allocate_exact_size(vec2(width, 36.0), Sense::click());
+                let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+                let fill = if active {
+                    theme::ACCENT.into()
+                } else {
+                    theme::lerp_color(theme::BG_CARD, theme::BG_HOVER, hover)
+                };
+                let outline = if active {
+                    theme::ACCENT_LIGHT.into()
+                } else {
+                    theme::BORDER_STRONG.into()
+                };
+                pixel::plate(ui.painter(), rect, 5.0, fill, outline);
+                ui.painter().galley(
+                    pos2(
+                        rect.center().x - galley.size().x / 2.0,
+                        rect.center().y - galley.size().y / 2.0,
+                    ),
+                    galley,
+                    if active {
+                        theme::BG.into()
+                    } else {
+                        theme::TEXT.into()
+                    },
+                );
+                if resp.clicked() {
+                    self.sub_tab = tab;
+                }
+            }
+        });
+
+        ui.add_space(12.0);
+        ScrollArea::vertical()
+            .id_salt(("millida_settings_scroll", self.sub_tab as u8))
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.scope(|ui| {
+                    apply_millida_settings_style(ui);
+                    match self.sub_tab {
+                        SettingsSubTab::General => {
+                            self.show_general(ui, config, paths, server_running, server_status)
+                        }
+                        SettingsSubTab::Java => self.show_java(ui, config, paths),
+                        SettingsSubTab::Accounts => {
+                            self.show_accounts(ui, account_mgr, config, lang)
+                        }
+                    }
+                });
+                ui.add_space(18.0);
             });
     }
 
@@ -360,7 +468,7 @@ impl SettingsPage {
 
         // Language selection group
         ui.group(|ui| {
-            if self.skin == SettingsSkin::Modrinth {
+            if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
             }
             ui.label(
@@ -401,7 +509,7 @@ impl SettingsPage {
         // Operation mode group (CONCEPT "Режимы работы", ROADMAP P1).
         // Switchable here at any time; the first-run wizard will ask it once.
         ui.group(|ui| {
-            if self.skin == SettingsSkin::Modrinth {
+            if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
             }
             ui.label(
@@ -448,7 +556,7 @@ impl SettingsPage {
         ui.add_space(14.0);
 
         ui.group(|ui| {
-            if self.skin == SettingsSkin::Modrinth {
+            if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
             }
             ui.label(
@@ -543,7 +651,7 @@ impl SettingsPage {
         ui.add_space(14.0);
 
         ui.group(|ui| {
-            if self.skin == SettingsSkin::Modrinth {
+            if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
             }
             ui.label(
@@ -572,7 +680,7 @@ impl SettingsPage {
         ui.add_space(14.0);
 
         ui.group(|ui| {
-            if self.skin == SettingsSkin::Modrinth {
+            if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
             }
             ui.label(
@@ -614,7 +722,7 @@ impl SettingsPage {
         ui.add_space(14.0);
 
         ui.group(|ui| {
-            if self.skin == SettingsSkin::Modrinth {
+            if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
             }
             ui.label(
@@ -661,7 +769,7 @@ impl SettingsPage {
 
         // World backups folder + schedule (CONCEPT "Управление мирами", P9).
         ui.group(|ui| {
-            if self.skin == SettingsSkin::Modrinth {
+            if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
             }
             ui.label(
@@ -716,7 +824,7 @@ impl SettingsPage {
 
         // Notifications per type (CONCEPT "Уведомления").
         ui.group(|ui| {
-            if self.skin == SettingsSkin::Modrinth {
+            if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
             }
             ui.label(
@@ -758,7 +866,7 @@ impl SettingsPage {
 
         // Rebindable hotkeys (CONCEPT "Горячие клавиши", P10).
         ui.group(|ui| {
-            if self.skin == SettingsSkin::Modrinth {
+            if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
             }
             ui.label(
@@ -816,7 +924,7 @@ impl SettingsPage {
 
         // Launcher updates, crash reports, diagnostics export.
         ui.group(|ui| {
-            if self.skin == SettingsSkin::Modrinth {
+            if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
             }
             ui.label(
@@ -865,7 +973,7 @@ impl SettingsPage {
         // Manual settings transfer for moving to another PC
         // (CONCEPT "Облачная синхронизация", P10 — no cloud in v1.0).
         ui.group(|ui| {
-            if self.skin == SettingsSkin::Modrinth {
+            if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
             }
             ui.label(
@@ -905,7 +1013,7 @@ impl SettingsPage {
         // Local dedicated server for the selected instance (CONCEPT P13).
         // Stops with the launcher (kill_on_drop); no LAN tunneling in v1.0.
         ui.group(|ui| {
-            if self.skin == SettingsSkin::Modrinth {
+            if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
             }
             ui.label(
@@ -952,7 +1060,7 @@ impl SettingsPage {
         let mr = self.skin == SettingsSkin::Modrinth;
 
         ui.group(|ui| {
-            if self.skin == SettingsSkin::Modrinth {
+            if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
             }
             ui.label(
@@ -1000,7 +1108,7 @@ impl SettingsPage {
         ui.add_space(14.0);
 
         ui.group(|ui| {
-            if self.skin == SettingsSkin::Modrinth {
+            if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
             }
             ui.label(
@@ -1077,7 +1185,7 @@ impl SettingsPage {
         // Shared Java/RAM groups (CONCEPT P2): one edit applies to every
         // member instance at launch. Instances join by name in their card.
         ui.group(|ui| {
-            if self.skin == SettingsSkin::Modrinth {
+            if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
             }
             ui.label(
@@ -1192,7 +1300,7 @@ impl SettingsPage {
 
         // Java manager: discovered system runtimes + launcher runtimes.
         ui.group(|ui| {
-            if self.skin == SettingsSkin::Modrinth {
+            if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
             }
             ui.horizontal(|ui| {
@@ -1348,7 +1456,7 @@ impl SettingsPage {
         ui.add_space(14.0);
 
         ui.group(|ui| {
-            if self.skin == SettingsSkin::Modrinth {
+            if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
             }
             ui.label(
@@ -1465,7 +1573,7 @@ impl SettingsPage {
         ui.add_space(14.0);
 
         ui.group(|ui| {
-            if self.skin == SettingsSkin::Modrinth {
+            if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
             }
             ui.label(
@@ -1542,7 +1650,7 @@ impl SettingsPage {
     ) {
         let mr = self.skin == SettingsSkin::Modrinth;
         ui.group(|ui| {
-            if self.skin == SettingsSkin::Modrinth {
+            if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
             }
             ui.label(
@@ -1681,6 +1789,46 @@ fn bool_setting(skin: SettingsSkin, ui: &mut Ui, value: &mut bool, label: &str) 
     } else {
         ui.checkbox(value, egui::RichText::new(label).color(TEXT_PRIMARY))
     }
+}
+
+/// Scoped square controls for the Millida settings form.
+fn apply_millida_settings_style(ui: &mut Ui) {
+    ui.spacing_mut().item_spacing = vec2(8.0, 8.0);
+    ui.spacing_mut().button_padding = vec2(12.0, 7.0);
+    ui.spacing_mut().slider_width = 190.0;
+    let visuals = ui.visuals_mut();
+    visuals.widgets.noninteractive.bg_fill = Color32::from(theme::BG_CARD);
+    visuals.widgets.noninteractive.weak_bg_fill = Color32::from(theme::BG_CARD);
+    visuals.widgets.noninteractive.bg_stroke =
+        Stroke::new(1.0_f32, Color32::from(theme::BORDER_STRONG));
+    visuals.widgets.noninteractive.rounding = Rounding::ZERO;
+    visuals.widgets.noninteractive.fg_stroke.color = Color32::from(theme::TEXT);
+
+    visuals.widgets.inactive.bg_fill = Color32::from(theme::BG_HOVER);
+    visuals.widgets.inactive.weak_bg_fill = Color32::from(theme::BG_HOVER);
+    visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, Color32::from(theme::BORDER_STRONG));
+    visuals.widgets.inactive.rounding = Rounding::ZERO;
+    visuals.widgets.inactive.fg_stroke.color = Color32::from(theme::TEXT);
+
+    visuals.widgets.hovered.bg_fill = Color32::from(theme::ACCENT_DIM);
+    visuals.widgets.hovered.weak_bg_fill = Color32::from(theme::ACCENT_DIM);
+    visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, Color32::from(theme::ACCENT));
+    visuals.widgets.hovered.rounding = Rounding::ZERO;
+    visuals.widgets.hovered.fg_stroke.color = Color32::from(theme::HEAD);
+
+    visuals.widgets.active.bg_fill = Color32::from(theme::ACCENT);
+    visuals.widgets.active.weak_bg_fill = Color32::from(theme::ACCENT);
+    visuals.widgets.active.bg_stroke = Stroke::new(1.0_f32, Color32::from(theme::ACCENT_LIGHT));
+    visuals.widgets.active.rounding = Rounding::ZERO;
+    visuals.widgets.active.fg_stroke.color = Color32::from(theme::BG);
+
+    visuals.selection.bg_fill = with_alpha(theme::ACCENT, 100);
+    visuals.selection.stroke = Stroke::new(1.0_f32, Color32::from(theme::ACCENT_LIGHT));
+    visuals.hyperlink_color = Color32::from(theme::ACCENT_LIGHT);
+    visuals.extreme_bg_color = Color32::from(theme::BG);
+    visuals.faint_bg_color = Color32::from(theme::BG_CARD);
+    visuals.window_fill = Color32::from(theme::BG_CARD);
+    visuals.panel_fill = Color32::from(theme::BG);
 }
 
 /// Scoped visuals for the Modrinth settings form. Existing controls keep

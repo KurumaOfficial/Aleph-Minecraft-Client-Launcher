@@ -4743,6 +4743,8 @@ impl App for LauncherApp {
                         let skin = self.skins_page.skin_image.as_ref();
                         let profile_skin = if shell == amc_core::config::ShellKind::Modrinth {
                             ProfileSkin::Modrinth
+                        } else if shell == amc_core::config::ShellKind::Millida {
+                            ProfileSkin::Millida
                         } else {
                             ProfileSkin::Amc
                         };
@@ -4771,6 +4773,8 @@ impl App for LauncherApp {
                         let server_running = self.server_child.is_some();
                         let settings_skin = if shell == amc_core::config::ShellKind::Modrinth {
                             SettingsSkin::Modrinth
+                        } else if shell == amc_core::config::ShellKind::Millida {
+                            SettingsSkin::Millida
                         } else {
                             SettingsSkin::Amc
                         };
