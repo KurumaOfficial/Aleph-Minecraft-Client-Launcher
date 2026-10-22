@@ -4760,7 +4760,13 @@ impl App for LauncherApp {
                         } else {
                             SkinsSkin::Amc
                         };
-                        self.skins_page.show(&mut content_ui, acc, lang, skins_skin);
+                        self.skins_page.show(
+                            &mut content_ui,
+                            acc,
+                            lang,
+                            skins_skin,
+                            &self.paths.root_dir,
+                        );
                     }
                     NavTab::Profile => {
                         let acc = self.account_mgr.active_account();

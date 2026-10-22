@@ -1264,6 +1264,33 @@ impl Language {
         }
     }
 
+    /// Modrinth shell: save the current custom skin into the local library.
+    pub fn skins_save_current(&self) -> &'static str {
+        match self {
+            Self::English => "Save current skin",
+            Self::Russian => "Сохранить текущий скин",
+            Self::Ukrainian => "Зберегти поточний скін",
+        }
+    }
+
+    /// Modrinth shell: delete one saved skin.
+    pub fn skins_remove_saved(&self) -> &'static str {
+        match self {
+            Self::English => "Remove",
+            Self::Russian => "Удалить",
+            Self::Ukrainian => "Видалити",
+        }
+    }
+
+    /// Modrinth shell: saved-skins hint.
+    pub fn skins_saved_hint(&self) -> &'static str {
+        match self {
+            Self::English => "Click a skin to apply it",
+            Self::Russian => "Нажмите на скин, чтобы применить",
+            Self::Ukrainian => "Натисніть на скін, щоб застосувати",
+        }
+    }
+
     /// Modrinth shell: demo-account notice.
     pub fn skins_demo_notice(&self) -> &'static str {
         match self {
@@ -5432,6 +5459,9 @@ mod tests {
             assert!(!lang.skins_drag_rotate().is_empty());
             assert!(!lang.skins_defaults().is_empty());
             assert!(!lang.skins_no_saved().is_empty());
+            assert!(!lang.skins_save_current().is_empty());
+            assert!(!lang.skins_remove_saved().is_empty());
+            assert!(!lang.skins_saved_hint().is_empty());
             assert!(!lang.skins_demo_notice().is_empty());
             assert!(!lang.skins_load_skin().is_empty());
             assert!(!lang.skins_model_classic().is_empty());

@@ -5,9 +5,12 @@ use crate::theme::{
 };
 use crate::widgets::icons::{self, Icon};
 use amc_auth::Account;
+use amc_core::skins::SkinLibrary;
 use egui::{pos2, vec2, Color32, Rect, Sense, Stroke, TextureOptions, Ui};
 use image::RgbaImage;
-use std::path::PathBuf;
+use std::collections::HashMap;
+use std::io::Cursor;
+use std::path::{Path, PathBuf};
 
 const STEVE_SKIN: &[u8] = include_bytes!("../../../../assets/modrinth/skins/steve.png");
 
@@ -29,6 +32,9 @@ pub struct SkinsPage {
     pub dirty: bool,
     pub avatar_dirty: bool,
     skin3d: Skin3d,
+    saved_skins: SkinLibrary,
+    saved_root: Option<PathBuf>,
+    saved_heads: HashMap<String, egui::TextureHandle>,
 }
 
 impl Default for SkinsPage {
@@ -42,6 +48,9 @@ impl Default for SkinsPage {
             dirty: true,
             avatar_dirty: true,
             skin3d: Skin3d::default(),
+            saved_skins: SkinLibrary::default(),
+            saved_root: None,
+            saved_heads: HashMap::new(),
         }
     }
 }
@@ -53,12 +62,15 @@ impl SkinsPage {
         account: Option<&Account>,
         lang: amc_core::Language,
         skin: SkinsSkin,
+        root_dir: &Path,
     ) {
         if skin == SkinsSkin::Modrinth {
+            self.ensure_saved_library(root_dir);
             self.show_modrinth(ui, account, lang);
             return;
         }
         if skin == SkinsSkin::Millida {
+            self.ensure_saved_library(root_dir);
             self.show_millida(ui, account, lang);
             return;
         }
@@ -706,28 +718,168 @@ impl SkinsPage {
                 .color(theme::MUTED),
         );
         ui.add_space(8.0);
-        let (empty, _) = ui.allocate_exact_size(vec2(width, 58.0), Sense::hover());
-        millida_pixel_plate(
-            ui.painter(),
-            empty,
-            6.0,
-            theme::with_alpha(theme::BG_CARD, 150),
-            theme::BORDER_DEFAULT.into(),
-        );
-        icons::draw_centered(
-            ui.painter(),
-            Icon::Plus,
-            pos2(empty.left() + 24.0, empty.center().y),
-            14.0,
-            theme::MUTED,
-        );
-        ui.painter().text(
-            pos2(empty.left() + 42.0, empty.center().y),
-            egui::Align2::LEFT_CENTER,
-            lang.skins_no_saved(),
-            egui::FontId::proportional(12.0),
-            theme::MUTED.into(),
-        );
+        self.show_millida_saved(ui, lang, width);
+    }
+
+    fn show_millida_saved(&mut self, ui: &mut Ui, lang: amc_core::Language, width: f32) {
+        if self.saved_skins.is_empty() {
+            let (empty, resp) = ui.allocate_exact_size(vec2(width, 58.0), Sense::click());
+            millida_pixel_plate(
+                ui.painter(),
+                empty,
+                6.0,
+                theme::with_alpha(theme::BG_CARD, 150),
+                theme::BORDER_DEFAULT.into(),
+            );
+            icons::draw_centered(
+                ui.painter(),
+                Icon::Plus,
+                pos2(empty.left() + 24.0, empty.center().y),
+                14.0,
+                theme::MUTED,
+            );
+            ui.painter().text(
+                pos2(empty.left() + 42.0, empty.center().y),
+                egui::Align2::LEFT_CENTER,
+                lang.skins_no_saved(),
+                egui::FontId::proportional(12.0),
+                theme::MUTED.into(),
+            );
+            if resp.clicked() {
+                self.load_skin_dialog(lang);
+            }
+            if resp.hovered() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+            }
+        } else {
+            ui.label(
+                egui::RichText::new(lang.skins_saved_hint())
+                    .font(egui::FontId::proportional(10.5))
+                    .color(theme::MUTED),
+            );
+            ui.add_space(6.0);
+            let skins = self.saved_skins.skins().to_vec();
+            for skin in skins {
+                let path = self.saved_skins.path_of(&skin);
+                let current = self.custom_skin_path.as_deref() == Some(path.as_path());
+                let (row, resp) = ui.allocate_exact_size(vec2(width, 56.0), Sense::click());
+                let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+                millida_pixel_plate(
+                    ui.painter(),
+                    row,
+                    6.0,
+                    theme::lerp_color(theme::BG_CARD, theme::BG_HOVER, hover),
+                    if current {
+                        theme::ACCENT.into()
+                    } else {
+                        theme::BORDER_STRONG.into()
+                    },
+                );
+                let key = skin.id.to_string();
+                if !self.saved_heads.contains_key(&key) {
+                    if let Ok(image) = image::open(&path) {
+                        let rgba = image.to_rgba8();
+                        let head = extract_head_avatar(Some(&rgba), skin.slim);
+                        let texture = ui.ctx().load_texture(
+                            format!("saved_skin_{key}"),
+                            head,
+                            TextureOptions::NEAREST,
+                        );
+                        self.saved_heads.insert(key.clone(), texture);
+                    }
+                }
+                let head =
+                    Rect::from_min_size(pos2(row.left() + 10.0, row.top() + 8.0), vec2(40.0, 40.0));
+                millida_pixel_plate(
+                    ui.painter(),
+                    head,
+                    5.0,
+                    theme::BG.into(),
+                    theme::BORDER_DEFAULT.into(),
+                );
+                if let Some(texture) = self.saved_heads.get(&key) {
+                    ui.painter().image(
+                        texture.id(),
+                        head.shrink(4.0),
+                        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                        Color32::WHITE,
+                    );
+                }
+                ui.painter().text(
+                    pos2(row.left() + 60.0, row.center().y - 8.0),
+                    egui::Align2::LEFT_CENTER,
+                    truncate_skin_name(&skin.name, 24),
+                    egui::FontId::new(12.5, egui::FontFamily::Name("bold".into())),
+                    theme::HEAD.into(),
+                );
+                ui.painter().text(
+                    pos2(row.left() + 60.0, row.center().y + 9.0),
+                    egui::Align2::LEFT_CENTER,
+                    if skin.slim {
+                        lang.skins_model_slim()
+                    } else {
+                        lang.skins_model_classic()
+                    },
+                    egui::FontId::proportional(10.5),
+                    theme::MUTED.into(),
+                );
+                let remove = Rect::from_min_size(
+                    pos2(row.right() - 74.0, row.center().y - 11.0),
+                    vec2(64.0, 22.0),
+                );
+                let remove_resp = ui.interact(
+                    remove,
+                    ui.id().with(("saved_skin_remove", skin.id)),
+                    Sense::click(),
+                );
+                ui.painter().text(
+                    remove.center(),
+                    egui::Align2::CENTER_CENTER,
+                    lang.skins_remove_saved(),
+                    egui::FontId::proportional(10.5),
+                    if remove_resp.hovered() {
+                        theme::DANGER.into()
+                    } else {
+                        theme::MUTED.into()
+                    },
+                );
+                if remove_resp.clicked() {
+                    if let Err(err) = self.saved_skins.remove(skin.id) {
+                        tracing::warn!("saved skin remove failed: {err}");
+                    }
+                    self.saved_heads.remove(&key);
+                    if current {
+                        self.custom_skin_path = None;
+                    }
+                } else if resp.clicked() {
+                    if let Ok(image) = image::open(&path) {
+                        self.skin_image = Some(image.to_rgba8());
+                        self.custom_skin_path = Some(path);
+                        self.active_skin_name = skin.name.clone();
+                        self.is_slim_model = skin.slim;
+                        self.dirty = true;
+                        self.avatar_dirty = true;
+                    }
+                }
+                if resp.hovered() && !remove_resp.hovered() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
+                ui.add_space(6.0);
+            }
+        }
+
+        if self.skin_image.is_some() {
+            ui.add_space(4.0);
+            if millida_skin_button(
+                ui,
+                Icon::Check,
+                lang.skins_save_current(),
+                false,
+                width.max(120.0),
+            ) {
+                self.save_current_skin();
+            }
+        }
     }
 
     /// Modrinth reference composition: a sticky preview column and a skin
@@ -881,6 +1033,228 @@ impl SkinsPage {
                 .font(egui::FontId::proportional(11.5))
                 .color(crate::theme::MODRINTH_TEXT_SECONDARY),
         );
+    }
+
+    fn ensure_saved_library(&mut self, root_dir: &Path) {
+        if self.saved_root.as_deref() == Some(root_dir) {
+            return;
+        }
+        self.saved_skins = SkinLibrary::load(root_dir);
+        self.saved_root = Some(root_dir.to_path_buf());
+        self.saved_heads.clear();
+    }
+
+    /// Modrinth saved-skin library: rows with a real head preview, apply on
+    /// click and a separate remove action. The empty state doubles as the
+    /// "load a skin" affordance from the reference.
+    fn show_modrinth_saved(&mut self, ui: &mut Ui, lang: amc_core::Language, width: f32) {
+        if self.saved_skins.is_empty() {
+            let (empty, resp) = ui.allocate_exact_size(vec2(width, 62.0), Sense::click());
+            let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+            ui.painter().rect_filled(
+                empty,
+                egui::Rounding::same(12.0),
+                crate::theme::lerp_color(
+                    Color32::TRANSPARENT,
+                    crate::theme::MODRINTH_SURFACE,
+                    hover,
+                ),
+            );
+            ui.painter().rect_stroke(
+                empty,
+                egui::Rounding::same(12.0),
+                Stroke::new(1.0_f32, crate::theme::MODRINTH_SURFACE_HIGH),
+            );
+            icons::draw(
+                ui.painter(),
+                Icon::Plus,
+                Rect::from_center_size(
+                    pos2(empty.left() + 24.0, empty.center().y),
+                    vec2(15.0, 15.0),
+                ),
+                crate::theme::MODRINTH_GREEN,
+                1.5,
+            );
+            ui.painter().text(
+                pos2(empty.left() + 42.0, empty.center().y),
+                egui::Align2::LEFT_CENTER,
+                lang.skins_no_saved(),
+                egui::FontId::proportional(12.0),
+                crate::theme::MODRINTH_TEXT_SECONDARY,
+            );
+            if resp.hovered() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+            }
+            if resp.clicked() {
+                self.load_skin_dialog(lang);
+            }
+        } else {
+            ui.label(
+                egui::RichText::new(lang.skins_saved_hint())
+                    .font(egui::FontId::proportional(11.0))
+                    .color(crate::theme::MODRINTH_TEXT_SECONDARY),
+            );
+            ui.add_space(6.0);
+            let skins = self.saved_skins.skins().to_vec();
+            for skin in skins {
+                let path = self.saved_skins.path_of(&skin);
+                let current = self.custom_skin_path.as_deref() == Some(path.as_path());
+                let (row, resp) = ui.allocate_exact_size(vec2(width, 58.0), Sense::click());
+                let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+                ui.painter().rect_filled(
+                    row,
+                    egui::Rounding::same(12.0),
+                    crate::theme::lerp_color(
+                        crate::theme::MODRINTH_SURFACE,
+                        crate::theme::MODRINTH_SURFACE_HOVER,
+                        hover,
+                    ),
+                );
+                ui.painter().rect_stroke(
+                    row,
+                    egui::Rounding::same(12.0),
+                    Stroke::new(
+                        1.0_f32,
+                        if current {
+                            crate::theme::MODRINTH_GREEN
+                        } else {
+                            crate::theme::MODRINTH_SURFACE_HIGH
+                        },
+                    ),
+                );
+
+                let key = skin.id.to_string();
+                if !self.saved_heads.contains_key(&key) {
+                    if let Ok(image) = image::open(&path) {
+                        let rgba = image.to_rgba8();
+                        let head = extract_head_avatar(Some(&rgba), skin.slim);
+                        let texture = ui.ctx().load_texture(
+                            format!("saved_skin_{key}"),
+                            head,
+                            TextureOptions::NEAREST,
+                        );
+                        self.saved_heads.insert(key.clone(), texture);
+                    }
+                }
+                let head =
+                    Rect::from_min_size(pos2(row.left() + 10.0, row.top() + 9.0), vec2(40.0, 40.0));
+                ui.painter().rect_filled(
+                    head,
+                    egui::Rounding::same(8.0),
+                    crate::theme::MODRINTH_SURFACE_HOVER,
+                );
+                if let Some(texture) = self.saved_heads.get(&key) {
+                    ui.painter().image(
+                        texture.id(),
+                        head.shrink(3.0),
+                        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                        Color32::WHITE,
+                    );
+                }
+                ui.painter().text(
+                    pos2(row.left() + 60.0, row.center().y - 8.0),
+                    egui::Align2::LEFT_CENTER,
+                    truncate_skin_name(&skin.name, 24),
+                    egui::FontId::proportional(12.5),
+                    crate::theme::MODRINTH_TEXT_CONTRAST,
+                );
+                ui.painter().text(
+                    pos2(row.left() + 60.0, row.center().y + 9.0),
+                    egui::Align2::LEFT_CENTER,
+                    if skin.slim {
+                        lang.skins_model_slim()
+                    } else {
+                        lang.skins_model_classic()
+                    },
+                    egui::FontId::proportional(10.5),
+                    crate::theme::MODRINTH_TEXT_SECONDARY,
+                );
+                let remove = Rect::from_min_size(
+                    pos2(row.right() - 74.0, row.center().y - 11.0),
+                    vec2(64.0, 22.0),
+                );
+                let remove_resp = ui.interact(
+                    remove,
+                    ui.id().with(("saved_skin_remove", skin.id)),
+                    Sense::click(),
+                );
+                ui.painter().rect_filled(
+                    remove,
+                    egui::Rounding::same(8.0),
+                    if remove_resp.hovered() {
+                        crate::theme::with_alpha(crate::theme::DANGER, 26)
+                    } else {
+                        Color32::TRANSPARENT
+                    },
+                );
+                ui.painter().text(
+                    remove.center(),
+                    egui::Align2::CENTER_CENTER,
+                    lang.skins_remove_saved(),
+                    egui::FontId::proportional(10.5),
+                    crate::theme::DANGER.into(),
+                );
+                if remove_resp.clicked() {
+                    if let Err(err) = self.saved_skins.remove(skin.id) {
+                        tracing::warn!("saved skin remove failed: {err}");
+                    }
+                    self.saved_heads.remove(&key);
+                    if current {
+                        self.custom_skin_path = None;
+                    }
+                } else if resp.clicked() {
+                    if let Ok(image) = image::open(&path) {
+                        self.skin_image = Some(image.to_rgba8());
+                        self.custom_skin_path = Some(path);
+                        self.active_skin_name = skin.name.clone();
+                        self.is_slim_model = skin.slim;
+                        self.dirty = true;
+                        self.avatar_dirty = true;
+                    }
+                }
+                if resp.hovered() && !remove_resp.hovered() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
+                ui.add_space(6.0);
+            }
+        }
+
+        if self.skin_image.is_some() {
+            ui.add_space(4.0);
+            if modrinth_skin_button(
+                ui,
+                Icon::Check,
+                lang.skins_save_current(),
+                false,
+                width.max(120.0),
+            ) {
+                self.save_current_skin();
+            }
+        }
+    }
+
+    fn save_current_skin(&mut self) {
+        let Some(image) = self.skin_image.as_ref() else {
+            return;
+        };
+        let mut buf = Cursor::new(Vec::new());
+        let encoded = image::DynamicImage::ImageRgba8(image.clone())
+            .write_to(&mut buf, image::ImageFormat::Png)
+            .is_ok();
+        if !encoded {
+            tracing::warn!("saved skin encode failed");
+            return;
+        }
+        let name = self.active_skin_name.clone();
+        match self
+            .saved_skins
+            .add(&name, self.is_slim_model, buf.get_ref())
+        {
+            Ok(saved) => {
+                self.saved_heads.remove(&saved.id.to_string());
+            }
+            Err(err) => tracing::warn!("saved skin add failed: {err}"),
+        }
     }
 
     fn show_modrinth_skin_list(&mut self, ui: &mut Ui, lang: amc_core::Language, width: f32) {
@@ -1048,41 +1422,7 @@ impl SkinsPage {
                 .color(crate::theme::MODRINTH_TEXT_SECONDARY),
         );
         ui.add_space(8.0);
-        let (empty, resp) = ui.allocate_exact_size(vec2(width, 62.0), Sense::click());
-        let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
-        ui.painter().rect_filled(
-            empty,
-            egui::Rounding::same(12.0),
-            crate::theme::lerp_color(Color32::TRANSPARENT, crate::theme::MODRINTH_SURFACE, hover),
-        );
-        ui.painter().rect_stroke(
-            empty,
-            egui::Rounding::same(12.0),
-            Stroke::new(1.0_f32, crate::theme::MODRINTH_SURFACE_HIGH),
-        );
-        icons::draw(
-            ui.painter(),
-            Icon::Plus,
-            Rect::from_center_size(
-                pos2(empty.left() + 24.0, empty.center().y),
-                vec2(15.0, 15.0),
-            ),
-            crate::theme::MODRINTH_GREEN,
-            1.5,
-        );
-        ui.painter().text(
-            pos2(empty.left() + 42.0, empty.center().y),
-            egui::Align2::LEFT_CENTER,
-            lang.skins_no_saved(),
-            egui::FontId::proportional(12.0),
-            crate::theme::MODRINTH_TEXT_SECONDARY,
-        );
-        if resp.hovered() {
-            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-        }
-        if resp.clicked() {
-            self.load_skin_dialog(lang);
-        }
+        self.show_modrinth_saved(ui, lang, width);
     }
 }
 

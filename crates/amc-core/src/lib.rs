@@ -10,6 +10,7 @@ pub mod paths;
 
 pub mod settings_bundle;
 pub mod shortcuts;
+pub mod skins;
 pub mod trash;
 pub mod types;
 pub mod worlds;

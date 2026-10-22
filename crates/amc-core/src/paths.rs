@@ -48,6 +48,7 @@ impl LauncherPaths {
             self.logs_dir(),
             self.backups_dir(),
             self.trash_dir(),
+            self.skins_dir(),
         ];
 
         for dir in dirs {
@@ -103,6 +104,14 @@ impl LauncherPaths {
 
     pub fn logs_dir(&self) -> PathBuf {
         self.root_dir.join("logs")
+    }
+
+    pub fn skins_dir(&self) -> PathBuf {
+        self.root_dir.join("skins")
+    }
+
+    pub fn skins_file(&self) -> PathBuf {
+        self.root_dir.join("skins.json")
     }
 
     pub fn config_file(&self) -> PathBuf {
