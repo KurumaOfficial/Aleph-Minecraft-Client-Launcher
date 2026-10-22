@@ -13,6 +13,7 @@
 
 use crate::shells::{short_name, tab_label, ShellAction};
 use crate::theme;
+use crate::widgets::brand;
 use crate::widgets::icons::{self, Icon};
 use crate::widgets::NavTab;
 use amc_core::types::Instance;
@@ -130,17 +131,21 @@ pub fn show_tabs(ui: &mut Ui, lang: Language, current_tab: NavTab) -> ShellActio
             }
         }
 
-        // Launcher wordmark in the reference logo slot.
+        // AMC identity in the reference logo slot.
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.add_space(PAD);
             let galley = ui.painter().layout_no_wrap(
-                "ALEPH".to_owned(),
-                theme::display(16.0),
+                brand::APP_NAME_UPPER.to_owned(),
+                theme::display(14.0),
                 Color32::PLACEHOLDER,
             );
-            let (rect, _) = ui.allocate_exact_size(galley.size(), Sense::hover());
+            let (rect, _) =
+                ui.allocate_exact_size(vec2(12.0 + 7.0 + galley.size().x, 14.0), Sense::hover());
+            let mark =
+                Rect::from_min_size(pos2(rect.left(), rect.center().y - 6.0), vec2(12.0, 12.0));
+            brand::hollow_square(ui.painter(), mark, brand::BRAND_RED);
             ui.painter().galley(
-                pos2(rect.left(), rect.center().y - galley.size().y / 2.0),
+                pos2(mark.right() + 7.0, rect.center().y - galley.size().y / 2.0),
                 galley,
                 theme::HEAD.into(),
             );

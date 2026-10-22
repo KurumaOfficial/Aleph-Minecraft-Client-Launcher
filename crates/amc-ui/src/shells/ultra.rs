@@ -7,6 +7,7 @@
 
 use crate::shells::{tab_label, ShellAction};
 use crate::theme;
+use crate::widgets::brand;
 use crate::widgets::icons::{self, Icon};
 use crate::widgets::NavTab;
 use amc_core::Language;
@@ -88,9 +89,12 @@ pub fn show_screen(
             .layout(egui::Layout::top_down(egui::Align::Center)),
     );
 
-    hero.add_space((rect.height() * 0.18).max(24.0));
+    hero.add_space((rect.height() * 0.14).max(20.0));
+    let (mark, _) = hero.allocate_exact_size(vec2(36.0, 36.0), Sense::hover());
+    brand::hollow_square(hero.painter(), mark, brand::BRAND_RED);
+    hero.add_space(14.0);
     hero.label(
-        egui::RichText::new("ALEPH LAUNCHER")
+        egui::RichText::new(brand::APP_NAME_UPPER)
             .font(theme::display(26.0))
             .color(theme::HEAD),
     );

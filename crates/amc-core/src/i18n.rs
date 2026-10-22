@@ -707,9 +707,9 @@ impl Language {
     /// Modrinth shell: friends section empty state.
     pub fn modrinth_no_friends(&self) -> &'static str {
         match self {
-            Self::English => "Sign in to Modrinth to see friends",
-            Self::Russian => "Войдите в Modrinth, чтобы видеть друзей",
-            Self::Ukrainian => "Увійдіть у Modrinth, щоб бачити друзів",
+            Self::English => "Sign in to AMC to see friends",
+            Self::Russian => "Войдите в AMC, чтобы видеть друзей",
+            Self::Ukrainian => "Увійдіть у AMC, щоб бачити друзів",
         }
     }
 
@@ -1482,9 +1482,9 @@ impl Language {
     // ---- Tutorial tour (CONCEPT, P1) ----
     pub fn tour_home_title(&self) -> &'static str {
         match self {
-            Self::English => "Welcome to Aleph!",
-            Self::Russian => "Добро пожаловать в Aleph!",
-            Self::Ukrainian => "Ласкаво просимо до Aleph!",
+            Self::English => "Welcome to AMC!",
+            Self::Russian => "Добро пожаловать в AMC!",
+            Self::Ukrainian => "Ласкаво просимо до AMC!",
         }
     }
 
@@ -2629,9 +2629,9 @@ impl Language {
 
     pub fn settings_mode_ultra(&self) -> &'static str {
         match self {
-            Self::English => "Aleph Ultra",
-            Self::Russian => "Aleph Ультра",
-            Self::Ukrainian => "Aleph Ультра",
+            Self::English => "AMC Ultra",
+            Self::Russian => "AMC Ультра",
+            Self::Ukrainian => "AMC Ультра",
         }
     }
 

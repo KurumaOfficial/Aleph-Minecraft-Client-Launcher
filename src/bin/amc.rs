@@ -10,7 +10,7 @@ use amc_minecraft::{MinecraftLauncher, VersionDetails};
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn usage() -> &'static str {
-    "Aleph Minecraft Client Launcher (headless CLI)\n\
+    "AMC Launcher (headless CLI)\n\
      \n\
      Usage:\n  \
        amc --help                    this help\n  \

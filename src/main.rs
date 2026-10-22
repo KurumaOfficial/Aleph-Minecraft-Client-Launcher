@@ -63,11 +63,11 @@ async fn main() -> Result<(), eframe::Error> {
 
     // Initialize structured logging to stdout and logs/launcher.log
     init_logging(logs_dir.as_deref());
-    tracing::info!("Starting Aleph Minecraft Client Launcher (AMC Launcher)...");
+    tracing::info!("Starting AMC Launcher (Aleph Minecraft Client Launcher)...");
 
     let mut viewport = egui::ViewportBuilder::default()
-        .with_title("Aleph Launcher")
-        .with_app_id("aleph_launcher")
+        .with_title("AMC Launcher")
+        .with_app_id("amc_launcher")
         .with_inner_size(vec2(1120.0, 700.0))
         .with_min_inner_size(vec2(960.0, 600.0))
         .with_decorations(false)
@@ -85,7 +85,7 @@ async fn main() -> Result<(), eframe::Error> {
     };
 
     eframe::run_native(
-        "Aleph Launcher",
+        "AMC Launcher",
         options,
         Box::new(move |cc| {
             setup_fonts(&cc.egui_ctx);

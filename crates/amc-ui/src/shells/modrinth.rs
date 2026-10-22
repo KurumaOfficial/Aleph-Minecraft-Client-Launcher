@@ -469,7 +469,7 @@ fn news_card(ui: &mut Ui, width: f32, title: &str, lang: Language, icon: Icon) {
         title_galley.clone(),
         theme::MODRINTH_TEXT_CONTRAST,
     );
-    let meta = format!("{} · Modrinth", lang.modrinth_news_today());
+    let meta = format!("{} - AMC", lang.modrinth_news_today());
     ui.painter().text(
         pos2(text_x, rect.top() + 20.0 + title_galley.size().y),
         Align2::LEFT_CENTER,

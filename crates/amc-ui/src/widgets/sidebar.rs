@@ -1,7 +1,8 @@
 use crate::theme::{
-    lerp_color, BG_ELEVATED, BORDER_DEFAULT, BORDER_SUBTLE, RUBY, RUBY_DIM, RUBY_LIGHT, TEXT_DIM,
+    lerp_color, BG_ELEVATED, BORDER_DEFAULT, BORDER_SUBTLE, RUBY_DIM, RUBY_LIGHT, TEXT_DIM,
     TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
+use crate::widgets::brand;
 use crate::widgets::icons::{self, Icon};
 use egui::{vec2, Color32, Pos2, Rect, Sense, Stroke, Ui};
 
@@ -124,43 +125,20 @@ impl Sidebar {
 
         let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
 
-        // Aleph Studio Square Motif icon (26x26)
+        // AMC hollow-square mark (26x26).
         let sq_size = 26.0;
         let sq_rect = Rect::from_min_size(
             Pos2::new(rect.left() + 16.0, rect.center().y - sq_size / 2.0),
             vec2(sq_size, sq_size),
         );
+        brand::hollow_square(ui.painter(), sq_rect, brand::BRAND_RED);
 
-        let sq_bg = lerp_color(
-            Color32::from_rgba_premultiplied(139, 26, 42, 16),
-            Color32::from_rgba_premultiplied(181, 34, 57, 45),
-            hover_t,
-        );
-        let sq_stroke = lerp_color(RUBY, RUBY_LIGHT, hover_t);
-
-        ui.painter()
-            .rect_filled(sq_rect, crate::theme::rounding(), sq_bg);
-        ui.painter().rect_stroke(
-            sq_rect,
-            crate::theme::rounding(),
-            Stroke::new(1.5_f32, sq_stroke),
-        );
-
-        // Central 'ℵ' glyph
-        ui.painter().text(
-            sq_rect.center(),
-            egui::Align2::CENTER_CENTER,
-            "ℵ",
-            egui::FontId::proportional(15.0),
-            lerp_color(RUBY_LIGHT, Color32::WHITE, hover_t),
-        );
-
-        // Title and Studio subtitle
+        // Product title and descriptor.
         let title_col = lerp_color(TEXT_HEADING, Color32::WHITE, hover_t);
         ui.painter().text(
             Pos2::new(sq_rect.right() + 10.0, rect.center().y - 7.0),
             egui::Align2::LEFT_CENTER,
-            "Aleph Launcher",
+            brand::APP_NAME,
             egui::FontId::proportional(13.5),
             title_col,
         );
@@ -168,7 +146,7 @@ impl Sidebar {
         ui.painter().text(
             Pos2::new(sq_rect.right() + 10.0, rect.center().y + 8.0),
             egui::Align2::LEFT_CENTER,
-            "ALEPH.ICU STUDIO",
+            "MINECRAFT LAUNCHER",
             egui::FontId::monospace(9.0),
             TEXT_DIM.into(),
         );

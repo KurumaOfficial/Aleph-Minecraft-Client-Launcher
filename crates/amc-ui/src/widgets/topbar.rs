@@ -1,4 +1,5 @@
 use crate::theme::{self, RUBY_DIM, TEXT_MUTED};
+use crate::widgets::brand;
 use crate::widgets::full::{nav_link, red_button};
 use crate::widgets::NavTab;
 use amc_core::Language;
@@ -75,20 +76,16 @@ pub fn show_topbar(
     ui.horizontal(|ui| {
         ui.add_space(PAD);
 
-        // Logo block 210x40: ruby square outline + wordmark, click → Home.
+        // Logo block 210x40: hollow AMC square + product name, click -> Home.
         let logo_resp = ui.allocate_response(vec2(210.0, 40.0), Sense::click());
         {
             let p = ui.painter().clone();
             let sq = egui::Rect::from_min_size(logo_resp.rect.min, Vec2::splat(22.0));
-            p.rect_stroke(
-                sq,
-                crate::theme::rounding(),
-                Stroke::new(2.0_f32, theme::ACCENT),
-            );
+            brand::hollow_square(&p, sq, brand::BRAND_RED);
             p.text(
                 pos2(sq.right() + 12.0, sq.center().y),
                 Align2::LEFT_CENTER,
-                "ALEPH LAUNCHER",
+                brand::APP_NAME_UPPER,
                 theme::display(12.0),
                 theme::HEAD.into(),
             );

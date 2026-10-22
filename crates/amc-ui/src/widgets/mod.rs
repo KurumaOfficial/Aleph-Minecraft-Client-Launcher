@@ -1,5 +1,6 @@
 pub mod badge;
 pub mod bottom_bar;
+pub mod brand;
 pub mod choice_chip;
 pub mod full;
 pub mod icons;

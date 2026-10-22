@@ -21,6 +21,7 @@
 
 use crate::shells::{short_name, tab_label, ShellAction};
 use crate::theme;
+use crate::widgets::brand;
 use crate::widgets::icons::{self, Icon};
 use crate::widgets::NavTab;
 use amc_core::Language;
@@ -379,30 +380,12 @@ pub fn show_rail(
     // Brand row: pixel mark plus wordmark; the utility shortcuts sit at the
     // row's right edge (the lobby keeps them in its corner cluster instead).
     let mark = Rect::from_min_size(pos2(bar.left() + 16.0, bar.top() + 18.0), vec2(26.0, 26.0));
-    stepped_plate(
-        &painter,
-        mark,
-        6.0,
-        theme::ACCENT.into(),
-        Color32::TRANSPARENT,
-        0.0,
-    );
-    let diamond = Rect::from_center_size(mark.center(), vec2(10.0, 10.0));
-    painter.add(egui::Shape::convex_polygon(
-        vec![
-            diamond.center_top(),
-            diamond.right_center(),
-            diamond.center_bottom(),
-            diamond.left_center(),
-        ],
-        Color32::from_white_alpha(235),
-        Stroke::NONE,
-    ));
+    brand::hollow_square(&painter, mark, brand::BRAND_RED);
     painter.text(
         pos2(mark.right() + 10.0, mark.center().y),
         Align2::LEFT_CENTER,
-        "ALEPH",
-        theme::display(15.0),
+        brand::APP_NAME_UPPER,
+        theme::display(13.0),
         theme::HEAD.into(),
     );
 
@@ -1179,7 +1162,7 @@ fn draw_promo(ui: &mut Ui, stage: Rect, lang: Language) {
     painter.text(
         pos2(x, rect.top() + 52.0),
         Align2::LEFT_CENTER,
-        "ALEPH",
+        "AMC",
         theme::display(26.0),
         Color32::WHITE,
     );

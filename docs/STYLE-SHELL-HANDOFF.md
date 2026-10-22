@@ -60,9 +60,9 @@
 - левый навбар 190 px, зелёный акцент, палитра Modrinth;
 - правый rail 300 px: «Вы играете как», карточка аккаунта, «Друзья»,
   «Новости», переключатель панели в titlebar;
-- кастомный titlebar 48 px с официальным wordmark Modrinth, disabled
-  history-стрелками, хлебными крошками, статус-пилюлей, quiet-кнопками,
-  переключателем rail и кнопками окна;
+- кастомный titlebar 48 px с брендом AMC (полый квадрат + название),
+  disabled history-стрелками, хлебными крошками, статус-пилюлей,
+  quiet-кнопками, переключателем rail и кнопками окна;
 - библиотека: сортировка, группировка, фильтры, сворачивание секций,
   карточки, hover-Play, выбор, контекстное меню, модалка новой группы;
 - страница модов: Modrinth-заголовок, табы-пилюли, пустое состояние,
@@ -73,7 +73,8 @@
 - 3D-превью скина на нативном egui `Mesh` (перспективная проекция,
   отсечение задних граней, слои hat/jacket, вращение мышью) — без WebView
   и без WebGL;
-- официальные ассеты Modrinth: wordmark, instance-icons, steve.png;
+- ассеты Modrinth: instance-icons и steve.png (логотипы/wordmark лаунчера
+  не используются — везде бренд AMC);
 - страница `Profile`: заголовок в композиции Modrinth (круглая голова 96 px,
   ник, тип и статус аккаунта, кнопки смены скина/управления аккаунтом),
   карточка данных аккаунта с UUID и копированием, переход в скины и счета;
@@ -145,7 +146,8 @@ WebGL-встраивание и браузерные движки не испо�
   композит скина, Steve/Alex, ассет Steve.
 - `crates/amc-ui/src/pages/instance_manage.rs` — управление сборкой.
 - `crates/amc-core/src/i18n.rs` — EN/RU/UK.
-- `assets/modrinth/` — wordmark, instance icons, steve.png, README.
+- `assets/modrinth/` - instance icons, steve.png, README (без чужих
+  логотипов лаунчеров).
 
 ## Референсы
 
@@ -179,7 +181,6 @@ Millida). Собранные ассеты, которые уже использ�
 1. Класть PNG в `assets/modrinth/...` (или другую папку по оболочке).
 2. Для Modrinth использовать `widgets/modrinth_assets.rs`:
    - `loader_texture(ctx, loader)`;
-   - `wordmark_texture(ctx)`;
    - кэш — в `ctx.data_mut`.
 3. Для произвольных картинок — `include_bytes!` + `image::load_from_memory` +
    `ctx.load_texture`. Кэшировать, не грузить каждую frame.
@@ -188,8 +189,9 @@ Millida). Собранные ассеты, которые уже использ�
    - сделать HTML с нужным фоном;
    - `chrome --headless=new --screenshot=... --window-size=W,H`;
    - PNG положить в assets и подключить.
-5. Wordmark Modrinth растрирован на фоне `#27292e` (цвет titlebar), поэтому
-   он рисуется как непрозрачная картинка без шва.
+5. Брендинг лаунчера всегда AMC: полый квадрат + `AMC Launcher`. Чужие
+   логотипы/wordmark лаунчеров не переносим; `widgets/brand.rs` — единая
+   точка для знака и названия.
 
 ## Локальный запуск и проверка
 

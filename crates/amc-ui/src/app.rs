@@ -3420,7 +3420,7 @@ impl App for LauncherApp {
                     GameEvent::Started { pid } => {
                         let msg = self.config.ui.language().console_started(pid);
                         tracing::info!("{msg}");
-                        self.console_modal.push_line(format!("[ALEPH] {msg}"));
+                        self.console_modal.push_line(format!("[AMC] {msg}"));
                         self.session_start_time = Some(std::time::Instant::now());
                         self.is_launching = false;
                         match self.config.ui.after_launch {
@@ -3441,7 +3441,7 @@ impl App for LauncherApp {
                         let lang = self.config.ui.language();
                         let msg = lang.status_process_exited(code);
                         tracing::info!("{msg}");
-                        self.console_modal.push_line(format!("[ALEPH] {msg}"));
+                        self.console_modal.push_line(format!("[AMC] {msg}"));
                         self.is_launching = false;
                         if let Some(start) = self.session_start_time.take() {
                             let elapsed_mins = (start.elapsed().as_secs() / 60).max(1);
@@ -3472,14 +3472,14 @@ impl App for LauncherApp {
                         let lang = self.config.ui.language();
                         let msg = lang.status_download_paused();
                         tracing::info!("{msg}");
-                        self.console_modal.push_line(format!("[ALEPH] {msg}"));
+                        self.console_modal.push_line(format!("[AMC] {msg}"));
                         self.download_paused = true;
                     }
                     GameEvent::Cancelled => {
                         let lang = self.config.ui.language();
                         let msg = lang.status_download_cancelled();
                         tracing::info!("{msg}");
-                        self.console_modal.push_line(format!("[ALEPH] {msg}"));
+                        self.console_modal.push_line(format!("[AMC] {msg}"));
                         self.is_launching = false;
                     }
                     GameEvent::Crashed { message } => {
@@ -3684,7 +3684,7 @@ impl App for LauncherApp {
             .frame(egui::Frame::none())
             .show(ctx, |ui| {
                 let tb_resp = if shell == amc_core::config::ShellKind::Millida {
-                    TitleBar::show_pixel(ui, "Aleph Launcher")
+                    TitleBar::show_pixel(ui, "AMC Launcher")
                 } else if shell == amc_core::config::ShellKind::Modrinth {
                     let breadcrumb = if self.current_tab == NavTab::Home
                         || self.current_tab == NavTab::Modpacks
@@ -3701,7 +3701,7 @@ impl App for LauncherApp {
                         self.is_launching,
                     )
                 } else {
-                    TitleBar::show(ui, "Aleph Launcher", lang)
+                    TitleBar::show(ui, "AMC Launcher", lang)
                 };
                 if tb_resp.console_clicked {
                     self.console_modal.is_open = !self.console_modal.is_open;

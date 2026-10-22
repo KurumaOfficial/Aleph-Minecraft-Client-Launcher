@@ -741,7 +741,7 @@ impl HomePage {
                         .color(RUBY_LIGHT),
                 );
                 ui.label(
-                    egui::RichText::new("ALEPH")
+                    egui::RichText::new("AMC")
                         .font(crate::theme::display(54.0))
                         .color(TEXT_HEADING),
                 );

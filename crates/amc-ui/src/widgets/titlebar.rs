@@ -1,7 +1,8 @@
 use crate::theme::{
-    lerp_color, with_alpha, ACCENT, BG, BORDER_SUBTLE, CARD_HOVER, DANGER, TEXT_HEADING,
-    TEXT_MUTED, TEXT_PRIMARY,
+    lerp_color, with_alpha, BG, BORDER_SUBTLE, CARD_HOVER, DANGER, TEXT_HEADING, TEXT_MUTED,
+    TEXT_PRIMARY,
 };
+use crate::widgets::brand;
 use crate::widgets::icons::{self, Icon};
 use egui::{
     pos2, vec2, Color32, Pos2, Rect, Response, Rounding, Sense, Stroke, Ui, ViewportCommand,
@@ -54,9 +55,14 @@ impl TitleBar {
                 .send_viewport_cmd(ViewportCommand::Maximized(!is_maximized));
         }
 
-        // Draw title inside drag area
+        // Draw the AMC hollow-square mark and title inside the drag area.
+        let mark = Rect::from_center_size(
+            Pos2::new(drag_rect.left() + 23.0, drag_rect.center().y),
+            vec2(14.0, 14.0),
+        );
+        brand::hollow_square(ui.painter(), mark, brand::BRAND_RED);
         ui.painter().text(
-            Pos2::new(drag_rect.left() + 16.0, drag_rect.center().y),
+            Pos2::new(mark.right() + 8.0, drag_rect.center().y),
             egui::Align2::LEFT_CENTER,
             title,
             egui::FontId::proportional(12.0),
@@ -160,53 +166,25 @@ impl TitleBar {
             Stroke::new(1.0_f32, crate::theme::MODRINTH_SURFACE_HIGH),
         );
 
-        // Official reference wordmark (bundled asset, rendered at the same
-        // 28 px optical height as the original TextLogo component).
-        let wordmark_h = 28.0;
-        let wordmark_w = wordmark_h * (1654.0 / 297.0);
-        let wordmark = Rect::from_min_size(
-            pos2(bar.left() + 14.0, bar.center().y - wordmark_h / 2.0),
-            vec2(wordmark_w, wordmark_h),
+        // AMC identity: hollow square + product name. Shell layout mirrors
+        // the reference, but the launcher never wears another product's logo.
+        let mark = Rect::from_min_size(
+            pos2(bar.left() + 14.0, bar.center().y - 12.0),
+            vec2(24.0, 24.0),
         );
-        let brand_right =
-            if let Some(tex) = crate::widgets::modrinth_assets::wordmark_texture(ui.ctx()) {
-                painter.image(
-                    tex.id(),
-                    wordmark,
-                    Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                    Color32::WHITE,
-                );
-                wordmark.right()
-            } else {
-                let mark = Rect::from_min_size(
-                    pos2(bar.left() + 14.0, bar.center().y - 12.0),
-                    vec2(24.0, 24.0),
-                );
-                painter.rect_filled(mark, Rounding::same(6.0), crate::theme::MODRINTH_GREEN);
-                let diamond = Rect::from_center_size(mark.center(), vec2(10.0, 10.0));
-                painter.add(egui::Shape::convex_polygon(
-                    vec![
-                        diamond.center_top(),
-                        diamond.right_center(),
-                        diamond.center_bottom(),
-                        diamond.left_center(),
-                    ],
-                    Color32::from_white_alpha(235),
-                    Stroke::NONE,
-                ));
-                let brand = painter.layout_no_wrap(
-                    "ALEPH".to_owned(),
-                    crate::theme::display(13.0),
-                    crate::theme::MODRINTH_TEXT_CONTRAST,
-                );
-                let brand_x = mark.right() + 8.0;
-                painter.galley(
-                    pos2(brand_x, bar.center().y - brand.size().y / 2.0),
-                    brand.clone(),
-                    crate::theme::MODRINTH_TEXT_CONTRAST,
-                );
-                brand_x + brand.size().x
-            };
+        brand::hollow_square(&painter, mark, brand::BRAND_RED);
+        let brand = painter.layout_no_wrap(
+            brand::APP_NAME.to_owned(),
+            egui::FontId::new(14.0, egui::FontFamily::Name("bold".into())),
+            crate::theme::MODRINTH_TEXT_CONTRAST,
+        );
+        let brand_x = mark.right() + 9.0;
+        painter.galley(
+            pos2(brand_x, bar.center().y - brand.size().y / 2.0),
+            brand.clone(),
+            crate::theme::MODRINTH_TEXT_CONTRAST,
+        );
+        let brand_right = brand_x + brand.size().x;
 
         // Disabled browser-style history arrows (the app has no route stack).
         let mut x = brand_right + 14.0;
@@ -549,19 +527,7 @@ impl TitleBar {
         let total = 22.0 + 9.0 + galley.size().x;
         let left = bar_rect.center().x - total / 2.0;
         let mark = Rect::from_min_size(pos2(left, bar_rect.center().y - 11.0), vec2(22.0, 22.0));
-        ui.painter()
-            .rect_filled(mark, egui::Rounding::same(8.0), ACCENT);
-        let diamond = Rect::from_center_size(mark.center(), vec2(9.0, 9.0));
-        ui.painter().add(egui::Shape::convex_polygon(
-            vec![
-                diamond.center_top(),
-                diamond.right_center(),
-                diamond.center_bottom(),
-                diamond.left_center(),
-            ],
-            Color32::from_white_alpha(235),
-            Stroke::NONE,
-        ));
+        brand::hollow_square(ui.painter(), mark, brand::BRAND_RED);
         ui.painter().galley(
             pos2(left + 31.0, bar_rect.center().y - galley.size().y / 2.0),
             galley,
