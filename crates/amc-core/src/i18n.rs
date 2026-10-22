@@ -1219,6 +1219,15 @@ impl Language {
         }
     }
 
+    /// Modrinth skin preview: pointer hint above the native 3D viewer.
+    pub fn skins_drag_rotate(&self) -> &'static str {
+        match self {
+            Self::English => "Drag to rotate",
+            Self::Russian => "Потяните, чтобы повернуть",
+            Self::Ukrainian => "Потягніть, щоб повернути",
+        }
+    }
+
     /// Modrinth shell: default skin section heading.
     pub fn skins_defaults(&self) -> &'static str {
         match self {
@@ -5154,6 +5163,7 @@ mod tests {
             assert!(!lang.skins_saved_title().is_empty());
             assert!(!lang.skins_add().is_empty());
             assert!(!lang.skins_active_badge().is_empty());
+            assert!(!lang.skins_drag_rotate().is_empty());
             assert!(!lang.skins_defaults().is_empty());
             assert!(!lang.skins_no_saved().is_empty());
             assert!(!lang.skins_demo_notice().is_empty());

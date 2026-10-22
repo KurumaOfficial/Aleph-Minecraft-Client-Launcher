@@ -26,6 +26,7 @@ pub struct SkinsPage {
     pub texture_handle: Option<egui::TextureHandle>,
     pub dirty: bool,
     pub avatar_dirty: bool,
+    skin3d: Skin3d,
 }
 
 impl Default for SkinsPage {
@@ -38,6 +39,7 @@ impl Default for SkinsPage {
             texture_handle: None,
             dirty: true,
             avatar_dirty: true,
+            skin3d: Skin3d::default(),
         }
     }
 }
@@ -411,20 +413,23 @@ impl SkinsPage {
             crate::theme::with_alpha(crate::theme::MODRINTH_GREEN, 12),
         );
 
-        if let Some(tex) = &self.texture_handle {
-            let image_h = (preview_h - 54.0).min(400.0);
-            let image_w = image_h / 2.0;
-            let image_rect = Rect::from_center_size(
-                pos2(rect.center().x, rect.center().y + 8.0),
-                vec2(image_w, image_h),
-            );
-            ui.painter().image(
-                tex.id(),
-                image_rect,
-                Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
-                Color32::WHITE,
-            );
-        }
+        let viewer_rect = Rect::from_min_max(
+            pos2(rect.left() + 12.0, rect.top() + 34.0),
+            pos2(rect.right() - 12.0, rect.bottom() - 34.0),
+        );
+        self.skin3d.show(
+            ui,
+            viewer_rect,
+            self.skin_image.as_ref(),
+            self.is_slim_model,
+        );
+        ui.painter().text(
+            pos2(rect.center().x, rect.bottom() - 17.0),
+            egui::Align2::CENTER_CENTER,
+            lang.skins_drag_rotate(),
+            egui::FontId::proportional(10.5),
+            crate::theme::MODRINTH_TEXT_SECONDARY,
+        );
 
         let chip = Rect::from_min_size(
             pos2(rect.left() + 14.0, rect.top() + 14.0),
@@ -846,6 +851,559 @@ fn modrinth_skin_button(ui: &mut Ui, icon: Icon, label: &str, primary: bool, wid
     resp.clicked()
 }
 
+#[derive(Clone, Copy)]
+struct V3 {
+    x: f32,
+    y: f32,
+    z: f32,
+}
+
+impl V3 {
+    const fn new(x: f32, y: f32, z: f32) -> Self {
+        Self { x, y, z }
+    }
+
+    fn rotate_y(self, cos: f32, sin: f32) -> Self {
+        Self {
+            x: self.x * cos + self.z * sin,
+            y: self.y,
+            z: -self.x * sin + self.z * cos,
+        }
+    }
+
+    fn dot(self, other: Self) -> f32 {
+        self.x * other.x + self.y * other.y + self.z * other.z
+    }
+}
+
+#[derive(Clone, Copy)]
+struct UvRect {
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+}
+
+impl UvRect {
+    const fn new(x: f32, y: f32, w: f32, h: f32) -> Self {
+        Self { x, y, w, h }
+    }
+
+    /// Normalised corners with a sub-pixel inset so nearest-neighbour
+    /// sampling never bleeds the adjacent skin region into a face.
+    fn corners(self) -> [(f32, f32); 4] {
+        const SCALE: f32 = 1.0 / 64.0;
+        const INSET: f32 = 0.03;
+        let u0 = (self.x + INSET) * SCALE;
+        let v0 = (self.y + INSET) * SCALE;
+        let u1 = (self.x + self.w - INSET) * SCALE;
+        let v1 = (self.y + self.h - INSET) * SCALE;
+        [(u0, v0), (u1, v0), (u1, v1), (u0, v1)]
+    }
+}
+
+/// Six skin faces in front/back/right/left/top/bottom order.
+#[derive(Clone, Copy)]
+struct BoxUv {
+    faces: [UvRect; 6],
+}
+
+/// One textured, culled model face before projection.
+struct SkinFace {
+    verts: [V3; 4],
+    uv: [(f32, f32); 4],
+    normal: V3,
+}
+
+/// Native software-projected 3D player preview. The mesh is drawn by egui's
+/// painter (no WebView/WebGL), sampled straight from the skin PNG.
+pub struct Skin3d {
+    texture: Option<egui::TextureHandle>,
+    key: Option<(bool, usize, usize)>,
+    yaw: f32,
+}
+
+impl Default for Skin3d {
+    fn default() -> Self {
+        Self {
+            texture: None,
+            key: None,
+            yaw: std::f32::consts::FRAC_PI_8,
+        }
+    }
+}
+
+impl Skin3d {
+    fn show(&mut self, ui: &mut Ui, rect: Rect, skin: Option<&RgbaImage>, slim: bool) {
+        if rect.width() < 20.0 || rect.height() < 40.0 {
+            return;
+        }
+        self.ensure_texture(ui.ctx(), skin, slim);
+        let resp = ui.interact(
+            rect,
+            ui.id().with("modrinth_skin3d"),
+            Sense::click_and_drag(),
+        );
+        if resp.dragged() {
+            self.yaw = (self.yaw - resp.drag_delta().x * 0.011).rem_euclid(std::f32::consts::TAU);
+        }
+        if resp.dragged() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::Grabbing);
+        } else if resp.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::Grab);
+        }
+
+        if let Some(texture) = &self.texture {
+            let shadow = pos2(rect.center().x, rect.center().y + rect.height() * 0.415);
+            draw_soft_shadow(
+                ui.painter(),
+                shadow,
+                rect.width() * 0.24,
+                rect.height() * 0.038,
+            );
+            paint_player(ui.painter(), rect, texture.id(), slim, self.yaw);
+        }
+    }
+
+    fn ensure_texture(&mut self, ctx: &egui::Context, skin: Option<&RgbaImage>, slim: bool) {
+        let key = (
+            slim,
+            skin.map_or(0, |image| image.as_raw().as_ptr() as usize),
+            skin.map_or(0, |image| image.as_raw().len()),
+        );
+        if self.key == Some(key) {
+            return;
+        }
+        let image = match skin {
+            Some(image) => image.clone(),
+            None if slim => generate_default_skin(true),
+            None => embedded_steve().unwrap_or_else(|| generate_default_skin(false)),
+        };
+        let size = [image.width() as usize, image.height() as usize];
+        if size[0] == 0 || size[1] == 0 {
+            return;
+        }
+        let pixels = image
+            .pixels()
+            .map(|p| Color32::from_rgba_unmultiplied(p[0], p[1], p[2], p[3]))
+            .collect();
+        self.texture = Some(ctx.load_texture(
+            "modrinth_skin3d",
+            egui::ColorImage { size, pixels },
+            TextureOptions::NEAREST,
+        ));
+        self.key = Some(key);
+    }
+}
+
+/// One face after perspective projection, ready for depth sorting.
+struct ProjectedFace {
+    depth: f32,
+    points: [egui::Pos2; 4],
+    uvs: [(f32, f32); 4],
+    lum: u8,
+}
+
+fn paint_player(
+    painter: &egui::Painter,
+    rect: Rect,
+    texture: egui::TextureId,
+    slim: bool,
+    yaw: f32,
+) {
+    let mut faces = Vec::with_capacity(72);
+    build_player(&mut faces, slim);
+
+    let (sin, cos) = yaw.sin_cos();
+    let camera = V3::new(0.0, 16.0, -62.0);
+    let focal = rect.height() * 1.8;
+    let light = V3::new(-0.42, 0.78, -0.46);
+    let mut visible: Vec<ProjectedFace> = Vec::with_capacity(faces.len());
+
+    for face in faces {
+        let normal = face.normal.rotate_y(cos, sin);
+        let centroid = face.verts.iter().fold(V3::new(0.0, 0.0, 0.0), |sum, v| {
+            V3::new(sum.x + v.x, sum.y + v.y, sum.z + v.z)
+        });
+        let centroid =
+            V3::new(centroid.x / 4.0, centroid.y / 4.0, centroid.z / 4.0).rotate_y(cos, sin);
+        let to_camera = V3::new(
+            camera.x - centroid.x,
+            camera.y - centroid.y,
+            camera.z - centroid.z,
+        );
+        if normal.dot(to_camera) <= 0.001 {
+            continue;
+        }
+        let depth = centroid.z - camera.z;
+        if depth <= 1.0 {
+            continue;
+        }
+
+        let mut points = [egui::Pos2::ZERO; 4];
+        let mut valid = true;
+        for (slot, vertex) in points.iter_mut().zip(face.verts.iter()) {
+            let p = vertex.rotate_y(cos, sin);
+            let d = p.z - camera.z;
+            if d <= 1.0 {
+                valid = false;
+                break;
+            }
+            let scale = focal / d;
+            *slot = pos2(
+                rect.center().x + p.x * scale,
+                rect.center().y - (p.y - 16.0) * scale,
+            );
+        }
+        if !valid {
+            continue;
+        }
+        let lum = 0.62 + 0.38 * normal.dot(light).max(0.0);
+        visible.push(ProjectedFace {
+            depth,
+            points,
+            uvs: face.uv,
+            lum: (lum.clamp(0.0, 1.0) * 255.0) as u8,
+        });
+    }
+
+    visible.sort_by(|a, b| b.depth.total_cmp(&a.depth));
+
+    let mut mesh = egui::Mesh {
+        texture_id: texture,
+        ..Default::default()
+    };
+    for face in visible {
+        let base = mesh.vertices.len() as u32;
+        let color = Color32::from_gray(face.lum);
+        for (point, uv) in face.points.iter().zip(face.uvs.iter()) {
+            mesh.vertices.push(egui::epaint::Vertex {
+                pos: *point,
+                uv: pos2(uv.0, uv.1),
+                color,
+            });
+        }
+        mesh.add_triangle(base, base + 1, base + 2);
+        mesh.add_triangle(base, base + 2, base + 3);
+    }
+    painter.add(egui::Shape::mesh(mesh));
+}
+
+fn draw_soft_shadow(painter: &egui::Painter, center: egui::Pos2, rx: f32, ry: f32) {
+    if rx <= 0.0 || ry <= 0.0 {
+        return;
+    }
+    let segments = 32u32;
+    let mut mesh = egui::Mesh::default();
+    mesh.colored_vertex(center, Color32::from_black_alpha(64));
+    for index in 0..segments {
+        let angle = index as f32 / segments as f32 * std::f32::consts::TAU;
+        mesh.colored_vertex(
+            pos2(center.x + angle.cos() * rx, center.y + angle.sin() * ry),
+            Color32::TRANSPARENT,
+        );
+    }
+    for index in 1..=segments {
+        let next = if index == segments { 1 } else { index + 1 };
+        mesh.add_triangle(0, index, next);
+    }
+    painter.add(egui::Shape::mesh(mesh));
+}
+
+fn build_player(faces: &mut Vec<SkinFace>, slim: bool) {
+    let head = BoxUv {
+        faces: [
+            UvRect::new(8.0, 8.0, 8.0, 8.0),
+            UvRect::new(24.0, 8.0, 8.0, 8.0),
+            UvRect::new(0.0, 8.0, 8.0, 8.0),
+            UvRect::new(16.0, 8.0, 8.0, 8.0),
+            UvRect::new(8.0, 0.0, 8.0, 8.0),
+            UvRect::new(16.0, 0.0, 8.0, 8.0),
+        ],
+    };
+    let hat = BoxUv {
+        faces: [
+            UvRect::new(40.0, 8.0, 8.0, 8.0),
+            UvRect::new(56.0, 8.0, 8.0, 8.0),
+            UvRect::new(32.0, 8.0, 8.0, 8.0),
+            UvRect::new(48.0, 8.0, 8.0, 8.0),
+            UvRect::new(40.0, 0.0, 8.0, 8.0),
+            UvRect::new(48.0, 0.0, 8.0, 8.0),
+        ],
+    };
+    let body = BoxUv {
+        faces: [
+            UvRect::new(20.0, 20.0, 8.0, 12.0),
+            UvRect::new(32.0, 20.0, 8.0, 12.0),
+            UvRect::new(16.0, 20.0, 4.0, 12.0),
+            UvRect::new(28.0, 20.0, 4.0, 12.0),
+            UvRect::new(20.0, 16.0, 8.0, 4.0),
+            UvRect::new(28.0, 16.0, 8.0, 4.0),
+        ],
+    };
+    let jacket = BoxUv {
+        faces: [
+            UvRect::new(20.0, 36.0, 8.0, 12.0),
+            UvRect::new(32.0, 36.0, 8.0, 12.0),
+            UvRect::new(16.0, 36.0, 4.0, 12.0),
+            UvRect::new(28.0, 36.0, 4.0, 12.0),
+            UvRect::new(20.0, 32.0, 8.0, 4.0),
+            UvRect::new(28.0, 32.0, 8.0, 4.0),
+        ],
+    };
+    let left_leg = BoxUv {
+        faces: [
+            UvRect::new(20.0, 52.0, 4.0, 12.0),
+            UvRect::new(28.0, 52.0, 4.0, 12.0),
+            UvRect::new(16.0, 52.0, 4.0, 12.0),
+            UvRect::new(24.0, 52.0, 4.0, 12.0),
+            UvRect::new(20.0, 48.0, 4.0, 4.0),
+            UvRect::new(24.0, 48.0, 4.0, 4.0),
+        ],
+    };
+    let left_leg_overlay = BoxUv {
+        faces: [
+            UvRect::new(4.0, 52.0, 4.0, 12.0),
+            UvRect::new(12.0, 52.0, 4.0, 12.0),
+            UvRect::new(0.0, 52.0, 4.0, 12.0),
+            UvRect::new(8.0, 52.0, 4.0, 12.0),
+            UvRect::new(4.0, 48.0, 4.0, 4.0),
+            UvRect::new(8.0, 48.0, 4.0, 4.0),
+        ],
+    };
+    let right_leg = BoxUv {
+        faces: [
+            UvRect::new(4.0, 20.0, 4.0, 12.0),
+            UvRect::new(12.0, 20.0, 4.0, 12.0),
+            UvRect::new(0.0, 20.0, 4.0, 12.0),
+            UvRect::new(8.0, 20.0, 4.0, 12.0),
+            UvRect::new(4.0, 16.0, 4.0, 4.0),
+            UvRect::new(8.0, 16.0, 4.0, 4.0),
+        ],
+    };
+    let right_leg_overlay = BoxUv {
+        faces: [
+            UvRect::new(4.0, 36.0, 4.0, 12.0),
+            UvRect::new(12.0, 36.0, 4.0, 12.0),
+            UvRect::new(0.0, 36.0, 4.0, 12.0),
+            UvRect::new(8.0, 36.0, 4.0, 12.0),
+            UvRect::new(4.0, 32.0, 4.0, 4.0),
+            UvRect::new(8.0, 32.0, 4.0, 4.0),
+        ],
+    };
+    let arm_w = if slim { 3.0 } else { 4.0 };
+    let right_arm = BoxUv {
+        faces: [
+            UvRect::new(44.0, 20.0, arm_w, 12.0),
+            UvRect::new(44.0 + arm_w + 4.0, 20.0, arm_w, 12.0),
+            UvRect::new(40.0, 20.0, 4.0, 12.0),
+            UvRect::new(44.0 + arm_w, 20.0, 4.0, 12.0),
+            UvRect::new(44.0, 16.0, arm_w, 4.0),
+            UvRect::new(44.0 + arm_w, 16.0, arm_w, 4.0),
+        ],
+    };
+    let right_arm_overlay = BoxUv {
+        faces: [
+            UvRect::new(44.0, 36.0, arm_w, 12.0),
+            UvRect::new(44.0 + arm_w + 4.0, 36.0, arm_w, 12.0),
+            UvRect::new(40.0, 36.0, 4.0, 12.0),
+            UvRect::new(44.0 + arm_w, 36.0, 4.0, 12.0),
+            UvRect::new(44.0, 32.0, arm_w, 4.0),
+            UvRect::new(44.0 + arm_w, 32.0, arm_w, 4.0),
+        ],
+    };
+    let left_arm = BoxUv {
+        faces: [
+            UvRect::new(36.0, 52.0, arm_w, 12.0),
+            UvRect::new(36.0 + arm_w + 4.0, 52.0, arm_w, 12.0),
+            UvRect::new(32.0, 52.0, 4.0, 12.0),
+            UvRect::new(36.0 + arm_w, 52.0, 4.0, 12.0),
+            UvRect::new(36.0, 48.0, arm_w, 4.0),
+            UvRect::new(36.0 + arm_w, 48.0, arm_w, 4.0),
+        ],
+    };
+    let left_arm_overlay = BoxUv {
+        faces: [
+            UvRect::new(52.0, 52.0, arm_w, 12.0),
+            UvRect::new(52.0 + arm_w + 4.0, 52.0, arm_w, 12.0),
+            UvRect::new(48.0, 52.0, 4.0, 12.0),
+            UvRect::new(52.0 + arm_w, 52.0, 4.0, 12.0),
+            UvRect::new(52.0, 48.0, arm_w, 4.0),
+            UvRect::new(52.0 + arm_w, 48.0, arm_w, 4.0),
+        ],
+    };
+
+    push_box(
+        faces,
+        V3::new(0.0, 28.0, 0.0),
+        V3::new(8.0, 8.0, 8.0),
+        &head,
+        0.0,
+    );
+    push_box(
+        faces,
+        V3::new(0.0, 28.0, 0.0),
+        V3::new(8.0, 8.0, 8.0),
+        &hat,
+        0.5,
+    );
+    push_box(
+        faces,
+        V3::new(0.0, 18.0, 0.0),
+        V3::new(8.0, 12.0, 4.0),
+        &body,
+        0.0,
+    );
+    push_box(
+        faces,
+        V3::new(0.0, 18.0, 0.0),
+        V3::new(8.0, 12.0, 4.0),
+        &jacket,
+        0.25,
+    );
+    let arm_x = 4.0 + arm_w / 2.0;
+    push_box(
+        faces,
+        V3::new(-arm_x, 18.0, 0.0),
+        V3::new(arm_w, 12.0, 4.0),
+        &right_arm,
+        0.0,
+    );
+    push_box(
+        faces,
+        V3::new(-arm_x, 18.0, 0.0),
+        V3::new(arm_w, 12.0, 4.0),
+        &right_arm_overlay,
+        0.25,
+    );
+    push_box(
+        faces,
+        V3::new(arm_x, 18.0, 0.0),
+        V3::new(arm_w, 12.0, 4.0),
+        &left_arm,
+        0.0,
+    );
+    push_box(
+        faces,
+        V3::new(arm_x, 18.0, 0.0),
+        V3::new(arm_w, 12.0, 4.0),
+        &left_arm_overlay,
+        0.25,
+    );
+    push_box(
+        faces,
+        V3::new(-2.0, 6.0, 0.0),
+        V3::new(4.0, 12.0, 4.0),
+        &right_leg,
+        0.0,
+    );
+    push_box(
+        faces,
+        V3::new(-2.0, 6.0, 0.0),
+        V3::new(4.0, 12.0, 4.0),
+        &right_leg_overlay,
+        0.25,
+    );
+    push_box(
+        faces,
+        V3::new(2.0, 6.0, 0.0),
+        V3::new(4.0, 12.0, 4.0),
+        &left_leg,
+        0.0,
+    );
+    push_box(
+        faces,
+        V3::new(2.0, 6.0, 0.0),
+        V3::new(4.0, 12.0, 4.0),
+        &left_leg_overlay,
+        0.25,
+    );
+}
+
+fn push_box(faces: &mut Vec<SkinFace>, center: V3, size: V3, uv: &BoxUv, inflate: f32) {
+    let hx = size.x / 2.0 + inflate;
+    let hy = size.y / 2.0 + inflate;
+    let hz = size.z / 2.0 + inflate;
+    let (x0, x1) = (center.x - hx, center.x + hx);
+    let (y0, y1) = (center.y - hy, center.y + hy);
+    let (z0, z1) = (center.z - hz, center.z + hz);
+
+    push_face(
+        faces,
+        [
+            V3::new(x0, y1, z0),
+            V3::new(x1, y1, z0),
+            V3::new(x1, y0, z0),
+            V3::new(x0, y0, z0),
+        ],
+        V3::new(0.0, 0.0, -1.0),
+        uv.faces[0],
+    );
+    push_face(
+        faces,
+        [
+            V3::new(x1, y1, z1),
+            V3::new(x0, y1, z1),
+            V3::new(x0, y0, z1),
+            V3::new(x1, y0, z1),
+        ],
+        V3::new(0.0, 0.0, 1.0),
+        uv.faces[1],
+    );
+    push_face(
+        faces,
+        [
+            V3::new(x1, y1, z1),
+            V3::new(x1, y1, z0),
+            V3::new(x1, y0, z0),
+            V3::new(x1, y0, z1),
+        ],
+        V3::new(1.0, 0.0, 0.0),
+        uv.faces[2],
+    );
+    push_face(
+        faces,
+        [
+            V3::new(x0, y1, z0),
+            V3::new(x0, y1, z1),
+            V3::new(x0, y0, z1),
+            V3::new(x0, y0, z0),
+        ],
+        V3::new(-1.0, 0.0, 0.0),
+        uv.faces[3],
+    );
+    push_face(
+        faces,
+        [
+            V3::new(x0, y1, z0),
+            V3::new(x1, y1, z0),
+            V3::new(x1, y1, z1),
+            V3::new(x0, y1, z1),
+        ],
+        V3::new(0.0, 1.0, 0.0),
+        uv.faces[4],
+    );
+    push_face(
+        faces,
+        [
+            V3::new(x0, y0, z1),
+            V3::new(x1, y0, z1),
+            V3::new(x1, y0, z0),
+            V3::new(x0, y0, z0),
+        ],
+        V3::new(0.0, -1.0, 0.0),
+        uv.faces[5],
+    );
+}
+
+fn push_face(faces: &mut Vec<SkinFace>, verts: [V3; 4], normal: V3, uv: UvRect) {
+    faces.push(SkinFace {
+        verts,
+        uv: uv.corners(),
+        normal,
+    });
+}
+
 pub fn extract_head_avatar(skin: Option<&RgbaImage>, is_slim: bool) -> egui::ColorImage {
     let default_img;
     let img = match skin {
@@ -969,6 +1527,15 @@ fn composite_front_skin(skin: &RgbaImage, is_slim: bool) -> egui::ColorImage {
     egui::ColorImage { size, pixels }
 }
 
+fn fill_rect(skin: &mut RgbaImage, x: u32, y: u32, w: u32, h: u32, color: [u8; 4]) {
+    for py in y..y + h {
+        for px in x..x + w {
+            if px < skin.width() && py < skin.height() {
+                skin.put_pixel(px, py, image::Rgba(color));
+            }
+        }
+    }
+}
 fn generate_default_skin(is_slim: bool) -> RgbaImage {
     let mut skin = RgbaImage::new(64, 64);
 
@@ -991,68 +1558,118 @@ fn generate_default_skin(is_slim: bool) -> RgbaImage {
             [43, 59, 137, 255],
         )
     };
+    let shoes = [60, 60, 60, 255];
 
-    // Head base (8, 8, 8, 8)
-    for y in 8..16 {
-        for x in 8..16 {
-            skin.put_pixel(x, y, image::Rgba(skin_color));
-        }
-    }
-    // Hair on top of face (first 2 rows)
-    for y in 8..10 {
-        for x in 8..16 {
-            skin.put_pixel(x, y, image::Rgba(hair_color));
-        }
-    }
-    // Eyes at y = 12
+    // Head: every face is filled so the native 3D viewer never samples an
+    // empty side/back region on the generated fallback.
+    fill_rect(&mut skin, 8, 8, 8, 8, skin_color);
+    fill_rect(&mut skin, 8, 8, 8, 2, hair_color);
+    fill_rect(&mut skin, 0, 8, 8, 8, skin_color);
+    fill_rect(&mut skin, 0, 8, 8, 3, hair_color);
+    fill_rect(&mut skin, 16, 8, 8, 8, skin_color);
+    fill_rect(&mut skin, 16, 8, 8, 3, hair_color);
+    fill_rect(&mut skin, 24, 8, 8, 8, hair_color);
+    fill_rect(&mut skin, 8, 0, 8, 8, hair_color);
+    fill_rect(&mut skin, 16, 0, 8, 8, skin_color);
+    // Face details on the front region.
     skin.put_pixel(9, 12, image::Rgba([255, 255, 255, 255]));
     skin.put_pixel(10, 12, image::Rgba(eye_color));
     skin.put_pixel(13, 12, image::Rgba(eye_color));
     skin.put_pixel(14, 12, image::Rgba([255, 255, 255, 255]));
-
-    // Torso (20, 20, 8, 12)
-    for y in 20..32 {
-        for x in 20..28 {
-            skin.put_pixel(x, y, image::Rgba(shirt_color));
-        }
+    fill_rect(&mut skin, 11, 14, 2, 1, [150, 90, 70, 255]);
+    if !is_slim {
+        fill_rect(&mut skin, 8, 14, 8, 2, [120, 75, 45, 255]);
     }
 
-    // Arms
+    // Torso.
+    fill_rect(&mut skin, 20, 20, 8, 12, shirt_color);
+    fill_rect(&mut skin, 32, 20, 8, 12, shirt_color);
+    fill_rect(&mut skin, 16, 20, 4, 12, shirt_color);
+    fill_rect(&mut skin, 28, 20, 4, 12, shirt_color);
+    fill_rect(&mut skin, 20, 16, 8, 4, shirt_color);
+    fill_rect(&mut skin, 28, 16, 8, 4, shirt_color);
+
     let arm_w = if is_slim { 3 } else { 4 };
-    for y in 20..32 {
-        for x in 44..(44 + arm_w) {
-            let col = if y < 24 { shirt_color } else { skin_color };
-            skin.put_pixel(x, y, image::Rgba(col));
-        }
-    }
-    for y in 52..64 {
-        for x in 36..(36 + arm_w) {
-            let col = if y < 56 { shirt_color } else { skin_color };
-            skin.put_pixel(x, y, image::Rgba(col));
-        }
-    }
+    // Right arm.
+    fill_rect(&mut skin, 44, 20, arm_w, 12, skin_color);
+    fill_rect(&mut skin, 44, 20, arm_w, 4, shirt_color);
+    fill_rect(&mut skin, 44 + arm_w + 4, 20, arm_w, 12, skin_color);
+    fill_rect(&mut skin, 44 + arm_w + 4, 20, arm_w, 4, shirt_color);
+    fill_rect(&mut skin, 40, 20, 4, 12, skin_color);
+    fill_rect(&mut skin, 40, 20, 4, 4, shirt_color);
+    fill_rect(&mut skin, 44 + arm_w, 20, 4, 12, skin_color);
+    fill_rect(&mut skin, 44 + arm_w, 20, 4, 4, shirt_color);
+    fill_rect(&mut skin, 44, 16, arm_w, 4, shirt_color);
+    fill_rect(&mut skin, 44 + arm_w, 16, arm_w, 4, skin_color);
+    // Left arm.
+    fill_rect(&mut skin, 36, 52, arm_w, 12, skin_color);
+    fill_rect(&mut skin, 36, 52, arm_w, 4, shirt_color);
+    fill_rect(&mut skin, 36 + arm_w + 4, 52, arm_w, 12, skin_color);
+    fill_rect(&mut skin, 36 + arm_w + 4, 52, arm_w, 4, shirt_color);
+    fill_rect(&mut skin, 32, 52, 4, 12, skin_color);
+    fill_rect(&mut skin, 32, 52, 4, 4, shirt_color);
+    fill_rect(&mut skin, 36 + arm_w, 52, 4, 12, skin_color);
+    fill_rect(&mut skin, 36 + arm_w, 52, 4, 4, shirt_color);
+    fill_rect(&mut skin, 36, 48, arm_w, 4, shirt_color);
+    fill_rect(&mut skin, 36 + arm_w, 48, arm_w, 4, skin_color);
 
-    // Legs
-    for y in 20..32 {
-        for x in 4..8 {
-            let col = if y < 30 {
-                pants_color
-            } else {
-                [60, 60, 60, 255]
-            };
-            skin.put_pixel(x, y, image::Rgba(col));
-        }
-    }
-    for y in 52..64 {
-        for x in 20..24 {
-            let col = if y < 62 {
-                pants_color
-            } else {
-                [60, 60, 60, 255]
-            };
-            skin.put_pixel(x, y, image::Rgba(col));
-        }
-    }
+    // Right leg.
+    fill_rect(&mut skin, 4, 20, 4, 12, pants_color);
+    fill_rect(&mut skin, 12, 20, 4, 12, pants_color);
+    fill_rect(&mut skin, 0, 20, 4, 12, pants_color);
+    fill_rect(&mut skin, 8, 20, 4, 12, pants_color);
+    fill_rect(&mut skin, 4, 16, 4, 4, pants_color);
+    fill_rect(&mut skin, 8, 16, 4, 4, shoes);
+    fill_rect(&mut skin, 4, 30, 4, 2, shoes);
+    fill_rect(&mut skin, 12, 30, 4, 2, shoes);
+    fill_rect(&mut skin, 0, 30, 4, 2, shoes);
+    fill_rect(&mut skin, 8, 30, 4, 2, shoes);
+    // Left leg.
+    fill_rect(&mut skin, 20, 52, 4, 12, pants_color);
+    fill_rect(&mut skin, 28, 52, 4, 12, pants_color);
+    fill_rect(&mut skin, 16, 52, 4, 12, pants_color);
+    fill_rect(&mut skin, 24, 52, 4, 12, pants_color);
+    fill_rect(&mut skin, 20, 48, 4, 4, pants_color);
+    fill_rect(&mut skin, 24, 48, 4, 4, shoes);
+    fill_rect(&mut skin, 20, 62, 4, 2, shoes);
+    fill_rect(&mut skin, 28, 62, 4, 2, shoes);
+    fill_rect(&mut skin, 16, 62, 4, 2, shoes);
+    fill_rect(&mut skin, 24, 62, 4, 2, shoes);
 
     skin
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn player_model_builds_all_cube_faces() {
+        for slim in [false, true] {
+            let mut faces = Vec::new();
+            build_player(&mut faces, slim);
+            assert_eq!(faces.len(), 12 * 6);
+            for face in faces {
+                assert!(face
+                    .verts
+                    .iter()
+                    .all(|v| { v.x.is_finite() && v.y.is_finite() && v.z.is_finite() }));
+                assert!(face
+                    .uv
+                    .iter()
+                    .all(|(u, v)| { (0.0..=1.0).contains(u) && (0.0..=1.0).contains(v) }));
+            }
+        }
+    }
+
+    #[test]
+    fn generated_default_skin_covers_every_model_face() {
+        let skin = generate_default_skin(true);
+        assert_eq!(skin.dimensions(), (64, 64));
+        // Front/back/right/left/top head regions; the 3D viewer samples all
+        // of them, unlike the old front-only fallback.
+        for (x, y) in [(8, 8), (24, 8), (0, 8), (16, 8), (8, 0), (16, 0)] {
+            assert!(skin.get_pixel(x, y)[3] > 0, "face {x},{y} is empty");
+        }
+    }
 }

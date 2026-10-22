@@ -30,7 +30,7 @@ pub enum ProfileSkin {
 #[derive(Default)]
 pub struct ProfilePage {
     tex: Option<egui::TextureHandle>,
-    tex_key: Option<(bool, usize, bool)>,
+    tex_key: Option<(bool, usize, usize, bool)>,
     copied_at: Option<Instant>,
 }
 
@@ -49,7 +49,12 @@ impl ProfilePage {
         slim: bool,
         circular: bool,
     ) {
-        let key = (slim, skin.map(|s| s.as_raw().len()).unwrap_or(0), circular);
+        let key = (
+            slim,
+            skin.map_or(0, |s| s.as_raw().as_ptr() as usize),
+            skin.map_or(0, |s| s.as_raw().len()),
+            circular,
+        );
         if self.tex_key == Some(key) {
             return;
         }
