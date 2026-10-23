@@ -45,6 +45,8 @@ pub struct HomePage {
     pub labymod_account_request: bool,
     /// LabyMod Home: the launch button's secondary segment opens Instances.
     pub labymod_instances_request: bool,
+    /// LabyMod Home: Quick Play server manager modal.
+    pub labymod_servers_open: bool,
     drawer_open: bool,
     drawer_version: Option<String>,
     hero_texture: Option<egui::TextureHandle>,
@@ -84,6 +86,7 @@ impl Default for HomePage {
             drawer_play_request: None,
             labymod_account_request: false,
             labymod_instances_request: false,
+            labymod_servers_open: false,
             drawer_open: false,
             drawer_version: None,
             hero_texture: None,
@@ -134,6 +137,7 @@ impl HomePage {
         if ctx_data.labymod {
             self.ensure_hero_texture(ui.ctx());
             self.show_labymod(ui, ctx_data, favorites, lang);
+            self.show_labymod_servers_modal(ui.ctx(), favorites, lang);
             return;
         }
         self.refresh_installed(versions, ctx_data.versions_dir);
@@ -949,7 +953,7 @@ impl HomePage {
                 .size()
                 .x;
             let chip_w = (text_w + 34.0).clamp(76.0, 158.0);
-            if x + chip_w > quick.right() - 8.0 {
+            if x + chip_w > quick.right() - 50.0 {
                 break;
             }
             let chip = egui::Rect::from_min_size(
@@ -993,6 +997,65 @@ impl HomePage {
             }
             x += chip_w + 7.0;
         }
+
+        // Add/manage saved servers. The manager reuses the shared favorites
+        // form, so LabyMod users are not locked out of Quick Play editing.
+        let add = egui::Rect::from_min_size(
+            egui::pos2(quick.right() - 42.0, quick.top() + 5.0),
+            vec2(30.0, quick.height() - 10.0),
+        );
+        let add_resp = ui.interact(add, ui.id().with("labymod_add_server"), Sense::click());
+        ui.painter().rect_filled(
+            add,
+            egui::Rounding::same(9.0),
+            if add_resp.hovered() {
+                crate::theme::with_alpha(crate::theme::ACCENT, 45)
+            } else {
+                crate::theme::with_alpha(crate::theme::CARD, 190)
+            },
+        );
+        icons::draw(
+            ui.painter(),
+            Icon::Plus,
+            egui::Rect::from_center_size(add.center(), vec2(13.0, 13.0)),
+            crate::theme::ACCENT_LIGHT,
+            1.6,
+        );
+        if add_resp.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+        if add_resp.clicked() {
+            self.labymod_servers_open = true;
+        }
+    }
+
+    fn show_labymod_servers_modal(
+        &mut self,
+        ctx: &egui::Context,
+        favorites: &mut Vec<FavoriteServerEntry>,
+        lang: amc_core::Language,
+    ) {
+        if !self.labymod_servers_open {
+            return;
+        }
+        let mut open = self.labymod_servers_open;
+        egui::Window::new(lang.labymod_quick_play())
+            .open(&mut open)
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, vec2(0.0, 0.0))
+            .frame(
+                egui::Frame::none()
+                    .fill(BG_CARD.into())
+                    .stroke(Stroke::new(1.0_f32, BORDER_STRONG))
+                    .rounding(egui::Rounding::same(16.0))
+                    .inner_margin(egui::Margin::same(18.0)),
+            )
+            .show(ctx, |ui| {
+                ui.set_width(460.0);
+                self.show_favorites(ui, favorites, lang);
+            });
+        self.labymod_servers_open = open;
     }
 
     fn show_labymod_side(
@@ -1027,9 +1090,7 @@ impl HomePage {
             crate::theme::ACCENT_LIGHT,
             1.6,
         );
-        let account_name = ctx
-            .account_name
-            .unwrap_or_else(|| lang.modrinth_sign_in());
+        let account_name = ctx.account_name.unwrap_or_else(|| lang.modrinth_sign_in());
         ui.painter().text(
             egui::pos2(avatar.right() + 10.0, account.center().y - 9.0),
             egui::Align2::LEFT_CENTER,
