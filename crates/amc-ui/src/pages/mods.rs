@@ -881,6 +881,35 @@ impl ModsPage {
         update_install: &mut Option<(ModSearchResult, String)>,
     ) {
         if self.local_mods.is_empty() {
+            if skin == ModsSkin::Multimc {
+                // Qt empty state: the reference offers the next action
+                // instead of leaving a dead-end sentence.
+                ui.add_space(60.0);
+                ui.vertical_centered(|ui| {
+                    ui.label(
+                        egui::RichText::new(lang.mods_empty_title())
+                            .font(egui::FontId::proportional(15.0))
+                            .strong()
+                            .color(TEXT_PRIMARY),
+                    );
+                    ui.add_space(4.0);
+                    ui.label(
+                        egui::RichText::new(lang.mods_empty_hint())
+                            .font(egui::FontId::proportional(12.0))
+                            .color(TEXT_MUTED),
+                    );
+                    ui.add_space(12.0);
+                    let button = egui::Button::new(
+                        egui::RichText::new(lang.mods_browse_action())
+                            .font(egui::FontId::proportional(12.0)),
+                    )
+                    .min_size(vec2(140.0, 32.0));
+                    if ui.add(button).clicked() {
+                        self.sub_tab = ModsSubTab::Search;
+                    }
+                });
+                return;
+            }
             if skin == ModsSkin::Millida {
                 self.show_millida_empty(ui, lang);
                 return;

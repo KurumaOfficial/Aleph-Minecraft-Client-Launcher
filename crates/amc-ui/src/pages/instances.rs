@@ -255,7 +255,7 @@ impl Default for InstancesPage {
             modrinth_menu: None,
             modrinth_menu_fresh: false,
             manage: InstanceManage::default(),
-            discover_open: true,
+            discover_open: false,
             discover: Vec::new(),
             discover_loading: false,
             discover_requested: false,
@@ -3141,40 +3141,51 @@ impl InstancesPage {
                         });
                     }
                     let mut install: Option<String> = None;
-                    for pack in &self.discover {
-                        ui.horizontal(|ui| {
-                            ui.label(
-                                egui::RichText::new(truncate_name(&pack.title, 34))
-                                    .font(egui::FontId::proportional(12.0))
-                                    .strong()
-                                    .color(TEXT_PRIMARY),
-                            );
-                            icons::icon_label(
-                                ui,
-                                Icon::Download,
-                                &pack.downloads.to_string(),
-                                TEXT_MUTED,
-                                egui::FontId::proportional(11.0),
-                            );
-                            if pack.rating > 0 {
-                                icons::icon_label(
-                                    ui,
-                                    Icon::Star,
-                                    &pack.rating.to_string(),
-                                    TEXT_MUTED,
-                                    egui::FontId::proportional(11.0),
-                                );
-                            }
-                            ui.with_layout(
-                                egui::Layout::right_to_left(egui::Align::Center),
-                                |ui| {
-                                    if ui.button(lang.discover_install()).clicked() {
-                                        install = Some(pack.id.clone());
+                    // The trending feed is secondary to the user's own
+                    // instances. Cap it to the shorter of 220 px and a third
+                    // of the remaining page height so opening it at 960x600
+                    // cannot push the local grid off-screen.
+                    let discover_max = (ui.available_height() * 0.28).clamp(80.0, 200.0);
+                    egui::ScrollArea::vertical()
+                        .id_salt("discover_pack_list")
+                        .max_height(discover_max)
+                        .auto_shrink([false, true])
+                        .show(ui, |ui| {
+                            for pack in &self.discover {
+                                ui.horizontal(|ui| {
+                                    ui.label(
+                                        egui::RichText::new(truncate_name(&pack.title, 34))
+                                            .font(egui::FontId::proportional(12.0))
+                                            .strong()
+                                            .color(TEXT_PRIMARY),
+                                    );
+                                    icons::icon_label(
+                                        ui,
+                                        Icon::Download,
+                                        &pack.downloads.to_string(),
+                                        TEXT_MUTED,
+                                        egui::FontId::proportional(11.0),
+                                    );
+                                    if pack.rating > 0 {
+                                        icons::icon_label(
+                                            ui,
+                                            Icon::Star,
+                                            &pack.rating.to_string(),
+                                            TEXT_MUTED,
+                                            egui::FontId::proportional(11.0),
+                                        );
                                     }
-                                },
-                            );
+                                    ui.with_layout(
+                                        egui::Layout::right_to_left(egui::Align::Center),
+                                        |ui| {
+                                            if ui.button(lang.discover_install()).clicked() {
+                                                install = Some(pack.id.clone());
+                                            }
+                                        },
+                                    );
+                                });
+                            }
                         });
-                    }
                     if let Some(slug) = install {
                         self.discover_install = Some(slug);
                     }
