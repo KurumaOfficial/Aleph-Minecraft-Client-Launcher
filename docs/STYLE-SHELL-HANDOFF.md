@@ -24,11 +24,13 @@
 
 - Remote: `https://github.com/KurumaOfficial/Aleph-Minecraft-Client-Launcher.git`
 - Branch: `main`
-- Последний коммит на момент передачи: `184ebb1` (`feat(shell/modrinth): rebuild skin selector`)
+- Последний коммит на момент передачи: `356dcbe` (`feat(shell/labymod): replace Legacy with LabyMod style`)
 - Все изменения запушены, рабочее дерево чистое.
 - Локальный release, выложенный в `dist`, имеет SHA-256
-  `118AB91DA724719DAC918F4FC36D598E4C4E2E3F7EBBDC342AA155A5C7D9442C`
+  `206849BBAD4185652E3DB2EFB598F486ADCC3A644A62B55DEFD6B6274047D4CE`
   (сам `dist` не хранится в git; на другом устройстве пересобрать).
+- Перед деплоем 23.10.2026 создан бэкап
+  `dist/amc-launcher.exe.bak-20261023-0939`.
 
 ## Обязательные правила
 
