@@ -1,3 +1,4 @@
+use crate::shells::short_name;
 use crate::theme::{
     lerp_color, ACCENT_DIM, BG_CARD, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, BORDER_STRONG, RUBY,
     RUBY_DIM, RUBY_LIGHT, SUCCESS, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
@@ -9,6 +10,7 @@ use crate::widgets::icons::{self, Icon};
 use amc_core::types::{GameVersion, ReleaseType};
 use amc_minecraft::{FavoriteServerEntry, ServerStatus};
 use egui::{vec2, Color32, ScrollArea, Sense, Stroke, TextEdit, Ui};
+use image::RgbaImage;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
@@ -39,9 +41,14 @@ pub struct HomePage {
     pub direct_connect_request: Option<(String, u16)>,
     pub hero_play_request: bool,
     pub drawer_play_request: Option<String>,
+    /// LabyMod Home: the account chip opens Profile/login.
+    pub labymod_account_request: bool,
+    /// LabyMod Home: the launch button's secondary segment opens Instances.
+    pub labymod_instances_request: bool,
     drawer_open: bool,
     drawer_version: Option<String>,
     hero_texture: Option<egui::TextureHandle>,
+    hero_skin3d: super::skins::Skin3d,
     hero_failed: bool,
     installed_cache: HashSet<String>,
     installed_for: usize,
@@ -75,9 +82,12 @@ impl Default for HomePage {
             direct_connect_request: None,
             hero_play_request: false,
             drawer_play_request: None,
+            labymod_account_request: false,
+            labymod_instances_request: false,
             drawer_open: false,
             drawer_version: None,
             hero_texture: None,
+            hero_skin3d: super::skins::Skin3d::default(),
             hero_failed: false,
             installed_cache: HashSet::new(),
             installed_for: usize::MAX,
@@ -100,8 +110,15 @@ pub struct HomeContext<'a> {
     pub versions_dir: &'a Path,
     pub instances_count: usize,
     pub memory_mb: u32,
-    /// Legacy shells render the 1.6.94 news page instead of the Aleph hero.
-    pub legacy: bool,
+    /// LabyMod shells render the dark hero/friends/news layout.
+    pub labymod: bool,
+    /// Selected instance name, used as the hero profile name.
+    pub profile_name: Option<&'a str>,
+    pub account_name: Option<&'a str>,
+    pub launch_version: Option<&'a str>,
+    pub skin: Option<&'a RgbaImage>,
+    pub slim: bool,
+    pub launching: bool,
 }
 
 impl HomePage {
@@ -114,8 +131,9 @@ impl HomePage {
         favorites: &mut Vec<FavoriteServerEntry>,
         lang: amc_core::Language,
     ) {
-        if ctx_data.legacy {
-            self.show_legacy_news(ui, lang);
+        if ctx_data.labymod {
+            self.ensure_hero_texture(ui.ctx());
+            self.show_labymod(ui, ctx_data, favorites, lang);
             return;
         }
         self.refresh_installed(versions, ctx_data.versions_dir);
@@ -686,180 +704,464 @@ impl HomePage {
 
     /// Full-style hero: cover art, red-square deco, display titles,
     /// big Play + ghost pick link, stats row.
-    /// Legacy 1.6.94 news page: dark parchment-like canvas, a wide news
-    /// column with blue article headings and the classic links sidebar.
-    fn show_legacy_news(&mut self, ui: &mut Ui, lang: amc_core::Language) {
-        const NEWS_BG: Color32 = Color32::from_rgb(0x1D, 0x1D, 0x1D);
-        const NEWS_PANEL: Color32 = Color32::from_rgb(0x27, 0x27, 0x27);
-        const NEWS_TEXT: Color32 = Color32::from_rgb(0xC8, 0xC8, 0xC8);
-        const NEWS_MUTED: Color32 = Color32::from_rgb(0x8F, 0x8F, 0x8F);
-        const NEWS_LINK: Color32 = Color32::from_rgb(0x70, 0x9F, 0xE8);
-        const NEWS_RULE: Color32 = Color32::from_rgb(0x3A, 0x3A, 0x3A);
-
+    /// LabyMod Home: dark hero canvas with the selected skin, a large blue
+    /// launch button and Quick Play, plus the account/friends/news column.
+    fn show_labymod(
+        &mut self,
+        ui: &mut Ui,
+        ctx: &HomeContext,
+        favorites: &[FavoriteServerEntry],
+        lang: amc_core::Language,
+    ) {
         let area = ui.available_rect_before_wrap();
         ui.painter()
-            .rect_filled(area, egui::Rounding::ZERO, NEWS_BG);
-        let inner = area.shrink2(vec2(20.0, 16.0));
+            .rect_filled(area, egui::Rounding::ZERO, crate::theme::BG);
+        let inner = area.shrink2(vec2(14.0, 14.0));
         ui.allocate_new_ui(
             egui::UiBuilder::new()
                 .max_rect(inner)
                 .layout(egui::Layout::top_down(egui::Align::Min)),
             |ui| {
-                ScrollArea::vertical()
-                    .id_salt("legacy_news_scroll")
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
-                        ui.set_min_width(inner.width());
-                        ui.horizontal_top(|ui| {
-                            let total = ui.available_width();
-                            let sidebar = 250.0;
-                            let gap = 28.0;
-                            let left = (total - sidebar - gap).max(360.0);
-
-                            ui.vertical(|ui| {
-                                ui.set_width(left);
-                                ui.horizontal(|ui| {
-                                    ui.label(
-                                        egui::RichText::new(lang.legacy_news_title())
-                                            .font(egui::FontId::proportional(27.0))
-                                            .strong()
-                                            .color(Color32::from_rgb(0xEE, 0xEE, 0xEE)),
-                                    );
-                                    ui.with_layout(
-                                        egui::Layout::right_to_left(egui::Align::Center),
-                                        |ui| {
-                                            ui.label(
-                                                egui::RichText::new(lang.legacy_powered())
-                                                    .font(egui::FontId::proportional(11.0))
-                                                    .color(NEWS_MUTED),
-                                            );
-                                        },
-                                    );
-                                });
-                                let (rule, _) = ui.allocate_exact_size(
-                                    vec2(ui.available_width(), 1.0),
-                                    Sense::hover(),
-                                );
-                                ui.painter()
-                                    .rect_filled(rule, egui::Rounding::ZERO, NEWS_RULE);
-                                ui.add_space(16.0);
-
-                                for (title, body) in [
-                                    (
-                                        lang.legacy_news_updates_title(),
-                                        lang.legacy_news_updates_body(),
-                                    ),
-                                    (
-                                        lang.legacy_news_community_title(),
-                                        lang.legacy_news_community_body(),
-                                    ),
-                                    (
-                                        lang.legacy_news_catalog_title(),
-                                        lang.legacy_news_catalog_body(),
-                                    ),
-                                    (
-                                        lang.legacy_news_profiles_title(),
-                                        lang.legacy_news_profiles_body(),
-                                    ),
-                                    (
-                                        lang.legacy_news_accounts_title(),
-                                        lang.legacy_news_accounts_body(),
-                                    ),
-                                ] {
-                                    legacy_news_link_title(ui, title, NEWS_LINK);
-                                    ui.add_space(4.0);
-                                    ui.label(
-                                        egui::RichText::new(body)
-                                            .font(egui::FontId::proportional(12.5))
-                                            .color(NEWS_TEXT),
-                                    );
-                                    ui.add_space(15.0);
-                                    let (rule, _) = ui.allocate_exact_size(
-                                        vec2(ui.available_width(), 1.0),
-                                        Sense::hover(),
-                                    );
-                                    ui.painter()
-                                        .rect_filled(rule, egui::Rounding::ZERO, NEWS_RULE);
-                                    ui.add_space(15.0);
-                                }
-                            });
-
-                            ui.add_space(gap);
-                            ui.vertical(|ui| {
-                                ui.set_width(sidebar);
-                                ui.label(
-                                    egui::RichText::new(lang.legacy_official_links())
-                                        .font(egui::FontId::proportional(15.0))
-                                        .strong()
-                                        .color(Color32::from_rgb(0xEE, 0xEE, 0xEE)),
-                                );
-                                ui.add_space(7.0);
-                                legacy_news_link(ui, lang.legacy_link_github(), PROJECT_URL);
-                                legacy_news_link(
-                                    ui,
-                                    lang.legacy_link_modrinth(),
-                                    "https://modrinth.com",
-                                );
-                                legacy_news_link(
-                                    ui,
-                                    lang.legacy_link_wiki(),
-                                    "https://minecraft.wiki",
-                                );
-
-                                ui.add_space(18.0);
-                                ui.label(
-                                    egui::RichText::new(lang.legacy_other_projects())
-                                        .font(egui::FontId::proportional(15.0))
-                                        .strong()
-                                        .color(Color32::from_rgb(0xEE, 0xEE, 0xEE)),
-                                );
-                                ui.add_space(7.0);
-                                egui::Frame::none()
-                                    .fill(NEWS_PANEL)
-                                    .stroke(Stroke::new(1.0_f32, NEWS_RULE))
-                                    .inner_margin(egui::Margin::same(12.0))
-                                    .show(ui, |ui| {
-                                        ui.set_width(sidebar - 26.0);
-                                        ui.horizontal(|ui| {
-                                            let (mark, _) = ui.allocate_exact_size(
-                                                vec2(16.0, 16.0),
-                                                Sense::hover(),
-                                            );
-                                            brand::hollow_square(
-                                                ui.painter(),
-                                                mark,
-                                                brand::BRAND_RED,
-                                            );
-                                            ui.label(
-                                                egui::RichText::new(brand::APP_NAME)
-                                                    .font(crate::theme::display(14.0))
-                                                    .color(Color32::from_rgb(0xEE, 0xEE, 0xEE)),
-                                            );
-                                        });
-                                    });
-
-                                ui.add_space(18.0);
-                                ui.label(
-                                    egui::RichText::new(lang.legacy_community_links())
-                                        .font(egui::FontId::proportional(15.0))
-                                        .strong()
-                                        .color(Color32::from_rgb(0xEE, 0xEE, 0xEE)),
-                                );
-                                ui.add_space(7.0);
-                                legacy_news_link(
-                                    ui,
-                                    lang.legacy_link_issues(),
-                                    &format!("{PROJECT_URL}/issues"),
-                                );
-                                legacy_news_link(
-                                    ui,
-                                    lang.legacy_link_support(),
-                                    &format!("{PROJECT_URL}/issues"),
-                                );
-                            });
-                        });
-                    });
+                let width = ui.available_width();
+                let height = ui.available_height();
+                let right = (width * 0.235).clamp(240.0, 300.0);
+                let gap = 14.0;
+                let main = (width - right - gap).max(360.0);
+                ui.horizontal_top(|ui| {
+                    ui.allocate_ui_with_layout(
+                        vec2(main, height),
+                        egui::Layout::top_down(egui::Align::Min),
+                        |ui| self.show_labymod_hero(ui, main, height, ctx, favorites, lang),
+                    );
+                    ui.add_space(gap);
+                    ui.allocate_ui_with_layout(
+                        vec2(right, height),
+                        egui::Layout::top_down(egui::Align::Min),
+                        |ui| self.show_labymod_side(ui, right, height, ctx, lang),
+                    );
+                });
             },
+        );
+    }
+
+    fn show_labymod_hero(
+        &mut self,
+        ui: &mut Ui,
+        width: f32,
+        height: f32,
+        ctx: &HomeContext,
+        favorites: &[FavoriteServerEntry],
+        lang: amc_core::Language,
+    ) {
+        let texture = self.hero_texture.clone();
+        let (card, _) = ui.allocate_exact_size(vec2(width, height), Sense::hover());
+        let painter = ui.painter();
+        painter.rect_filled(card, egui::Rounding::same(18.0), BG_CARD);
+        if let Some(tex) = texture.as_ref() {
+            rounded_image(painter, card, 18.0, tex, Color32::from_rgb(120, 124, 136));
+        }
+        painter.rect_filled(
+            card,
+            egui::Rounding::same(18.0),
+            Color32::from_rgba_unmultiplied(7, 9, 14, 196),
+        );
+        painter.rect_stroke(
+            card,
+            egui::Rounding::same(18.0),
+            Stroke::new(1.0_f32, BORDER_STRONG),
+        );
+
+        let cx = card.center().x;
+        let viewer = egui::Rect::from_min_max(
+            egui::pos2(cx - width * 0.24, card.top() + 58.0),
+            egui::pos2(cx + width * 0.24, card.bottom() - 155.0),
+        );
+        painter.circle_filled(
+            egui::pos2(cx, viewer.center().y + 24.0),
+            (viewer.height() * 0.32).min(width * 0.20),
+            crate::theme::with_alpha(crate::theme::ACCENT, 20),
+        );
+        self.hero_skin3d.show(ui, viewer, ctx.skin, ctx.slim);
+
+        let name = ctx
+            .account_name
+            .or(ctx.profile_name)
+            .unwrap_or_else(|| lang.legacy_guest());
+        ui.painter().text(
+            egui::pos2(cx, card.top() + 34.0),
+            egui::Align2::CENTER_CENTER,
+            short_name(name, 26),
+            egui::FontId::proportional(29.0),
+            Color32::WHITE,
+        );
+
+        let default_chip = egui::Rect::from_center_size(
+            egui::pos2(cx + width * 0.19, card.bottom() - 134.0),
+            vec2(100.0, 24.0),
+        );
+        ui.painter().rect_filled(
+            default_chip,
+            egui::Rounding::same(12.0),
+            crate::theme::with_alpha(crate::theme::BG, 170),
+        );
+        icons::draw(
+            ui.painter(),
+            Icon::Dot,
+            egui::Rect::from_center_size(
+                egui::pos2(default_chip.left() + 16.0, default_chip.center().y),
+                vec2(9.0, 9.0),
+            ),
+            Color32::from_rgb(0xE0, 0xC0, 0x60),
+            1.5,
+        );
+        ui.painter().text(
+            egui::pos2(default_chip.left() + 28.0, default_chip.center().y),
+            egui::Align2::LEFT_CENTER,
+            lang.labymod_default(),
+            egui::FontId::proportional(10.5),
+            TEXT_PRIMARY.into(),
+        );
+
+        let button_w = (width * 0.56).clamp(360.0, 560.0);
+        let button = egui::Rect::from_center_size(
+            egui::pos2(cx, card.bottom() - 91.0),
+            vec2(button_w, 60.0),
+        );
+        let btn_resp = ui.interact(button, ui.id().with("labymod_launch"), Sense::click());
+        let hover = ui
+            .ctx()
+            .animate_bool_responsive(btn_resp.id, btn_resp.hovered());
+        let fill = crate::theme::lerp_color(
+            crate::theme::ACCENT,
+            crate::theme::ACCENT_LIGHT,
+            hover * 0.5,
+        );
+        ui.painter()
+            .rect_filled(button, egui::Rounding::same(14.0), fill);
+        ui.painter().rect_stroke(
+            button,
+            egui::Rounding::same(14.0),
+            Stroke::new(1.0_f32, crate::theme::ACCENT_LIGHT),
+        );
+        let split = button.right() - 54.0;
+        ui.painter().line_segment(
+            [
+                egui::pos2(split, button.top() + 8.0),
+                egui::pos2(split, button.bottom() - 8.0),
+            ],
+            Stroke::new(1.0_f32, crate::theme::with_alpha(Color32::WHITE, 55)),
+        );
+        icons::draw(
+            ui.painter(),
+            Icon::Play,
+            egui::Rect::from_center_size(
+                egui::pos2(button.left() + 28.0, button.center().y),
+                vec2(20.0, 20.0),
+            ),
+            Color32::WHITE,
+            1.8,
+        );
+        let version = ctx.launch_version.unwrap_or("1.20.1");
+        let launch = if ctx.launching {
+            lang.labymod_launching().to_string()
+        } else {
+            format!("{} {version}", lang.labymod_launch())
+        };
+        ui.painter().text(
+            egui::pos2(button.center().x - 8.0, button.center().y - 9.0),
+            egui::Align2::CENTER_CENTER,
+            launch,
+            egui::FontId::proportional(17.0),
+            Color32::WHITE,
+        );
+        ui.painter().text(
+            egui::pos2(button.center().x - 8.0, button.center().y + 12.0),
+            egui::Align2::CENTER_CENTER,
+            brand::APP_NAME,
+            egui::FontId::proportional(10.0),
+            crate::theme::with_alpha(Color32::WHITE, 175),
+        );
+        let swap = egui::Rect::from_min_max(
+            egui::pos2(split + 1.0, button.top() + 1.0),
+            egui::pos2(button.right() - 1.0, button.bottom() - 1.0),
+        );
+        let swap_resp = ui.interact(swap, ui.id().with("labymod_swap"), Sense::click());
+        icons::draw(
+            ui.painter(),
+            Icon::Refresh,
+            egui::Rect::from_center_size(swap.center(), vec2(20.0, 20.0)),
+            if swap_resp.hovered() {
+                Color32::WHITE
+            } else {
+                crate::theme::with_alpha(Color32::WHITE, 200)
+            },
+            1.7,
+        );
+        if swap_resp.clicked() {
+            self.labymod_instances_request = true;
+        } else if btn_resp.clicked() && !ctx.launching {
+            self.hero_play_request = true;
+        }
+        if (btn_resp.hovered() || swap_resp.hovered()) && !ctx.launching {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+
+        let quick = egui::Rect::from_min_max(
+            egui::pos2(card.left() + 14.0, card.bottom() - 50.0),
+            egui::pos2(card.right() - 14.0, card.bottom() - 10.0),
+        );
+        ui.painter().rect_filled(
+            quick,
+            egui::Rounding::same(12.0),
+            crate::theme::with_alpha(crate::theme::BG, 205),
+        );
+        ui.painter().rect_stroke(
+            quick,
+            egui::Rounding::same(12.0),
+            Stroke::new(1.0_f32, crate::theme::with_alpha(BORDER_STRONG, 150)),
+        );
+        ui.painter().text(
+            egui::pos2(quick.left() + 14.0, quick.center().y),
+            egui::Align2::LEFT_CENTER,
+            lang.labymod_quick_play(),
+            egui::FontId::proportional(10.5),
+            TEXT_MUTED.into(),
+        );
+        let mut x = quick.left() + 112.0;
+        if favorites.is_empty() {
+            ui.painter().text(
+                egui::pos2(x, quick.center().y),
+                egui::Align2::LEFT_CENTER,
+                lang.labymod_no_servers(),
+                egui::FontId::proportional(10.0),
+                TEXT_MUTED.into(),
+            );
+        }
+        for (idx, fav) in favorites.iter().take(5).enumerate() {
+            let label = short_name(&fav.name, 18);
+            let text_w = ui
+                .painter()
+                .layout_no_wrap(
+                    label.clone(),
+                    egui::FontId::proportional(10.0),
+                    Color32::PLACEHOLDER,
+                )
+                .size()
+                .x;
+            let chip_w = (text_w + 34.0).clamp(76.0, 158.0);
+            if x + chip_w > quick.right() - 8.0 {
+                break;
+            }
+            let chip = egui::Rect::from_min_size(
+                egui::pos2(x, quick.top() + 5.0),
+                vec2(chip_w, quick.height() - 10.0),
+            );
+            let resp = ui.interact(chip, ui.id().with(("labymod_quick", idx)), Sense::click());
+            ui.painter().rect_filled(
+                chip,
+                egui::Rounding::same(9.0),
+                if resp.hovered() {
+                    crate::theme::with_alpha(crate::theme::CARD_HOVER, 220)
+                } else {
+                    crate::theme::with_alpha(crate::theme::CARD, 190)
+                },
+            );
+            icons::draw(
+                ui.painter(),
+                Icon::Globe,
+                egui::Rect::from_center_size(
+                    egui::pos2(chip.left() + 12.0, chip.center().y),
+                    vec2(12.0, 12.0),
+                ),
+                crate::theme::ACCENT_LIGHT,
+                1.4,
+            );
+            ui.painter().text(
+                egui::pos2(chip.left() + 22.0, chip.center().y),
+                egui::Align2::LEFT_CENTER,
+                label,
+                egui::FontId::proportional(10.0),
+                TEXT_PRIMARY.into(),
+            );
+            if resp.hovered() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+            }
+            if resp.clicked() {
+                if let Some((host, port)) = amc_minecraft::parse_server_address(&fav.address) {
+                    self.direct_connect_request = Some((host, port));
+                }
+            }
+            x += chip_w + 7.0;
+        }
+    }
+
+    fn show_labymod_side(
+        &mut self,
+        ui: &mut Ui,
+        width: f32,
+        height: f32,
+        ctx: &HomeContext,
+        lang: amc_core::Language,
+    ) {
+        let (account, account_resp) = ui.allocate_exact_size(vec2(width, 56.0), Sense::click());
+        ui.painter()
+            .rect_filled(account, egui::Rounding::same(14.0), BG_CARD);
+        ui.painter().rect_stroke(
+            account,
+            egui::Rounding::same(14.0),
+            Stroke::new(1.0_f32, BORDER_STRONG),
+        );
+        let avatar = egui::Rect::from_min_size(
+            egui::pos2(account.left() + 10.0, account.top() + 9.0),
+            vec2(38.0, 38.0),
+        );
+        ui.painter().rect_filled(
+            avatar,
+            egui::Rounding::same(10.0),
+            crate::theme::with_alpha(crate::theme::ACCENT, 40),
+        );
+        icons::draw(
+            ui.painter(),
+            Icon::Person,
+            egui::Rect::from_center_size(avatar.center(), vec2(19.0, 19.0)),
+            crate::theme::ACCENT_LIGHT,
+            1.6,
+        );
+        let account_name = ctx
+            .account_name
+            .unwrap_or_else(|| lang.modrinth_sign_in());
+        ui.painter().text(
+            egui::pos2(avatar.right() + 10.0, account.center().y - 9.0),
+            egui::Align2::LEFT_CENTER,
+            short_name(account_name, 18),
+            egui::FontId::proportional(12.5),
+            TEXT_HEADING.into(),
+        );
+        ui.painter().text(
+            egui::pos2(avatar.right() + 10.0, account.center().y + 9.0),
+            egui::Align2::LEFT_CENTER,
+            brand::APP_NAME,
+            egui::FontId::proportional(9.5),
+            TEXT_MUTED.into(),
+        );
+        icons::draw(
+            ui.painter(),
+            Icon::ChevronRight,
+            egui::Rect::from_center_size(
+                egui::pos2(account.right() - 18.0, account.center().y),
+                vec2(13.0, 13.0),
+            ),
+            TEXT_MUTED,
+            1.5,
+        );
+        if account_resp.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+        if account_resp.clicked() {
+            self.labymod_account_request = true;
+        }
+
+        ui.add_space(12.0);
+        let remaining = (height - 68.0).max(260.0);
+        let friends_h = (remaining * 0.48).max(150.0);
+        let news_h = (remaining - friends_h - 12.0).max(140.0);
+
+        let (friends, _) = ui.allocate_exact_size(vec2(width, friends_h), Sense::hover());
+        ui.painter()
+            .rect_filled(friends, egui::Rounding::same(16.0), BG_CARD);
+        ui.painter().rect_stroke(
+            friends,
+            egui::Rounding::same(16.0),
+            Stroke::new(1.0_f32, BORDER_STRONG),
+        );
+        ui.painter().text(
+            egui::pos2(friends.left() + 16.0, friends.top() + 18.0),
+            egui::Align2::LEFT_CENTER,
+            lang.modrinth_friends().to_uppercase(),
+            egui::FontId::proportional(11.5),
+            TEXT_HEADING.into(),
+        );
+        ui.painter().text(
+            egui::pos2(friends.left() + 16.0, friends.top() + 48.0),
+            egui::Align2::LEFT_CENTER,
+            "OFFLINE",
+            egui::FontId::proportional(9.0),
+            TEXT_MUTED.into(),
+        );
+        let hint = lang.modrinth_no_friends();
+        ui.allocate_new_ui(
+            egui::UiBuilder::new().max_rect(egui::Rect::from_min_max(
+                egui::pos2(friends.left() + 16.0, friends.top() + 66.0),
+                egui::pos2(friends.right() - 16.0, friends.bottom() - 12.0),
+            )),
+            |ui| {
+                ui.label(
+                    egui::RichText::new(hint)
+                        .font(egui::FontId::proportional(11.5))
+                        .color(TEXT_MUTED),
+                );
+            },
+        );
+
+        ui.add_space(12.0);
+        let (news, _) = ui.allocate_exact_size(vec2(width, news_h), Sense::hover());
+        ui.painter()
+            .rect_filled(news, egui::Rounding::same(16.0), BG_CARD);
+        ui.painter().rect_stroke(
+            news,
+            egui::Rounding::same(16.0),
+            Stroke::new(1.0_f32, BORDER_STRONG),
+        );
+        ui.painter().text(
+            egui::pos2(news.left() + 16.0, news.top() + 18.0),
+            egui::Align2::LEFT_CENTER,
+            lang.modrinth_news().to_uppercase(),
+            egui::FontId::proportional(11.5),
+            TEXT_HEADING.into(),
+        );
+        ui.painter().text(
+            egui::pos2(news.right() - 16.0, news.top() + 18.0),
+            egui::Align2::RIGHT_CENTER,
+            lang.shell_more_news(),
+            egui::FontId::proportional(9.5),
+            crate::theme::ACCENT_LIGHT.into(),
+        );
+        let thumb = egui::Rect::from_min_max(
+            egui::pos2(news.left() + 14.0, news.top() + 38.0),
+            egui::pos2(news.right() - 14.0, news.bottom() - 52.0),
+        );
+        ui.painter().rect_filled(
+            thumb,
+            egui::Rounding::same(10.0),
+            crate::theme::with_alpha(crate::theme::BG, 180),
+        );
+        if let Some(tex) = self.hero_texture.as_ref() {
+            rounded_image(
+                ui.painter(),
+                thumb,
+                10.0,
+                tex,
+                Color32::from_rgb(105, 110, 122),
+            );
+        }
+        ui.painter().rect_filled(
+            thumb,
+            egui::Rounding::same(10.0),
+            Color32::from_rgba_unmultiplied(7, 9, 14, 120),
+        );
+        ui.painter().text(
+            egui::pos2(news.left() + 16.0, news.bottom() - 34.0),
+            egui::Align2::LEFT_CENTER,
+            lang.modrinth_news_updates(),
+            egui::FontId::proportional(11.5),
+            TEXT_PRIMARY.into(),
+        );
+        ui.painter().text(
+            egui::pos2(news.left() + 16.0, news.bottom() - 19.0),
+            egui::Align2::LEFT_CENTER,
+            lang.modrinth_news_today(),
+            egui::FontId::proportional(9.5),
+            TEXT_MUTED.into(),
         );
     }
 
@@ -1157,43 +1459,83 @@ impl HomePage {
     }
 }
 
-/// Public project page used by the Legacy news sidebar.
-const PROJECT_URL: &str = "https://github.com/KurumaOfficial/Aleph-Minecraft-Client-Launcher";
-
-fn legacy_news_link_title(ui: &mut Ui, title: &str, color: Color32) {
-    ui.label(
-        egui::RichText::new(title)
-            .font(egui::FontId::proportional(16.5))
-            .strong()
-            .color(color),
-    );
-}
-
-fn legacy_news_link(ui: &mut Ui, label: &str, url: &str) {
-    let resp = ui.add(
-        egui::Label::new(
-            egui::RichText::new(label)
-                .font(egui::FontId::proportional(12.5))
-                .color(Color32::from_rgb(0x70, 0x9F, 0xE8)),
-        )
-        .sense(Sense::click()),
-    );
-    if resp.hovered() {
-        ui.painter().line_segment(
-            [
-                egui::pos2(resp.rect.left(), resp.rect.bottom() - 1.0),
-                egui::pos2(resp.rect.right(), resp.rect.bottom() - 1.0),
-            ],
-            Stroke::new(1.0_f32, Color32::from_rgb(0x70, 0x9F, 0xE8)),
-        );
-        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+/// Draws a texture clipped to a rounded rectangle using a triangle fan. The
+/// regular `image_cover` helper paints a square quad, which leaves visible
+/// corners on LabyMod's large rounded hero card.
+fn rounded_image(
+    painter: &egui::Painter,
+    rect: egui::Rect,
+    radius: f32,
+    texture: &egui::TextureHandle,
+    tint: Color32,
+) {
+    let radius = radius.min(rect.width() / 2.0).min(rect.height() / 2.0);
+    if radius <= 0.5 {
+        image_cover(painter, rect, texture, tint);
+        return;
     }
-    if resp.clicked() {
-        if let Err(err) = open::that(url) {
-            tracing::warn!("Legacy news link failed: {err}");
+    let steps = 6;
+    let corners = [
+        (
+            egui::pos2(rect.left() + radius, rect.top() + radius),
+            std::f32::consts::PI,
+            std::f32::consts::PI * 1.5,
+        ),
+        (
+            egui::pos2(rect.right() - radius, rect.top() + radius),
+            -std::f32::consts::FRAC_PI_2,
+            0.0,
+        ),
+        (
+            egui::pos2(rect.right() - radius, rect.bottom() - radius),
+            0.0,
+            std::f32::consts::FRAC_PI_2,
+        ),
+        (
+            egui::pos2(rect.left() + radius, rect.bottom() - radius),
+            std::f32::consts::FRAC_PI_2,
+            std::f32::consts::PI,
+        ),
+    ];
+    let mut points = Vec::with_capacity((steps + 1) * corners.len());
+    for (center, start, end) in corners {
+        for i in 0..=steps {
+            let t = i as f32 / steps as f32;
+            let angle = start + (end - start) * t;
+            points.push(egui::pos2(
+                center.x + radius * angle.cos(),
+                center.y + radius * angle.sin(),
+            ));
         }
     }
-    ui.add_space(3.0);
+
+    let uv = |p: egui::Pos2| {
+        egui::pos2(
+            (p.x - rect.left()) / rect.width(),
+            (p.y - rect.top()) / rect.height(),
+        )
+    };
+    let mut mesh = egui::Mesh {
+        texture_id: texture.id(),
+        ..Default::default()
+    };
+    mesh.vertices.push(egui::epaint::Vertex {
+        pos: rect.center(),
+        uv: egui::pos2(0.5, 0.5),
+        color: tint,
+    });
+    for p in &points {
+        mesh.vertices.push(egui::epaint::Vertex {
+            pos: *p,
+            uv: uv(*p),
+            color: tint,
+        });
+    }
+    let n = points.len() as u32;
+    for i in 0..n {
+        mesh.add_triangle(0, 1 + i, 1 + ((i + 1) % n));
+    }
+    painter.add(egui::Shape::mesh(mesh));
 }
 
 #[cfg(test)]

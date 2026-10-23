@@ -96,8 +96,12 @@ pub enum AppMode {
     Multimc,
     /// Aleph ultra-simplified: nickname + version + Play, no tabs.
     Ultra,
-    /// Legacy-inspired: text tabs + footer Play bar.
-    Legacy,
+    /// LabyMod-inspired: dark icon rail, hero Play card and friends/news rail.
+    ///
+    /// The serialized value stays `legacy` so configs written for the old
+    /// Legacy shell keep loading without a migration.
+    #[serde(rename = "legacy")]
+    Labymod,
     /// Millida-inspired: lobby tiles + content.
     Millida,
     /// Modrinth-inspired: sidebar navigation, green accents on gray.
@@ -115,8 +119,8 @@ pub enum ShellKind {
     Ultra,
     /// Toolbar + list + status bar (Multimc).
     Multimc,
-    /// Text tabs + footer Play bar (Legacy).
-    Legacy,
+    /// Dark icon rail + hero card (LabyMod).
+    Labymod,
     /// Lobby tiles + content (Millida).
     Millida,
     /// Sidebar navigation with green accents (Modrinth).
@@ -129,7 +133,7 @@ impl AppMode {
         AppMode::Professional,
         AppMode::Multimc,
         AppMode::Ultra,
-        AppMode::Legacy,
+        AppMode::Labymod,
         AppMode::Millida,
         AppMode::Modrinth,
     ];
@@ -147,7 +151,7 @@ impl AppMode {
             Self::Professional => ShellKind::Topbar,
             Self::Multimc => ShellKind::Multimc,
             Self::Ultra => ShellKind::Ultra,
-            Self::Legacy => ShellKind::Legacy,
+            Self::Labymod => ShellKind::Labymod,
             Self::Millida => ShellKind::Millida,
             Self::Modrinth => ShellKind::Modrinth,
         }
@@ -432,6 +436,16 @@ mod tests {
         let pro = serde_json::to_string(&AppMode::Professional).unwrap();
         assert_eq!(simple, "\"simple\"");
         assert_eq!(pro, "\"professional\"");
+        // The LabyMod shell replaced the Legacy visuals but keeps the old
+        // config key so shipped configs load unchanged.
+        assert_eq!(
+            serde_json::to_string(&AppMode::Labymod).unwrap(),
+            "\"legacy\""
+        );
+        assert_eq!(
+            serde_json::from_str::<AppMode>("\"legacy\"").unwrap(),
+            AppMode::Labymod
+        );
         // Historical values from shipped configs must keep loading.
         assert_eq!(
             serde_json::from_str::<AppMode>("\"professional\"").unwrap(),

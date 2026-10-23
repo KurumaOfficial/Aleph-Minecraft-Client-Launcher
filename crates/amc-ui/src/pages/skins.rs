@@ -1656,7 +1656,7 @@ impl Default for Skin3d {
 }
 
 impl Skin3d {
-    fn show(&mut self, ui: &mut Ui, rect: Rect, skin: Option<&RgbaImage>, slim: bool) {
+    pub(crate) fn show(&mut self, ui: &mut Ui, rect: Rect, skin: Option<&RgbaImage>, slim: bool) {
         if rect.width() < 20.0 || rect.height() < 40.0 {
             return;
         }

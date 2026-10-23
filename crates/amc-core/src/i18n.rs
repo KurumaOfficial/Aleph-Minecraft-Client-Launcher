@@ -2688,19 +2688,19 @@ impl Language {
         }
     }
 
-    pub fn settings_mode_legacy(&self) -> &'static str {
+    pub fn settings_mode_labymod(&self) -> &'static str {
         match self {
-            Self::English => "Legacy",
-            Self::Russian => "Legacy",
-            Self::Ukrainian => "Legacy",
+            Self::English => "LabyMod",
+            Self::Russian => "LabyMod",
+            Self::Ukrainian => "LabyMod",
         }
     }
 
-    pub fn settings_mode_legacy_desc(&self) -> &'static str {
+    pub fn settings_mode_labymod_desc(&self) -> &'static str {
         match self {
-            Self::English => "Text tabs and a bottom Play panel",
-            Self::Russian => "Текстовые вкладки и нижняя панель Play",
-            Self::Ukrainian => "Текстові вкладки та нижня панель грати",
+            Self::English => "Dark icon rail, hero Play card and friends/news",
+            Self::Russian => "Тёмный рейл, крупная карточка Play и друзья/новости",
+            Self::Ukrainian => "Темний рейл, велика картка Play і друзі/новини",
         }
     }
 
@@ -3198,6 +3198,54 @@ impl Language {
             Self::English => "Play",
             Self::Russian => "Играть",
             Self::Ukrainian => "Грати",
+        }
+    }
+
+    pub fn labymod_play_tab(&self) -> &'static str {
+        match self {
+            Self::English => "Play",
+            Self::Russian => "Играть",
+            Self::Ukrainian => "Грати",
+        }
+    }
+
+    pub fn labymod_launch(&self) -> &'static str {
+        match self {
+            Self::English => "Launch",
+            Self::Russian => "Запустить",
+            Self::Ukrainian => "Запустити",
+        }
+    }
+
+    pub fn labymod_launching(&self) -> &'static str {
+        match self {
+            Self::English => "Launching…",
+            Self::Russian => "Запуск…",
+            Self::Ukrainian => "Запуск…",
+        }
+    }
+
+    pub fn labymod_default(&self) -> &'static str {
+        match self {
+            Self::English => "Default",
+            Self::Russian => "По умолчанию",
+            Self::Ukrainian => "За замовчуванням",
+        }
+    }
+
+    pub fn labymod_quick_play(&self) -> &'static str {
+        match self {
+            Self::English => "Quick Play",
+            Self::Russian => "Быстрый вход",
+            Self::Ukrainian => "Швидкий вхід",
+        }
+    }
+
+    pub fn labymod_no_servers(&self) -> &'static str {
+        match self {
+            Self::English => "No saved servers yet",
+            Self::Russian => "Сохранённых серверов пока нет",
+            Self::Ukrainian => "Збережених серверів ще немає",
         }
     }
 
@@ -5554,6 +5602,12 @@ mod tests {
             assert!(!lang.legacy_new_profile().is_empty());
             assert!(!lang.legacy_play().is_empty());
             assert!(!lang.legacy_launching().is_empty());
+            assert!(!lang.labymod_play_tab().is_empty());
+            assert!(!lang.labymod_launch().is_empty());
+            assert!(!lang.labymod_launching().is_empty());
+            assert!(!lang.labymod_default().is_empty());
+            assert!(!lang.labymod_quick_play().is_empty());
+            assert!(!lang.labymod_no_servers().is_empty());
             assert!(!lang.legacy_guest().is_empty());
             assert!(!lang.legacy_welcome("AMC").is_empty());
             assert!(!lang.legacy_ready("1.21").is_empty());
@@ -5608,8 +5662,8 @@ mod tests {
                 ),
                 (lang.settings_mode_ultra(), lang.settings_mode_ultra_desc()),
                 (
-                    lang.settings_mode_legacy(),
-                    lang.settings_mode_legacy_desc(),
+                    lang.settings_mode_labymod(),
+                    lang.settings_mode_labymod_desc(),
                 ),
                 (
                     lang.settings_mode_millida(),

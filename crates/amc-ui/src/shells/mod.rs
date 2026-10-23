@@ -23,10 +23,9 @@
 //!   accent, custom title bar.
 //! - Millida: hero banner plus a lobby grid of tiles, content opens from a
 //!   tile.
-//! - Legacy: a light text-menu strip on top, the news canvas in the middle and
-//!   a bottom panel with the profile picker, Play and the account block.
+//! - LabyMod: a dark icon rail, a hero Play canvas and a friends/news column.
 
-pub mod legacy;
+pub mod labymod;
 pub mod millida;
 pub mod modrinth;
 pub mod multimc;

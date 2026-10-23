@@ -50,9 +50,9 @@ pub fn mode_labels(lang: Language, mode: AppMode) -> (&'static str, &'static str
             lang.settings_mode_multimc_desc(),
         ),
         AppMode::Ultra => (lang.settings_mode_ultra(), lang.settings_mode_ultra_desc()),
-        AppMode::Legacy => (
-            lang.settings_mode_legacy(),
-            lang.settings_mode_legacy_desc(),
+        AppMode::Labymod => (
+            lang.settings_mode_labymod(),
+            lang.settings_mode_labymod_desc(),
         ),
         AppMode::Millida => (
             lang.settings_mode_millida(),

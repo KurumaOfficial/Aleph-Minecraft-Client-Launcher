@@ -2913,15 +2913,15 @@ async fn resolve_java_for_install(
 impl App for LauncherApp {
     fn update(&mut self, ctx: &Context, _frame: &mut eframe::Frame) {
         // Per-shell palette: each visual shell resolves the shared theme
-        // tokens against its own palette (MultiMC Qt light, Legacy Mojang
-        // light, Millida charcoal, Modrinth gray/green; the studio shells
-        // keep Aleph). Applied only when the shell actually changes.
+        // tokens against its own palette (MultiMC Qt light, LabyMod navy,
+        // Millida charcoal, Modrinth gray/green; the studio shells keep
+        // Aleph). Applied only when the shell actually changes.
         let palette_shell = self.config.app_mode.shell();
         if self.theme_shell != Some(palette_shell) {
             self.theme_shell = Some(palette_shell);
             let palette = match palette_shell {
                 amc_core::config::ShellKind::Multimc => crate::theme::PaletteId::Multimc,
-                amc_core::config::ShellKind::Legacy => crate::theme::PaletteId::Legacy,
+                amc_core::config::ShellKind::Labymod => crate::theme::PaletteId::Labymod,
                 amc_core::config::ShellKind::Millida => crate::theme::PaletteId::Millida,
                 amc_core::config::ShellKind::Modrinth => crate::theme::PaletteId::Modrinth,
                 _ => crate::theme::PaletteId::Aleph,
@@ -3676,8 +3676,22 @@ impl App for LauncherApp {
             44.0
         } else if shell == amc_core::config::ShellKind::Modrinth {
             48.0
+        } else if shell == amc_core::config::ShellKind::Labymod {
+            52.0
         } else {
             36.0
+        };
+        let labymod_account = if shell == amc_core::config::ShellKind::Labymod {
+            self.account_mgr
+                .active_account()
+                .map(|a| a.username.clone())
+        } else {
+            None
+        };
+        let labymod_avatar = if shell == amc_core::config::ShellKind::Labymod {
+            self.avatar_texture.clone()
+        } else {
+            None
         };
         TopBottomPanel::top("title_bar")
             .exact_height(title_height)
@@ -3700,6 +3714,14 @@ impl App for LauncherApp {
                         self.modrinth_sidebar_open,
                         self.is_launching,
                     )
+                } else if shell == amc_core::config::ShellKind::Labymod {
+                    TitleBar::show_labymod(
+                        ui,
+                        "AMC Launcher",
+                        lang,
+                        labymod_account.as_deref(),
+                        labymod_avatar.as_ref(),
+                    )
                 } else {
                     TitleBar::show(ui, "AMC Launcher", lang)
                 };
@@ -3714,6 +3736,13 @@ impl App for LauncherApp {
                 }
                 if tb_resp.sidebar_toggle {
                     self.modrinth_sidebar_open = !self.modrinth_sidebar_open;
+                }
+                if tb_resp.account_clicked {
+                    if self.account_mgr.active_account().is_some() {
+                        self.current_tab = NavTab::Profile;
+                    } else {
+                        self.login_modal.is_open = true;
+                    }
                 }
             });
 
@@ -3912,69 +3941,20 @@ impl App for LauncherApp {
                         self.current_tab = tab;
                     }
                 });
-        } else if shell == amc_core::config::ShellKind::Legacy {
-            // Legacy launcher (1.6.94): text menu strip on top, news canvas
-            // in the middle and the profile / Play / account bar below.
+        } else if shell == amc_core::config::ShellKind::Labymod {
+            // LabyMod: dark labelled icon rail on the left; Play/hero,
+            // friends and news live in the Home page itself.
             ctx.animate_bool_responsive(pro_slide_id, false);
-            let mut shell_action = crate::shells::ShellAction::default();
-            let launching = self.is_launching;
-            let account_name: Option<String> = self
-                .account_mgr
-                .active_account()
-                .map(|a| a.username.clone());
-            let launch_version: Option<String> = self
-                .selected_instance
-                .and_then(|id| self.instances.iter().find(|i| i.id == id))
-                .map(|inst| inst.game_version.clone())
-                .or_else(|| self.selected_version.clone());
-            TopBottomPanel::bottom("legacy_play")
-                .exact_height(crate::shells::legacy::PLAY_HEIGHT)
+            SidePanel::left("labymod_rail")
+                .exact_width(crate::shells::labymod::RAIL_WIDTH)
+                .resizable(false)
                 .frame(egui::Frame::none())
                 .show(ctx, |ui| {
-                    let bar_ctx = crate::shells::legacy::PlayBarCtx {
-                        instances: &self.instances,
-                        selected: self.selected_instance,
-                        version: launch_version.as_deref(),
-                        account: account_name.as_deref(),
-                    };
-                    let action =
-                        crate::shells::legacy::show_play_bar(ui, lang, &bar_ctx, launching);
-                    shell_action.merge(action);
-                });
-            TopBottomPanel::top("legacy_tabs")
-                .exact_height(crate::shells::legacy::TABS_HEIGHT)
-                .frame(egui::Frame::none())
-                .show(ctx, |ui| {
-                    let action = crate::shells::legacy::show_tabs(ui, lang, self.current_tab);
-                    shell_action.merge(action);
-                });
-            if let Some(tab) = shell_action.tab {
-                self.current_tab = tab;
-            }
-            if shell_action.new_instance {
-                self.current_tab = NavTab::Modpacks;
-                self.instances_page.new_instance_ram = self.hw_suggested_ram;
-                self.instances_page.show_create_modal = true;
-            }
-            if shell_action.edit_instance {
-                if let Some(id) = self.selected_instance {
-                    if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
-                        self.instances_page.open_edit_modal(inst);
+                    let action = crate::shells::labymod::show_rail(ui, lang, self.current_tab);
+                    if let Some(tab) = action.tab {
+                        self.current_tab = tab;
                     }
-                }
-            }
-            if shell_action.login {
-                self.login_modal.is_open = true;
-            }
-            if let Some(id) = shell_action.select_instance {
-                self.selected_instance = Some(id);
-                if let Some(inst) = self.instances.iter().find(|i| i.id == id) {
-                    self.selected_version = Some(inst.game_version.clone());
-                }
-            }
-            if shell_action.launch {
-                self.handle_launch();
-            }
+                });
         } else if shell == amc_core::config::ShellKind::Millida {
             // Millida: the default lobby fills the window and has no rail;
             // every other page opens behind the classic 236 px rail.
@@ -4094,12 +4074,10 @@ impl App for LauncherApp {
                 });
         }
 
-        // 4. Central content panel. Modrinth paints its own gray surface and
-        // Legacy the white page its folder tabs merge into; the other
-        // shells keep the palette background.
+        // 4. Central content panel. Modrinth paints its own gray surface;
+        // the other shells keep the palette background.
         let canvas: egui::Color32 = match shell {
             amc_core::config::ShellKind::Modrinth => crate::theme::MODRINTH_BG,
-            amc_core::config::ShellKind::Legacy => crate::theme::FIELD.into(),
             _ => BG.into(),
         };
         CentralPanel::default()
@@ -4111,7 +4089,7 @@ impl App for LauncherApp {
                 let available = ui.available_rect_before_wrap();
                 let edge_to_edge = (shell == amc_core::config::ShellKind::Millida
                     && self.current_tab == NavTab::Home)
-                    || (shell == amc_core::config::ShellKind::Legacy
+                    || (shell == amc_core::config::ShellKind::Labymod
                         && self.current_tab == NavTab::Home);
                 let inner_rect = if edge_to_edge {
                     available
@@ -4290,11 +4268,31 @@ impl App for LauncherApp {
                             }
                             return;
                         }
+                        let labymod = shell == amc_core::config::ShellKind::Labymod;
+                        let home_profile = self
+                            .selected_instance
+                            .and_then(|id| self.instances.iter().find(|i| i.id == id))
+                            .map(|inst| inst.name.clone());
+                        let home_version = self
+                            .selected_instance
+                            .and_then(|id| self.instances.iter().find(|i| i.id == id))
+                            .map(|inst| inst.game_version.clone())
+                            .or_else(|| self.selected_version.clone());
+                        let home_account = self
+                            .account_mgr
+                            .active_account()
+                            .map(|a| a.username.clone());
                         let home_ctx = HomeContext {
                             versions_dir: &self.paths.versions_dir(),
                             instances_count: self.instances.len(),
                             memory_mb: self.config.default_launch_options.memory_max_mb,
-                            legacy: shell == amc_core::config::ShellKind::Legacy,
+                            labymod,
+                            profile_name: home_profile.as_deref(),
+                            account_name: home_account.as_deref(),
+                            launch_version: home_version.as_deref(),
+                            skin: self.skins_page.skin_image.as_ref(),
+                            slim: self.skins_page.is_slim_model,
+                            launching: self.is_launching,
                         };
                         self.home_page.show(
                             &mut content_ui,
@@ -4304,6 +4302,18 @@ impl App for LauncherApp {
                             &mut self.favorites,
                             lang,
                         );
+                        if self.home_page.labymod_instances_request {
+                            self.home_page.labymod_instances_request = false;
+                            self.current_tab = NavTab::Modpacks;
+                        }
+                        if self.home_page.labymod_account_request {
+                            self.home_page.labymod_account_request = false;
+                            if self.account_mgr.active_account().is_some() {
+                                self.current_tab = NavTab::Profile;
+                            } else {
+                                self.login_modal.is_open = true;
+                            }
+                        }
                         if let Some((server, port)) = self.home_page.direct_connect_request.take() {
                             self.handle_direct_connect(server, port);
                         }

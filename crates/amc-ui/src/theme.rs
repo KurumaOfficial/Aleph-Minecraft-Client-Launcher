@@ -16,7 +16,7 @@ use egui::{
 // constant is now a palette token: it resolves to the color of the active
 // shell palette when it reaches the painter. Swapping the palette repaints
 // every shared page, so a shell can reproduce its reference look (gray/green
-// Modrinth, light MultiMC, Mojang-light Legacy, …) without forking pages.
+// Modrinth, light MultiMC, dark-blue LabyMod, …) without forking pages.
 
 /// Palette token; its public names are the `theme::` color constants below.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,8 +71,8 @@ pub enum PaletteId {
     Aleph,
     /// MultiMC / Prism (Qt light gray).
     Multimc,
-    /// Legacy Mojang launcher (light gray, green primary).
-    Legacy,
+    /// LabyMod launcher (dark navy surfaces, blue primary).
+    Labymod,
     /// Millida (dark violet).
     Millida,
     /// Modrinth (gray surfaces, green accent).
@@ -299,36 +299,36 @@ const MULTIMC: Palette = Palette {
     hover_stroke: Color32::from_rgb(0x9A, 0x9A, 0x9A),
     rounding: 0.0,
 };
-/// Legacy Mojang launcher palette (light gray chrome, green primary button);
-/// values follow the launcher's public screenshots.
-const LEGACY: Palette = Palette {
-    bg: Color32::from_rgb(0xD6, 0xD6, 0xD6),
-    card: Color32::from_rgb(0xF2, 0xF2, 0xF2),
-    card_hover: Color32::from_rgb(0xE9, 0xE9, 0xE9),
-    field: Color32::from_rgb(0xFF, 0xFF, 0xFF),
-    bg_card: Color32::from_rgb(0xC9, 0xC9, 0xC9),
-    bg_active: Color32::from_rgb(0xE4, 0xEE, 0xDD),
-    border: Color32::from_rgb(0xA8, 0xA8, 0xA8),
-    border_soft: Color32::from_rgb(0xC4, 0xC4, 0xC4),
-    border_strong: Color32::from_rgb(0x8A, 0x8A, 0x8A),
-    border_subtle: tint(Color32::from_rgb(0x6D, 0xBE, 0x45), 40),
-    border_default: tint(Color32::from_rgb(0x6D, 0xBE, 0x45), 70),
-    border_accent: tint(Color32::from_rgb(0x6D, 0xBE, 0x45), 130),
-    text: Color32::from_rgb(0x33, 0x33, 0x33),
-    head: Color32::from_rgb(0x11, 0x11, 0x11),
-    muted: Color32::from_rgb(0x66, 0x66, 0x66),
-    muted_dim: Color32::from_rgb(0x8A, 0x8A, 0x8A),
-    text_dim: Color32::from_rgb(0x75, 0x75, 0x75),
-    accent: Color32::from_rgb(0x6D, 0xBE, 0x45),
-    accent_light: Color32::from_rgb(0x8B, 0xD9, 0x6A),
-    accent_dim: Color32::from_rgb(0x4C, 0x8A, 0x35),
-    accent_soft: Color32::from_rgb(0xE8, 0xF2, 0xE0),
-    danger: Color32::from_rgb(0xB0, 0x30, 0x30),
-    success: Color32::from_rgb(0x6D, 0xBE, 0x45),
-    warn: Color32::from_rgb(0xC0, 0x7A, 0x30),
-    info: Color32::from_rgb(0x3B, 0x78, 0xB4),
-    hover_stroke: Color32::from_rgb(0x8A, 0x8A, 0x8A),
-    rounding: 2.0,
+/// LabyMod launcher palette (dark navy surfaces, blue primary button);
+/// values follow the launcher's public Flathub screenshots.
+const LABYMOD: Palette = Palette {
+    bg: Color32::from_rgb(0x0B, 0x0F, 0x17),
+    card: Color32::from_rgb(0x16, 0x1B, 0x25),
+    card_hover: Color32::from_rgb(0x1D, 0x24, 0x31),
+    field: Color32::from_rgb(0x10, 0x14, 0x1D),
+    bg_card: Color32::from_rgb(0x12, 0x17, 0x21),
+    bg_active: Color32::from_rgb(0x1A, 0x22, 0x33),
+    border: Color32::from_rgb(0x2A, 0x31, 0x42),
+    border_soft: Color32::from_rgb(0x20, 0x26, 0x33),
+    border_strong: Color32::from_rgb(0x3A, 0x44, 0x5C),
+    border_subtle: tint(Color32::from_rgb(0x3B, 0x82, 0xF6), 45),
+    border_default: tint(Color32::from_rgb(0x3B, 0x82, 0xF6), 80),
+    border_accent: tint(Color32::from_rgb(0x3B, 0x82, 0xF6), 150),
+    text: Color32::from_rgb(0xE3, 0xE8, 0xF2),
+    head: Color32::from_rgb(0xF5, 0xF7, 0xFB),
+    muted: Color32::from_rgb(0x98, 0xA2, 0xB8),
+    muted_dim: Color32::from_rgb(0x6E, 0x79, 0x90),
+    text_dim: Color32::from_rgb(0x82, 0x8C, 0xA2),
+    accent: Color32::from_rgb(0x3B, 0x82, 0xF6),
+    accent_light: Color32::from_rgb(0x60, 0x9E, 0xFF),
+    accent_dim: Color32::from_rgb(0x24, 0x58, 0xB8),
+    accent_soft: Color32::from_rgb(0x16, 0x25, 0x42),
+    danger: Color32::from_rgb(0xE0, 0x5A, 0x64),
+    success: Color32::from_rgb(0x4C, 0xC3, 0x8A),
+    warn: Color32::from_rgb(0xE0, 0xA3, 0x40),
+    info: Color32::from_rgb(0x4F, 0x9C, 0xF9),
+    hover_stroke: Color32::from_rgb(0x4B, 0x57, 0x70),
+    rounding: 12.0,
 };
 /// Millida palette (dark charcoal with the mint-green accent). Values follow
 /// the design tokens published in the launcher's public GPL source tree
@@ -394,7 +394,7 @@ const MODRINTH: Palette = Palette {
     rounding: 6.0,
 };
 
-const PALETTES: [Palette; 5] = [ALEPH, MULTIMC, LEGACY, MILLIDA, MODRINTH];
+const PALETTES: [Palette; 5] = [ALEPH, MULTIMC, LABYMOD, MILLIDA, MODRINTH];
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -410,7 +410,7 @@ pub fn set_palette(id: PaletteId) {
 pub fn palette_id() -> PaletteId {
     match ACTIVE_PALETTE.load(Ordering::Relaxed) {
         1 => PaletteId::Multimc,
-        2 => PaletteId::Legacy,
+        2 => PaletteId::Labymod,
         3 => PaletteId::Millida,
         4 => PaletteId::Modrinth,
         _ => PaletteId::Aleph,
@@ -721,7 +721,7 @@ fn apply_common_style(style: &mut egui::Style) {
 /// windows) matches the tokens the shared pages draw with.
 pub fn apply_active_theme(ctx: &Context) {
     let id = palette_id();
-    let light = matches!(id, PaletteId::Multimc | PaletteId::Legacy);
+    let light = matches!(id, PaletteId::Multimc);
     let mut style = (*ctx.style()).clone();
     apply_common_style(&mut style);
     style.visuals = visuals_from(&palette_of(id), light);
@@ -741,7 +741,7 @@ pub fn apply_modrinth_theme(ctx: &Context) {
 }
 
 /// Egui visuals derived from one concrete palette; `light` selects the light
-/// baseline (MultiMC/Legacy) instead of the dark one.
+/// baseline (MultiMC) instead of the dark one.
 fn visuals_from(palette: &Palette, light: bool) -> Visuals {
     let mut visuals = if light {
         Visuals::light()

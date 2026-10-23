@@ -14,6 +14,7 @@ pub struct TitleBarResponse {
     pub gallery_clicked: bool,
     pub downloads_clicked: bool,
     pub sidebar_toggle: bool,
+    pub account_clicked: bool,
 }
 
 pub struct TitleBar;
@@ -140,6 +141,184 @@ impl TitleBar {
         }
 
         // Advance cursor
+        ui.advance_cursor_after_rect(bar_rect);
+        response
+    }
+
+    /// LabyMod-style title bar: a taller dark strip with the AMC identity on
+    /// the left, a rounded account chip before the utility/window controls.
+    pub fn show_labymod(
+        ui: &mut Ui,
+        title: &str,
+        lang: amc_core::Language,
+        account: Option<&str>,
+        avatar: Option<&egui::TextureHandle>,
+    ) -> TitleBarResponse {
+        let mut response = TitleBarResponse::default();
+        let height = 52.0;
+        let rect = ui.available_rect_before_wrap();
+        let bar_rect = Rect::from_min_size(rect.min, vec2(rect.width(), height));
+
+        ui.painter().rect_filled(bar_rect, egui::Rounding::ZERO, BG);
+        ui.painter().line_segment(
+            [bar_rect.left_bottom(), bar_rect.right_bottom()],
+            Stroke::new(1.0_f32, BORDER_SUBTLE),
+        );
+
+        let button_w = 36.0;
+        let controls_width = button_w * 6.0;
+        let account_w = 210.0;
+        let controls_left = bar_rect.right() - controls_width;
+        let account_rect = Rect::from_min_size(
+            Pos2::new(controls_left - account_w - 8.0, bar_rect.top() + 8.0),
+            vec2(account_w, height - 16.0),
+        );
+        let drag_rect = Rect::from_min_size(
+            bar_rect.min,
+            vec2((account_rect.left() - bar_rect.left()).max(120.0), height),
+        );
+        let drag_resp = ui.allocate_rect(drag_rect, Sense::click_and_drag());
+        if drag_resp.dragged() {
+            ui.ctx().send_viewport_cmd(ViewportCommand::StartDrag);
+        }
+        if drag_resp.double_clicked() {
+            let is_maximized = ui.input(|i| i.viewport().maximized.unwrap_or(false));
+            ui.ctx()
+                .send_viewport_cmd(ViewportCommand::Maximized(!is_maximized));
+        }
+
+        let mark = Rect::from_center_size(
+            Pos2::new(bar_rect.left() + 24.0, bar_rect.center().y),
+            vec2(18.0, 18.0),
+        );
+        brand::hollow_square(ui.painter(), mark, brand::BRAND_RED);
+        ui.painter().text(
+            Pos2::new(mark.right() + 10.0, bar_rect.center().y),
+            egui::Align2::LEFT_CENTER,
+            title,
+            egui::FontId::new(17.0, egui::FontFamily::Name("bold".into())),
+            TEXT_HEADING.into(),
+        );
+
+        let account_resp = ui.allocate_rect(account_rect, Sense::click());
+        let account_hover = ui
+            .ctx()
+            .animate_bool_responsive(account_resp.id, account_resp.hovered());
+        ui.painter().rect_filled(
+            account_rect,
+            egui::Rounding::same(18.0),
+            lerp_color(crate::theme::CARD, crate::theme::CARD_HOVER, account_hover),
+        );
+        ui.painter().rect_stroke(
+            account_rect,
+            egui::Rounding::same(18.0),
+            Stroke::new(1.0_f32, crate::theme::BORDER),
+        );
+        let head = Rect::from_center_size(
+            Pos2::new(account_rect.left() + 22.0, account_rect.center().y),
+            vec2(28.0, 28.0),
+        );
+        ui.painter()
+            .rect_filled(head, egui::Rounding::same(8.0), BG);
+        if account.is_some() {
+            if let Some(avatar) = avatar {
+                ui.painter().image(
+                    avatar.id(),
+                    head.shrink(2.0),
+                    Rect::from_min_max(Pos2::new(0.0, 0.0), Pos2::new(1.0, 1.0)),
+                    Color32::WHITE,
+                );
+            }
+        } else {
+            icons::draw(
+                ui.painter(),
+                Icon::Person,
+                head.shrink(6.0),
+                crate::theme::ACCENT_LIGHT,
+                1.5,
+            );
+        }
+        ui.painter().text(
+            Pos2::new(account_rect.left() + 42.0, account_rect.center().y - 7.0),
+            egui::Align2::LEFT_CENTER,
+            account.unwrap_or_else(|| lang.modrinth_sign_in()),
+            egui::FontId::proportional(12.5),
+            TEXT_PRIMARY.into(),
+        );
+        ui.painter().text(
+            Pos2::new(account_rect.left() + 42.0, account_rect.center().y + 8.0),
+            egui::Align2::LEFT_CENTER,
+            brand::APP_NAME,
+            egui::FontId::proportional(9.0),
+            TEXT_MUTED.into(),
+        );
+        icons::draw(
+            ui.painter(),
+            Icon::ChevronRight,
+            Rect::from_center_size(
+                Pos2::new(account_rect.right() - 16.0, account_rect.center().y),
+                vec2(13.0, 13.0),
+            ),
+            TEXT_MUTED,
+            1.4,
+        );
+        if account_resp.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+        if account_resp.clicked() {
+            response.account_clicked = true;
+        }
+
+        let gal_rect = Rect::from_min_size(
+            Pos2::new(controls_left, bar_rect.top()),
+            vec2(button_w, height),
+        );
+        if Self::draw_control_button(ui, gal_rect, Icon::Gallery, false).clicked() {
+            response.gallery_clicked = true;
+        }
+        let con_rect = Rect::from_min_size(
+            Pos2::new(controls_left + button_w, bar_rect.top()),
+            vec2(button_w, height),
+        );
+        if Self::draw_control_button(ui, con_rect, Icon::Console, false).clicked() {
+            response.console_clicked = true;
+        }
+        let dl_rect = Rect::from_min_size(
+            Pos2::new(controls_left + button_w * 2.0, bar_rect.top()),
+            vec2(button_w, height),
+        );
+        if Self::draw_control_button(ui, dl_rect, Icon::Download, false).clicked() {
+            response.downloads_clicked = true;
+        }
+        let min_rect = Rect::from_min_size(
+            Pos2::new(controls_left + button_w * 3.0, bar_rect.top()),
+            vec2(button_w, height),
+        );
+        if Self::draw_control_button(ui, min_rect, Icon::Minimize, false).clicked() {
+            ui.ctx().send_viewport_cmd(ViewportCommand::Minimized(true));
+        }
+        let is_maximized = ui.input(|i| i.viewport().maximized.unwrap_or(false));
+        let max_icon = if is_maximized {
+            Icon::Restore
+        } else {
+            Icon::Maximize
+        };
+        let max_rect = Rect::from_min_size(
+            Pos2::new(controls_left + button_w * 4.0, bar_rect.top()),
+            vec2(button_w, height),
+        );
+        if Self::draw_control_button(ui, max_rect, max_icon, false).clicked() {
+            ui.ctx()
+                .send_viewport_cmd(ViewportCommand::Maximized(!is_maximized));
+        }
+        let close_rect = Rect::from_min_size(
+            Pos2::new(controls_left + button_w * 5.0, bar_rect.top()),
+            vec2(button_w, height),
+        );
+        if Self::draw_control_button(ui, close_rect, Icon::Close, true).clicked() {
+            ui.ctx().send_viewport_cmd(ViewportCommand::Close);
+        }
+
         ui.advance_cursor_after_rect(bar_rect);
         response
     }
