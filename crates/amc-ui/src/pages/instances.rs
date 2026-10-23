@@ -2669,7 +2669,13 @@ impl InstancesPage {
                 ui.add_space(3.0);
                 for (group, indices) in &groups {
                     let collapsed = self.multimc_collapsed.contains(group);
-                    if multimc_group_header(ui, group, collapsed) {
+                    // MultiMC labels its default (ungrouped) bucket too.
+                    let group_label = if group.is_empty() {
+                        lang.nav_instances()
+                    } else {
+                        group.as_str()
+                    };
+                    if multimc_group_header(ui, group_label, collapsed) {
                         if collapsed {
                             self.multimc_collapsed.remove(group);
                         } else {

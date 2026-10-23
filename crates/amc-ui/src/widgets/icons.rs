@@ -629,9 +629,19 @@ pub fn draw(painter: &Painter, icon: Icon, rect: Rect, color: impl Into<Color32>
             line(&[vec2(0.52, -0.62), vec2(0.52, 0.3), vec2(0.1, 0.72)]);
         }
         Icon::Spool => {
-            circle(0.0, 0.0, 0.72);
-            circle(0.0, 0.0, 0.42);
-            seg(vec2(0.3, 0.3), vec2(0.88, 0.88));
+            // Spool of thread (Fabric): flanged ends, barrel and thread wraps.
+            seg(vec2(-0.82, -0.72), vec2(0.82, -0.72));
+            seg(vec2(-0.82, 0.72), vec2(0.82, 0.72));
+            line(&[
+                vec2(-0.54, -0.72),
+                vec2(-0.54, 0.72),
+                vec2(0.54, 0.72),
+                vec2(0.54, -0.72),
+            ]);
+            seg(vec2(-0.54, -0.34), vec2(0.54, -0.34));
+            seg(vec2(-0.54, 0.0), vec2(0.54, 0.0));
+            seg(vec2(-0.54, 0.34), vec2(0.54, 0.34));
+            seg(vec2(0.54, 0.34), vec2(0.86, 0.58));
         }
         Icon::Needle => {
             seg(vec2(-0.8, 0.8), vec2(0.42, -0.42));
