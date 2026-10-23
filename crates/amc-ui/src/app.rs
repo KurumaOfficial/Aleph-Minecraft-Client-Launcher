@@ -4345,6 +4345,9 @@ impl App for LauncherApp {
                                 amc_core::config::ShellKind::Multimc => {
                                     crate::pages::instances::LibrarySkin::Multimc
                                 }
+                                amc_core::config::ShellKind::Labymod => {
+                                    crate::pages::instances::LibrarySkin::Labymod
+                                }
                                 _ => crate::pages::instances::LibrarySkin::Amc,
                             },
                         };

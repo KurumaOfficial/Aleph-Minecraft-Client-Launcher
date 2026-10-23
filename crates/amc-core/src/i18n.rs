@@ -3249,6 +3249,24 @@ impl Language {
         }
     }
 
+    pub fn labymod_instances_title(&self) -> &'static str {
+        match self {
+            Self::English => "Instances",
+            Self::Russian => "Сборки",
+            Self::Ukrainian => "Збірки",
+        }
+    }
+
+    pub fn labymod_instances_subtitle(&self) -> &'static str {
+        match self {
+            Self::English => "Create, configure and launch every version from one place",
+            Self::Russian => "Создавайте, настраивайте и запускайте любые версии в одном месте",
+            Self::Ukrainian => {
+                "Створюйте, налаштовуйте та запускайте будь-які версії в одному місці"
+            }
+        }
+    }
+
     pub fn legacy_launching(&self) -> &'static str {
         match self {
             Self::English => "Launching…",
@@ -5608,6 +5626,8 @@ mod tests {
             assert!(!lang.labymod_default().is_empty());
             assert!(!lang.labymod_quick_play().is_empty());
             assert!(!lang.labymod_no_servers().is_empty());
+            assert!(!lang.labymod_instances_title().is_empty());
+            assert!(!lang.labymod_instances_subtitle().is_empty());
             assert!(!lang.legacy_guest().is_empty());
             assert!(!lang.legacy_welcome("AMC").is_empty());
             assert!(!lang.legacy_ready("1.21").is_empty());

@@ -45,6 +45,8 @@ pub enum LibrarySkin {
     Amc,
     Modrinth,
     Multimc,
+    /// LabyMod: dark hero header above the shared instance cards.
+    Labymod,
 }
 
 /// Loader accent shared by the card strip, the MultiMC icon tiles and the
@@ -58,6 +60,50 @@ pub fn loader_color(loader: LoaderType) -> Color32 {
         LoaderType::NeoForge => Color32::from_rgb(0xFF, 0x6D, 0x00),
         LoaderType::OptiFine => Color32::from_rgb(0x00, 0x83, 0x8F),
     }
+}
+
+/// LabyMod Instances header: dark rounded banner with a blue glow and the
+/// instance count chip, matching the launcher's hero surfaces.
+fn labymod_instances_header(ui: &mut Ui, lang: Language) {
+    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 106.0), Sense::hover());
+    let painter = ui.painter();
+    painter.rect_filled(rect, Rounding::same(16.0), BG_CARD);
+    painter.rect_stroke(
+        rect,
+        Rounding::same(16.0),
+        Stroke::new(1.0_f32, BORDER_DEFAULT),
+    );
+    painter.circle_filled(
+        pos2(rect.right() - 92.0, rect.center().y),
+        86.0,
+        with_alpha(crate::theme::ACCENT, 18),
+    );
+    painter.circle_filled(
+        pos2(rect.right() - 92.0, rect.center().y),
+        48.0,
+        with_alpha(crate::theme::ACCENT, 26),
+    );
+    painter.text(
+        pos2(rect.left() + 20.0, rect.top() + 23.0),
+        Align2::LEFT_CENTER,
+        lang.nav_instances().to_uppercase(),
+        egui::FontId::proportional(10.5),
+        crate::theme::ACCENT_LIGHT.into(),
+    );
+    painter.text(
+        pos2(rect.left() + 20.0, rect.top() + 49.0),
+        Align2::LEFT_CENTER,
+        lang.labymod_instances_title(),
+        egui::FontId::new(27.0, egui::FontFamily::Name("bold".into())),
+        TEXT_HEADING.into(),
+    );
+    painter.text(
+        pos2(rect.left() + 20.0, rect.top() + 79.0),
+        Align2::LEFT_CENTER,
+        lang.labymod_instances_subtitle(),
+        egui::FontId::proportional(11.5),
+        TEXT_MUTED.into(),
+    );
 }
 
 /// Ambient data for the instances page, bundled so `show` stays under
@@ -2861,18 +2907,24 @@ impl InstancesPage {
                 // icon-grid instance view instead of the card list.
                 self.show_multimc_view(ui, instances, selected_instance, ctx, lang, &mut action);
             }
-            LibrarySkin::Amc => {
-                ui.add_space(20.0);
+            LibrarySkin::Amc | LibrarySkin::Labymod => {
+                let labymod = ctx.skin == LibrarySkin::Labymod;
+                if labymod {
+                    labymod_instances_header(ui, lang);
+                    ui.add_space(12.0);
+                } else {
+                    ui.add_space(20.0);
 
-                // Header
-                ui.label(
-                    egui::RichText::new(lang.inst_title())
-                        .font(egui::FontId::proportional(26.0))
-                        .strong()
-                        .color(TEXT_HEADING),
-                );
+                    // Header
+                    ui.label(
+                        egui::RichText::new(lang.inst_title())
+                            .font(egui::FontId::proportional(26.0))
+                            .strong()
+                            .color(TEXT_HEADING),
+                    );
 
-                ui.add_space(14.0);
+                    ui.add_space(14.0);
+                }
 
                 // Control Row
                 ui.horizontal(|ui| {
