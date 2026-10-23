@@ -724,6 +724,15 @@ pub fn apply_active_theme(ctx: &Context) {
     let light = matches!(id, PaletteId::Multimc);
     let mut style = (*ctx.style()).clone();
     apply_common_style(&mut style);
+    // Aleph's editorial body face is a serif; the four launcher replicas use
+    // plain sans-serif chrome like their references. Without this, native
+    // labels (empty states, hints, settings descriptions) silently inherit
+    // Cormorant and look like a stray editorial font in Qt/Modrinth UI.
+    if !matches!(id, PaletteId::Aleph) {
+        style
+            .text_styles
+            .insert(TextStyle::Body, FontId::new(14.0, FontFamily::Proportional));
+    }
     style.visuals = visuals_from(&palette_of(id), light);
     ctx.set_style(style);
 }

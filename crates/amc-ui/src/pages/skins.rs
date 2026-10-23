@@ -930,7 +930,9 @@ impl SkinsPage {
         width: f32,
         panel_h: f32,
     ) {
-        let preview_h = (panel_h - 140.0).max(240.0);
+        // Reserve the full action stack below the preview. At 960x600 the
+        // previous 140 px reserve pushed the account footer under the window.
+        let preview_h = (panel_h - 170.0).max(240.0);
         let (rect, _) = ui.allocate_exact_size(vec2(width, preview_h), Sense::hover());
         ui.painter()
             .rect_filled(rect, egui::Rounding::same(18.0), BG_CARD);
@@ -1420,7 +1422,9 @@ impl SkinsPage {
         width: f32,
         panel_h: f32,
     ) {
-        let preview_h = (panel_h - 136.0).max(250.0);
+        // Leave room for the model switch, both skin actions and the account
+        // footer; at the 960x600 minimum the old fixed reserve clipped them.
+        let preview_h = (panel_h - 170.0).max(250.0);
         let (rect, _) = ui.allocate_exact_size(vec2(width, preview_h), Sense::hover());
         ui.painter().rect_filled(
             rect,

@@ -807,7 +807,7 @@ fn draw_tile(ui: &mut Ui, rect: Rect, index: usize, lang: Language) -> Response 
     let inner = rect.shrink(3.0);
     let band_h = 34.0;
     let band_top = inner.bottom() - band_h;
-    let art_center = pos2(rect.center().x, band_top - 29.0);
+    let art_center = pos2(rect.center().x, (band_top - 29.0).max(rect.top() + 24.0));
     for (dx, dy) in [(-64.0, 24.0), (-44.0, 50.0), (64.0, 24.0), (44.0, 50.0)] {
         painter.line_segment(
             [art_center, pos2(art_center.x + dx, art_center.y + dy)],
@@ -1455,12 +1455,17 @@ pub fn show_lobby(
     draw_centerpiece(ui, stage, ctx, skin3d);
 
     let mut y = stage.top() + 20.0;
+    // The four tiles share the space above the dock. At 960x600 the fixed
+    // 97 px height ran 27 px into the dock, hiding the Settings tile; scale
+    // the tiles down instead of letting them collide with the dock.
+    let dock_top = stage.bottom() - DOCK_H;
+    let tile_h = ((dock_top - 10.0 - y - 3.0 * TILE_GAP) / 4.0).clamp(84.0, TILE_H);
     for (index, (target, _, _)) in TILE_TARGETS.iter().enumerate() {
-        let rect = Rect::from_min_size(pos2(stage.left() + 20.0, y), vec2(TILE_W, TILE_H));
+        let rect = Rect::from_min_size(pos2(stage.left() + 20.0, y), vec2(TILE_W, tile_h));
         if draw_tile(ui, rect, index, lang).clicked() {
             action.tab = Some(*target);
         }
-        y += TILE_H + TILE_GAP;
+        y += tile_h + TILE_GAP;
     }
 
     draw_cluster(ui, stage, lang, ctx, &mut action);

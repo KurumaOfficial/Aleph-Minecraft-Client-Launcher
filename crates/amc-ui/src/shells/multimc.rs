@@ -289,6 +289,11 @@ pub fn show_toolbar(ui: &mut Ui, lang: Language, ctx: &ToolbarCtx<'_>) -> ShellA
 
     ui.horizontal_centered(|ui| {
         ui.spacing_mut().item_spacing = vec2(2.0, 0.0);
+        // Qt toolbars keep every entry, but at the 960 px minimum the full
+        // reference set overflows into the accounts button on the right.
+        // Drop the two decorative entries (Support and Meow) first so the
+        // functional toolbar stays legible instead of clipping.
+        let compact = ui.available_width() < 900.0;
         ui.add_space(4.0);
 
         // Add Instance.
@@ -353,14 +358,16 @@ pub fn show_toolbar(ui: &mut Ui, lang: Language, ctx: &ToolbarCtx<'_>) -> ShellA
 
         tb_separator(ui);
 
-        // Support (visual entry of the reference toolbar).
-        let _ = tb_button(ui, Icon::Heart, lang.shell_support(), false, false);
+        if !compact {
+            // Support (visual entry of the reference toolbar).
+            let _ = tb_button(ui, Icon::Heart, lang.shell_support(), false, false);
 
-        // Meow: checkable easter egg of the reference.
-        let meow_id = ui.id().with("multimc_meow");
-        let meow = ui.ctx().data_mut(|d| *d.get_temp_mut_or(meow_id, false));
-        if tb_button(ui, Icon::Star, lang.shell_meow(), false, meow).clicked() {
-            ui.ctx().data_mut(|d| d.insert_temp(meow_id, !meow));
+            // Meow: checkable easter egg of the reference.
+            let meow_id = ui.id().with("multimc_meow");
+            let meow = ui.ctx().data_mut(|d| *d.get_temp_mut_or(meow_id, false));
+            if tb_button(ui, Icon::Star, lang.shell_meow(), false, meow).clicked() {
+                ui.ctx().data_mut(|d| d.insert_temp(meow_id, !meow));
+            }
         }
 
         // Right side: the accounts dropdown (face + profile name).
