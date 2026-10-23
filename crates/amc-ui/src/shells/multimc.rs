@@ -431,7 +431,7 @@ pub fn show_news_bar(ui: &mut Ui, lang: Language) {
         ui.add_space(6.0);
         let font = egui::FontId::proportional(12.0);
         let galley = ui.painter().layout_no_wrap(
-            lang.shell_news_none().to_owned(),
+            format!("{} · AMC", lang.legacy_news_updates_title()),
             font,
             Color32::PLACEHOLDER,
         );
@@ -459,6 +459,12 @@ pub fn show_news_bar(ui: &mut Ui, lang: Language) {
             galley,
             theme::MUTED.into(),
         );
+        if resp.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+        if resp.clicked() {
+            let _ = open::that(PROJECT_URL);
+        }
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.add_space(6.0);

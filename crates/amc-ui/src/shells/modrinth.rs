@@ -29,6 +29,7 @@ pub const SIDEBAR_WIDTH: f32 = 190.0;
 /// Right sidebar width (reference: friends/news rail).
 pub const RIGHT_SIDEBAR_WIDTH: f32 = 300.0;
 const PAD: f32 = 10.0;
+const PROJECT_URL: &str = "https://github.com/KurumaOfficial/Aleph-Minecraft-Client-Launcher";
 
 /// Sidebar shortcuts in display order.
 pub const NAV_TABS: [(NavTab, Icon); 6] = [
@@ -290,14 +291,9 @@ pub fn show_right_sidebar(ui: &mut Ui, lang: Language, account_name: Option<&str
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 ui.add_space(16.0);
-                ui.add(
-                    egui::Label::new(
-                        egui::RichText::new(lang.modrinth_no_friends())
-                            .font(egui::FontId::proportional(12.0))
-                            .color(theme::MODRINTH_TEXT_SECONDARY),
-                    )
-                    .wrap(),
-                );
+                if friends_empty_card(ui, width, lang) {
+                    action.login = true;
+                }
             });
             ui.add_space(14.0);
 
@@ -310,6 +306,36 @@ pub fn show_right_sidebar(ui: &mut Ui, lang: Language, account_name: Option<&str
                         .font(egui::FontId::proportional(16.0))
                         .color(theme::MODRINTH_TEXT_CONTRAST),
                 );
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    ui.add_space(16.0);
+                    let galley = ui.painter().layout_no_wrap(
+                        lang.shell_more_news().to_owned(),
+                        egui::FontId::proportional(11.0),
+                        Color32::PLACEHOLDER,
+                    );
+                    let (rect, resp) =
+                        ui.allocate_exact_size(vec2(galley.size().x + 8.0, 20.0), Sense::click());
+                    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+                    let color = theme::lerp_color(
+                        theme::MODRINTH_TEXT_SECONDARY,
+                        theme::MODRINTH_GREEN_LIGHT,
+                        hover,
+                    );
+                    ui.painter().galley(
+                        pos2(
+                            rect.center().x - galley.size().x / 2.0,
+                            rect.center().y - galley.size().y / 2.0,
+                        ),
+                        galley,
+                        color,
+                    );
+                    if resp.hovered() {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                    }
+                    if resp.clicked() {
+                        let _ = open::that(PROJECT_URL);
+                    }
+                });
             });
             ui.add_space(10.0);
             for (title, icon) in [
@@ -318,7 +344,9 @@ pub fn show_right_sidebar(ui: &mut Ui, lang: Language, account_name: Option<&str
             ] {
                 ui.horizontal(|ui| {
                     ui.add_space(16.0);
-                    news_card(ui, width, title, lang, icon);
+                    if news_card(ui, width, title, lang, icon) {
+                        let _ = open::that(PROJECT_URL);
+                    }
                 });
                 ui.add_space(8.0);
             }
@@ -429,14 +457,94 @@ fn account_card(ui: &mut Ui, width: f32, lang: Language, account_name: Option<&s
     resp.clicked()
 }
 
-fn news_card(ui: &mut Ui, width: f32, title: &str, lang: Language, icon: Icon) {
-    let (rect, _) = ui.allocate_exact_size(vec2(width, 76.0), Sense::hover());
-    ui.painter()
-        .rect_filled(rect, Rounding::same(10.0), theme::MODRINTH_SURFACE);
+fn friends_empty_card(ui: &mut Ui, width: f32, lang: Language) -> bool {
+    let (rect, resp) = ui.allocate_exact_size(vec2(width, 78.0), Sense::click());
+    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+    ui.painter().rect_filled(
+        rect,
+        Rounding::same(10.0),
+        theme::lerp_color(
+            theme::MODRINTH_SURFACE,
+            theme::MODRINTH_SURFACE_HOVER,
+            hover,
+        ),
+    );
     ui.painter().rect_stroke(
         rect,
         Rounding::same(10.0),
-        Stroke::new(1.0_f32, theme::MODRINTH_SURFACE_HIGH),
+        Stroke::new(
+            1.0_f32,
+            theme::lerp_color(
+                theme::MODRINTH_SURFACE_HIGH,
+                theme::with_alpha(theme::MODRINTH_GREEN, 120),
+                hover,
+            ),
+        ),
+    );
+    let icon = pos2(rect.left() + 30.0, rect.top() + 28.0);
+    ui.painter()
+        .circle_filled(icon, 17.0, theme::MODRINTH_SURFACE_HOVER);
+    icons::draw(
+        ui.painter(),
+        Icon::Person,
+        Rect::from_center_size(icon, vec2(17.0, 17.0)),
+        theme::MODRINTH_TEXT_SECONDARY,
+        1.35,
+    );
+    let text = ui.painter().layout(
+        lang.modrinth_no_friends().to_owned(),
+        egui::FontId::proportional(11.5),
+        theme::MODRINTH_TEXT_SECONDARY,
+        (rect.width() - 96.0).max(90.0),
+    );
+    ui.painter().galley(
+        pos2(rect.left() + 56.0, rect.top() + 16.0),
+        text,
+        theme::MODRINTH_TEXT_SECONDARY,
+    );
+    ui.painter().text(
+        pos2(rect.left() + 56.0, rect.top() + 60.0),
+        Align2::LEFT_CENTER,
+        lang.modrinth_sign_in(),
+        egui::FontId::proportional(11.0),
+        theme::MODRINTH_GREEN,
+    );
+    icons::draw(
+        ui.painter(),
+        Icon::ChevronRight,
+        Rect::from_center_size(pos2(rect.right() - 17.0, rect.center().y), vec2(13.0, 13.0)),
+        theme::MODRINTH_TEXT_SECONDARY,
+        1.3,
+    );
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp.clicked()
+}
+
+fn news_card(ui: &mut Ui, width: f32, title: &str, lang: Language, icon: Icon) -> bool {
+    let (rect, resp) = ui.allocate_exact_size(vec2(width, 76.0), Sense::click());
+    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+    ui.painter().rect_filled(
+        rect,
+        Rounding::same(10.0),
+        theme::lerp_color(
+            theme::MODRINTH_SURFACE,
+            theme::MODRINTH_SURFACE_HOVER,
+            hover,
+        ),
+    );
+    ui.painter().rect_stroke(
+        rect,
+        Rounding::same(10.0),
+        Stroke::new(
+            1.0_f32,
+            theme::lerp_color(
+                theme::MODRINTH_SURFACE_HIGH,
+                theme::with_alpha(theme::MODRINTH_GREEN, 120),
+                hover,
+            ),
+        ),
     );
 
     let thumb = Rect::from_min_size(
@@ -446,7 +554,7 @@ fn news_card(ui: &mut Ui, width: f32, title: &str, lang: Language, icon: Icon) {
     ui.painter().rect_filled(
         thumb,
         Rounding::same(8.0),
-        theme::with_alpha(theme::MODRINTH_GREEN, 26),
+        theme::with_alpha(theme::MODRINTH_GREEN, 26 + (hover * 20.0) as u8),
     );
     icons::draw(
         ui.painter(),
@@ -477,6 +585,10 @@ fn news_card(ui: &mut Ui, width: f32, title: &str, lang: Language, icon: Icon) {
         egui::FontId::proportional(10.5),
         theme::MODRINTH_TEXT_SECONDARY,
     );
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp.clicked()
 }
 
 #[cfg(test)]

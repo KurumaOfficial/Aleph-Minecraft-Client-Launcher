@@ -12,6 +12,9 @@ use amc_minecraft::{FavoriteServerEntry, ServerStatus};
 use egui::{vec2, Color32, ScrollArea, Sense, Stroke, TextEdit, Ui};
 use image::RgbaImage;
 use std::collections::{HashMap, HashSet};
+
+/// Project page used by the LabyMod news card.
+const PROJECT_URL: &str = "https://github.com/KurumaOfficial/Aleph-Minecraft-Client-Launcher";
 use std::path::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -1121,13 +1124,56 @@ impl HomePage {
             egui::FontId::proportional(11.5),
             TEXT_HEADING.into(),
         );
-        ui.painter().text(
-            egui::pos2(news.right() - 16.0, news.top() + 18.0),
-            egui::Align2::RIGHT_CENTER,
-            lang.shell_more_news(),
+        let show_all = ui.painter().layout_no_wrap(
+            lang.shell_more_news().to_owned(),
             egui::FontId::proportional(9.5),
-            crate::theme::ACCENT_LIGHT.into(),
+            Color32::PLACEHOLDER,
         );
+        let show_all_rect = egui::Rect::from_center_size(
+            egui::pos2(
+                news.right() - 16.0 - show_all.size().x / 2.0,
+                news.top() + 18.0,
+            ),
+            show_all.size() + vec2(10.0, 12.0),
+        );
+        let show_all_resp = ui.interact(
+            show_all_rect,
+            ui.id().with("labymod_news_all"),
+            Sense::click(),
+        );
+        let show_all_hover = ui
+            .ctx()
+            .animate_bool_responsive(show_all_resp.id, show_all_resp.hovered());
+        ui.painter().galley(
+            egui::pos2(
+                news.right() - 16.0 - show_all.size().x,
+                news.top() + 18.0 - show_all.size().y / 2.0,
+            ),
+            show_all,
+            crate::theme::lerp_color(crate::theme::ACCENT_LIGHT, Color32::WHITE, show_all_hover),
+        );
+        if show_all_resp.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+        if show_all_resp.clicked() {
+            let _ = open::that(PROJECT_URL);
+        }
+
+        let news_click = egui::Rect::from_min_max(
+            egui::pos2(news.left() + 10.0, news.top() + 34.0),
+            egui::pos2(news.right() - 10.0, news.bottom() - 6.0),
+        );
+        let news_resp = ui.interact(
+            news_click,
+            ui.id().with("labymod_news_open"),
+            Sense::click(),
+        );
+        if news_resp.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+        if news_resp.clicked() {
+            let _ = open::that(PROJECT_URL);
+        }
         let thumb = egui::Rect::from_min_max(
             egui::pos2(news.left() + 14.0, news.top() + 38.0),
             egui::pos2(news.right() - 14.0, news.bottom() - 52.0),
