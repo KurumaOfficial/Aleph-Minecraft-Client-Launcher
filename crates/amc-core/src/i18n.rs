@@ -3249,6 +3249,14 @@ impl Language {
         }
     }
 
+    pub fn labymod_settings_subtitle(&self) -> &'static str {
+        match self {
+            Self::English => "Launcher, Java and account preferences",
+            Self::Russian => "Параметры лаунчера, Java и аккаунтов",
+            Self::Ukrainian => "Параметри лаунчера, Java та акаунтів",
+        }
+    }
+
     pub fn labymod_mods_subtitle(&self) -> &'static str {
         match self {
             Self::English => "Manage local mods and search the catalog",
@@ -5650,6 +5658,7 @@ mod tests {
             assert!(!lang.labymod_default().is_empty());
             assert!(!lang.labymod_quick_play().is_empty());
             assert!(!lang.labymod_no_servers().is_empty());
+            assert!(!lang.labymod_settings_subtitle().is_empty());
             assert!(!lang.labymod_mods_subtitle().is_empty());
             assert!(!lang.labymod_profile_subtitle().is_empty());
             assert!(!lang.labymod_skins_subtitle().is_empty());

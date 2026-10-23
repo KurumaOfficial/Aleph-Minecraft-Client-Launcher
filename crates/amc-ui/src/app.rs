@@ -4819,6 +4819,8 @@ impl App for LauncherApp {
                             SettingsSkin::Millida
                         } else if shell == amc_core::config::ShellKind::Multimc {
                             SettingsSkin::Multimc
+                        } else if shell == amc_core::config::ShellKind::Labymod {
+                            SettingsSkin::Labymod
                         } else {
                             SettingsSkin::Amc
                         };

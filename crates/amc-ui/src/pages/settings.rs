@@ -1,8 +1,9 @@
 use crate::theme;
 use crate::theme::{
-    lerp_color, with_alpha, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, MODRINTH_BG, MODRINTH_GREEN,
-    MODRINTH_SURFACE, MODRINTH_SURFACE_HIGH, MODRINTH_SURFACE_HOVER, MODRINTH_TEXT_CONTRAST,
-    MODRINTH_TEXT_SECONDARY, RUBY, RUBY_LIGHT, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
+    lerp_color, with_alpha, BG_CARD, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, MODRINTH_BG,
+    MODRINTH_GREEN, MODRINTH_SURFACE, MODRINTH_SURFACE_HIGH, MODRINTH_SURFACE_HOVER,
+    MODRINTH_TEXT_CONTRAST, MODRINTH_TEXT_SECONDARY, RUBY, RUBY_LIGHT, TEXT_HEADING, TEXT_MUTED,
+    TEXT_PRIMARY,
 };
 use crate::widgets::choice_chip;
 use crate::widgets::icons::{icon_button, Icon};
@@ -26,6 +27,7 @@ pub enum SettingsSkin {
     Modrinth,
     Millida,
     Multimc,
+    Labymod,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -149,6 +151,15 @@ impl SettingsPage {
                 server_running,
                 server_status,
             );
+        } else if skin == SettingsSkin::Labymod {
+            self.show_labymod(
+                ui,
+                config,
+                account_mgr,
+                paths,
+                server_running,
+                server_status,
+            );
         } else {
             self.show_amc(
                 ui,
@@ -191,6 +202,40 @@ impl SettingsPage {
 
         ui.add_space(16.0);
 
+        ScrollArea::vertical()
+            .auto_shrink([false, false])
+            .show(ui, |ui| match self.sub_tab {
+                SettingsSubTab::General => {
+                    self.show_general(ui, config, paths, server_running, server_status)
+                }
+                SettingsSubTab::Java => self.show_java(ui, config, paths),
+                SettingsSubTab::Accounts => self.show_accounts(ui, account_mgr, config, lang),
+            });
+    }
+
+    /// LabyMod settings: hero header, blue section pills and the shared
+    /// group-box forms on the dark palette.
+    fn show_labymod(
+        &mut self,
+        ui: &mut Ui,
+        config: &mut LauncherConfig,
+        account_mgr: &mut AccountManager,
+        paths: &LauncherPaths,
+        server_running: bool,
+        server_status: &Option<String>,
+    ) {
+        let lang = config.ui.language();
+        ui.add_space(12.0);
+        labymod_settings_header(ui, lang);
+        ui.add_space(12.0);
+
+        ui.horizontal(|ui| {
+            self.subtab_btn(ui, lang.settings_tab_general(), SettingsSubTab::General);
+            self.subtab_btn(ui, lang.settings_tab_java(), SettingsSubTab::Java);
+            self.subtab_btn(ui, lang.settings_tab_accounts(), SettingsSubTab::Accounts);
+        });
+
+        ui.add_space(16.0);
         ScrollArea::vertical()
             .auto_shrink([false, false])
             .show(ui, |ui| match self.sub_tab {
@@ -617,7 +662,15 @@ impl SettingsPage {
                         if choice_chip(ui, name, 170.0, 36.0, 12.5, config.app_mode == mode) {
                             config.app_mode = mode;
                         }
-                        ui.label(egui::RichText::new(desc).color(TEXT_MUTED));
+                        if self.skin == SettingsSkin::Labymod {
+                            ui.label(
+                                egui::RichText::new(desc)
+                                    .font(egui::FontId::proportional(12.0))
+                                    .color(TEXT_MUTED),
+                            );
+                        } else {
+                            ui.label(egui::RichText::new(desc).color(TEXT_MUTED));
+                        }
                     });
                 }
                 ui.add_space(6.0);
@@ -1935,6 +1988,38 @@ fn apply_millida_settings_style(ui: &mut Ui) {
     visuals.faint_bg_color = Color32::from(theme::BG_CARD);
     visuals.window_fill = Color32::from(theme::BG_CARD);
     visuals.panel_fill = Color32::from(theme::BG);
+}
+
+fn labymod_settings_header(ui: &mut Ui, lang: Language) {
+    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 96.0), Sense::hover());
+    let painter = ui.painter();
+    painter.rect_filled(rect, Rounding::same(16.0), BG_CARD);
+    painter.rect_stroke(
+        rect,
+        Rounding::same(16.0),
+        Stroke::new(1.0_f32, BORDER_DEFAULT),
+    );
+    painter.text(
+        pos2(rect.left() + 20.0, rect.top() + 22.0),
+        egui::Align2::LEFT_CENTER,
+        lang.nav_settings().to_uppercase(),
+        FontId::proportional(10.5),
+        theme::ACCENT_LIGHT.into(),
+    );
+    painter.text(
+        pos2(rect.left() + 20.0, rect.top() + 47.0),
+        egui::Align2::LEFT_CENTER,
+        lang.settings_title(),
+        FontId::new(27.0, FontFamily::Name("bold".into())),
+        TEXT_HEADING.into(),
+    );
+    painter.text(
+        pos2(rect.left() + 20.0, rect.top() + 74.0),
+        egui::Align2::LEFT_CENTER,
+        lang.labymod_settings_subtitle(),
+        FontId::proportional(11.5),
+        TEXT_MUTED.into(),
+    );
 }
 
 /// Scoped visuals for the Modrinth settings form. Existing controls keep
