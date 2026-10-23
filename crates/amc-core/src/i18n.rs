@@ -3249,6 +3249,14 @@ impl Language {
         }
     }
 
+    pub fn labymod_mods_subtitle(&self) -> &'static str {
+        match self {
+            Self::English => "Manage local mods and search the catalog",
+            Self::Russian => "Управляйте локальными модами и ищите в каталоге",
+            Self::Ukrainian => "Керуйте локальними модами та шукайте в каталозі",
+        }
+    }
+
     pub fn labymod_profile_subtitle(&self) -> &'static str {
         match self {
             Self::English => "Your account, skin and player data",
@@ -5642,6 +5650,7 @@ mod tests {
             assert!(!lang.labymod_default().is_empty());
             assert!(!lang.labymod_quick_play().is_empty());
             assert!(!lang.labymod_no_servers().is_empty());
+            assert!(!lang.labymod_mods_subtitle().is_empty());
             assert!(!lang.labymod_profile_subtitle().is_empty());
             assert!(!lang.labymod_skins_subtitle().is_empty());
             assert!(!lang.labymod_instances_title().is_empty());

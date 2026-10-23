@@ -4626,6 +4626,8 @@ impl App for LauncherApp {
                             ModsSkin::Millida
                         } else if shell == amc_core::config::ShellKind::Multimc {
                             ModsSkin::Multimc
+                        } else if shell == amc_core::config::ShellKind::Labymod {
+                            ModsSkin::Labymod
                         } else {
                             ModsSkin::Amc
                         };

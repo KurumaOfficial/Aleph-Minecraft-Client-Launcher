@@ -26,6 +26,7 @@ pub enum ModsSkin {
     Modrinth,
     Millida,
     Multimc,
+    Labymod,
 }
 
 /// Outcome of one update check (CONCEPT P4): the fresh local scan
@@ -210,6 +211,8 @@ impl ModsPage {
     {
         ui.add_space(if skin == ModsSkin::Millida {
             14.0
+        } else if skin == ModsSkin::Labymod {
+            12.0
         } else {
             20.0
         });
@@ -217,70 +220,75 @@ impl ModsPage {
         // Header
         let millida = skin == ModsSkin::Millida;
         let multimc = skin == ModsSkin::Multimc;
-        let title_size = if skin == ModsSkin::Modrinth {
-            24.0
-        } else if millida {
-            28.0
-        } else if multimc {
-            16.0
+        if skin == ModsSkin::Labymod {
+            labymod_mods_header(ui, lang);
         } else {
-            26.0
-        };
-        let title = if skin == ModsSkin::Modrinth {
-            lang.nav_mods()
-        } else if millida {
-            lang.millida_mods_title()
-        } else {
-            lang.mods_title()
-        };
-        let title_font = if millida {
-            crate::theme::display(title_size)
-        } else {
-            egui::FontId::proportional(title_size)
-        };
-        ui.label(
-            egui::RichText::new(title)
-                .font(title_font)
-                .strong()
-                .color(TEXT_HEADING),
-        );
-        if multimc {
-            let (line, _) = ui.allocate_exact_size(vec2(ui.available_width(), 1.0), Sense::hover());
-            ui.painter()
-                .rect_filled(line, egui::Rounding::ZERO, BORDER_DEFAULT);
-        }
-        if skin == ModsSkin::Modrinth {
-            if let Some(meta) = instance_meta {
-                ui.add_space(4.0);
-                ui.label(
-                    egui::RichText::new(meta)
-                        .font(egui::FontId::proportional(12.0))
-                        .color(crate::theme::MODRINTH_TEXT_SECONDARY),
-                );
-            }
-        } else if millida {
-            let count = match self.sub_tab {
-                ModsSubTab::Local => self.local_mods.len(),
-                ModsSubTab::Search => self.search_results.len(),
+            let title_size = if skin == ModsSkin::Modrinth {
+                24.0
+            } else if millida {
+                28.0
+            } else if multimc {
+                16.0
+            } else {
+                26.0
             };
-            ui.add_space(5.0);
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 8.0;
-                let (mark, _) = ui.allocate_exact_size(vec2(10.0, 10.0), Sense::hover());
-                ui.painter().rect_filled(mark, egui::Rounding::ZERO, RUBY);
-                ui.label(
-                    egui::RichText::new(lang.millida_mods_count(count))
-                        .font(egui::FontId::proportional(12.5))
-                        .color(TEXT_MUTED),
-                );
+            let title = if skin == ModsSkin::Modrinth {
+                lang.nav_mods()
+            } else if millida {
+                lang.millida_mods_title()
+            } else {
+                lang.mods_title()
+            };
+            let title_font = if millida {
+                crate::theme::display(title_size)
+            } else {
+                egui::FontId::proportional(title_size)
+            };
+            ui.label(
+                egui::RichText::new(title)
+                    .font(title_font)
+                    .strong()
+                    .color(TEXT_HEADING),
+            );
+            if multimc {
+                let (line, _) =
+                    ui.allocate_exact_size(vec2(ui.available_width(), 1.0), Sense::hover());
+                ui.painter()
+                    .rect_filled(line, egui::Rounding::ZERO, BORDER_DEFAULT);
+            }
+            if skin == ModsSkin::Modrinth {
                 if let Some(meta) = instance_meta {
+                    ui.add_space(4.0);
                     ui.label(
                         egui::RichText::new(meta)
                             .font(egui::FontId::proportional(12.0))
-                            .color(TEXT_MUTED),
+                            .color(crate::theme::MODRINTH_TEXT_SECONDARY),
                     );
                 }
-            });
+            } else if millida {
+                let count = match self.sub_tab {
+                    ModsSubTab::Local => self.local_mods.len(),
+                    ModsSubTab::Search => self.search_results.len(),
+                };
+                ui.add_space(5.0);
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = 8.0;
+                    let (mark, _) = ui.allocate_exact_size(vec2(10.0, 10.0), Sense::hover());
+                    ui.painter().rect_filled(mark, egui::Rounding::ZERO, RUBY);
+                    ui.label(
+                        egui::RichText::new(lang.millida_mods_count(count))
+                            .font(egui::FontId::proportional(12.5))
+                            .color(TEXT_MUTED),
+                    );
+                    if let Some(meta) = instance_meta {
+                        ui.label(
+                            egui::RichText::new(meta)
+                                .font(egui::FontId::proportional(12.0))
+                                .color(TEXT_MUTED),
+                        );
+                    }
+                });
+            }
         }
 
         ui.add_space(if millida { 12.0 } else { 14.0 });
@@ -778,6 +786,93 @@ impl ModsPage {
         }
     }
 
+    fn show_labymod_empty(&mut self, ui: &mut Ui, lang: Language) {
+        ui.add_space(22.0);
+        let width = ui.available_width();
+        let (card, _) = ui.allocate_exact_size(vec2(width, 232.0), Sense::hover());
+        ui.painter()
+            .rect_filled(card, egui::Rounding::same(16.0), BG_CARD);
+        ui.painter().rect_stroke(
+            card,
+            egui::Rounding::same(16.0),
+            Stroke::new(1.0_f32, BORDER_DEFAULT),
+        );
+        let icon = egui::Rect::from_center_size(
+            pos2(card.center().x, card.top() + 58.0),
+            vec2(64.0, 64.0),
+        );
+        ui.painter().rect_filled(
+            icon,
+            egui::Rounding::same(16.0),
+            theme::with_alpha(theme::ACCENT, 38),
+        );
+        ui.painter().rect_stroke(
+            icon,
+            egui::Rounding::same(16.0),
+            Stroke::new(1.0_f32, theme::with_alpha(theme::ACCENT, 130)),
+        );
+        icons::draw_centered(
+            ui.painter(),
+            Icon::Puzzle,
+            icon.center(),
+            28.0,
+            theme::ACCENT_LIGHT,
+        );
+        let title = ui.painter().layout_no_wrap(
+            lang.mods_empty_title().to_owned(),
+            egui::FontId::new(18.0, egui::FontFamily::Name("bold".into())),
+            TEXT_HEADING.into(),
+        );
+        ui.painter().galley(
+            pos2(card.center().x - title.size().x / 2.0, card.top() + 104.0),
+            title,
+            TEXT_HEADING.into(),
+        );
+        let hint = ui.painter().layout(
+            lang.mods_empty_hint().to_owned(),
+            egui::FontId::proportional(12.5),
+            TEXT_MUTED.into(),
+            (width - 56.0).max(120.0),
+        );
+        ui.painter().galley(
+            pos2(card.center().x - hint.size().x / 2.0, card.top() + 132.0),
+            hint,
+            TEXT_MUTED.into(),
+        );
+
+        let action = egui::Rect::from_center_size(
+            pos2(card.center().x, card.bottom() - 38.0),
+            vec2(180.0, 36.0),
+        );
+        let resp = ui
+            .interact(action, ui.id().with("laby_browse_mods"), Sense::click())
+            .on_hover_text(lang.mods_browse_action());
+        let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+        ui.painter().rect_filled(
+            action,
+            egui::Rounding::same(10.0),
+            theme::lerp_color(theme::ACCENT, theme::ACCENT_LIGHT, hover),
+        );
+        ui.painter().rect_stroke(
+            action,
+            egui::Rounding::same(10.0),
+            Stroke::new(1.0_f32, theme::ACCENT_LIGHT),
+        );
+        ui.painter().text(
+            action.center(),
+            egui::Align2::CENTER_CENTER,
+            lang.mods_browse_action(),
+            egui::FontId::new(12.0, egui::FontFamily::Name("bold".into())),
+            Color32::WHITE,
+        );
+        if resp.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+        if resp.clicked() {
+            self.sub_tab = ModsSubTab::Search;
+        }
+    }
+
     fn show_local_mods(
         &mut self,
         ui: &mut Ui,
@@ -788,6 +883,10 @@ impl ModsPage {
         if self.local_mods.is_empty() {
             if skin == ModsSkin::Millida {
                 self.show_millida_empty(ui, lang);
+                return;
+            }
+            if skin == ModsSkin::Labymod {
+                self.show_labymod_empty(ui, lang);
                 return;
             }
             if skin == ModsSkin::Modrinth {
@@ -1728,6 +1827,38 @@ fn millida_pixel_plate(
 ) {
     millida_pixel_rect(painter, rect, cut, outline);
     millida_pixel_rect(painter, rect.shrink(1.0), cut, fill);
+}
+
+fn labymod_mods_header(ui: &mut Ui, lang: Language) {
+    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 96.0), Sense::hover());
+    let painter = ui.painter();
+    painter.rect_filled(rect, egui::Rounding::same(16.0), BG_CARD);
+    painter.rect_stroke(
+        rect,
+        egui::Rounding::same(16.0),
+        Stroke::new(1.0_f32, BORDER_DEFAULT),
+    );
+    painter.text(
+        pos2(rect.left() + 20.0, rect.top() + 22.0),
+        egui::Align2::LEFT_CENTER,
+        lang.nav_mods().to_uppercase(),
+        egui::FontId::proportional(10.5),
+        crate::theme::ACCENT_LIGHT.into(),
+    );
+    painter.text(
+        pos2(rect.left() + 20.0, rect.top() + 47.0),
+        egui::Align2::LEFT_CENTER,
+        lang.mods_title(),
+        egui::FontId::new(27.0, egui::FontFamily::Name("bold".into())),
+        TEXT_HEADING.into(),
+    );
+    painter.text(
+        pos2(rect.left() + 20.0, rect.top() + 74.0),
+        egui::Align2::LEFT_CENTER,
+        lang.labymod_mods_subtitle(),
+        egui::FontId::proportional(11.5),
+        TEXT_MUTED.into(),
+    );
 }
 
 #[cfg(test)]
