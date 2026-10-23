@@ -6,7 +6,7 @@ use crate::theme::{
 use crate::widgets::icons::{self, Icon};
 use amc_auth::Account;
 use amc_core::skins::SkinLibrary;
-use egui::{pos2, vec2, Color32, Rect, Sense, Stroke, TextureOptions, Ui};
+use egui::{pos2, vec2, Color32, Rect, ScrollArea, Sense, Stroke, TextureOptions, Ui};
 use image::RgbaImage;
 use std::collections::HashMap;
 use std::io::Cursor;
@@ -21,6 +21,7 @@ pub enum SkinsSkin {
     Amc,
     Modrinth,
     Millida,
+    Labymod,
 }
 
 pub struct SkinsPage {
@@ -72,6 +73,11 @@ impl SkinsPage {
         if skin == SkinsSkin::Millida {
             self.ensure_saved_library(root_dir);
             self.show_millida(ui, account, lang);
+            return;
+        }
+        if skin == SkinsSkin::Labymod {
+            self.ensure_saved_library(root_dir);
+            self.show_labymod(ui, account, lang);
             return;
         }
         ui.add_space(20.0);
@@ -884,6 +890,488 @@ impl SkinsPage {
 
     /// Modrinth reference composition: a sticky preview column and a skin
     /// library rail with the active skin, default heads and an add tile.
+    /// LabyMod skin selector: a large 3D preview on the left and the active
+    /// skin / defaults / saved library on the right.
+    fn show_labymod(&mut self, ui: &mut Ui, account: Option<&Account>, lang: amc_core::Language) {
+        self.ensure_preview_texture(ui.ctx());
+        ui.add_space(12.0);
+        labymod_skins_header(ui, lang);
+        ui.add_space(12.0);
+
+        let available = ui.available_width();
+        let gap = 14.0;
+        let left = (available * 0.44).clamp(300.0, 420.0);
+        let right = (available - left - gap).max(240.0);
+        let panel_h = (ui.available_height() - 4.0).max(420.0);
+        ui.horizontal_top(|ui| {
+            ui.allocate_ui_with_layout(
+                vec2(left, panel_h),
+                egui::Layout::top_down(egui::Align::Min),
+                |ui| self.show_labymod_preview(ui, account, lang, left, panel_h),
+            );
+            ui.add_space(gap);
+            ui.allocate_ui_with_layout(
+                vec2(right, panel_h),
+                egui::Layout::top_down(egui::Align::Min),
+                |ui| {
+                    ScrollArea::vertical()
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| self.show_labymod_list(ui, lang, right));
+                },
+            );
+        });
+    }
+
+    fn show_labymod_preview(
+        &mut self,
+        ui: &mut Ui,
+        account: Option<&Account>,
+        lang: amc_core::Language,
+        width: f32,
+        panel_h: f32,
+    ) {
+        let preview_h = (panel_h - 140.0).max(240.0);
+        let (rect, _) = ui.allocate_exact_size(vec2(width, preview_h), Sense::hover());
+        ui.painter()
+            .rect_filled(rect, egui::Rounding::same(18.0), BG_CARD);
+        ui.painter().rect_stroke(
+            rect,
+            egui::Rounding::same(18.0),
+            Stroke::new(1.0_f32, BORDER_STRONG),
+        );
+        let glow = ui.painter().with_clip_rect(rect);
+        glow.circle_filled(
+            egui::pos2(rect.center().x, rect.center().y + 8.0),
+            preview_h * 0.32,
+            theme::with_alpha(theme::ACCENT, 18),
+        );
+
+        let viewer = egui::Rect::from_min_max(
+            egui::pos2(rect.left() + 12.0, rect.top() + 28.0),
+            egui::pos2(rect.right() - 12.0, rect.bottom() - 46.0),
+        );
+        self.skin3d
+            .show(ui, viewer, self.skin_image.as_ref(), self.is_slim_model);
+
+        let model = if self.is_slim_model {
+            lang.skins_model_slim()
+        } else {
+            lang.skins_model_classic()
+        };
+        let chip = egui::Rect::from_min_size(
+            egui::pos2(rect.left() + 14.0, rect.top() + 14.0),
+            vec2(102.0, 24.0),
+        );
+        ui.painter().rect_filled(
+            chip,
+            egui::Rounding::same(12.0),
+            theme::with_alpha(theme::BG, 190),
+        );
+        ui.painter().text(
+            chip.center(),
+            egui::Align2::CENTER_CENTER,
+            model,
+            egui::FontId::proportional(10.5),
+            theme::TEXT_PRIMARY.into(),
+        );
+        ui.painter().text(
+            egui::pos2(rect.center().x, rect.bottom() - 16.0),
+            egui::Align2::CENTER_CENTER,
+            truncate_skin_name(&self.active_skin_name, 28),
+            egui::FontId::proportional(11.5),
+            theme::TEXT_MUTED.into(),
+        );
+
+        ui.add_space(8.0);
+        if let Some(new_slim) = labymod_model_switch(ui, self.is_slim_model, lang, width) {
+            self.is_slim_model = new_slim;
+            self.dirty = true;
+            self.avatar_dirty = true;
+        }
+
+        ui.add_space(8.0);
+        let button_w = ((width - 8.0) / 2.0).max(110.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing = vec2(8.0, 0.0);
+            if labymod_skin_button(ui, Icon::Folder, lang.skins_load_skin(), true, button_w) {
+                self.load_skin_dialog(lang);
+            }
+            let reset = if self.is_slim_model {
+                lang.skins_btn_reset_alex()
+            } else {
+                lang.skins_btn_reset_steve()
+            };
+            if labymod_skin_button(ui, Icon::Refresh, reset, false, button_w) {
+                self.skin_image = None;
+                self.custom_skin_path = None;
+                self.active_skin_name = if self.is_slim_model {
+                    "Alex".to_string()
+                } else {
+                    "Steve".to_string()
+                };
+                self.dirty = true;
+                self.avatar_dirty = true;
+            }
+        });
+
+        ui.add_space(8.0);
+        let status = match account {
+            Some(acc) => format!(
+                "{}: {} ({})",
+                lang.skins_account_label(),
+                acc.username,
+                acc.account_type.as_str()
+            ),
+            None => lang.skins_demo_notice().to_string(),
+        };
+        ui.label(
+            egui::RichText::new(status)
+                .font(egui::FontId::proportional(11.0))
+                .color(theme::TEXT_MUTED),
+        );
+    }
+
+    fn show_labymod_list(&mut self, ui: &mut Ui, lang: amc_core::Language, width: f32) {
+        ui.horizontal(|ui| {
+            ui.label(
+                egui::RichText::new(lang.nav_skins())
+                    .font(egui::FontId::new(
+                        17.0,
+                        egui::FontFamily::Name("bold".into()),
+                    ))
+                    .color(TEXT_HEADING),
+            );
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if labymod_skin_button(
+                    ui,
+                    Icon::Plus,
+                    lang.skins_add(),
+                    true,
+                    (width * 0.42).clamp(108.0, 154.0),
+                ) {
+                    self.load_skin_dialog(lang);
+                }
+            });
+        });
+        ui.add_space(10.0);
+
+        let (card, _) = ui.allocate_exact_size(vec2(width, 72.0), Sense::hover());
+        ui.painter()
+            .rect_filled(card, egui::Rounding::same(14.0), BG_CARD);
+        ui.painter().rect_stroke(
+            card,
+            egui::Rounding::same(14.0),
+            Stroke::new(1.0_f32, theme::with_alpha(theme::ACCENT, 110)),
+        );
+        let head = egui::Rect::from_min_size(
+            egui::pos2(card.left() + 12.0, card.top() + 12.0),
+            vec2(48.0, 48.0),
+        );
+        ui.painter().rect_filled(
+            head,
+            egui::Rounding::same(10.0),
+            theme::with_alpha(theme::ACCENT, 40),
+        );
+        if let Some(tex) = &self.texture_handle {
+            ui.painter().image(
+                tex.id(),
+                head.shrink(4.0),
+                egui::Rect::from_min_max(pos2(0.25, 0.0), pos2(0.75, 0.25)),
+                Color32::WHITE,
+            );
+        }
+        ui.painter().text(
+            egui::pos2(card.left() + 72.0, card.center().y - 9.0),
+            egui::Align2::LEFT_CENTER,
+            truncate_skin_name(&self.active_skin_name, 28),
+            egui::FontId::proportional(13.5),
+            TEXT_HEADING.into(),
+        );
+        ui.painter().text(
+            egui::pos2(card.left() + 72.0, card.center().y + 11.0),
+            egui::Align2::LEFT_CENTER,
+            if self.is_slim_model {
+                lang.skins_model_slim()
+            } else {
+                lang.skins_model_classic()
+            },
+            egui::FontId::proportional(11.0),
+            TEXT_MUTED.into(),
+        );
+        let badge = egui::Rect::from_min_size(
+            egui::pos2(card.right() - 78.0, card.center().y - 12.0),
+            vec2(66.0, 24.0),
+        );
+        ui.painter().rect_filled(
+            badge,
+            egui::Rounding::same(12.0),
+            theme::with_alpha(theme::ACCENT, 40),
+        );
+        ui.painter().text(
+            badge.center(),
+            egui::Align2::CENTER_CENTER,
+            lang.skins_active_badge(),
+            egui::FontId::proportional(10.5),
+            theme::ACCENT_LIGHT.into(),
+        );
+
+        ui.add_space(16.0);
+        ui.label(
+            egui::RichText::new(lang.skins_defaults())
+                .font(egui::FontId::proportional(12.5))
+                .strong()
+                .color(TEXT_MUTED),
+        );
+        ui.add_space(8.0);
+        let gap = 8.0;
+        let tile_w = ((width - gap) / 2.0).max(90.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing = vec2(gap, 0.0);
+            for (slim, label, tex) in [
+                (false, "Steve", default_head_texture(ui.ctx(), false)),
+                (true, "Alex", default_head_texture(ui.ctx(), true)),
+            ] {
+                let (tile, resp) = ui.allocate_exact_size(vec2(tile_w, 92.0), Sense::click());
+                let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+                let active = self.skin_image.is_none() && self.is_slim_model == slim;
+                ui.painter().rect_filled(
+                    tile,
+                    egui::Rounding::same(12.0),
+                    theme::lerp_color(BG_CARD, theme::CARD_HOVER, hover),
+                );
+                ui.painter().rect_stroke(
+                    tile,
+                    egui::Rounding::same(12.0),
+                    Stroke::new(
+                        1.0_f32,
+                        if active {
+                            theme::ACCENT
+                        } else {
+                            theme::BORDER_STRONG
+                        },
+                    ),
+                );
+                let head = egui::Rect::from_center_size(
+                    egui::pos2(tile.center().x, tile.top() + 34.0),
+                    vec2(44.0, 44.0),
+                );
+                ui.painter().image(
+                    tex.id(),
+                    head,
+                    egui::Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                    Color32::WHITE,
+                );
+                ui.painter().text(
+                    egui::pos2(tile.center().x, tile.bottom() - 17.0),
+                    egui::Align2::CENTER_CENTER,
+                    label,
+                    egui::FontId::proportional(11.5),
+                    TEXT_PRIMARY.into(),
+                );
+                if resp.hovered() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
+                if resp.clicked() {
+                    self.is_slim_model = slim;
+                    self.skin_image = None;
+                    self.custom_skin_path = None;
+                    self.active_skin_name = label.to_string();
+                    self.dirty = true;
+                    self.avatar_dirty = true;
+                }
+            }
+        });
+
+        ui.add_space(16.0);
+        ui.label(
+            egui::RichText::new(lang.skins_saved_title())
+                .font(egui::FontId::proportional(12.5))
+                .strong()
+                .color(TEXT_MUTED),
+        );
+        ui.add_space(8.0);
+        self.show_labymod_saved(ui, lang, width);
+    }
+
+    fn show_labymod_saved(&mut self, ui: &mut Ui, lang: amc_core::Language, width: f32) {
+        if self.saved_skins.is_empty() {
+            let (empty, resp) = ui.allocate_exact_size(vec2(width, 62.0), Sense::click());
+            let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+            ui.painter().rect_filled(
+                empty,
+                egui::Rounding::same(12.0),
+                theme::lerp_color(Color32::TRANSPARENT, BG_CARD, hover),
+            );
+            ui.painter().rect_stroke(
+                empty,
+                egui::Rounding::same(12.0),
+                Stroke::new(1.0_f32, BORDER_STRONG),
+            );
+            icons::draw(
+                ui.painter(),
+                Icon::Plus,
+                egui::Rect::from_center_size(
+                    egui::pos2(empty.left() + 24.0, empty.center().y),
+                    vec2(15.0, 15.0),
+                ),
+                theme::ACCENT_LIGHT,
+                1.5,
+            );
+            ui.painter().text(
+                egui::pos2(empty.left() + 42.0, empty.center().y),
+                egui::Align2::LEFT_CENTER,
+                lang.skins_no_saved(),
+                egui::FontId::proportional(12.0),
+                TEXT_MUTED.into(),
+            );
+            if resp.hovered() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+            }
+            if resp.clicked() {
+                self.load_skin_dialog(lang);
+            }
+        } else {
+            ui.label(
+                egui::RichText::new(lang.skins_saved_hint())
+                    .font(egui::FontId::proportional(11.0))
+                    .color(TEXT_MUTED),
+            );
+            ui.add_space(6.0);
+            let skins = self.saved_skins.skins().to_vec();
+            for skin in skins {
+                let path = self.saved_skins.path_of(&skin);
+                let current = self.custom_skin_path.as_deref() == Some(path.as_path());
+                let (row, resp) = ui.allocate_exact_size(vec2(width, 58.0), Sense::click());
+                let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+                ui.painter().rect_filled(
+                    row,
+                    egui::Rounding::same(12.0),
+                    theme::lerp_color(BG_CARD, theme::CARD_HOVER, hover),
+                );
+                ui.painter().rect_stroke(
+                    row,
+                    egui::Rounding::same(12.0),
+                    Stroke::new(
+                        1.0_f32,
+                        if current {
+                            theme::ACCENT
+                        } else {
+                            theme::BORDER_STRONG
+                        },
+                    ),
+                );
+                let key = skin.id.to_string();
+                if !self.saved_heads.contains_key(&key) {
+                    if let Ok(image) = image::open(&path) {
+                        let rgba = image.to_rgba8();
+                        let head = extract_head_avatar(Some(&rgba), skin.slim);
+                        let texture = ui.ctx().load_texture(
+                            format!("saved_skin_{key}"),
+                            head,
+                            TextureOptions::NEAREST,
+                        );
+                        self.saved_heads.insert(key.clone(), texture);
+                    }
+                }
+                let head = egui::Rect::from_min_size(
+                    egui::pos2(row.left() + 10.0, row.top() + 9.0),
+                    vec2(40.0, 40.0),
+                );
+                ui.painter().rect_filled(
+                    head,
+                    egui::Rounding::same(8.0),
+                    theme::with_alpha(theme::ACCENT, 32),
+                );
+                if let Some(texture) = self.saved_heads.get(&key) {
+                    ui.painter().image(
+                        texture.id(),
+                        head.shrink(3.0),
+                        egui::Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                        Color32::WHITE,
+                    );
+                }
+                ui.painter().text(
+                    egui::pos2(row.left() + 60.0, row.center().y - 8.0),
+                    egui::Align2::LEFT_CENTER,
+                    truncate_skin_name(&skin.name, 24),
+                    egui::FontId::proportional(12.5),
+                    TEXT_HEADING.into(),
+                );
+                ui.painter().text(
+                    egui::pos2(row.left() + 60.0, row.center().y + 9.0),
+                    egui::Align2::LEFT_CENTER,
+                    if skin.slim {
+                        lang.skins_model_slim()
+                    } else {
+                        lang.skins_model_classic()
+                    },
+                    egui::FontId::proportional(10.5),
+                    TEXT_MUTED.into(),
+                );
+                let remove = egui::Rect::from_min_size(
+                    egui::pos2(row.right() - 74.0, row.center().y - 11.0),
+                    vec2(64.0, 22.0),
+                );
+                let remove_resp = ui.interact(
+                    remove,
+                    ui.id().with(("saved_skin_remove", skin.id)),
+                    Sense::click(),
+                );
+                ui.painter().rect_filled(
+                    remove,
+                    egui::Rounding::same(8.0),
+                    if remove_resp.hovered() {
+                        theme::with_alpha(theme::DANGER, 24)
+                    } else {
+                        Color32::TRANSPARENT
+                    },
+                );
+                ui.painter().text(
+                    remove.center(),
+                    egui::Align2::CENTER_CENTER,
+                    lang.skins_remove_saved(),
+                    egui::FontId::proportional(10.5),
+                    theme::DANGER.into(),
+                );
+                if remove_resp.clicked() {
+                    if let Err(err) = self.saved_skins.remove(skin.id) {
+                        tracing::warn!("saved skin remove failed: {err}");
+                    }
+                    self.saved_heads.remove(&key);
+                    if current {
+                        self.custom_skin_path = None;
+                    }
+                } else if resp.clicked() {
+                    if let Ok(image) = image::open(&path) {
+                        self.skin_image = Some(image.to_rgba8());
+                        self.custom_skin_path = Some(path);
+                        self.active_skin_name = skin.name.clone();
+                        self.is_slim_model = skin.slim;
+                        self.dirty = true;
+                        self.avatar_dirty = true;
+                    }
+                }
+                if resp.hovered() && !remove_resp.hovered() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
+                ui.add_space(6.0);
+            }
+        }
+
+        if self.skin_image.is_some() {
+            ui.add_space(4.0);
+            if labymod_skin_button(
+                ui,
+                Icon::Check,
+                lang.skins_save_current(),
+                false,
+                width.max(120.0),
+            ) {
+                self.save_current_skin();
+            }
+        }
+    }
+
     fn show_modrinth(&mut self, ui: &mut Ui, account: Option<&Account>, lang: amc_core::Language) {
         self.ensure_preview_texture(ui.ctx());
 
@@ -1453,6 +1941,147 @@ fn default_head_texture(ctx: &egui::Context, slim: bool) -> egui::TextureHandle 
     );
     ctx.data_mut(|data| data.insert_temp(id, texture.clone()));
     texture
+}
+
+fn labymod_skins_header(ui: &mut Ui, lang: amc_core::Language) {
+    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 96.0), Sense::hover());
+    let painter = ui.painter();
+    painter.rect_filled(rect, egui::Rounding::same(16.0), BG_CARD);
+    painter.rect_stroke(
+        rect,
+        egui::Rounding::same(16.0),
+        Stroke::new(1.0_f32, BORDER_STRONG),
+    );
+    painter.text(
+        pos2(rect.left() + 20.0, rect.top() + 22.0),
+        egui::Align2::LEFT_CENTER,
+        lang.nav_skins().to_uppercase(),
+        egui::FontId::proportional(10.5),
+        theme::ACCENT_LIGHT.into(),
+    );
+    painter.text(
+        pos2(rect.left() + 20.0, rect.top() + 47.0),
+        egui::Align2::LEFT_CENTER,
+        lang.skins_title(),
+        egui::FontId::new(27.0, egui::FontFamily::Name("bold".into())),
+        TEXT_HEADING.into(),
+    );
+    painter.text(
+        pos2(rect.left() + 20.0, rect.top() + 74.0),
+        egui::Align2::LEFT_CENTER,
+        lang.labymod_skins_subtitle(),
+        egui::FontId::proportional(11.5),
+        TEXT_MUTED.into(),
+    );
+}
+
+fn labymod_model_switch(
+    ui: &mut Ui,
+    slim: bool,
+    lang: amc_core::Language,
+    width: f32,
+) -> Option<bool> {
+    let mut result = None;
+    let (tray, _) = ui.allocate_exact_size(vec2(width, 36.0), Sense::hover());
+    ui.painter()
+        .rect_filled(tray, egui::Rounding::same(18.0), theme::BG);
+    ui.painter().rect_stroke(
+        tray,
+        egui::Rounding::same(18.0),
+        Stroke::new(1.0_f32, BORDER_STRONG),
+    );
+    let segment_w = (tray.width() - 8.0) / 2.0;
+    for (idx, (label, active, value)) in [
+        (lang.skins_model_classic(), !slim, false),
+        (lang.skins_model_slim(), slim, true),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let rect = Rect::from_min_size(
+            pos2(tray.left() + 4.0 + idx as f32 * segment_w, tray.top() + 4.0),
+            vec2(segment_w, 28.0),
+        );
+        let resp = ui.interact(rect, ui.id().with(("laby_skin_model", idx)), Sense::click());
+        let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+        if active {
+            ui.painter()
+                .rect_filled(rect, egui::Rounding::same(14.0), theme::ACCENT);
+        } else if hover > 0.02 {
+            ui.painter().rect_filled(
+                rect,
+                egui::Rounding::same(14.0),
+                theme::with_alpha(theme::CARD_HOVER, (hover * 210.0) as u8),
+            );
+        }
+        ui.painter().text(
+            rect.center(),
+            egui::Align2::CENTER_CENTER,
+            label,
+            egui::FontId::proportional(11.0),
+            if active {
+                Color32::WHITE
+            } else {
+                TEXT_MUTED.into()
+            },
+        );
+        if resp.clicked() {
+            result = Some(value);
+        }
+    }
+    result
+}
+
+fn labymod_skin_button(ui: &mut Ui, icon: Icon, label: &str, primary: bool, width: f32) -> bool {
+    let (rect, resp) = ui.allocate_exact_size(vec2(width, 38.0), Sense::click());
+    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+    let fill = if primary {
+        theme::lerp_color(theme::ACCENT, theme::ACCENT_LIGHT, hover * 0.55)
+    } else {
+        theme::lerp_color(Color32::TRANSPARENT, theme::CARD_HOVER, hover)
+    };
+    ui.painter()
+        .rect_filled(rect, egui::Rounding::same(10.0), fill);
+    ui.painter().rect_stroke(
+        rect,
+        egui::Rounding::same(10.0),
+        Stroke::new(
+            1.0_f32,
+            if primary {
+                theme::ACCENT_LIGHT
+            } else {
+                BORDER_STRONG
+            },
+        ),
+    );
+    let text_color = if primary {
+        Color32::WHITE
+    } else {
+        TEXT_PRIMARY.into()
+    };
+    let galley = ui.painter().layout_no_wrap(
+        label.to_owned(),
+        egui::FontId::proportional(12.0),
+        text_color,
+    );
+    let content_w = 15.0 + 7.0 + galley.size().x;
+    let left = rect.center().x - content_w / 2.0;
+    icons::draw(
+        ui.painter(),
+        icon,
+        Rect::from_center_size(pos2(left + 7.5, rect.center().y), vec2(15.0, 15.0)),
+        text_color,
+        1.5,
+    );
+    ui.painter().galley(
+        pos2(left + 22.0, rect.center().y - galley.size().y / 2.0),
+        galley,
+        text_color,
+    );
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp.clicked()
 }
 
 fn modrinth_model_switch(

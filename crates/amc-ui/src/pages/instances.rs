@@ -73,17 +73,6 @@ fn labymod_instances_header(ui: &mut Ui, lang: Language) {
         Rounding::same(16.0),
         Stroke::new(1.0_f32, BORDER_DEFAULT),
     );
-    let glow = ui.painter().with_clip_rect(rect);
-    glow.circle_filled(
-        pos2(rect.right() - 92.0, rect.center().y),
-        86.0,
-        with_alpha(crate::theme::ACCENT, 12),
-    );
-    glow.circle_filled(
-        pos2(rect.right() - 92.0, rect.center().y),
-        48.0,
-        with_alpha(crate::theme::ACCENT, 10),
-    );
     painter.text(
         pos2(rect.left() + 20.0, rect.top() + 23.0),
         Align2::LEFT_CENTER,

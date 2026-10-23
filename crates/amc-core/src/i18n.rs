@@ -3249,6 +3249,14 @@ impl Language {
         }
     }
 
+    pub fn labymod_skins_subtitle(&self) -> &'static str {
+        match self {
+            Self::English => "Preview, load and save your Minecraft skins",
+            Self::Russian => "Просматривайте, загружайте и сохраняйте скины Minecraft",
+            Self::Ukrainian => "Переглядайте, завантажуйте та зберігайте скіни Minecraft",
+        }
+    }
+
     pub fn labymod_instances_title(&self) -> &'static str {
         match self {
             Self::English => "Instances",
@@ -5626,6 +5634,7 @@ mod tests {
             assert!(!lang.labymod_default().is_empty());
             assert!(!lang.labymod_quick_play().is_empty());
             assert!(!lang.labymod_no_servers().is_empty());
+            assert!(!lang.labymod_skins_subtitle().is_empty());
             assert!(!lang.labymod_instances_title().is_empty());
             assert!(!lang.labymod_instances_subtitle().is_empty());
             assert!(!lang.legacy_guest().is_empty());
