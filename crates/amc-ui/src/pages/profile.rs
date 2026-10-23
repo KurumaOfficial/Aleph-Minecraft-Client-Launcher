@@ -8,9 +8,9 @@ use image::RgbaImage;
 use std::time::{Duration, Instant};
 
 use crate::theme::{
-    self, lerp_color, with_alpha, BG_ELEVATED, BORDER_DEFAULT, MODRINTH_SURFACE,
-    MODRINTH_SURFACE_HIGH, MODRINTH_TEXT, MODRINTH_TEXT_CONTRAST, MODRINTH_TEXT_SECONDARY,
-    TEXT_HEADING, TEXT_MUTED,
+    self, lerp_color, with_alpha, BG_CARD, BG_ELEVATED, BORDER_DEFAULT, BORDER_STRONG,
+    MODRINTH_SURFACE, MODRINTH_SURFACE_HIGH, MODRINTH_TEXT, MODRINTH_TEXT_CONTRAST,
+    MODRINTH_TEXT_SECONDARY, TEXT_HEADING, TEXT_MUTED,
 };
 use crate::widgets::icons::{self, Icon};
 use crate::widgets::modrinth_ui::{self, ModrinthButtonKind};
@@ -24,6 +24,7 @@ pub enum ProfileSkin {
     Amc,
     Modrinth,
     Millida,
+    Labymod,
 }
 
 /// Player profile tab (CONCEPT "Профиль игрока", P7): nickname, skin and
@@ -81,6 +82,9 @@ impl ProfilePage {
         }
         if page_skin == ProfileSkin::Millida {
             return self.show_millida(ui, account, skin, slim, lang);
+        }
+        if page_skin == ProfileSkin::Labymod {
+            return self.show_labymod(ui, account, skin, slim, lang);
         }
 
         let mut action = ProfileAction::None;
@@ -498,6 +502,303 @@ impl ProfilePage {
         action
     }
 
+    /// LabyMod profile: hero header, contact card with avatar/actions and a
+    /// three-row details card (nickname, UUID, skin model).
+    fn show_labymod(
+        &mut self,
+        ui: &mut Ui,
+        account: Option<&Account>,
+        skin: Option<&RgbaImage>,
+        slim: bool,
+        lang: Language,
+    ) -> ProfileAction {
+        self.ensure_tex(ui.ctx(), skin, slim, false);
+        let mut action = ProfileAction::None;
+        let now = Instant::now();
+        let copied = self
+            .copied_at
+            .is_some_and(|at| now.duration_since(at) < Duration::from_millis(1500));
+        if self.copied_at.is_some() {
+            ui.ctx().request_repaint_after(Duration::from_millis(250));
+        }
+
+        ScrollArea::vertical()
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.add_space(12.0);
+                labymod_profile_header(ui, lang);
+                ui.add_space(12.0);
+
+                let width = ui.available_width();
+                let (card, _) = ui.allocate_exact_size(vec2(width, 158.0), Sense::hover());
+                ui.painter()
+                    .rect_filled(card, Rounding::same(16.0), BG_CARD);
+                ui.painter().rect_stroke(
+                    card,
+                    Rounding::same(16.0),
+                    Stroke::new(1.0_f32, BORDER_STRONG),
+                );
+
+                let avatar = Rect::from_min_size(
+                    pos2(card.left() + 22.0, card.top() + 26.0),
+                    vec2(94.0, 94.0),
+                );
+                ui.painter().rect_filled(
+                    avatar,
+                    Rounding::same(20.0),
+                    with_alpha(theme::ACCENT, 38),
+                );
+                if let Some(tex) = &self.tex {
+                    ui.painter().image(
+                        tex.id(),
+                        avatar.shrink(4.0),
+                        Rect::from_min_max(pos2(0.0, 0.0), pos2(1.0, 1.0)),
+                        Color32::WHITE,
+                    );
+                }
+                ui.painter().rect_stroke(
+                    avatar,
+                    Rounding::same(20.0),
+                    Stroke::new(1.0_f32, with_alpha(theme::ACCENT, 110)),
+                );
+
+                let name = account
+                    .map(|a| a.username.as_str())
+                    .unwrap_or_else(|| lang.modrinth_no_account());
+                let name_pos = pos2(avatar.right() + 20.0, card.top() + 42.0);
+                ui.painter().text(
+                    name_pos,
+                    egui::Align2::LEFT_CENTER,
+                    name,
+                    FontId::new(25.0, FontFamily::Name("bold".into())),
+                    TEXT_HEADING.into(),
+                );
+                if let Some(acc) = account {
+                    let name_w = ui
+                        .painter()
+                        .layout_no_wrap(
+                            name.to_owned(),
+                            FontId::new(25.0, FontFamily::Name("bold".into())),
+                            Color32::PLACEHOLDER,
+                        )
+                        .size()
+                        .x;
+                    labymod_account_pill(
+                        ui,
+                        pos2(name_pos.x + name_w + 12.0, card.top() + 28.0),
+                        account_type_label(acc, lang),
+                        acc.account_type != AccountType::Offline,
+                    );
+                }
+
+                let (status, dot) = account_status(account, lang);
+                let status_y = card.top() + 77.0;
+                ui.painter()
+                    .circle_filled(pos2(avatar.right() + 25.0, status_y), 3.5, dot);
+                ui.painter().text(
+                    pos2(avatar.right() + 35.0, status_y),
+                    egui::Align2::LEFT_CENTER,
+                    status,
+                    FontId::proportional(12.0),
+                    TEXT_MUTED.into(),
+                );
+
+                let primary_label;
+                let secondary_label;
+                let primary_icon;
+                let secondary_icon;
+                let mut primary_action;
+                let mut secondary_action;
+                let primary_w;
+                let secondary_w;
+                if account.is_some() {
+                    primary_label = lang.modrinth_profile_change_skin();
+                    secondary_label = lang.modrinth_profile_manage_account();
+                    primary_icon = Icon::Palette;
+                    secondary_icon = Icon::Gear;
+                    primary_action = ProfileAction::OpenSkins;
+                    secondary_action = ProfileAction::OpenAccounts;
+                    primary_w = 172.0;
+                    secondary_w = 196.0;
+                } else {
+                    primary_label = lang.bottom_btn_login();
+                    secondary_label = lang.modrinth_profile_change_skin();
+                    primary_icon = Icon::Person;
+                    secondary_icon = Icon::Palette;
+                    primary_action = ProfileAction::OpenLogin;
+                    secondary_action = ProfileAction::OpenSkins;
+                    primary_w = 150.0;
+                    secondary_w = 172.0;
+                }
+                let gap = 8.0;
+                let total = primary_w + gap + secondary_w;
+                let by = card.bottom() - 50.0;
+                let primary_rect = Rect::from_min_size(
+                    pos2(card.right() - 20.0 - total, by),
+                    vec2(primary_w, 36.0),
+                );
+                let secondary_rect = Rect::from_min_size(
+                    pos2(primary_rect.right() + gap, by),
+                    vec2(secondary_w, 36.0),
+                );
+                if labymod_profile_button(ui, primary_rect, primary_label, Some(primary_icon), true)
+                {
+                    action = std::mem::replace(&mut primary_action, ProfileAction::None);
+                }
+                if labymod_profile_button(
+                    ui,
+                    secondary_rect,
+                    secondary_label,
+                    Some(secondary_icon),
+                    false,
+                ) {
+                    action = std::mem::replace(&mut secondary_action, ProfileAction::None);
+                }
+
+                ui.add_space(16.0);
+                ui.label(
+                    egui::RichText::new(lang.modrinth_profile_details())
+                        .font(FontId::new(18.0, FontFamily::Name("bold".into())))
+                        .color(TEXT_HEADING),
+                );
+                ui.add_space(10.0);
+
+                let row_h = 58.0;
+                let (details, _) = ui.allocate_exact_size(vec2(width, row_h * 3.0), Sense::hover());
+                ui.painter()
+                    .rect_filled(details, Rounding::same(14.0), BG_CARD);
+                ui.painter().rect_stroke(
+                    details,
+                    Rounding::same(14.0),
+                    Stroke::new(1.0_f32, BORDER_STRONG),
+                );
+
+                let username = account.map(|a| a.username.as_str()).unwrap_or("—");
+                let username_row = Rect::from_min_size(details.min, vec2(width, row_h));
+                paint_labymod_detail_row(
+                    ui,
+                    username_row,
+                    Icon::Person,
+                    lang.profile_nickname(),
+                    username,
+                    false,
+                );
+                if let Some(acc) = account {
+                    labymod_account_pill(
+                        ui,
+                        pos2(username_row.left() + 330.0, username_row.center().y - 11.0),
+                        account_type_label(acc, lang),
+                        acc.account_type != AccountType::Offline,
+                    );
+                }
+
+                let uuid_row = username_row.translate(vec2(0.0, row_h));
+                paint_labymod_row_separator(ui, uuid_row);
+                let uuid = account
+                    .map(|a| a.uuid.as_str())
+                    .filter(|uuid| !uuid.trim().is_empty());
+                paint_labymod_detail_row(
+                    ui,
+                    uuid_row,
+                    Icon::Card,
+                    lang.modrinth_profile_player_uuid(),
+                    uuid.unwrap_or_else(|| lang.modrinth_profile_no_uuid()),
+                    true,
+                );
+                if let Some(uuid) = uuid {
+                    let copy_rect = Rect::from_center_size(
+                        pos2(uuid_row.right() - 30.0, uuid_row.center().y),
+                        vec2(34.0, 34.0),
+                    );
+                    let resp = ui
+                        .interact(
+                            copy_rect,
+                            ui.id().with("laby_profile_copy_uuid"),
+                            Sense::click(),
+                        )
+                        .on_hover_text(lang.modrinth_profile_copy_uuid());
+                    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+                    if hover > 0.01 {
+                        ui.painter().rect_filled(
+                            copy_rect,
+                            Rounding::same(8.0),
+                            with_alpha(theme::CARD_HOVER, (hover * 210.0) as u8),
+                        );
+                    }
+                    icons::draw(
+                        ui.painter(),
+                        if copied { Icon::Check } else { Icon::Clipboard },
+                        Rect::from_center_size(copy_rect.center(), vec2(16.0, 16.0)),
+                        if copied {
+                            theme::ACCENT.into()
+                        } else {
+                            lerp_color(TEXT_MUTED, TEXT_HEADING, hover)
+                        },
+                        1.4,
+                    );
+                    if copied {
+                        ui.painter().text(
+                            pos2(copy_rect.left() - 8.0, copy_rect.center().y),
+                            egui::Align2::RIGHT_CENTER,
+                            lang.modrinth_profile_copied(),
+                            FontId::proportional(11.0),
+                            theme::ACCENT.into(),
+                        );
+                    }
+                    if resp.clicked() {
+                        ui.ctx().copy_text(uuid.to_owned());
+                        self.copied_at = Some(Instant::now());
+                    }
+                    if resp.hovered() {
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                    }
+                }
+
+                let model_row = uuid_row.translate(vec2(0.0, row_h));
+                paint_labymod_row_separator(ui, model_row);
+                paint_labymod_detail_row(
+                    ui,
+                    model_row,
+                    Icon::Diamond,
+                    lang.modrinth_profile_skin_model(),
+                    if slim {
+                        lang.skins_model_slim()
+                    } else {
+                        lang.skins_model_classic()
+                    },
+                    false,
+                );
+                icons::draw(
+                    ui.painter(),
+                    Icon::ChevronRight,
+                    Rect::from_center_size(
+                        pos2(model_row.right() - 28.0, model_row.center().y),
+                        vec2(15.0, 15.0),
+                    ),
+                    TEXT_MUTED,
+                    1.4,
+                );
+                let model_resp = ui.interact(
+                    Rect::from_min_max(
+                        pos2(model_row.left(), model_row.top()),
+                        pos2(model_row.right() - 48.0, model_row.bottom()),
+                    ),
+                    ui.id().with("laby_profile_skin_row"),
+                    Sense::click(),
+                );
+                if model_resp.hovered() {
+                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                }
+                if model_resp.clicked() {
+                    action = ProfileAction::OpenSkins;
+                }
+
+                ui.add_space(16.0);
+            });
+
+        action
+    }
+
     fn show_modrinth(
         &mut self,
         ui: &mut Ui,
@@ -778,6 +1079,183 @@ impl ProfilePage {
 
         action
     }
+}
+
+fn labymod_profile_header(ui: &mut Ui, lang: Language) {
+    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 96.0), Sense::hover());
+    let painter = ui.painter();
+    painter.rect_filled(rect, Rounding::same(16.0), BG_CARD);
+    painter.rect_stroke(
+        rect,
+        Rounding::same(16.0),
+        Stroke::new(1.0_f32, BORDER_STRONG),
+    );
+    painter.text(
+        pos2(rect.left() + 20.0, rect.top() + 22.0),
+        egui::Align2::LEFT_CENTER,
+        lang.nav_profile().to_uppercase(),
+        FontId::proportional(10.5),
+        theme::ACCENT_LIGHT.into(),
+    );
+    painter.text(
+        pos2(rect.left() + 20.0, rect.top() + 47.0),
+        egui::Align2::LEFT_CENTER,
+        lang.profile_title(),
+        FontId::new(27.0, FontFamily::Name("bold".into())),
+        TEXT_HEADING.into(),
+    );
+    painter.text(
+        pos2(rect.left() + 20.0, rect.top() + 74.0),
+        egui::Align2::LEFT_CENTER,
+        lang.labymod_profile_subtitle(),
+        FontId::proportional(11.5),
+        TEXT_MUTED.into(),
+    );
+}
+
+fn labymod_account_pill(ui: &mut Ui, pos: egui::Pos2, label: &str, accented: bool) {
+    let galley = ui.painter().layout_no_wrap(
+        label.to_owned(),
+        FontId::proportional(10.5),
+        Color32::PLACEHOLDER,
+    );
+    let rect = Rect::from_min_size(pos, vec2(galley.size().x + 22.0, 22.0));
+    ui.painter().rect_filled(
+        rect,
+        Rounding::same(11.0),
+        if accented {
+            with_alpha(theme::ACCENT, 42)
+        } else {
+            with_alpha(theme::CARD_HOVER, 190)
+        },
+    );
+    ui.painter().rect_stroke(
+        rect,
+        Rounding::same(11.0),
+        Stroke::new(
+            1.0_f32,
+            if accented {
+                with_alpha(theme::ACCENT, 130)
+            } else {
+                theme::BORDER_STRONG.into()
+            },
+        ),
+    );
+    ui.painter().galley(
+        pos2(
+            rect.center().x - galley.size().x / 2.0,
+            rect.center().y - galley.size().y / 2.0,
+        ),
+        galley,
+        if accented {
+            theme::ACCENT_LIGHT.into()
+        } else {
+            TEXT_MUTED.into()
+        },
+    );
+}
+
+fn paint_labymod_detail_row(
+    ui: &Ui,
+    rect: Rect,
+    icon: Icon,
+    label: &str,
+    value: &str,
+    monospace: bool,
+) {
+    icons::draw(
+        ui.painter(),
+        icon,
+        Rect::from_center_size(pos2(rect.left() + 26.0, rect.center().y), vec2(16.0, 16.0)),
+        theme::ACCENT,
+        1.35,
+    );
+    ui.painter().text(
+        pos2(rect.left() + 48.0, rect.center().y - 10.0),
+        egui::Align2::LEFT_CENTER,
+        label,
+        FontId::proportional(10.5),
+        TEXT_MUTED.into(),
+    );
+    let font = if monospace {
+        FontId::new(12.0, FontFamily::Monospace)
+    } else {
+        FontId::proportional(13.0)
+    };
+    ui.painter().text(
+        pos2(rect.left() + 48.0, rect.center().y + 10.0),
+        egui::Align2::LEFT_CENTER,
+        value,
+        font,
+        TEXT_HEADING.into(),
+    );
+}
+
+fn paint_labymod_row_separator(ui: &Ui, row: Rect) {
+    ui.painter().line_segment(
+        [
+            pos2(row.left() + 14.0, row.top()),
+            pos2(row.right() - 14.0, row.top()),
+        ],
+        Stroke::new(1.0_f32, theme::BORDER_STRONG),
+    );
+}
+
+fn labymod_profile_button(
+    ui: &mut Ui,
+    rect: Rect,
+    label: &str,
+    icon: Option<Icon>,
+    primary: bool,
+) -> bool {
+    let resp = ui.interact(
+        rect,
+        ui.id().with(("labymod_profile_btn", label)),
+        Sense::click(),
+    );
+    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+    let (fill, outline, text): (Color32, Color32, Color32) = if primary {
+        (
+            lerp_color(theme::ACCENT, theme::ACCENT_LIGHT, hover),
+            theme::ACCENT_LIGHT.into(),
+            Color32::WHITE,
+        )
+    } else {
+        (
+            lerp_color(Color32::TRANSPARENT, theme::CARD_HOVER, hover),
+            theme::BORDER_STRONG.into(),
+            TEXT_HEADING.into(),
+        )
+    };
+    ui.painter().rect_filled(rect, Rounding::same(10.0), fill);
+    ui.painter()
+        .rect_stroke(rect, Rounding::same(10.0), Stroke::new(1.0_f32, outline));
+    let galley = ui.painter().layout_no_wrap(
+        label.to_owned(),
+        FontId::proportional(12.0),
+        Color32::PLACEHOLDER,
+    );
+    let icon_space = if icon.is_some() { 22.0 } else { 0.0 };
+    let total = icon_space + galley.size().x;
+    let left = rect.center().x - total / 2.0;
+    if let Some(icon) = icon {
+        icons::draw(
+            ui.painter(),
+            icon,
+            Rect::from_center_size(pos2(left + 8.0, rect.center().y), vec2(15.0, 15.0)),
+            text,
+            1.4,
+        );
+    }
+    ui.painter().galley(
+        pos2(left + icon_space, rect.center().y - galley.size().y / 2.0),
+        galley,
+        text,
+    );
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp.clicked()
 }
 
 fn paint_millida_detail_row(

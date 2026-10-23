@@ -3249,6 +3249,14 @@ impl Language {
         }
     }
 
+    pub fn labymod_profile_subtitle(&self) -> &'static str {
+        match self {
+            Self::English => "Your account, skin and player data",
+            Self::Russian => "Ваш аккаунт, скин и данные игрока",
+            Self::Ukrainian => "Ваш акаунт, скін і дані гравця",
+        }
+    }
+
     pub fn labymod_skins_subtitle(&self) -> &'static str {
         match self {
             Self::English => "Preview, load and save your Minecraft skins",
@@ -5634,6 +5642,7 @@ mod tests {
             assert!(!lang.labymod_default().is_empty());
             assert!(!lang.labymod_quick_play().is_empty());
             assert!(!lang.labymod_no_servers().is_empty());
+            assert!(!lang.labymod_profile_subtitle().is_empty());
             assert!(!lang.labymod_skins_subtitle().is_empty());
             assert!(!lang.labymod_instances_title().is_empty());
             assert!(!lang.labymod_instances_subtitle().is_empty());

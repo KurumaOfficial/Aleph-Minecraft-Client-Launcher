@@ -4783,6 +4783,8 @@ impl App for LauncherApp {
                             ProfileSkin::Modrinth
                         } else if shell == amc_core::config::ShellKind::Millida {
                             ProfileSkin::Millida
+                        } else if shell == amc_core::config::ShellKind::Labymod {
+                            ProfileSkin::Labymod
                         } else {
                             ProfileSkin::Amc
                         };
