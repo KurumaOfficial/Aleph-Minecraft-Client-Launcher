@@ -28,6 +28,9 @@ use egui::{pos2, vec2, Align2, Color32, Rect, Rounding, Sense, Stroke, Ui};
 pub const SIDEBAR_WIDTH: f32 = 190.0;
 /// Right sidebar width (reference: friends/news rail).
 pub const RIGHT_SIDEBAR_WIDTH: f32 = 300.0;
+/// Below this window width the rail is hidden by default and opens as an
+/// overlay, so the library/skins pages keep a usable content column.
+pub const RAIL_MIN_WIDTH: f32 = 1040.0;
 const PAD: f32 = 10.0;
 const PROJECT_URL: &str = "https://github.com/KurumaOfficial/Aleph-Minecraft-Client-Launcher";
 
@@ -168,6 +171,9 @@ pub fn show_sidebar(
         if resp.clicked() {
             action.tab = Some(tab);
         }
+        if resp.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
     }
 
     // Bottom block: Play button above the account chip.
@@ -234,7 +240,11 @@ pub fn show_sidebar(
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
     if resp.clicked() {
-        action.login = true;
+        if account_name.is_some() {
+            action.tab = Some(NavTab::Profile);
+        } else {
+            action.login = true;
+        }
     }
 
     action

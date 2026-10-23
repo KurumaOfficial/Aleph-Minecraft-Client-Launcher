@@ -131,6 +131,9 @@ pub struct LauncherApp {
     theme_shell: Option<amc_core::config::ShellKind>,
     /// Modrinth right rail (accounts/friends/news) visibility.
     modrinth_sidebar_open: bool,
+    /// Narrow Modrinth windows show the rail as an overlay instead of
+    /// squeezing the library under a fixed 300 px panel.
+    modrinth_rail_overlay: bool,
 }
 
 /// Outcome of a mod installation batch (CONCEPT P4): downloaded files plus
@@ -290,6 +293,7 @@ impl LauncherApp {
             settings_saved_config: None,
             theme_shell: None,
             modrinth_sidebar_open: true,
+            modrinth_rail_overlay: false,
             pending_direct_connect: None,
         }
     }
@@ -3696,6 +3700,15 @@ impl App for LauncherApp {
         } else {
             None
         };
+        // Modrinth's 300 px rail is optional chrome: below ~1040 px the
+        // library needs the full width, so the titlebar toggle opens the rail
+        // as an overlay instead of silently doing nothing.
+        let modrinth_narrow = ctx.screen_rect().width() < crate::shells::modrinth::RAIL_MIN_WIDTH;
+        let modrinth_rail_visible = if modrinth_narrow {
+            self.modrinth_rail_overlay
+        } else {
+            self.modrinth_sidebar_open
+        };
         TopBottomPanel::top("title_bar")
             .exact_height(title_height)
             .frame(egui::Frame::none())
@@ -3714,7 +3727,7 @@ impl App for LauncherApp {
                         ui,
                         lang,
                         breadcrumb,
-                        self.modrinth_sidebar_open,
+                        modrinth_rail_visible,
                         self.is_launching,
                     )
                 } else if shell == amc_core::config::ShellKind::Labymod {
@@ -3738,7 +3751,11 @@ impl App for LauncherApp {
                     self.download_manager.open = !self.download_manager.open;
                 }
                 if tb_resp.sidebar_toggle {
-                    self.modrinth_sidebar_open = !self.modrinth_sidebar_open;
+                    if modrinth_narrow {
+                        self.modrinth_rail_overlay = !self.modrinth_rail_overlay;
+                    } else {
+                        self.modrinth_sidebar_open = !self.modrinth_sidebar_open;
+                    }
                 }
                 if tb_resp.account_clicked {
                     if self.account_mgr.active_account().is_some() {
@@ -4029,10 +4046,12 @@ impl App for LauncherApp {
 
             // The rail is optional chrome: below ~1040 px the 190 px nav plus
             // 300 px rail leave too little room for the library/skins pages,
-            // so the content gets the full width instead of clipping buttons
-            // under the rail.
-            let show_modrinth_rail =
-                self.modrinth_sidebar_open && ctx.screen_rect().width() >= 1040.0;
+            // so the content gets the full width and the titlebar toggle opens
+            // the rail as a floating overlay instead.
+            if !modrinth_narrow {
+                self.modrinth_rail_overlay = false;
+            }
+            let show_modrinth_rail = self.modrinth_sidebar_open && !modrinth_narrow;
             if show_modrinth_rail {
                 SidePanel::right("modrinth_right_sidebar")
                     .exact_width(crate::shells::modrinth::RIGHT_SIDEBAR_WIDTH)
@@ -4863,6 +4882,85 @@ impl App for LauncherApp {
                     }
                 }
             });
+
+        // Modrinth narrow layout: the right rail becomes a floating drawer
+        // above a dimmed canvas. It keeps the Friends/News content reachable
+        // at 960 px without shrinking the library below its usable width.
+        if shell == amc_core::config::ShellKind::Modrinth && modrinth_narrow {
+            let screen = ctx.screen_rect();
+            if self.modrinth_rail_overlay && ctx.input(|input| input.key_pressed(egui::Key::Escape))
+            {
+                self.modrinth_rail_overlay = false;
+            }
+            if self.modrinth_rail_overlay {
+                let overlay_w = crate::shells::modrinth::RIGHT_SIDEBAR_WIDTH;
+                let overlay_top = 60.0;
+                let overlay_h = (screen.height() - overlay_top - 12.0).max(220.0);
+                let rail_pos = egui::pos2(screen.right() - overlay_w - 12.0, overlay_top);
+                let acc_name: Option<String> = self
+                    .account_mgr
+                    .active_account()
+                    .map(|account| account.username.clone());
+                let mut close_overlay = false;
+                let mut open_login = false;
+
+                egui::Area::new(egui::Id::new("modrinth_rail_backdrop"))
+                    .fixed_pos(egui::pos2(0.0, 48.0))
+                    .order(egui::Order::Middle)
+                    .show(ctx, |ui| {
+                        let (rect, resp) = ui.allocate_exact_size(
+                            egui::vec2(screen.width(), (screen.height() - 48.0).max(0.0)),
+                            egui::Sense::click(),
+                        );
+                        ui.painter().rect_filled(
+                            rect,
+                            egui::Rounding::ZERO,
+                            egui::Color32::from_black_alpha(96),
+                        );
+                        if resp.clicked() {
+                            close_overlay = true;
+                        }
+                    });
+
+                egui::Area::new(egui::Id::new("modrinth_rail_overlay"))
+                    .fixed_pos(rail_pos)
+                    .order(egui::Order::Foreground)
+                    .show(ctx, |ui| {
+                        egui::Frame::none()
+                            .fill(crate::theme::MODRINTH_BG)
+                            .stroke(egui::Stroke::new(
+                                1.0_f32,
+                                crate::theme::MODRINTH_SURFACE_HIGH,
+                            ))
+                            .shadow(egui::epaint::Shadow {
+                                offset: egui::vec2(0.0, 10.0),
+                                blur: 28.0,
+                                spread: 0.0,
+                                color: egui::Color32::from_black_alpha(170),
+                            })
+                            .show(ui, |ui| {
+                                ui.set_width(overlay_w);
+                                ui.set_height(overlay_h);
+                                let action = crate::shells::modrinth::show_right_sidebar(
+                                    ui,
+                                    lang,
+                                    acc_name.as_deref(),
+                                );
+                                if action.login {
+                                    open_login = true;
+                                    close_overlay = true;
+                                }
+                            });
+                    });
+
+                if close_overlay {
+                    self.modrinth_rail_overlay = false;
+                }
+                if open_login {
+                    self.login_modal.is_open = true;
+                }
+            }
+        }
 
         // Modals
         let mut request_ms = false;
