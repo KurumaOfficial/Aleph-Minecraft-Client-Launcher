@@ -1,7 +1,7 @@
 use crate::pages::instance_manage::InstanceManage;
 use crate::theme::{
-    lerp_color, with_alpha, BG_CARD, BG_HOVER, BORDER_DEFAULT, MODRINTH_FIELD, MODRINTH_GREEN,
-    MODRINTH_SURFACE, MODRINTH_SURFACE_HIGH, MODRINTH_SURFACE_HOVER, MODRINTH_TEXT,
+    lerp_color, with_alpha, BG_CARD, BG_HOVER, BORDER_DEFAULT, MODRINTH_BG, MODRINTH_FIELD,
+    MODRINTH_GREEN, MODRINTH_SURFACE, MODRINTH_SURFACE_HIGH, MODRINTH_SURFACE_HOVER, MODRINTH_TEXT,
     MODRINTH_TEXT_CONTRAST, MODRINTH_TEXT_SECONDARY, RUBY, RUBY_DIM, RUBY_LIGHT, TEXT_HEADING,
     TEXT_MUTED, TEXT_PRIMARY, WARNING,
 };
@@ -1453,21 +1453,96 @@ impl InstancesPage {
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 if instances.is_empty() {
-                    ui.add_space(50.0);
+                    ui.add_space(28.0);
+                    let card_w = ui.available_width().min(580.0);
                     ui.vertical_centered(|ui| {
-                        ui.label(
-                            egui::RichText::new(lang.inst_empty())
-                                .font(egui::FontId::proportional(15.0))
-                                .color(MODRINTH_TEXT_SECONDARY),
+                        let (card, _) = ui.allocate_exact_size(vec2(card_w, 242.0), Sense::hover());
+                        ui.painter()
+                            .rect_filled(card, Rounding::same(18.0), MODRINTH_SURFACE);
+                        ui.painter().rect_stroke(
+                            card,
+                            Rounding::same(18.0),
+                            Stroke::new(1.0_f32, MODRINTH_SURFACE_HIGH),
                         );
-                        ui.add_space(12.0);
-                        if m_button(
-                            ui,
-                            Some(Icon::Plus),
+                        let icon = Rect::from_center_size(
+                            pos2(card.center().x, card.top() + 56.0),
+                            vec2(64.0, 64.0),
+                        );
+                        ui.painter().rect_filled(
+                            icon,
+                            Rounding::same(16.0),
+                            with_alpha(MODRINTH_GREEN, 22),
+                        );
+                        ui.painter().rect_stroke(
+                            icon,
+                            Rounding::same(16.0),
+                            Stroke::new(1.0_f32, with_alpha(MODRINTH_GREEN, 90)),
+                        );
+                        icons::draw_centered(
+                            ui.painter(),
+                            Icon::Cube,
+                            icon.center(),
+                            28.0,
+                            MODRINTH_GREEN,
+                        );
+                        ui.painter().text(
+                            pos2(card.center().x, card.top() + 116.0),
+                            Align2::CENTER_CENTER,
+                            lang.inst_empty_title(),
+                            egui::FontId::new(18.0, egui::FontFamily::Name("bold".into())),
+                            MODRINTH_TEXT_CONTRAST,
+                        );
+                        let hint = ui.painter().layout(
+                            lang.inst_empty_hint().to_owned(),
+                            egui::FontId::proportional(12.5),
+                            MODRINTH_TEXT_SECONDARY,
+                            (card_w - 80.0).max(160.0),
+                        );
+                        ui.painter().galley(
+                            pos2(card.center().x - hint.size().x / 2.0, card.top() + 140.0),
+                            hint,
+                            MODRINTH_TEXT_SECONDARY,
+                        );
+                        let button = Rect::from_center_size(
+                            pos2(card.center().x, card.bottom() - 42.0),
+                            vec2(190.0, 38.0),
+                        );
+                        let resp = ui.interact(
+                            button,
+                            ui.id().with("modrinth_empty_create"),
+                            Sense::click(),
+                        );
+                        let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+                        ui.painter().rect_filled(
+                            button,
+                            Rounding::same(10.0),
+                            lerp_color(
+                                MODRINTH_GREEN,
+                                crate::theme::MODRINTH_GREEN_LIGHT,
+                                hover * 0.55,
+                            ),
+                        );
+                        icons::draw(
+                            ui.painter(),
+                            Icon::Plus,
+                            Rect::from_center_size(
+                                pos2(button.left() + 38.0, button.center().y),
+                                vec2(16.0, 16.0),
+                            ),
+                            MODRINTH_BG,
+                            1.6,
+                        );
+                        ui.painter().text(
+                            pos2(button.left() + 54.0, button.center().y),
+                            Align2::LEFT_CENTER,
                             lang.inst_btn_new_instance(),
-                            true,
-                            36.0,
-                        ) {
+                            egui::FontId::proportional(12.5),
+                            MODRINTH_BG,
+                        );
+                        if resp.hovered() {
+                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                        }
+                        if resp.clicked() {
                             self.new_instance_ram = ctx.suggested_ram_mb;
                             self.show_create_modal = true;
                         }

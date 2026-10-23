@@ -3249,6 +3249,22 @@ impl Language {
         }
     }
 
+    pub fn inst_empty_title(&self) -> &'static str {
+        match self {
+            Self::English => "No instances yet",
+            Self::Russian => "Сборок пока нет",
+            Self::Ukrainian => "Збірок ще немає",
+        }
+    }
+
+    pub fn inst_empty_hint(&self) -> &'static str {
+        match self {
+            Self::English => "Create your first instance to start playing",
+            Self::Russian => "Создайте первую сборку, чтобы начать играть",
+            Self::Ukrainian => "Створіть першу збірку, щоб почати грати",
+        }
+    }
+
     pub fn labymod_settings_subtitle(&self) -> &'static str {
         match self {
             Self::English => "Launcher, Java and account preferences",
@@ -5658,6 +5674,8 @@ mod tests {
             assert!(!lang.labymod_default().is_empty());
             assert!(!lang.labymod_quick_play().is_empty());
             assert!(!lang.labymod_no_servers().is_empty());
+            assert!(!lang.inst_empty_title().is_empty());
+            assert!(!lang.inst_empty_hint().is_empty());
             assert!(!lang.labymod_settings_subtitle().is_empty());
             assert!(!lang.labymod_mods_subtitle().is_empty());
             assert!(!lang.labymod_profile_subtitle().is_empty());
