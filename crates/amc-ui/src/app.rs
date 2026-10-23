@@ -4306,14 +4306,6 @@ impl App for LauncherApp {
                             self.home_page.labymod_instances_request = false;
                             self.current_tab = NavTab::Modpacks;
                         }
-                        if self.home_page.labymod_account_request {
-                            self.home_page.labymod_account_request = false;
-                            if self.account_mgr.active_account().is_some() {
-                                self.current_tab = NavTab::Profile;
-                            } else {
-                                self.login_modal.is_open = true;
-                            }
-                        }
                         if let Some((server, port)) = self.home_page.direct_connect_request.take() {
                             self.handle_direct_connect(server, port);
                         }

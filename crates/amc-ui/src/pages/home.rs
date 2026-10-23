@@ -41,8 +41,6 @@ pub struct HomePage {
     pub direct_connect_request: Option<(String, u16)>,
     pub hero_play_request: bool,
     pub drawer_play_request: Option<String>,
-    /// LabyMod Home: the account chip opens Profile/login.
-    pub labymod_account_request: bool,
     /// LabyMod Home: the launch button's secondary segment opens Instances.
     pub labymod_instances_request: bool,
     /// LabyMod Home: Quick Play server manager modal.
@@ -84,7 +82,6 @@ impl Default for HomePage {
             direct_connect_request: None,
             hero_play_request: false,
             drawer_play_request: None,
-            labymod_account_request: false,
             labymod_instances_request: false,
             labymod_servers_open: false,
             drawer_open: false,
@@ -741,7 +738,7 @@ impl HomePage {
                     ui.allocate_ui_with_layout(
                         vec2(right, height),
                         egui::Layout::top_down(egui::Align::Min),
-                        |ui| self.show_labymod_side(ui, right, height, ctx, lang),
+                        |ui| self.show_labymod_side(ui, right, height, lang),
                     );
                 });
             },
@@ -1063,68 +1060,12 @@ impl HomePage {
         ui: &mut Ui,
         width: f32,
         height: f32,
-        ctx: &HomeContext,
         lang: amc_core::Language,
     ) {
-        let (account, account_resp) = ui.allocate_exact_size(vec2(width, 56.0), Sense::click());
-        ui.painter()
-            .rect_filled(account, egui::Rounding::same(14.0), BG_CARD);
-        ui.painter().rect_stroke(
-            account,
-            egui::Rounding::same(14.0),
-            Stroke::new(1.0_f32, BORDER_STRONG),
-        );
-        let avatar = egui::Rect::from_min_size(
-            egui::pos2(account.left() + 10.0, account.top() + 9.0),
-            vec2(38.0, 38.0),
-        );
-        ui.painter().rect_filled(
-            avatar,
-            egui::Rounding::same(10.0),
-            crate::theme::with_alpha(crate::theme::ACCENT, 40),
-        );
-        icons::draw(
-            ui.painter(),
-            Icon::Person,
-            egui::Rect::from_center_size(avatar.center(), vec2(19.0, 19.0)),
-            crate::theme::ACCENT_LIGHT,
-            1.6,
-        );
-        let account_name = ctx.account_name.unwrap_or_else(|| lang.modrinth_sign_in());
-        ui.painter().text(
-            egui::pos2(avatar.right() + 10.0, account.center().y - 9.0),
-            egui::Align2::LEFT_CENTER,
-            short_name(account_name, 18),
-            egui::FontId::proportional(12.5),
-            TEXT_HEADING.into(),
-        );
-        ui.painter().text(
-            egui::pos2(avatar.right() + 10.0, account.center().y + 9.0),
-            egui::Align2::LEFT_CENTER,
-            brand::APP_NAME,
-            egui::FontId::proportional(9.5),
-            TEXT_MUTED.into(),
-        );
-        icons::draw(
-            ui.painter(),
-            Icon::ChevronRight,
-            egui::Rect::from_center_size(
-                egui::pos2(account.right() - 18.0, account.center().y),
-                vec2(13.0, 13.0),
-            ),
-            TEXT_MUTED,
-            1.5,
-        );
-        if account_resp.hovered() {
-            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-        }
-        if account_resp.clicked() {
-            self.labymod_account_request = true;
-        }
-
-        ui.add_space(12.0);
-        let remaining = (height - 68.0).max(260.0);
-        let friends_h = (remaining * 0.48).max(150.0);
+        // The account chip lives in the titlebar now (as in the reference);
+        // the right column starts directly with Friends.
+        let remaining = height.max(260.0);
+        let friends_h = (remaining * 0.52).max(150.0);
         let news_h = (remaining - friends_h - 12.0).max(140.0);
 
         let (friends, _) = ui.allocate_exact_size(vec2(width, friends_h), Sense::hover());
