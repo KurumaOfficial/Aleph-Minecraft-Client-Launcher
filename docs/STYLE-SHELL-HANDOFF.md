@@ -27,10 +27,10 @@
 - Последний коммит на момент передачи: `356dcbe` (`feat(shell/labymod): replace Legacy with LabyMod style`)
 - Все изменения запушены, рабочее дерево чистое.
 - Локальный release, выложенный в `dist`, имеет SHA-256
-  `DC8DD2DDAE39414417505C9FAFE9A73EF5B8570D158342D64712D71D61F0FEE6`
+  `92DCF0D7E7AE20667CA43B5D36A589992AEA5031A7714FCBBEC10DDF4518789E`
   (сам `dist` не хранится в git; на другом устройстве пересобрать).
 - Перед деплоем 23.10.2026 создан бэкап
-  `dist/amc-launcher.exe.bak-20261023-1159`.
+  `dist/amc-launcher.exe.bak-20261023-1224`.
 
 ## Обязательные правила
 
