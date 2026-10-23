@@ -1080,10 +1080,11 @@ impl SkinsPage {
                 Color32::WHITE,
             );
         }
+        let name_chars = if width < 300.0 { 16 } else { 28 };
         ui.painter().text(
             egui::pos2(card.left() + 72.0, card.center().y - 9.0),
             egui::Align2::LEFT_CENTER,
-            truncate_skin_name(&self.active_skin_name, 28),
+            truncate_skin_name(&self.active_skin_name, name_chars),
             egui::FontId::proportional(13.5),
             TEXT_HEADING.into(),
         );
@@ -1098,22 +1099,24 @@ impl SkinsPage {
             egui::FontId::proportional(11.0),
             TEXT_MUTED.into(),
         );
-        let badge = egui::Rect::from_min_size(
-            egui::pos2(card.right() - 78.0, card.center().y - 12.0),
-            vec2(66.0, 24.0),
-        );
-        ui.painter().rect_filled(
-            badge,
-            egui::Rounding::same(12.0),
-            theme::with_alpha(theme::ACCENT, 40),
-        );
-        ui.painter().text(
-            badge.center(),
-            egui::Align2::CENTER_CENTER,
-            lang.skins_active_badge(),
-            egui::FontId::proportional(10.5),
-            theme::ACCENT_LIGHT.into(),
-        );
+        if width >= 300.0 {
+            let badge = egui::Rect::from_min_size(
+                egui::pos2(card.right() - 78.0, card.center().y - 12.0),
+                vec2(66.0, 24.0),
+            );
+            ui.painter().rect_filled(
+                badge,
+                egui::Rounding::same(12.0),
+                theme::with_alpha(theme::ACCENT, 40),
+            );
+            ui.painter().text(
+                badge.center(),
+                egui::Align2::CENTER_CENTER,
+                lang.skins_active_badge(),
+                egui::FontId::proportional(10.5),
+                theme::ACCENT_LIGHT.into(),
+            );
+        }
 
         ui.add_space(16.0);
         ui.label(
@@ -1386,8 +1389,8 @@ impl SkinsPage {
 
         let available = ui.available_width();
         let gap = 16.0;
-        let left_w = (available * 0.46).clamp(270.0, 360.0);
-        let right_w = (available - left_w - gap).max(220.0);
+        let left_w = (available * 0.46).clamp(210.0, 360.0);
+        let right_w = (available - left_w - gap).max(190.0);
         let panel_h = (ui.available_height() - 4.0).max(420.0);
 
         ui.horizontal_top(|ui| {

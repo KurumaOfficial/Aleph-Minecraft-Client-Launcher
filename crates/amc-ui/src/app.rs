@@ -62,6 +62,8 @@ pub struct LauncherApp {
     mods_page: ModsPage,
     skins_page: SkinsPage,
     settings_page: SettingsPage,
+    /// Persistent 3D character state for the Millida lobby pedestal.
+    millida_skin3d: crate::pages::skins::Skin3d,
 
     // Modals
     login_modal: LoginModal,
@@ -241,6 +243,7 @@ impl LauncherApp {
             mods_page,
             skins_page: SkinsPage::default(),
             settings_page: SettingsPage::default(),
+            millida_skin3d: crate::pages::skins::Skin3d::default(),
             login_modal: LoginModal::default(),
             console_modal: ConsoleModal::default(),
             screens_modal: ScreensModal::default(),
@@ -4024,7 +4027,13 @@ impl App for LauncherApp {
                     }
                 });
 
-            if self.modrinth_sidebar_open {
+            // The rail is optional chrome: below ~1040 px the 190 px nav plus
+            // 300 px rail leave too little room for the library/skins pages,
+            // so the content gets the full width instead of clipping buttons
+            // under the rail.
+            let show_modrinth_rail =
+                self.modrinth_sidebar_open && ctx.screen_rect().width() >= 1040.0;
+            if show_modrinth_rail {
                 SidePanel::right("modrinth_right_sidebar")
                     .exact_width(crate::shells::modrinth::RIGHT_SIDEBAR_WIDTH)
                     .resizable(false)
@@ -4242,6 +4251,8 @@ impl App for LauncherApp {
                                         minutes: *minutes,
                                     }
                                 });
+                            let lobby_skin = self.skins_page.skin_image.as_ref();
+                            let lobby_slim = self.skins_page.is_slim_model;
                             let action = crate::shells::millida::show_lobby(
                                 &mut content_ui,
                                 lang,
@@ -4249,7 +4260,10 @@ impl App for LauncherApp {
                                     instance: lobby_instance,
                                     account: account.as_deref(),
                                     launching: self.is_launching,
+                                    skin: lobby_skin,
+                                    slim: lobby_slim,
                                 },
+                                &mut self.millida_skin3d,
                             );
                             if let Some(tab) = action.tab {
                                 self.current_tab = tab;

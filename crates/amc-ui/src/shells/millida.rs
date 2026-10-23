@@ -19,6 +19,7 @@
 //! (5 px controls, 10 px panels) are drawn from plain rectangles; no
 //! third-party artwork, fonts or code is reused.
 
+use crate::pages::skins::Skin3d;
 use crate::shells::{short_name, tab_label, ShellAction};
 use crate::theme;
 use crate::widgets::brand;
@@ -26,6 +27,7 @@ use crate::widgets::icons::{self, Icon};
 use crate::widgets::NavTab;
 use amc_core::Language;
 use egui::{pos2, vec2, Align2, Color32, Rect, Response, Rounding, Sense, Stroke, Ui};
+use image::RgbaImage;
 
 /// The project page opened by the lobby promo card.
 const PROJECT_URL: &str = "https://github.com/KurumaOfficial/Aleph-Minecraft-Client-Launcher";
@@ -144,6 +146,9 @@ pub struct LobbyCtx<'a> {
     pub instance: Option<LobbyInstance<'a>>,
     pub account: Option<&'a str>,
     pub launching: bool,
+    /// Current skin image/slim flag; the lobby renders it on the pedestal.
+    pub skin: Option<&'a RgbaImage>,
+    pub slim: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -724,7 +729,7 @@ fn draw_scene(painter: &egui::Painter, stage: Rect) {
     }
 }
 
-fn draw_centerpiece(ui: &mut Ui, stage: Rect, ctx: &LobbyCtx<'_>) {
+fn draw_centerpiece(ui: &mut Ui, stage: Rect, ctx: &LobbyCtx<'_>, skin3d: &mut Skin3d) {
     let painter = ui.painter().clone();
     let base_y = stage.bottom() - DOCK_H - 16.0;
     let cx = stage.center().x;
@@ -754,64 +759,21 @@ fn draw_centerpiece(ui: &mut Ui, stage: Rect, ctx: &LobbyCtx<'_>) {
         );
     }
 
-    // Floating build plinth: the selected loader glyph instead of the
-    // reference's 3D character (no third-party art is reused).
-    let plate = Rect::from_center_size(pos2(cx, base_y - 36.0 - 42.0), vec2(84.0, 84.0));
-    stepped_plate(
-        &painter,
-        plate,
-        CUT_PANEL,
-        theme::CARD.into(),
-        theme::with_alpha(theme::ACCENT, 140),
-        2.0,
-    );
-    stepped_facets(
-        &painter,
-        plate,
-        CUT_PANEL,
-        2.0,
-        Color32::from_white_alpha(60),
-        Color32::from_black_alpha(70),
-    );
-    let glyph = loader_icon(ctx.instance.as_ref().map(|instance| instance.loader));
-    let glyph_color: Color32 = if ctx.instance.is_some() {
-        theme::HEAD.into()
-    } else {
-        theme::MUTED.into()
-    };
-    icons::draw(
-        &painter,
-        glyph,
-        Rect::from_center_size(plate.center(), vec2(44.0, 44.0)),
-        glyph_color,
-        1.6,
-    );
-    if ctx.instance.is_none() {
-        icons::draw(
-            &painter,
-            Icon::Plus,
-            Rect::from_center_size(
-                pos2(plate.right() - 16.0, plate.top() + 16.0),
-                vec2(16.0, 16.0),
-            ),
-            theme::ACCENT,
-            1.6,
-        );
-    }
+    // The reference lobby puts a full 3D player on the plinth. Draw the
+    // current skin through the same native egui mesh used by the skins page.
+    let viewer = Rect::from_center_size(pos2(cx, base_y - 180.0), vec2(250.0, 330.0));
+    skin3d.show(ui, viewer, ctx.skin, ctx.slim);
 
     for (dx, dy, size, alpha) in [
-        (-74.0, -22.0, 4.0, 120u8),
-        (82.0, -46.0, 3.0, 90),
-        (-96.0, 30.0, 3.0, 80),
-        (64.0, 34.0, 4.0, 110),
-        (-40.0, -84.0, 3.0, 90),
-        (44.0, -96.0, 2.0, 70),
+        (-112.0, -102.0, 4.0, 120u8),
+        (110.0, -72.0, 3.0, 90),
+        (-124.0, -26.0, 3.0, 80),
+        (104.0, -18.0, 4.0, 110),
+        (-64.0, -146.0, 3.0, 90),
+        (66.0, -154.0, 2.0, 70),
     ] {
         painter.rect_filled(
-            Rect::from_center_size(
-                pos2(plate.center().x + dx, plate.center().y + dy),
-                vec2(size, size),
-            ),
+            Rect::from_center_size(pos2(cx + dx, viewer.center().y + dy), vec2(size, size)),
             Rounding::ZERO,
             Color32::from_white_alpha(alpha),
         );
@@ -1480,12 +1442,17 @@ fn draw_dock(
 
 /// The default lobby (Home tab): stage, section tiles, corner cluster, promo
 /// and the bottom dock.
-pub fn show_lobby(ui: &mut Ui, lang: Language, ctx: &LobbyCtx<'_>) -> ShellAction {
+pub fn show_lobby(
+    ui: &mut Ui,
+    lang: Language,
+    ctx: &LobbyCtx<'_>,
+    skin3d: &mut Skin3d,
+) -> ShellAction {
     let mut action = ShellAction::default();
     let stage = ui.max_rect();
 
     draw_scene(ui.painter(), stage);
-    draw_centerpiece(ui, stage, ctx);
+    draw_centerpiece(ui, stage, ctx, skin3d);
 
     let mut y = stage.top() + 20.0;
     for (index, (target, _, _)) in TILE_TARGETS.iter().enumerate() {
