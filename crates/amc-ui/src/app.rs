@@ -4874,6 +4874,10 @@ impl App for LauncherApp {
                             &self.server_status,
                             settings_skin,
                         );
+                        if self.settings_page.login_request {
+                            self.settings_page.login_request = false;
+                            self.login_modal.is_open = true;
+                        }
                         // Auto-save configuration changes, but only on
                         // actual change — never a per-frame FS write.
                         let changed = self

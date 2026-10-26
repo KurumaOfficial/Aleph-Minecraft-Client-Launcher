@@ -85,6 +85,8 @@ pub struct SettingsPage {
     pub server_start_requested: bool,
     pub server_stop_requested: bool,
     pub server_eula_draft: bool,
+    /// Accounts settings empty state asked to open the login modal.
+    pub login_request: bool,
 }
 
 impl Default for SettingsPage {
@@ -107,6 +109,7 @@ impl Default for SettingsPage {
             server_start_requested: false,
             server_stop_requested: false,
             server_eula_draft: false,
+            login_request: false,
         }
     }
 }
@@ -1793,6 +1796,36 @@ impl SettingsPage {
 
             let accounts = account_mgr.accounts().to_vec();
             let active_id = account_mgr.active_account().map(|a| a.id);
+
+            if accounts.is_empty() && self.skin != SettingsSkin::Amc {
+                ui.add_space(4.0);
+                ui.horizontal(|ui| {
+                    ui.label(
+                        egui::RichText::new(lang.settings_no_accounts())
+                            .font(egui::FontId::proportional(12.5))
+                            .color(TEXT_MUTED),
+                    );
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        let clicked = if mr {
+                            modrinth_ui::button(
+                                ui,
+                                lang.modrinth_sign_in(),
+                                Some(Icon::Person),
+                                modrinth_ui::ModrinthButtonKind::Primary,
+                                150.0,
+                            )
+                            .clicked()
+                        } else {
+                            ui.button(lang.modrinth_sign_in()).clicked()
+                        };
+                        if clicked {
+                            self.login_request = true;
+                        }
+                    });
+                });
+                ui.add_space(4.0);
+                ui.separator();
+            }
 
             let mut set_active_id = None;
             let mut remove_id = None;

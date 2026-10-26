@@ -3939,6 +3939,15 @@ impl Language {
         }
     }
 
+    /// Accounts settings: empty state for shells with their own sign-in entry.
+    pub fn settings_no_accounts(&self) -> &'static str {
+        match self {
+            Self::English => "No saved accounts yet",
+            Self::Russian => "Сохранённых аккаунтов пока нет",
+            Self::Ukrainian => "Збережених акаунтів поки немає",
+        }
+    }
+
     pub fn settings_account_active(&self) -> &'static str {
         match self {
             Self::English => "✔ (Active)",
@@ -5943,6 +5952,7 @@ mod tests {
             assert!(!lang.picker_title().is_empty());
             assert!(!lang.picker_remember().is_empty());
             assert!(!lang.settings_ask_identity().is_empty());
+            assert!(!lang.settings_no_accounts().is_empty());
             assert!(!lang.settings_forget_identity().is_empty());
             assert!(!lang.profile_title().is_empty());
             assert!(!lang.profile_nickname().is_empty());
