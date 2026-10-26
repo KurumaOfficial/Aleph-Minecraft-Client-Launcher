@@ -424,6 +424,7 @@ impl ModsPage {
             ModsSubTab::Search => self.show_search(
                 ui,
                 lang,
+                skin,
                 actions.wishlist,
                 actions.on_search,
                 actions.on_install,
@@ -1277,10 +1278,32 @@ impl ModsPage {
         &mut self,
         ui: &mut Ui,
         lang: Language,
+        skin: ModsSkin,
         wishlist: &mut Vec<String>,
         on_search: impl FnOnce(String, ModSource, ModCategory, SearchSort),
         on_install: impl FnOnce(ModSearchResult),
     ) {
+        let millida = skin == ModsSkin::Millida;
+        let chip = |ui: &mut Ui, icon: Icon, label: &str, active: bool| -> bool {
+            if millida {
+                millida_action_button(ui, label, active)
+            } else {
+                icons::icon_text_button(
+                    ui,
+                    icon,
+                    None,
+                    label,
+                    if active {
+                        Color32::WHITE
+                    } else {
+                        TEXT_MUTED.into()
+                    },
+                    egui::FontId::proportional(11.0),
+                    if active { RUBY } else { BG_ELEVATED },
+                )
+                .clicked()
+            }
+        };
         ui.horizontal_wrapped(|ui| {
             let mr_active = self.search_provider == ModSource::Modrinth;
             let cf_active = self.search_provider == ModSource::CurseForge;
@@ -1298,7 +1321,12 @@ impl ModsPage {
             .fill(if mr_active { RUBY } else { BG_HOVER })
             .min_size(vec2(80.0, 30.0));
 
-            if ui.add(mr_btn).clicked() {
+            let mr_clicked = if millida {
+                millida_action_button(ui, "Modrinth", mr_active)
+            } else {
+                ui.add(mr_btn).clicked()
+            };
+            if mr_clicked {
                 self.search_provider = ModSource::Modrinth;
             }
 
@@ -1315,7 +1343,12 @@ impl ModsPage {
             .fill(if cf_active { RUBY } else { BG_HOVER })
             .min_size(vec2(90.0, 30.0));
 
-            if ui.add(cf_btn).clicked() {
+            let cf_clicked = if millida {
+                millida_action_button(ui, "CurseForge", cf_active)
+            } else {
+                ui.add(cf_btn).clicked()
+            };
+            if cf_clicked {
                 self.search_provider = ModSource::CurseForge;
                 self.search_category = ModCategory::Mod;
             }
@@ -1340,15 +1373,17 @@ impl ModsPage {
             ui.add_space(8.0);
 
             let mut on_search = Some(on_search);
-            if ui
-                .button(
+            let search_clicked = if millida {
+                millida_action_button(ui, lang.mods_btn_search(), false)
+            } else {
+                ui.button(
                     egui::RichText::new(lang.mods_btn_search())
                         .strong()
                         .color(Color32::WHITE),
                 )
                 .clicked()
-                || enter_pressed
-            {
+            };
+            if search_clicked || enter_pressed {
                 if let Some(f) = on_search.take() {
                     f(
                         self.search_query.clone(),
@@ -1363,17 +1398,21 @@ impl ModsPage {
                 ui.add_space(8.0);
                 let btn_font = egui::TextStyle::Button.resolve(ui.style());
                 let btn_fill = ui.visuals().widgets.inactive.weak_bg_fill;
-                if icons::icon_text_button(
-                    ui,
-                    Icon::Flame,
-                    None,
-                    lang.discover_title(),
-                    TEXT_PRIMARY,
-                    btn_font,
-                    btn_fill,
-                )
-                .clicked()
-                {
+                let trending_clicked = if millida {
+                    millida_action_button(ui, lang.discover_title(), false)
+                } else {
+                    icons::icon_text_button(
+                        ui,
+                        Icon::Flame,
+                        None,
+                        lang.discover_title(),
+                        TEXT_PRIMARY,
+                        btn_font,
+                        btn_fill,
+                    )
+                    .clicked()
+                };
+                if trending_clicked {
                     self.search_query.clear();
                     if let Some(f) = on_search.take() {
                         f(
@@ -1397,57 +1436,15 @@ impl ModsPage {
                     let cat_rp = self.search_category == ModCategory::ResourcePack;
                     let cat_sh = self.search_category == ModCategory::Shader;
 
-                    if icons::icon_text_button(
-                        ui,
-                        Icon::Puzzle,
-                        None,
-                        lang.mods_cat_mods(),
-                        if cat_mod {
-                            Color32::WHITE
-                        } else {
-                            TEXT_MUTED.into()
-                        },
-                        egui::FontId::proportional(11.0),
-                        if cat_mod { RUBY } else { BG_ELEVATED },
-                    )
-                    .clicked()
-                    {
+                    if chip(ui, Icon::Puzzle, lang.mods_cat_mods(), cat_mod) {
                         self.search_category = ModCategory::Mod;
                     }
 
-                    if icons::icon_text_button(
-                        ui,
-                        Icon::Palette,
-                        None,
-                        lang.mods_cat_resourcepacks(),
-                        if cat_rp {
-                            Color32::WHITE
-                        } else {
-                            TEXT_MUTED.into()
-                        },
-                        egui::FontId::proportional(11.0),
-                        if cat_rp { RUBY } else { BG_ELEVATED },
-                    )
-                    .clicked()
-                    {
+                    if chip(ui, Icon::Palette, lang.mods_cat_resourcepacks(), cat_rp) {
                         self.search_category = ModCategory::ResourcePack;
                     }
 
-                    if icons::icon_text_button(
-                        ui,
-                        Icon::Sun,
-                        None,
-                        lang.mods_cat_shaders(),
-                        if cat_sh {
-                            Color32::WHITE
-                        } else {
-                            TEXT_MUTED.into()
-                        },
-                        egui::FontId::proportional(11.0),
-                        if cat_sh { RUBY } else { BG_ELEVATED },
-                    )
-                    .clicked()
-                    {
+                    if chip(ui, Icon::Sun, lang.mods_cat_shaders(), cat_sh) {
                         self.search_category = ModCategory::Shader;
                     }
                 }
@@ -1457,38 +1454,10 @@ impl ModsPage {
                 ui.add_space(12.0);
                 let sort_rel = self.search_sort == SearchSort::Relevance;
                 let sort_dl = self.search_sort == SearchSort::Downloads;
-                if icons::icon_text_button(
-                    ui,
-                    Icon::List,
-                    None,
-                    lang.mods_sort_relevance(),
-                    if sort_rel {
-                        Color32::WHITE
-                    } else {
-                        TEXT_MUTED.into()
-                    },
-                    egui::FontId::proportional(11.0),
-                    if sort_rel { RUBY } else { BG_ELEVATED },
-                )
-                .clicked()
-                {
+                if chip(ui, Icon::List, lang.mods_sort_relevance(), sort_rel) {
                     self.search_sort = SearchSort::Relevance;
                 }
-                if icons::icon_text_button(
-                    ui,
-                    Icon::Download,
-                    None,
-                    lang.mods_sort_downloads(),
-                    if sort_dl {
-                        Color32::WHITE
-                    } else {
-                        TEXT_MUTED.into()
-                    },
-                    egui::FontId::proportional(11.0),
-                    if sort_dl { RUBY } else { BG_ELEVATED },
-                )
-                .clicked()
-                {
+                if chip(ui, Icon::Download, lang.mods_sort_downloads(), sort_dl) {
                     self.search_sort = SearchSort::Downloads;
                 }
             });
