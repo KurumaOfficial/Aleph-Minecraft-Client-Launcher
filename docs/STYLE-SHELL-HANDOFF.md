@@ -26,12 +26,12 @@
 - Branch: `main`
 - Коммиты сессии 2026-10-26: `5417adb` (minimum-size layouts),
   `c46eded` (Modrinth rail overlay), `e31a00f` (Discover/empty state),
-  `c9288e5` (Quick Play), `012b40e` (signed-out/friends states), `f1b7aa9` (empty accounts action), `6084535` (add account), `26517f7` (empty-instance/dialog fixes), `0ac49b3` (mod actions at minimum), `a6e9a1d` (toast expiry/edit scrollbar), `050ecac` (toast placement), `73bd20e` (accent/inset polish), `6adb133` (Millida pixel mods), `fbc6cb5` (Millida search controls);
+  `c9288e5` (Quick Play), `012b40e` (signed-out/friends states), `f1b7aa9` (empty accounts action), `6084535` (add account), `26517f7` (empty-instance/dialog fixes), `0ac49b3` (mod actions at minimum), `a6e9a1d` (toast expiry/edit scrollbar), `050ecac` (toast placement), `73bd20e` (accent/inset polish), `6adb133` (Millida pixel mods), `fbc6cb5` (Millida search controls), `1675083` (modal dismiss/manage actions);
   финальный коммит сессии добавляет этот файл и release-заметки.
 - Все изменения запушены, рабочее дерево чистое.
 - Локальный release, выложенный в `dist`, имеет SHA-256
-  `D1D8A53D1336E2CD7F332CD170080FC3F34F4372F9E09B10860B159B0CB94C0D`.
-- Перед деплоем 26.10.2026 создан бэкап `dist/amc-launcher.exe.bak-20261026-1320`.
+  `474B1CB3CD518A97028148996702E4EF4C0E7BA56F392377C3896BEEFD89A278`.
+- Перед деплоем 26.10.2026 создан бэкап `dist/amc-launcher.exe.bak-20261026-1341`.
 
 ## Сессия 2026-10-26: адаптивность и взаимодействия
 
@@ -106,6 +106,9 @@ physical при 125% DPI), а также на 1120×700 logical (1400×875 physi
 22. **Millida, поиск модов**: префиксы провайдера, кнопка поиска, «В тренде»,
     категории и сортировка переведены на те же пиксельные пластины; другие
     оболочки сохранили нативные контролы.
+23. **Диалоги и управление сборкой**: Create/Clone/Edit получили крестик в
+    заголовке и закрытие по Escape (кроме открытых popup). Пустые вкладки
+    «Миры» и «Конфиги» предлагают открыть соответствующую папку.
 
 ## Обязательные правила
 
