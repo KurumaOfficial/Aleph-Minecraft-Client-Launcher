@@ -26,12 +26,12 @@
 - Branch: `main`
 - Коммиты сессии 2026-10-26: `5417adb` (minimum-size layouts),
   `c46eded` (Modrinth rail overlay), `e31a00f` (Discover/empty state),
-  `c9288e5` (Quick Play), `012b40e` (signed-out/friends states), `f1b7aa9` (empty accounts action), `6084535` (add account), `26517f7` (empty-instance/dialog fixes);
+  `c9288e5` (Quick Play), `012b40e` (signed-out/friends states), `f1b7aa9` (empty accounts action), `6084535` (add account), `26517f7` (empty-instance/dialog fixes), `0ac49b3` (mod actions at minimum);
   финальный коммит сессии добавляет этот файл и release-заметки.
 - Все изменения запушены, рабочее дерево чистое.
 - Локальный release, выложенный в `dist`, имеет SHA-256
-  `7189CEBB540659B75A2177DDB4E8CBBBFAA65F598316D2711DE9A2003F76F4ED`.
-- Перед деплоем 26.10.2026 создан бэкап `dist/amc-launcher.exe.bak-20261026-1126`.
+  `D68C6C074F24B308DBC81CE47B232EA0F06E7F6D51A75BFB86EBB2C967560EF0`.
+- Перед деплоем 26.10.2026 создан бэкап `dist/amc-launcher.exe.bak-20261026-1143`.
 
 ## Сессия 2026-10-26: адаптивность и взаимодействия
 
@@ -85,6 +85,10 @@ physical при 125% DPI), а также на 1120×700 logical (1400×875 physi
 16. **Диалоги сборок**: кнопки Create/Save блокируются при пустом имени или
     версии, а в светлой MultiMC-теме их подписи больше не белые на белом.
     Escape закрывает login modal.
+17. **Локальные моды на 960×600**: панель пакетных действий переносится на
+    вторую строку, а в каждой строке зарезервирована колонка справа —
+    «Включить/Отключить», удаление, пин и «Есть обновление» больше не
+    уезжают за край при длинных именах. Проверено в Modrinth и LabyMod.
 
 ## Обязательные правила
 
