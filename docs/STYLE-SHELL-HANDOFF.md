@@ -26,12 +26,12 @@
 - Branch: `main`
 - Коммиты сессии 2026-10-26: `5417adb` (minimum-size layouts),
   `c46eded` (Modrinth rail overlay), `e31a00f` (Discover/empty state),
-  `c9288e5` (Quick Play), `012b40e` (signed-out/friends states), `f1b7aa9` (empty accounts action), `6084535` (add account), `26517f7` (empty-instance/dialog fixes), `0ac49b3` (mod actions at minimum);
+  `c9288e5` (Quick Play), `012b40e` (signed-out/friends states), `f1b7aa9` (empty accounts action), `6084535` (add account), `26517f7` (empty-instance/dialog fixes), `0ac49b3` (mod actions at minimum), `a6e9a1d` (toast expiry/edit scrollbar), `050ecac` (toast placement);
   финальный коммит сессии добавляет этот файл и release-заметки.
 - Все изменения запушены, рабочее дерево чистое.
 - Локальный release, выложенный в `dist`, имеет SHA-256
-  `D68C6C074F24B308DBC81CE47B232EA0F06E7F6D51A75BFB86EBB2C967560EF0`.
-- Перед деплоем 26.10.2026 создан бэкап `dist/amc-launcher.exe.bak-20261026-1143`.
+  `B209496D228C74C166A0D44FC5ACF4454A645B756D84CB001FC7C117AEA97C03`.
+- Перед деплоем 26.10.2026 создан бэкап `dist/amc-launcher.exe.bak-20261026-1210`.
 
 ## Сессия 2026-10-26: адаптивность и взаимодействия
 
@@ -89,6 +89,13 @@ physical при 125% DPI), а также на 1120×700 logical (1400×875 physi
     вторую строку, а в каждой строке зарезервирована колонка справа —
     «Включить/Отключить», удаление, пин и «Есть обновление» больше не
     уезжают за край при длинных именах. Проверено в Modrinth и LabyMod.
+18. **Toasts и длинная форма**: уведомления сами запрашивают repaint и
+    исчезают по таймеру даже в простое; длинный текст обрезается многоточием.
+    В модалке редактирования сборки всегда виден скроллбар — поля ниже
+    «Группы Java/RAM» остаются доступными.
+19. **Позиция уведомлений**: toasts перенесены в правый нижний стек и
+    учитывают нижнюю панель Simple и news/status MultiMC, поэтому больше не
+    перекрывают тулбар библиотеки, кнопку «Новая сборка» или account chip.
 
 ## Обязательные правила
 
