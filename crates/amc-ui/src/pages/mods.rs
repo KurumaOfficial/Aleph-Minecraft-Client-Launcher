@@ -979,8 +979,9 @@ impl ModsPage {
             .show(ui, |ui| {
                 ui.spacing_mut().item_spacing = vec2(0.0, 8.0);
 
-                // Batch operations bar.
-                ui.horizontal(|ui| {
+                // Batch operations bar. Wraps on the 960 px minimum instead
+                // of clipping the last action under the window edge.
+                ui.horizontal_wrapped(|ui| {
                     let all_selected = !self.local_mods.is_empty()
                         && self.selected_local.len() == self.local_mods.len();
                     let batch_icon = if all_selected {
@@ -1118,109 +1119,111 @@ impl ModsPage {
                     );
                     child.add_space(10.0);
 
-                    // Name + version with truncation
-                    let max_text_w = (child.available_width() - 150.0).max(120.0);
-                    child.vertical(|ui| {
-                        ui.set_max_width(max_text_w);
-                        ui.add(
-                            egui::Label::new(
-                                egui::RichText::new(&m.name)
-                                    .font(egui::FontId::proportional(14.0))
-                                    .strong()
-                                    .color(TEXT_HEADING),
-                            )
-                            .truncate(),
-                        );
-                        ui.label(
-                            egui::RichText::new(format!(
-                                "v{} • {:.1} KB",
-                                m.version,
-                                m.file_size as f64 / 1024.0
-                            ))
-                            .font(egui::FontId::proportional(11.0))
-                            .color(TEXT_MUTED),
-                        );
-                    });
-
-                    // Controls on the right
-                    let controls_width = 130.0;
-                    let avail = child.available_width() - controls_width - 16.0;
-                    if avail > 0.0 {
-                        child.add_space(avail);
-                    }
-
-                    // Toggle Button
-                    let toggle_text = if m.enabled {
-                        lang.mods_status_enabled()
-                    } else {
-                        lang.mods_status_disabled()
-                    };
-                    let toggle_color = if m.enabled { SUCCESS } else { TEXT_MUTED };
-                    let toggle_btn = egui::Button::new(
-                        egui::RichText::new(toggle_text)
-                            .font(egui::FontId::proportional(11.0))
-                            .strong()
-                            .color(Color32::WHITE),
-                    )
-                    .fill(toggle_color)
-                    .min_size(vec2(60.0, 26.0));
-
-                    if child.add(toggle_btn).clicked() {
-                        to_toggle = Some(idx);
-                    }
-
-                    child.add_space(8.0);
-
-                    // Delete button
-                    if icon_button(&mut child, Icon::Trash, TEXT_MUTED).clicked() {
-                        to_delete = Some(idx);
-                    }
-
-                    // One-click update when the checker found a newer build.
-                    if let Some(offer) = self.update_offers.get(&m.name).cloned() {
-                        child.add_space(8.0);
-                        let pinned = self.pinned_keys.contains(&offer.slug);
-                        if icon_button(
-                            &mut child,
-                            if pinned { Icon::Pin } else { Icon::PinOutline },
-                            if pinned { RUBY_LIGHT } else { TEXT_MUTED },
-                        )
-                        .on_hover_text(if pinned {
-                            lang.mods_unpin()
-                        } else {
-                            lang.mods_pin()
-                        })
-                        .clicked()
-                        {
-                            self.pin_toggle = Some(offer.slug.clone());
-                        }
-                        if !pinned
-                            && child
-                                .button(
-                                    egui::RichText::new(lang.mods_update_available())
-                                        .color(RUBY_LIGHT),
+                    // Name + version in a fixed text column so the action
+                    // controls always keep their reserved space at 960 px.
+                    let has_offer = self.update_offers.contains_key(&m.name);
+                    let controls_width = if has_offer { 258.0 } else { 116.0 };
+                    let text_w = (child.available_width() - controls_width).max(120.0);
+                    child.allocate_ui_with_layout(
+                        vec2(text_w, 44.0),
+                        egui::Layout::top_down(egui::Align::Min),
+                        |ui| {
+                            ui.add(
+                                egui::Label::new(
+                                    egui::RichText::new(&m.name)
+                                        .font(egui::FontId::proportional(14.0))
+                                        .strong()
+                                        .color(TEXT_HEADING),
                                 )
-                                .on_hover_text(changelog_preview(&offer.version, &offer.changelog))
-                                .clicked()
-                        {
-                            *update_install = Some((
-                                ModSearchResult {
-                                    source: ModSource::Modrinth,
-                                    id: offer.slug.clone(),
-                                    title: offer.title.clone(),
-                                    author: String::new(),
-                                    downloads: 0,
-                                    rating: 0,
-                                    description: String::new(),
-                                    icon_url: None,
-                                    category: ModCategory::Mod,
-                                    game_versions: Vec::new(),
-                                    loaders: Vec::new(),
-                                },
-                                offer.old_filename.clone(),
-                            ));
+                                .truncate(),
+                            );
+                            ui.label(
+                                egui::RichText::new(format!(
+                                    "v{} • {:.1} KB",
+                                    m.version,
+                                    m.file_size as f64 / 1024.0
+                                ))
+                                .font(egui::FontId::proportional(11.0))
+                                .color(TEXT_MUTED),
+                            );
+                        },
+                    );
+
+                    // Controls on the right, laid out from the right edge so
+                    // they cannot be pushed out by a long mod name.
+                    child.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if icon_button(ui, Icon::Trash, TEXT_MUTED).clicked() {
+                            to_delete = Some(idx);
                         }
-                    }
+                        ui.add_space(8.0);
+
+                        let toggle_text = if m.enabled {
+                            lang.mods_status_enabled()
+                        } else {
+                            lang.mods_status_disabled()
+                        };
+                        let toggle_color = if m.enabled { SUCCESS } else { TEXT_MUTED };
+                        let toggle_btn = egui::Button::new(
+                            egui::RichText::new(toggle_text)
+                                .font(egui::FontId::proportional(11.0))
+                                .strong()
+                                .color(Color32::WHITE),
+                        )
+                        .fill(toggle_color)
+                        .min_size(vec2(60.0, 26.0));
+                        if ui.add(toggle_btn).clicked() {
+                            to_toggle = Some(idx);
+                        }
+
+                        // One-click update when the checker found a newer build.
+                        if let Some(offer) = self.update_offers.get(&m.name).cloned() {
+                            ui.add_space(8.0);
+                            let pinned = self.pinned_keys.contains(&offer.slug);
+                            if icon_button(
+                                ui,
+                                if pinned { Icon::Pin } else { Icon::PinOutline },
+                                if pinned { RUBY_LIGHT } else { TEXT_MUTED },
+                            )
+                            .on_hover_text(if pinned {
+                                lang.mods_unpin()
+                            } else {
+                                lang.mods_pin()
+                            })
+                            .clicked()
+                            {
+                                self.pin_toggle = Some(offer.slug.clone());
+                            }
+                            if !pinned
+                                && ui
+                                    .button(
+                                        egui::RichText::new(lang.mods_update_available())
+                                            .color(RUBY_LIGHT),
+                                    )
+                                    .on_hover_text(changelog_preview(
+                                        &offer.version,
+                                        &offer.changelog,
+                                    ))
+                                    .clicked()
+                            {
+                                *update_install = Some((
+                                    ModSearchResult {
+                                        source: ModSource::Modrinth,
+                                        id: offer.slug.clone(),
+                                        title: offer.title.clone(),
+                                        author: String::new(),
+                                        downloads: 0,
+                                        rating: 0,
+                                        description: String::new(),
+                                        icon_url: None,
+                                        category: ModCategory::Mod,
+                                        game_versions: Vec::new(),
+                                        loaders: Vec::new(),
+                                    },
+                                    offer.old_filename.clone(),
+                                ));
+                            }
+                        }
+                    });
                 }
 
                 if let Some(idx) = to_toggle {
