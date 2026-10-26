@@ -3002,12 +3002,14 @@ impl App for LauncherApp {
         }
 
         // Toast notifications render above all panels.
-        let toast_bottom = match self.config.app_mode.shell() {
-            amc_core::config::ShellKind::Sidebar => 84.0,
-            amc_core::config::ShellKind::Multimc => 72.0,
-            _ => 16.0,
+        let (toast_bottom, toast_right) = match self.config.app_mode.shell() {
+            amc_core::config::ShellKind::Sidebar => (84.0, 0.0),
+            amc_core::config::ShellKind::Multimc => {
+                (72.0, crate::shells::multimc::INSTANCE_BAR_WIDTH)
+            }
+            _ => (16.0, 0.0),
         };
-        show_toasts(ctx, &mut self.toasts, toast_bottom);
+        show_toasts(ctx, &mut self.toasts, toast_bottom, toast_right);
 
         // Receive version manifest updates
         if let Some(rx) = &mut self.versions_rx {

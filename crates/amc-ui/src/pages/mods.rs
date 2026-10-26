@@ -1162,7 +1162,15 @@ impl ModsPage {
                         } else {
                             lang.mods_status_disabled()
                         };
-                        let toggle_color = if m.enabled { SUCCESS } else { TEXT_MUTED };
+                        let toggle_color: Color32 = if m.enabled {
+                            if skin == ModsSkin::Labymod {
+                                crate::theme::ACCENT.into()
+                            } else {
+                                SUCCESS.into()
+                            }
+                        } else {
+                            TEXT_MUTED.into()
+                        };
                         let toggle_btn = egui::Button::new(
                             egui::RichText::new(toggle_text)
                                 .font(egui::FontId::proportional(11.0))
