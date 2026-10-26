@@ -3627,7 +3627,14 @@ impl InstancesPage {
 
         // Create Instance Modal Dialog
         if self.show_create_modal {
+            let mut open = true;
+            if ui.ctx().input(|i| i.key_pressed(egui::Key::Escape))
+                && !ui.ctx().memory(|m| m.any_popup_open())
+            {
+                open = false;
+            }
             egui::Window::new(lang.inst_modal_create_title())
+                .open(&mut open)
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, vec2(0.0, 0.0))
@@ -3754,12 +3761,22 @@ impl InstancesPage {
                         }
                     });
                 });
+            if !open {
+                self.show_create_modal = false;
+            }
         }
 
         // Clone Instance Modal Dialog: duplicate with an optional
         // worlds/saves copy (CONCEPT P2).
         if self.show_clone_modal {
+            let mut open = true;
+            if ui.ctx().input(|i| i.key_pressed(egui::Key::Escape))
+                && !ui.ctx().memory(|m| m.any_popup_open())
+            {
+                open = false;
+            }
             egui::Window::new(lang.clone_title())
+                .open(&mut open)
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, vec2(0.0, 0.0))
@@ -3788,14 +3805,24 @@ impl InstancesPage {
                         }
                     });
                 });
+            if !open {
+                self.show_clone_modal = false;
+            }
         }
 
         // Edit Instance Modal Dialog
         if self.show_edit_modal {
             let mut close_edit = false;
             let mut save_edit = false;
+            let mut open = true;
+            if ui.ctx().input(|i| i.key_pressed(egui::Key::Escape))
+                && !ui.ctx().memory(|m| m.any_popup_open())
+            {
+                open = false;
+            }
 
             egui::Window::new(lang.inst_modal_edit_title())
+                .open(&mut open)
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, vec2(0.0, 0.0))
@@ -4159,6 +4186,10 @@ impl InstancesPage {
                         }
                     });
                 });
+
+            if !open {
+                close_edit = true;
+            }
 
             if save_edit {
                 if let Some(target_id) = self.edit_instance_id {

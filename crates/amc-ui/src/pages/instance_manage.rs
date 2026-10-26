@@ -215,6 +215,12 @@ impl InstanceManage {
                     .font(egui::FontId::proportional(13.0))
                     .color(TEXT_MUTED),
             );
+            ui.add_space(8.0);
+            if ui.button(lang.world_open_folder()).clicked() {
+                let dir = game_dir.join("saves");
+                let _ = std::fs::create_dir_all(&dir);
+                let _ = open::that(&dir);
+            }
             return;
         }
         ui.label(
@@ -370,6 +376,12 @@ impl InstanceManage {
                     .font(egui::FontId::proportional(13.0))
                     .color(TEXT_MUTED),
             );
+            ui.add_space(8.0);
+            if ui.button(lang.editor_open_folder()).clicked() {
+                let dir = game_dir.join("config");
+                let _ = std::fs::create_dir_all(&dir);
+                let _ = open::that(&dir);
+            }
             return;
         }
         // File filter (CONCEPT P2 config editor search).

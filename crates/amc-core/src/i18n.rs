@@ -1700,6 +1700,14 @@ impl Language {
         }
     }
 
+    pub fn editor_open_folder(&self) -> &'static str {
+        match self {
+            Self::English => "Open config folder",
+            Self::Russian => "Открыть папку конфигов",
+            Self::Ukrainian => "Відкрити папку конфігів",
+        }
+    }
+
     pub fn editor_saved(&self) -> &'static str {
         match self {
             Self::English => "Saved",
@@ -1900,6 +1908,14 @@ impl Language {
             Self::English => "Worlds",
             Self::Russian => "Миры",
             Self::Ukrainian => "Світи",
+        }
+    }
+
+    pub fn world_open_folder(&self) -> &'static str {
+        match self {
+            Self::English => "Open worlds folder",
+            Self::Russian => "Открыть папку миров",
+            Self::Ukrainian => "Відкрити папку світів",
         }
     }
 
@@ -5866,6 +5882,7 @@ mod tests {
             assert!(!lang.settings_root_restart().is_empty());
             assert!(!lang.editor_title().is_empty());
             assert!(!lang.editor_empty().is_empty());
+            assert!(!lang.editor_open_folder().is_empty());
             assert!(!lang.editor_saved().is_empty());
             assert!(!lang.health_title().is_empty());
             assert!(!lang.health_ok().is_empty());
@@ -5890,6 +5907,7 @@ mod tests {
             assert!(!lang.world_backups().is_empty());
             assert!(!lang.world_restore().is_empty());
             assert!(!lang.world_no_saves().is_empty());
+            assert!(!lang.world_open_folder().is_empty());
             assert!(!lang.world_no_backups().is_empty());
             assert!(!lang.world_auto_label().is_empty());
             assert!(!lang.world_delete().is_empty());
@@ -6023,6 +6041,7 @@ mod tests {
             assert!(!lang.settings_root_restart().is_empty());
             assert!(!lang.editor_title().is_empty());
             assert!(!lang.editor_empty().is_empty());
+            assert!(!lang.editor_open_folder().is_empty());
             assert!(!lang.editor_saved().is_empty());
             assert!(!lang.health_title().is_empty());
             assert!(!lang.health_ok().is_empty());
@@ -6044,6 +6063,7 @@ mod tests {
             assert!(!lang.world_backups().is_empty());
             assert!(!lang.world_restore().is_empty());
             assert!(!lang.world_no_saves().is_empty());
+            assert!(!lang.world_open_folder().is_empty());
             assert!(!lang.world_no_backups().is_empty());
             assert!(!lang.world_auto_label().is_empty());
             assert!(!lang.world_delete().is_empty());
