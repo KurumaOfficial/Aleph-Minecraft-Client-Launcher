@@ -3948,6 +3948,15 @@ impl Language {
         }
     }
 
+    /// Accounts settings: add another account to the existing list.
+    pub fn settings_add_account(&self) -> &'static str {
+        match self {
+            Self::English => "Add account",
+            Self::Russian => "Добавить аккаунт",
+            Self::Ukrainian => "Додати акаунт",
+        }
+    }
+
     pub fn settings_account_active(&self) -> &'static str {
         match self {
             Self::English => "✔ (Active)",
@@ -5953,6 +5962,7 @@ mod tests {
             assert!(!lang.picker_remember().is_empty());
             assert!(!lang.settings_ask_identity().is_empty());
             assert!(!lang.settings_no_accounts().is_empty());
+            assert!(!lang.settings_add_account().is_empty());
             assert!(!lang.settings_forget_identity().is_empty());
             assert!(!lang.profile_title().is_empty());
             assert!(!lang.profile_nickname().is_empty());

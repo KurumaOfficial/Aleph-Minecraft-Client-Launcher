@@ -1796,6 +1796,7 @@ impl SettingsPage {
 
             let accounts = account_mgr.accounts().to_vec();
             let active_id = account_mgr.active_account().map(|a| a.id);
+            let has_accounts = !accounts.is_empty();
 
             if accounts.is_empty() && self.skin != SettingsSkin::Amc {
                 ui.add_space(4.0);
@@ -1920,6 +1921,25 @@ impl SettingsPage {
             }
             if let Some(id) = remove_id {
                 let _ = account_mgr.remove_account(id);
+            }
+
+            if has_accounts && self.skin != SettingsSkin::Amc {
+                ui.add_space(6.0);
+                let clicked = if mr {
+                    modrinth_ui::button(
+                        ui,
+                        lang.settings_add_account(),
+                        Some(Icon::Plus),
+                        modrinth_ui::ModrinthButtonKind::Secondary,
+                        170.0,
+                    )
+                    .clicked()
+                } else {
+                    ui.button(lang.settings_add_account()).clicked()
+                };
+                if clicked {
+                    self.login_request = true;
+                }
             }
 
             ui.add_space(10.0);
