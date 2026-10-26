@@ -974,6 +974,7 @@ impl ModsPage {
             return;
         }
 
+        let millida = skin == ModsSkin::Millida;
         ScrollArea::vertical()
             .auto_shrink([false, false])
             .show(ui, |ui| {
@@ -982,6 +983,13 @@ impl ModsPage {
                 // Batch operations bar. Wraps on the 960 px minimum instead
                 // of clipping the last action under the window edge.
                 ui.horizontal_wrapped(|ui| {
+                    let action = |ui: &mut Ui, label: &str| -> bool {
+                        if millida {
+                            millida_action_button(ui, label, false)
+                        } else {
+                            ui.button(label).clicked()
+                        }
+                    };
                     let all_selected = !self.local_mods.is_empty()
                         && self.selected_local.len() == self.local_mods.len();
                     let batch_icon = if all_selected {
@@ -991,17 +999,21 @@ impl ModsPage {
                     };
                     let batch_font = egui::TextStyle::Button.resolve(ui.style());
                     let batch_fill = ui.visuals().widgets.inactive.weak_bg_fill;
-                    if icons::icon_text_button(
-                        ui,
-                        batch_icon,
-                        None,
-                        lang.batch_select_all(),
-                        TEXT_PRIMARY,
-                        batch_font,
-                        batch_fill,
-                    )
-                    .clicked()
-                    {
+                    let select_clicked = if millida {
+                        millida_action_button(ui, lang.batch_select_all(), false)
+                    } else {
+                        icons::icon_text_button(
+                            ui,
+                            batch_icon,
+                            None,
+                            lang.batch_select_all(),
+                            TEXT_PRIMARY,
+                            batch_font,
+                            batch_fill,
+                        )
+                        .clicked()
+                    };
+                    if select_clicked {
                         if all_selected {
                             self.selected_local.clear();
                         } else {
@@ -1012,7 +1024,7 @@ impl ModsPage {
                                 .collect();
                         }
                     }
-                    if ui.button(lang.batch_enable()).clicked() {
+                    if action(ui, lang.batch_enable()) {
                         for m in self.local_mods.iter_mut() {
                             let key = m.path.to_string_lossy().to_string();
                             if self.selected_local.contains(&key) && !m.enabled {
@@ -1024,7 +1036,7 @@ impl ModsPage {
                             }
                         }
                     }
-                    if ui.button(lang.batch_disable()).clicked() {
+                    if action(ui, lang.batch_disable()) {
                         for m in self.local_mods.iter_mut() {
                             let key = m.path.to_string_lossy().to_string();
                             if self.selected_local.contains(&key) && m.enabled {
@@ -1036,7 +1048,7 @@ impl ModsPage {
                             }
                         }
                     }
-                    if ui.button(lang.batch_delete()).clicked() {
+                    if action(ui, lang.batch_delete()) {
                         let doomed: Vec<String> = self.selected_local.iter().cloned().collect();
                         for key in &doomed {
                             if let Some(m) = self
@@ -1054,17 +1066,16 @@ impl ModsPage {
                     ui.add_space(16.0);
                     if self.update_checking {
                         ui.spinner();
-                    } else if ui.button(lang.mods_check_updates()).clicked() {
+                    } else if action(ui, lang.mods_check_updates()) {
                         self.update_check_requested = true;
                     }
-                    if !self.update_offers.is_empty() && ui.button(lang.mods_update_all()).clicked()
-                    {
+                    if !self.update_offers.is_empty() && action(ui, lang.mods_update_all()) {
                         self.update_all_requested = true;
                     }
-                    if self.rollback_available && ui.button(lang.mods_rollback()).clicked() {
+                    if self.rollback_available && action(ui, lang.mods_rollback()) {
                         self.rollback_requested = true;
                     }
-                    if ui.button(lang.mods_install_optifine()).clicked() {
+                    if action(ui, lang.mods_install_optifine()) {
                         self.optifine_install_requested = true;
                     }
                 });
@@ -1098,7 +1109,14 @@ impl ModsPage {
                     // Batch selection checkbox.
                     let row_key = m.path.to_string_lossy().to_string();
                     let mut row_sel = self.selected_local.contains(&row_key);
-                    child.checkbox(&mut row_sel, "");
+                    let toggled = if millida {
+                        millida_check(&mut child, row_sel)
+                    } else {
+                        child.checkbox(&mut row_sel, "").clicked()
+                    };
+                    if toggled {
+                        row_sel = !row_sel;
+                    }
                     if row_sel {
                         self.selected_local.insert(row_key);
                     } else {
@@ -1179,7 +1197,12 @@ impl ModsPage {
                         )
                         .fill(toggle_color)
                         .min_size(vec2(60.0, 26.0));
-                        if ui.add(toggle_btn).clicked() {
+                        let toggled = if millida {
+                            millida_action_button(ui, toggle_text, m.enabled)
+                        } else {
+                            ui.add(toggle_btn).clicked()
+                        };
+                        if toggled {
                             to_toggle = Some(idx);
                         }
 
@@ -1867,6 +1890,76 @@ fn millida_pixel_plate(
 ) {
     millida_pixel_rect(painter, rect, cut, outline);
     millida_pixel_rect(painter, rect.shrink(1.0), cut, fill);
+}
+
+/// Small cut-corner action used by the Millida mods list.
+fn millida_action_button(ui: &mut Ui, label: &str, active: bool) -> bool {
+    let font = egui::FontId::new(11.5, egui::FontFamily::Name("bold".into()));
+    let galley = ui
+        .painter()
+        .layout_no_wrap(label.to_owned(), font, Color32::PLACEHOLDER);
+    let (rect, resp) =
+        ui.allocate_exact_size(vec2(galley.size().x + 20.0, 30.0), egui::Sense::click());
+    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+    let (fill, outline, text): (Color32, Color32, Color32) = if active {
+        (
+            crate::theme::ACCENT.into(),
+            crate::theme::ACCENT_LIGHT.into(),
+            crate::theme::BG.into(),
+        )
+    } else {
+        (
+            lerp_color(crate::theme::CARD, crate::theme::CARD_HOVER, hover),
+            lerp_color(
+                crate::theme::BORDER_STRONG,
+                crate::theme::ACCENT_LIGHT,
+                hover,
+            ),
+            crate::theme::TEXT.into(),
+        )
+    };
+    millida_pixel_plate(ui.painter(), rect, 4.0, fill, outline);
+    ui.painter().galley(
+        pos2(
+            rect.center().x - galley.size().x / 2.0,
+            rect.center().y - galley.size().y / 2.0,
+        ),
+        galley,
+        text,
+    );
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp.clicked()
+}
+
+/// Cut-corner checkbox used instead of the native rounded checkbox.
+fn millida_check(ui: &mut Ui, selected: bool) -> bool {
+    let (rect, resp) = ui.allocate_exact_size(vec2(20.0, 20.0), egui::Sense::click());
+    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+    let outline = if selected {
+        crate::theme::ACCENT_LIGHT.into()
+    } else {
+        lerp_color(
+            crate::theme::BORDER_STRONG,
+            crate::theme::ACCENT_LIGHT,
+            hover,
+        )
+    };
+    let fill: Color32 = if selected {
+        crate::theme::ACCENT.into()
+    } else {
+        crate::theme::CARD_HOVER.into()
+    };
+    millida_pixel_plate(ui.painter(), rect, 4.0, fill, outline);
+    if selected {
+        let check_color: Color32 = crate::theme::BG.into();
+        icons::draw_centered(ui.painter(), Icon::Check, rect.center(), 12.0, check_color);
+    }
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp.clicked()
 }
 
 fn labymod_mods_header(ui: &mut Ui, lang: Language) {
