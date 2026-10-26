@@ -58,6 +58,11 @@ impl LoginModal {
         if !self.is_open {
             return;
         }
+        if ctx.input(|input| input.key_pressed(egui::Key::Escape)) {
+            self.is_open = false;
+            self.error_msg = None;
+            return;
+        }
 
         let mut success_account = None;
         let mut request_ms = false;

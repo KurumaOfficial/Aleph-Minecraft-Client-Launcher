@@ -308,6 +308,16 @@ fn truncate_name(name: &str, max_chars: usize) -> String {
     }
 }
 
+/// Foreground for native dialog action buttons: light MultiMC needs dark
+/// labels, the dark shells keep white.
+fn dialog_button_fg(ui: &Ui) -> Color32 {
+    if ui.visuals().dark_mode {
+        Color32::WHITE
+    } else {
+        TEXT_HEADING.into()
+    }
+}
+
 /// Instance list ordering (CONCEPT: folders/tags/sort, P2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum InstanceSort {
@@ -2717,13 +2727,30 @@ impl InstancesPage {
         action: &mut InstanceAction,
     ) {
         if instances.is_empty() {
-            ui.add_space(40.0);
+            ui.add_space(50.0);
             ui.vertical_centered(|ui| {
                 ui.label(
-                    egui::RichText::new(lang.inst_empty())
-                        .font(egui::FontId::proportional(13.0))
+                    egui::RichText::new(lang.inst_empty_title())
+                        .font(egui::FontId::proportional(15.0))
+                        .strong()
+                        .color(TEXT_PRIMARY),
+                );
+                ui.add_space(4.0);
+                ui.label(
+                    egui::RichText::new(lang.inst_empty_hint())
+                        .font(egui::FontId::proportional(12.0))
                         .color(TEXT_MUTED),
                 );
+                ui.add_space(12.0);
+                let button = egui::Button::new(
+                    egui::RichText::new(lang.shell_add_instance())
+                        .font(egui::FontId::proportional(12.0)),
+                )
+                .min_size(vec2(160.0, 32.0));
+                if ui.add(button).clicked() {
+                    self.new_instance_ram = ctx.suggested_ram_mb;
+                    self.show_create_modal = true;
+                }
             });
             return;
         }
@@ -3703,14 +3730,14 @@ impl InstancesPage {
 
                     ui.add_space(18.0);
                     ui.horizontal(|ui| {
-                        if ui
-                            .button(
-                                egui::RichText::new(lang.inst_modal_btn_create())
-                                    .strong()
-                                    .color(Color32::WHITE),
-                            )
-                            .clicked()
-                        {
+                        let can_create = !self.new_instance_name.trim().is_empty()
+                            && !self.new_instance_version.trim().is_empty();
+                        let create = egui::Button::new(
+                            egui::RichText::new(lang.inst_modal_btn_create())
+                                .strong()
+                                .color(dialog_button_fg(ui)),
+                        );
+                        if ui.add_enabled(can_create, create).clicked() {
                             let mut inst = Instance::new(
                                 &self.new_instance_name,
                                 &self.new_instance_version,
@@ -3746,7 +3773,7 @@ impl InstancesPage {
                             .button(
                                 egui::RichText::new(lang.inst_btn_clone())
                                     .strong()
-                                    .color(Color32::WHITE),
+                                    .color(dialog_button_fg(ui)),
                             )
                             .clicked()
                         {
@@ -4113,14 +4140,14 @@ impl InstancesPage {
                     ui.separator();
                     ui.add_space(6.0);
                     ui.horizontal(|ui| {
-                        if ui
-                            .button(
-                                egui::RichText::new(lang.inst_modal_btn_save())
-                                    .strong()
-                                    .color(Color32::WHITE),
-                            )
-                            .clicked()
-                        {
+                        let can_save = !self.edit_instance_name.trim().is_empty()
+                            && !self.edit_instance_version.trim().is_empty();
+                        let save = egui::Button::new(
+                            egui::RichText::new(lang.inst_modal_btn_save())
+                                .strong()
+                                .color(dialog_button_fg(ui)),
+                        );
+                        if ui.add_enabled(can_save, save).clicked() {
                             save_edit = true;
                         }
 
