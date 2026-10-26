@@ -713,6 +713,15 @@ impl Language {
         }
     }
 
+    /// Friends section, signed-in empty state.
+    pub fn modrinth_no_friends_yet(&self) -> &'static str {
+        match self {
+            Self::English => "Your friends list is empty for now",
+            Self::Russian => "Список друзей пока пуст",
+            Self::Ukrainian => "Список друзів поки порожній",
+        }
+    }
+
     /// Modrinth shell: right sidebar news heading.
     pub fn modrinth_news(&self) -> &'static str {
         match self {
@@ -5628,6 +5637,7 @@ mod tests {
             assert!(!lang.modrinth_sign_in().is_empty());
             assert!(!lang.modrinth_friends().is_empty());
             assert!(!lang.modrinth_no_friends().is_empty());
+            assert!(!lang.modrinth_no_friends_yet().is_empty());
             assert!(!lang.modrinth_news().is_empty());
             assert!(!lang.modrinth_news_updates().is_empty());
             assert!(!lang.modrinth_news_community().is_empty());

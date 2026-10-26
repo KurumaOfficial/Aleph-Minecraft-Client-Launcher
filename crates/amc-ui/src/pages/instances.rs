@@ -1,9 +1,9 @@
 use crate::pages::instance_manage::InstanceManage;
 use crate::theme::{
     lerp_color, with_alpha, BG_CARD, BG_HOVER, BORDER_DEFAULT, MODRINTH_BG, MODRINTH_FIELD,
-    MODRINTH_GREEN, MODRINTH_SURFACE, MODRINTH_SURFACE_HIGH, MODRINTH_SURFACE_HOVER, MODRINTH_TEXT,
-    MODRINTH_TEXT_CONTRAST, MODRINTH_TEXT_SECONDARY, RUBY, RUBY_DIM, RUBY_LIGHT, TEXT_HEADING,
-    TEXT_MUTED, TEXT_PRIMARY, WARNING,
+    MODRINTH_GREEN, MODRINTH_MUTED, MODRINTH_SURFACE, MODRINTH_SURFACE_HIGH,
+    MODRINTH_SURFACE_HOVER, MODRINTH_TEXT, MODRINTH_TEXT_CONTRAST, MODRINTH_TEXT_SECONDARY, RUBY,
+    RUBY_DIM, RUBY_LIGHT, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY, WARNING,
 };
 use crate::widgets::choice_chip;
 use crate::widgets::full::tag;
@@ -594,21 +594,21 @@ fn m_button_enabled(
     let fill = if enabled {
         lerp_color(base, hot, hover)
     } else {
-        with_alpha(base, 128)
+        MODRINTH_SURFACE_HOVER
     };
     ui.painter().rect_filled(rect, radius, fill);
     let content = if brand {
         if enabled {
             Color32::BLACK
         } else {
-            with_alpha(Color32::BLACK, 128)
+            MODRINTH_MUTED
         }
     } else if enabled {
         MODRINTH_TEXT_CONTRAST
     } else {
-        with_alpha(MODRINTH_TEXT, 128)
+        MODRINTH_MUTED
     };
-    if brand {
+    if brand && enabled {
         // Reference colored buttons carry a soft top highlight.
         ui.painter().line_segment(
             [
@@ -617,7 +617,7 @@ fn m_button_enabled(
             ],
             Stroke::new(1.0_f32, with_alpha(Color32::WHITE, 70)),
         );
-    } else {
+    } else if !brand {
         let stroke = if enabled {
             MODRINTH_SURFACE_HIGH
         } else {
@@ -1923,6 +1923,11 @@ impl InstancesPage {
         }
         if resp.hovered() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+        if inst.name.chars().count() > max_chars {
+            // Cards are as narrow as 160 px in the reference grid; keep the
+            // full instance name reachable when the painted line ellipsizes.
+            resp.on_hover_text(inst.name.as_str());
         }
     }
 

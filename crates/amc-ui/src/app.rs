@@ -4339,6 +4339,14 @@ impl App for LauncherApp {
                             self.home_page.labymod_instances_request = false;
                             self.current_tab = NavTab::Modpacks;
                         }
+                        if self.home_page.labymod_friends_request {
+                            self.home_page.labymod_friends_request = false;
+                            if self.account_mgr.active_account().is_some() {
+                                self.current_tab = NavTab::Profile;
+                            } else {
+                                self.login_modal.is_open = true;
+                            }
+                        }
                         if let Some((server, port)) = self.home_page.direct_connect_request.take() {
                             self.handle_direct_connect(server, port);
                         }
@@ -4903,6 +4911,7 @@ impl App for LauncherApp {
                     .map(|account| account.username.clone());
                 let mut close_overlay = false;
                 let mut open_login = false;
+                let mut overlay_tab: Option<NavTab> = None;
 
                 egui::Area::new(egui::Id::new("modrinth_rail_backdrop"))
                     .fixed_pos(egui::pos2(0.0, 48.0))
@@ -4950,11 +4959,58 @@ impl App for LauncherApp {
                                     open_login = true;
                                     close_overlay = true;
                                 }
+                                if action.tab.is_some() {
+                                    overlay_tab = action.tab;
+                                    close_overlay = true;
+                                }
+                                // Drawer chrome: an explicit close affordance in
+                                // addition to backdrop/Escape/toggle dismissal.
+                                let close_rect = egui::Rect::from_min_size(
+                                    egui::pos2(rail_pos.x + overlay_w - 34.0, rail_pos.y + 8.0),
+                                    egui::vec2(26.0, 26.0),
+                                );
+                                let close_resp = ui
+                                    .interact(
+                                        close_rect,
+                                        egui::Id::new("modrinth_rail_close"),
+                                        egui::Sense::click(),
+                                    )
+                                    .on_hover_text(lang.home_drawer_close());
+                                let close_hover = ui
+                                    .ctx()
+                                    .animate_bool_responsive(close_resp.id, close_resp.hovered());
+                                if close_hover > 0.02 {
+                                    ui.painter().rect_filled(
+                                        close_rect,
+                                        egui::Rounding::same(8.0),
+                                        egui::Color32::from_white_alpha((close_hover * 22.0) as u8),
+                                    );
+                                }
+                                crate::widgets::icons::draw(
+                                    ui.painter(),
+                                    crate::widgets::icons::Icon::Close,
+                                    close_rect.shrink(7.0),
+                                    crate::theme::lerp_color(
+                                        crate::theme::MODRINTH_TEXT_SECONDARY,
+                                        crate::theme::MODRINTH_TEXT_CONTRAST,
+                                        close_hover,
+                                    ),
+                                    1.5,
+                                );
+                                if close_resp.hovered() {
+                                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                }
+                                if close_resp.clicked() {
+                                    close_overlay = true;
+                                }
                             });
                     });
 
                 if close_overlay {
                     self.modrinth_rail_overlay = false;
+                }
+                if let Some(tab) = overlay_tab {
+                    self.current_tab = tab;
                 }
                 if open_login {
                     self.login_modal.is_open = true;

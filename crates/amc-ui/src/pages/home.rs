@@ -46,6 +46,8 @@ pub struct HomePage {
     pub drawer_play_request: Option<String>,
     /// LabyMod Home: the launch button's secondary segment opens Instances.
     pub labymod_instances_request: bool,
+    /// LabyMod Home: Friends card opens Profile (signed in) or Login.
+    pub labymod_friends_request: bool,
     /// LabyMod Home: Quick Play server manager modal.
     pub labymod_servers_open: bool,
     drawer_open: bool,
@@ -86,6 +88,7 @@ impl Default for HomePage {
             hero_play_request: false,
             drawer_play_request: None,
             labymod_instances_request: false,
+            labymod_friends_request: false,
             labymod_servers_open: false,
             drawer_open: false,
             drawer_version: None,
@@ -771,7 +774,15 @@ impl HomePage {
                     ui.allocate_ui_with_layout(
                         vec2(right, height),
                         egui::Layout::top_down(egui::Align::Min),
-                        |ui| self.show_labymod_side(ui, right, height, lang),
+                        |ui| {
+                            self.show_labymod_side(
+                                ui,
+                                right,
+                                height,
+                                lang,
+                                ctx.account_name.is_some(),
+                            )
+                        },
                     );
                 });
             },
@@ -1094,6 +1105,7 @@ impl HomePage {
         width: f32,
         height: f32,
         lang: amc_core::Language,
+        signed_in: bool,
     ) {
         // The account chip lives in the titlebar now (as in the reference);
         // the right column starts directly with Friends.
@@ -1101,9 +1113,16 @@ impl HomePage {
         let friends_h = (remaining * 0.52).max(150.0);
         let news_h = (remaining - friends_h - 12.0).max(140.0);
 
-        let (friends, _) = ui.allocate_exact_size(vec2(width, friends_h), Sense::hover());
-        ui.painter()
-            .rect_filled(friends, egui::Rounding::same(16.0), BG_CARD);
+        let (friends, friends_resp) =
+            ui.allocate_exact_size(vec2(width, friends_h), Sense::click());
+        let friends_hover = ui
+            .ctx()
+            .animate_bool_responsive(friends_resp.id, friends_resp.hovered());
+        ui.painter().rect_filled(
+            friends,
+            egui::Rounding::same(16.0),
+            lerp_color(BG_CARD, BG_HOVER, friends_hover),
+        );
         ui.painter().rect_stroke(
             friends,
             egui::Rounding::same(16.0),
@@ -1123,20 +1142,56 @@ impl HomePage {
             egui::FontId::proportional(9.0),
             TEXT_MUTED.into(),
         );
-        let hint = lang.modrinth_no_friends();
-        ui.allocate_new_ui(
-            egui::UiBuilder::new().max_rect(egui::Rect::from_min_max(
-                egui::pos2(friends.left() + 16.0, friends.top() + 66.0),
-                egui::pos2(friends.right() - 16.0, friends.bottom() - 12.0),
-            )),
-            |ui| {
-                ui.label(
-                    egui::RichText::new(hint)
-                        .font(egui::FontId::proportional(11.5))
-                        .color(TEXT_MUTED),
-                );
+        let hint = if signed_in {
+            lang.modrinth_no_friends_yet()
+        } else {
+            lang.modrinth_no_friends()
+        };
+        // Paint the hint at a fixed card position instead of nesting another
+        // allocating UI: a child allocation rewound the parent cursor and let
+        // the News card overlap the lower half of this card.
+        let hint_galley = ui.painter().layout(
+            hint.to_owned(),
+            egui::FontId::proportional(11.5),
+            TEXT_MUTED.into(),
+            (friends.width() - 32.0).max(80.0),
+        );
+        ui.painter().galley(
+            egui::pos2(friends.left() + 16.0, friends.top() + 66.0),
+            hint_galley,
+            TEXT_MUTED.into(),
+        );
+        ui.painter().text(
+            egui::pos2(friends.left() + 16.0, friends.bottom() - 15.0),
+            egui::Align2::LEFT_CENTER,
+            if signed_in {
+                lang.nav_profile()
+            } else {
+                lang.modrinth_sign_in()
+            },
+            egui::FontId::proportional(11.0),
+            if signed_in {
+                TEXT_MUTED.into()
+            } else {
+                crate::theme::ACCENT_LIGHT.into()
             },
         );
+        icons::draw(
+            ui.painter(),
+            Icon::ChevronRight,
+            egui::Rect::from_center_size(
+                egui::pos2(friends.right() - 18.0, friends.bottom() - 15.0),
+                vec2(13.0, 13.0),
+            ),
+            TEXT_MUTED,
+            1.3,
+        );
+        if friends_resp.hovered() {
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+        if friends_resp.clicked() {
+            self.labymod_friends_request = true;
+        }
 
         ui.add_space(12.0);
         let (news, _) = ui.allocate_exact_size(vec2(width, news_h), Sense::hover());

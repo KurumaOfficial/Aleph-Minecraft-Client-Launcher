@@ -195,7 +195,7 @@ pub fn show_sidebar(
 
     let (chip_row, _) = ui.allocate_exact_size(vec2(bar.width(), 46.0), Sense::hover());
     let chip = chip_row.shrink2(vec2(PAD, 4.0));
-    let display = account_name.unwrap_or_else(|| lang.shell_nickname());
+    let display = account_name.unwrap_or_else(|| lang.modrinth_sign_in());
     let resp = ui
         .interact(chip, ui.id().with("modrinth_account"), Sense::click())
         .on_hover_text(display);
@@ -301,8 +301,12 @@ pub fn show_right_sidebar(ui: &mut Ui, lang: Language, account_name: Option<&str
             ui.add_space(8.0);
             ui.horizontal(|ui| {
                 ui.add_space(16.0);
-                if friends_empty_card(ui, width, lang) {
-                    action.login = true;
+                if friends_empty_card(ui, width, lang, account_name.is_some()) {
+                    if account_name.is_some() {
+                        action.tab = Some(NavTab::Profile);
+                    } else {
+                        action.login = true;
+                    }
                 }
             });
             ui.add_space(14.0);
@@ -467,7 +471,7 @@ fn account_card(ui: &mut Ui, width: f32, lang: Language, account_name: Option<&s
     resp.clicked()
 }
 
-fn friends_empty_card(ui: &mut Ui, width: f32, lang: Language) -> bool {
+fn friends_empty_card(ui: &mut Ui, width: f32, lang: Language, signed_in: bool) -> bool {
     let (rect, resp) = ui.allocate_exact_size(vec2(width, 78.0), Sense::click());
     let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
     ui.painter().rect_filled(
@@ -501,8 +505,13 @@ fn friends_empty_card(ui: &mut Ui, width: f32, lang: Language) -> bool {
         theme::MODRINTH_TEXT_SECONDARY,
         1.35,
     );
+    let hint = if signed_in {
+        lang.modrinth_no_friends_yet()
+    } else {
+        lang.modrinth_no_friends()
+    };
     let text = ui.painter().layout(
-        lang.modrinth_no_friends().to_owned(),
+        hint.to_owned(),
         egui::FontId::proportional(11.5),
         theme::MODRINTH_TEXT_SECONDARY,
         (rect.width() - 96.0).max(90.0),
@@ -515,9 +524,17 @@ fn friends_empty_card(ui: &mut Ui, width: f32, lang: Language) -> bool {
     ui.painter().text(
         pos2(rect.left() + 56.0, rect.top() + 60.0),
         Align2::LEFT_CENTER,
-        lang.modrinth_sign_in(),
+        if signed_in {
+            lang.nav_profile()
+        } else {
+            lang.modrinth_sign_in()
+        },
         egui::FontId::proportional(11.0),
-        theme::MODRINTH_GREEN,
+        if signed_in {
+            theme::MODRINTH_TEXT_SECONDARY
+        } else {
+            theme::MODRINTH_GREEN
+        },
     );
     icons::draw(
         ui.painter(),
