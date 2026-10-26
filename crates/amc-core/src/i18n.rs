@@ -1075,9 +1075,26 @@ impl Language {
 
     pub fn mods_search_hint(&self, prov: &str) -> String {
         match self {
-            Self::English => format!("🔍 Search mods on {prov}..."),
-            Self::Russian => format!("🔍 Поиск модов на {prov}..."),
-            Self::Ukrainian => format!("🔍 Пошук модів на {prov}..."),
+            Self::English => format!("Search mods on {prov}..."),
+            Self::Russian => format!("Поиск модов на {prov}..."),
+            Self::Ukrainian => format!("Пошук модів на {prov}..."),
+        }
+    }
+
+    pub fn mods_search_clear(&self) -> &'static str {
+        match self {
+            Self::English => "Clear search",
+            Self::Russian => "Очистить поиск",
+            Self::Ukrainian => "Очистити пошук",
+        }
+    }
+
+    /// Settings → Accounts empty card subtitle for the LabyMod/Millida shells.
+    pub fn settings_accounts_empty_hint(&self) -> &'static str {
+        match self {
+            Self::English => "Sign in to use your profile, skins and servers",
+            Self::Russian => "Войдите, чтобы использовать профиль, скины и серверы",
+            Self::Ukrainian => "Увійдіть, щоб використовувати профіль, скіни та сервери",
         }
     }
 
@@ -5981,6 +5998,7 @@ mod tests {
             assert!(!lang.settings_ask_identity().is_empty());
             assert!(!lang.settings_no_accounts().is_empty());
             assert!(!lang.settings_add_account().is_empty());
+            assert!(!lang.settings_accounts_empty_hint().is_empty());
             assert!(!lang.settings_forget_identity().is_empty());
             assert!(!lang.profile_title().is_empty());
             assert!(!lang.profile_nickname().is_empty());
@@ -6015,6 +6033,7 @@ mod tests {
             assert!(!lang.mods_sort_downloads().is_empty());
             assert!(!lang.mods_install_optifine().is_empty());
             assert!(!lang.mods_optifine_need_instance().is_empty());
+            assert!(!lang.mods_search_clear().is_empty());
             assert!(!lang.toast_mod_installed("x").is_empty());
             assert!(!lang.err_mod_copy_failed("x", "y").is_empty());
             assert!(!lang.toast_world_imported("x").is_empty());

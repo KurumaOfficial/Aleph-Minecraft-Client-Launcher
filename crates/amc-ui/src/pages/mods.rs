@@ -1355,20 +1355,43 @@ impl ModsPage {
 
             ui.add_space(8.0);
 
-            let search_width = (ui.available_width() - 240.0).max(160.0);
+            let search_width = (ui.available_width()
+                - 240.0
+                - if self.search_query.is_empty() {
+                    0.0
+                } else {
+                    30.0
+                })
+            .max(160.0);
             let hint = match self.search_provider {
                 ModSource::Modrinth => lang.mods_search_hint("Modrinth"),
                 ModSource::CurseForge => lang.mods_search_hint("CurseForge"),
                 _ => lang.mods_search_hint("Mods"),
             };
 
+            let search_id = egui::Id::new("mods_search_field");
             let search_edit = TextEdit::singleline(&mut self.search_query)
+                .id(search_id)
                 .hint_text(egui::RichText::new(hint).color(TEXT_MUTED))
                 .desired_width(search_width)
                 .font(egui::FontId::proportional(14.0));
 
             let resp = ui.add(search_edit);
             let enter_pressed = resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+
+            if !self.search_query.is_empty()
+                && icons::icon_button(ui, Icon::Close, TEXT_MUTED)
+                    .on_hover_text(lang.mods_search_clear())
+                    .clicked()
+            {
+                self.search_query.clear();
+                ui.memory_mut(|m| m.request_focus(search_id));
+            }
+            if ui.memory(|m| m.has_focus(search_id))
+                && ui.input(|i| i.key_pressed(egui::Key::Escape))
+            {
+                self.search_query.clear();
+            }
 
             ui.add_space(8.0);
 

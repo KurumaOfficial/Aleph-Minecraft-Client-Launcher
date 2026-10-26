@@ -118,6 +118,8 @@ pub struct InstancesPage {
     pub new_instance_version: String,
     pub new_instance_loader: LoaderType,
     pub new_instance_ram: u32,
+    /// Modrinth create dialog: first-frame focus for the name field.
+    create_modal_seen: bool,
 
     // Edit modal
     pub show_edit_modal: bool,
@@ -142,7 +144,7 @@ pub struct InstancesPage {
     pub edit_instance_pre: String,
     pub edit_instance_post: String,
 
-    // Background disk-usage scan (CONCEPT "Место на диске").
+    // Background disk-usage scan (CONCEPT "ÐœÐµÑÑ‚Ð¾ Ð½Ð° Ð´Ð¸ÑÐºÐµ").
     disk_sizes: HashMap<Uuid, u64>,
     disk_scanned_for: Vec<Uuid>,
     disk_rx: Option<std::sync::mpsc::Receiver<Vec<(Uuid, u64, bool)>>>,
@@ -209,6 +211,7 @@ impl Default for InstancesPage {
             new_instance_version: "1.20.1".to_string(),
             new_instance_loader: LoaderType::Fabric,
             new_instance_ram: 4096,
+            create_modal_seen: false,
 
             show_edit_modal: false,
             edit_instance_id: None,
@@ -304,7 +307,7 @@ fn truncate_name(name: &str, max_chars: usize) -> String {
     if name.chars().count() <= max_chars {
         name.to_string()
     } else {
-        format!("{}…", name.chars().take(max_chars).collect::<String>())
+        format!("{}â€¦", name.chars().take(max_chars).collect::<String>())
     }
 }
 
@@ -666,6 +669,136 @@ fn m_button_enabled(
     enabled && resp.clicked()
 }
 
+/// Modrinth-style chip used by the creation dialog (loader/template picks).
+/// Active chips use the brand green with dark content, like the reference's
+/// selected `Chips` item; inactive chips sit on surface-4.
+fn modrinth_pick_chip(ui: &mut Ui, label: &str, active: bool) -> bool {
+    let galley = ui.painter().layout_no_wrap(
+        label.to_owned(),
+        egui::FontId::proportional(13.5),
+        Color32::PLACEHOLDER,
+    );
+    let width = (galley.size().x + 22.0).max(58.0);
+    let (rect, resp) = ui.allocate_exact_size(vec2(width, 32.0), Sense::click());
+    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+    let radius = Rounding::same(10.0);
+    let fill = if active {
+        lerp_color(MODRINTH_GREEN, crate::theme::MODRINTH_GREEN_LIGHT, hover)
+    } else {
+        lerp_color(
+            MODRINTH_SURFACE_HOVER,
+            m_brightness(MODRINTH_SURFACE_HOVER, 1.1),
+            hover,
+        )
+    };
+    ui.painter().rect_filled(rect, radius, fill);
+    if !active {
+        ui.painter()
+            .rect_stroke(rect, radius, Stroke::new(1.0_f32, MODRINTH_SURFACE_HIGH));
+    }
+    let text = if active {
+        MODRINTH_BG
+    } else {
+        MODRINTH_TEXT_CONTRAST
+    };
+    ui.painter().galley(
+        pos2(
+            rect.center().x - galley.size().x / 2.0,
+            rect.center().y - galley.size().y / 2.0,
+        ),
+        galley,
+        text,
+    );
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp.clicked()
+}
+
+/// Modrinth-style RAM slider: green track, white thumb and a compact value
+/// plate on the right. Keeps the dialog visually consistent instead of
+/// falling back to egui's default slider chrome.
+fn modrinth_ram_slider(ui: &mut Ui, value: &mut u32, width: f32) -> egui::Response {
+    const MIN_MB: u32 = 1024;
+    const MAX_MB: u32 = 16384;
+    const STEP_MB: u32 = 512;
+
+    let (rect, _) = ui.allocate_exact_size(vec2(width, 32.0), Sense::hover());
+    let plate_w = 76.0;
+    let track_w = (width - plate_w - 16.0).max(80.0);
+    let track = Rect::from_center_size(
+        pos2(rect.left() + track_w / 2.0, rect.center().y),
+        vec2(track_w, 6.0),
+    );
+    let resp = ui.interact(
+        Rect::from_min_max(
+            pos2(rect.left(), rect.top()),
+            pos2(track.right() + 10.0, rect.bottom()),
+        ),
+        ui.id().with("modrinth_ram_slider"),
+        Sense::click_and_drag(),
+    );
+    if resp.dragged() || resp.clicked() {
+        if let Some(pointer) = ui.input(|i| i.pointer.interact_pos()) {
+            let t = ((pointer.x - track.left()) / track.width()).clamp(0.0, 1.0);
+            let raw = MIN_MB as f32 + t * (MAX_MB - MIN_MB) as f32;
+            let stepped = ((raw / STEP_MB as f32).round() as u32) * STEP_MB;
+            *value = stepped.clamp(MIN_MB, MAX_MB);
+        }
+    }
+    let value = (*value).clamp(MIN_MB, MAX_MB);
+    let t = (value - MIN_MB) as f32 / (MAX_MB - MIN_MB) as f32;
+    ui.painter()
+        .rect_filled(track, Rounding::same(3.0), MODRINTH_SURFACE_HIGH);
+    ui.painter().rect_filled(
+        Rect::from_min_size(track.min, vec2(track.width() * t, track.height())),
+        Rounding::same(3.0),
+        MODRINTH_GREEN,
+    );
+    let knob = pos2(track.left() + track.width() * t, track.center().y);
+    ui.painter().circle_filled(
+        knob,
+        if resp.hovered() || resp.dragged() {
+            8.0
+        } else {
+            7.0
+        },
+        Color32::WHITE,
+    );
+    ui.painter().circle_stroke(
+        knob,
+        if resp.hovered() || resp.dragged() {
+            8.0
+        } else {
+            7.0
+        },
+        Stroke::new(1.0_f32, with_alpha(MODRINTH_BG, 90)),
+    );
+
+    let plate = Rect::from_min_size(
+        pos2(rect.right() - plate_w, rect.center().y - 14.0),
+        vec2(plate_w, 28.0),
+    );
+    ui.painter()
+        .rect_filled(plate, Rounding::same(8.0), MODRINTH_FIELD);
+    ui.painter().rect_stroke(
+        plate,
+        Rounding::same(8.0),
+        Stroke::new(1.0_f32, MODRINTH_SURFACE_HIGH),
+    );
+    ui.painter().text(
+        plate.center(),
+        Align2::CENTER_CENTER,
+        format!("{value} MB"),
+        egui::FontId::proportional(12.0),
+        MODRINTH_TEXT_CONTRAST,
+    );
+    if resp.hovered() || resp.dragged() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+    }
+    resp
+}
+
 /// Modrinth-style combobox button: leading icon, current value, caret.
 fn m_combo(ui: &mut Ui, icon: Icon, label: &str) -> egui::Response {
     let galley = ui.painter().layout_no_wrap(
@@ -936,7 +1069,7 @@ struct LibrarySection {
 
 /// Build the sections for the selected Modrinth grouping mode. Custom groups
 /// sort alphabetically with "Ungrouped" last; loaders follow the reference
-/// Fabric → Forge → NeoForge priority, versions are newest first.
+/// Fabric â†’ Forge â†’ NeoForge priority, versions are newest first.
 fn modrinth_sections(
     instances: &[Instance],
     filtered: &[usize],
@@ -1215,7 +1348,7 @@ impl InstancesPage {
     }
 
     /// Poll a finished background scan, or (re)start one when the instance
-    /// set changed. Measuring runs on a worker thread — the UI never blocks.
+    /// set changed. Measuring runs on a worker thread â€” the UI never blocks.
     /// Besides sizes it flags instances holding local (non-launcher) mods.
     fn poll_disk_sizes(&mut self, instances: &[Instance], instances_dir: &Path) {
         if let Some(rx) = &self.disk_rx {
@@ -1334,7 +1467,7 @@ impl InstancesPage {
         self.filter_cache.clone()
     }
 
-    /// Modrinth App shell: the library page — "Library" heading, search and
+    /// Modrinth App shell: the library page â€” "Library" heading, search and
     /// New buttons, sort/group/filter bar, big cards with a hover Play
     /// button. Layout mirrors `apps/app-frontend` (`library` components);
     /// colors are the reference's dark-theme CSS tokens.
@@ -1942,7 +2075,7 @@ impl InstancesPage {
     }
 
     /// Reference `ContextMenu` for an instance card: Play, Edit, Duplicate,
-    /// Manage, shortcut, folder, Delete — same order and icon placement.
+    /// Manage, shortcut, folder, Delete â€” same order and icon placement.
     fn modrinth_context_menu(
         &mut self,
         ctx: &egui::Context,
@@ -2074,6 +2207,326 @@ impl InstancesPage {
             }
             None => {}
         }
+    }
+
+    /// Modrinth App "Create instance" dialog. The reference uses a 600-ish
+    /// rounded modal on surface-3 with a 24px title, labeled fields, loader
+    /// chips and a brand-green primary action. The AMC dialog keeps the
+    /// template shortcuts and RAM control but presents them in that
+    /// composition, so Modrinth no longer falls back to a generic egui window.
+    fn modrinth_create_modal(
+        &mut self,
+        ctx: &egui::Context,
+        lang: Language,
+        selected_instance: &mut Option<Uuid>,
+    ) -> Option<InstanceAction> {
+        if !self.show_create_modal {
+            self.create_modal_seen = false;
+            return None;
+        }
+
+        let screen = ctx.screen_rect();
+        let modal_w = 600.0_f32.min(screen.width() - 32.0);
+        let content_w = modal_w - 36.0;
+        // The measured body is ~450px; 540 keeps the dialog below the custom
+        // titlebar and fully inside the 960x600 minimum.
+        let modal_h = 540.0_f32.min(screen.height() - 56.0);
+        let modal_pos = pos2(
+            screen.center().x - modal_w / 2.0,
+            (screen.center().y - modal_h / 2.0).max(screen.top() + 52.0),
+        );
+
+        let mut close = false;
+        let mut create = false;
+
+        egui::Area::new(egui::Id::new("modrinth_create_backdrop"))
+            .order(egui::Order::Middle)
+            .fixed_pos(screen.min)
+            .show(ctx, |ui| {
+                let (rect, resp) = ui.allocate_exact_size(screen.size(), Sense::click());
+                ui.painter()
+                    .rect_filled(rect, Rounding::ZERO, Color32::from_black_alpha(150));
+                if resp.clicked() {
+                    close = true;
+                }
+            });
+
+        egui::Area::new(egui::Id::new("modrinth_create_modal"))
+            .order(egui::Order::Foreground)
+            .fixed_pos(modal_pos)
+            .show(ctx, |ui| {
+                egui::Frame::none()
+                    .fill(MODRINTH_SURFACE)
+                    .stroke(Stroke::new(1.0_f32, MODRINTH_SURFACE_HIGH))
+                    .rounding(Rounding::same(16.0))
+                    .shadow(egui::epaint::Shadow {
+                        offset: vec2(0.0, 12.0),
+                        blur: 32.0,
+                        spread: 0.0,
+                        color: Color32::from_black_alpha(150),
+                    })
+                    .inner_margin(egui::Margin::same(18.0))
+                    .show(ui, |ui| {
+                        ui.set_width(content_w);
+                        ui.spacing_mut().item_spacing.y = 6.0;
+
+                        // Header: title + quiet close button.
+                        let (header, _) =
+                            ui.allocate_exact_size(vec2(content_w, 30.0), Sense::hover());
+                        ui.painter().text(
+                            pos2(header.left(), header.center().y),
+                            Align2::LEFT_CENTER,
+                            lang.inst_modal_create_title(),
+                            egui::FontId::new(23.0, egui::FontFamily::Name("bold".into())),
+                            MODRINTH_TEXT_CONTRAST,
+                        );
+                        let close_rect = Rect::from_center_size(
+                            pos2(header.right() - 14.0, header.center().y),
+                            vec2(32.0, 32.0),
+                        );
+                        let close_resp = ui.interact(
+                            close_rect,
+                            egui::Id::new("modrinth_create_close"),
+                            Sense::click(),
+                        );
+                        if close_resp.hovered() {
+                            ui.painter().rect_filled(
+                                close_rect,
+                                Rounding::same(8.0),
+                                with_alpha(MODRINTH_TEXT_CONTRAST, 16),
+                            );
+                            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                        }
+                        icons::draw(
+                            ui.painter(),
+                            Icon::Close,
+                            close_rect.shrink(9.0),
+                            MODRINTH_TEXT,
+                            1.7,
+                        );
+                        if close_resp.clicked() {
+                            close = true;
+                        }
+
+                        ui.add_space(8.0);
+
+                        // Name.
+                        ui.label(
+                            egui::RichText::new(lang.inst_modal_name())
+                                .font(egui::FontId::proportional(14.0))
+                                .strong()
+                                .color(MODRINTH_TEXT_CONTRAST),
+                        );
+                        ui.add_space(4.0);
+                        let name_resp = modrinth_input(
+                            ui,
+                            &mut self.new_instance_name,
+                            egui::Id::new("modrinth_create_name"),
+                            content_w,
+                            38.0,
+                            "My Instance",
+                            None,
+                        );
+                        if !self.create_modal_seen {
+                            ui.memory_mut(|mem| {
+                                mem.request_focus(egui::Id::new("modrinth_create_name"))
+                            });
+                            self.create_modal_seen = true;
+                        }
+
+                        ui.add_space(8.0);
+
+                        // Game version.
+                        ui.label(
+                            egui::RichText::new(lang.inst_modal_version())
+                                .font(egui::FontId::proportional(14.0))
+                                .strong()
+                                .color(MODRINTH_TEXT_CONTRAST),
+                        );
+                        ui.add_space(4.0);
+                        let version_resp = modrinth_input(
+                            ui,
+                            &mut self.new_instance_version,
+                            egui::Id::new("modrinth_create_version"),
+                            content_w,
+                            38.0,
+                            "1.20.1",
+                            None,
+                        );
+                        if self.new_instance_loader == LoaderType::Forge
+                            && amc_minecraft::loaders::forge::is_legacy_unsafe_line(
+                                &self.new_instance_version,
+                            )
+                        {
+                            ui.add_space(4.0);
+                            ui.label(
+                                egui::RichText::new(lang.inst_warn_legacy_forge())
+                                    .font(egui::FontId::proportional(12.0))
+                                    .color(WARNING),
+                            );
+                        }
+
+                        ui.add_space(8.0);
+
+                        // Loader chips.
+                        ui.label(
+                            egui::RichText::new(lang.inst_modal_loader())
+                                .font(egui::FontId::proportional(14.0))
+                                .strong()
+                                .color(MODRINTH_TEXT_CONTRAST),
+                        );
+                        ui.add_space(4.0);
+                        ui.horizontal_wrapped(|ui| {
+                            ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
+                            for loader in [
+                                LoaderType::Vanilla,
+                                LoaderType::Fabric,
+                                LoaderType::Quilt,
+                                LoaderType::Forge,
+                                LoaderType::NeoForge,
+                                LoaderType::OptiFine,
+                            ] {
+                                if modrinth_pick_chip(
+                                    ui,
+                                    loader.as_str(),
+                                    self.new_instance_loader == loader,
+                                ) {
+                                    self.new_instance_loader = loader;
+                                }
+                            }
+                        });
+
+                        ui.add_space(8.0);
+
+                        // Memory.
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                egui::RichText::new(lang.inst_modal_ram())
+                                    .font(egui::FontId::proportional(14.0))
+                                    .strong()
+                                    .color(MODRINTH_TEXT_CONTRAST),
+                            );
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    ui.label(
+                                        egui::RichText::new(format!(
+                                            "{} / 16384 MB",
+                                            self.new_instance_ram
+                                        ))
+                                        .font(egui::FontId::proportional(12.0))
+                                        .color(MODRINTH_TEXT_SECONDARY),
+                                    );
+                                },
+                            );
+                        });
+                        ui.add_space(2.0);
+                        modrinth_ram_slider(ui, &mut self.new_instance_ram, content_w);
+
+                        ui.add_space(8.0);
+
+                        // Template shortcuts (AMC feature, reference chip row).
+                        let tmpl_desc = InstanceTemplate::matching(
+                            self.new_instance_loader,
+                            self.new_instance_ram,
+                        )
+                        .map(|t| lang.tmpl_desc(t.id))
+                        .unwrap_or_else(|| lang.tmpl_custom_note());
+                        ui.horizontal(|ui| {
+                            ui.label(
+                                egui::RichText::new(lang.tmpl_title())
+                                    .font(egui::FontId::proportional(14.0))
+                                    .strong()
+                                    .color(MODRINTH_TEXT_CONTRAST),
+                            );
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    ui.label(
+                                        egui::RichText::new(truncate_name(tmpl_desc, 56))
+                                            .font(egui::FontId::proportional(11.5))
+                                            .color(MODRINTH_TEXT_SECONDARY),
+                                    );
+                                },
+                            );
+                        });
+                        ui.add_space(4.0);
+                        ui.horizontal_wrapped(|ui| {
+                            ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
+                            for tmpl in InstanceTemplate::ALL {
+                                let active = InstanceTemplate::matching(
+                                    self.new_instance_loader,
+                                    self.new_instance_ram,
+                                )
+                                .map(|t| t.id)
+                                    == Some(tmpl.id);
+                                if modrinth_pick_chip(ui, lang.tmpl_name(tmpl.id), active) {
+                                    self.apply_template(tmpl, lang);
+                                }
+                            }
+                        });
+
+                        ui.add_space(12.0);
+                        let (divider, _) =
+                            ui.allocate_exact_size(vec2(content_w, 1.0), Sense::hover());
+                        ui.painter().rect_filled(
+                            divider.expand2(vec2(20.0, 0.0)),
+                            Rounding::ZERO,
+                            MODRINTH_SURFACE_HIGH,
+                        );
+                        ui.add_space(12.0);
+
+                        let can_create = !self.new_instance_name.trim().is_empty()
+                            && !self.new_instance_version.trim().is_empty();
+                        let enter = (name_resp.has_focus() || version_resp.has_focus())
+                            && ui.input(|i| i.key_pressed(egui::Key::Enter));
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if m_button_enabled(
+                                ui,
+                                Some(Icon::Plus),
+                                lang.inst_modal_btn_create(),
+                                true,
+                                38.0,
+                                can_create,
+                            ) || (can_create && enter)
+                            {
+                                create = true;
+                            }
+                            ui.add_space(8.0);
+                            if m_button(
+                                ui,
+                                Some(Icon::Close),
+                                lang.inst_modal_btn_cancel(),
+                                false,
+                                38.0,
+                            ) {
+                                close = true;
+                            }
+                        });
+                    });
+            });
+
+        if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+            close = true;
+        }
+
+        if create {
+            let mut inst = Instance::new(
+                &self.new_instance_name,
+                &self.new_instance_version,
+                self.new_instance_loader,
+            );
+            inst.ram_mb = Some(self.new_instance_ram);
+            *selected_instance = Some(inst.id);
+            self.show_create_modal = false;
+            self.create_modal_seen = false;
+            return Some(InstanceAction::Created(inst));
+        }
+        if close {
+            self.show_create_modal = false;
+            self.create_modal_seen = false;
+        }
+        None
     }
 
     /// Reference `new-group-modal.vue`: 560px modal, name field, 400px
@@ -2654,9 +3107,13 @@ impl InstancesPage {
             1.5,
         );
         let edit_id = ui.id().with("modrinth_library_search");
+        let has_query = !self.search_query.is_empty();
         let text_rect = Rect::from_min_max(
             pos2(rect.left() + 38.0, rect.top() + 7.0),
-            pos2(rect.right() - 10.0, rect.bottom() - 7.0),
+            pos2(
+                rect.right() - if has_query { 36.0 } else { 10.0 },
+                rect.bottom() - 7.0,
+            ),
         );
         ui.scope_builder(
             egui::UiBuilder::new()
@@ -2676,6 +3133,43 @@ impl InstancesPage {
                 );
             },
         );
+        if has_query {
+            let clear_rect = Rect::from_center_size(
+                pos2(rect.right() - 19.0, rect.center().y),
+                vec2(24.0, 24.0),
+            );
+            let clear_resp = ui.interact(
+                clear_rect,
+                ui.id().with("modrinth_library_search_clear"),
+                Sense::click(),
+            );
+            if clear_resp.hovered() {
+                ui.painter().rect_filled(
+                    clear_rect,
+                    Rounding::same(7.0),
+                    with_alpha(MODRINTH_TEXT_CONTRAST, 18),
+                );
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+            }
+            icons::draw(
+                ui.painter(),
+                Icon::Close,
+                clear_rect.shrink(7.0),
+                if clear_resp.hovered() {
+                    MODRINTH_TEXT_CONTRAST
+                } else {
+                    MODRINTH_TEXT_SECONDARY
+                },
+                1.6,
+            );
+            if clear_resp.on_hover_text(lang.mods_search_clear()).clicked() {
+                self.search_query.clear();
+                ui.memory_mut(|m| m.request_focus(edit_id));
+            }
+        }
+        if ui.memory(|m| m.has_focus(edit_id)) && ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+            self.search_query.clear();
+        }
         if resp.clicked() {
             ui.memory_mut(|m| m.request_focus(edit_id));
         }
@@ -2713,7 +3207,7 @@ impl InstancesPage {
         self.manage.open_for(id);
     }
 
-    /// MultiMC shell: the reference instance view — 100px cells with a 48px
+    /// MultiMC shell: the reference instance view â€” 100px cells with a 48px
     /// icon and the name plate below, grouped under framed headers with a
     /// collapse square. Metrics follow `ui/instanceview/InstanceDelegate`
     /// and `VisualGroup`: 5px margins and spacing, 105px cell pitch.
@@ -3224,7 +3718,7 @@ impl InstancesPage {
                     ui.add_space(8.0);
                 }
 
-                // Filter + sort instances (memoized — see `filtered_indices`).
+                // Filter + sort instances (memoized â€” see `filtered_indices`).
                 let filtered_indices = self.filtered_indices(instances);
 
                 // Instances list
@@ -3429,7 +3923,7 @@ impl InstancesPage {
             };
             let size_text = match page.disk_sizes.get(&inst_id) {
                 Some(bytes) => lang.disk_size(*bytes),
-                None => "…".to_string(),
+                None => "â€¦".to_string(),
             };
             card.horizontal(|ui| {
                 icons::icon_label(
@@ -3564,8 +4058,8 @@ impl InstancesPage {
             }
         }
 
-        // Trash (CONCEPT "Корзина", P2): soft-deleted instances wait here
-        // for restore or permanent deletion. FS scan throttled to 2s —
+        // Trash (CONCEPT "ÐšÐ¾Ñ€Ð·Ð¸Ð½Ð°", P2): soft-deleted instances wait here
+        // for restore or permanent deletion. FS scan throttled to 2s â€”
         // never per frame. The Modrinth library skin has no trash section.
         if !matches!(ctx.skin, LibrarySkin::Modrinth | LibrarySkin::Multimc) {
             let trash_stale = match self.trash_at {
@@ -3605,7 +4099,7 @@ impl InstancesPage {
                 ui.horizontal(|ui| {
                     ui.label(
                         egui::RichText::new(format!(
-                            "{} • {} {}",
+                            "{} â€¢ {} {}",
                             truncate_name(&entry.instance.name, 28),
                             entry.instance.game_version,
                             entry.instance.loader.as_str(),
@@ -3627,142 +4121,164 @@ impl InstancesPage {
 
         // Create Instance Modal Dialog
         if self.show_create_modal {
-            let mut open = true;
-            if ui.ctx().input(|i| i.key_pressed(egui::Key::Escape))
-                && !ui.ctx().memory(|m| m.any_popup_open())
-            {
-                open = false;
-            }
-            egui::Window::new(lang.inst_modal_create_title())
-                .open(&mut open)
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, vec2(0.0, 0.0))
-                .min_width(420.0)
-                .show(ui.ctx(), |ui| {
-                    ui.add_space(8.0);
-                    ui.label(
-                        egui::RichText::new(lang.tmpl_title())
-                            .strong()
-                            .color(TEXT_HEADING),
-                    );
-                    ui.horizontal(|ui| {
-                        for tmpl in InstanceTemplate::ALL {
-                            let active = InstanceTemplate::matching(
-                                self.new_instance_loader,
-                                self.new_instance_ram,
-                            )
-                            .map(|t| t.id)
-                                == Some(tmpl.id);
-                            if choice_chip(ui, lang.tmpl_name(tmpl.id), 130.0, 32.0, 12.0, active) {
-                                self.apply_template(tmpl, lang);
-                            }
-                        }
-                    });
-                    let tmpl_desc =
-                        InstanceTemplate::matching(self.new_instance_loader, self.new_instance_ram)
-                            .map(|t| lang.tmpl_desc(t.id))
-                            .unwrap_or_else(|| lang.tmpl_custom_note());
-                    ui.label(egui::RichText::new(tmpl_desc).color(TEXT_MUTED));
-                    ui.add_space(8.0);
-                    ui.label(egui::RichText::new(lang.inst_modal_name()).color(TEXT_PRIMARY));
-                    ui.add(TextEdit::singleline(&mut self.new_instance_name).desired_width(400.0));
-
-                    ui.add_space(10.0);
-                    ui.label(egui::RichText::new(lang.inst_modal_version()).color(TEXT_PRIMARY));
-                    ui.add(
-                        TextEdit::singleline(&mut self.new_instance_version).desired_width(400.0),
-                    );
-
-                    ui.add_space(10.0);
-                    ui.label(egui::RichText::new(lang.inst_modal_loader()).color(TEXT_PRIMARY));
-                    egui::ComboBox::from_id_salt("loader_select")
-                        .selected_text(self.new_instance_loader.as_str())
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(
-                                &mut self.new_instance_loader,
-                                LoaderType::Vanilla,
-                                "Vanilla",
-                            );
-                            ui.selectable_value(
-                                &mut self.new_instance_loader,
-                                LoaderType::Fabric,
-                                "Fabric",
-                            );
-                            ui.selectable_value(
-                                &mut self.new_instance_loader,
-                                LoaderType::Quilt,
-                                "Quilt",
-                            );
-                            ui.selectable_value(
-                                &mut self.new_instance_loader,
-                                LoaderType::Forge,
-                                "Forge",
-                            );
-                            ui.selectable_value(
-                                &mut self.new_instance_loader,
-                                LoaderType::NeoForge,
-                                "NeoForge",
-                            );
-                            ui.selectable_value(
-                                &mut self.new_instance_loader,
-                                LoaderType::OptiFine,
-                                "OptiFine",
-                            );
-                        });
-                    if self.new_instance_loader == LoaderType::Forge
-                        && amc_minecraft::loaders::forge::is_legacy_unsafe_line(
-                            &self.new_instance_version,
-                        )
-                    {
+            if ctx.skin == LibrarySkin::Modrinth {
+                if let Some(created) = self.modrinth_create_modal(ui.ctx(), lang, selected_instance)
+                {
+                    action = created;
+                }
+            } else {
+                let mut open = true;
+                if ui.ctx().input(|i| i.key_pressed(egui::Key::Escape))
+                    && !ui.ctx().memory(|m| m.any_popup_open())
+                {
+                    open = false;
+                }
+                egui::Window::new(lang.inst_modal_create_title())
+                    .open(&mut open)
+                    .collapsible(false)
+                    .resizable(false)
+                    .anchor(egui::Align2::CENTER_CENTER, vec2(0.0, 0.0))
+                    .min_width(420.0)
+                    .show(ui.ctx(), |ui| {
+                        ui.add_space(8.0);
                         ui.label(
-                            egui::RichText::new(lang.inst_warn_legacy_forge())
-                                .font(egui::FontId::proportional(12.0))
-                                .color(WARNING),
-                        );
-                    }
-
-                    ui.add_space(10.0);
-                    ui.label(
-                        egui::RichText::new(format!(
-                            "{}: {} MB",
-                            lang.inst_modal_ram(),
-                            self.new_instance_ram
-                        ))
-                        .color(TEXT_PRIMARY),
-                    );
-                    ui.add(
-                        egui::Slider::new(&mut self.new_instance_ram, 1024..=16384).step_by(512.0),
-                    );
-
-                    ui.add_space(18.0);
-                    ui.horizontal(|ui| {
-                        let can_create = !self.new_instance_name.trim().is_empty()
-                            && !self.new_instance_version.trim().is_empty();
-                        let create = egui::Button::new(
-                            egui::RichText::new(lang.inst_modal_btn_create())
+                            egui::RichText::new(lang.tmpl_title())
                                 .strong()
-                                .color(dialog_button_fg(ui)),
+                                .color(TEXT_HEADING),
                         );
-                        if ui.add_enabled(can_create, create).clicked() {
-                            let mut inst = Instance::new(
-                                &self.new_instance_name,
+                        ui.horizontal(|ui| {
+                            for tmpl in InstanceTemplate::ALL {
+                                let active = InstanceTemplate::matching(
+                                    self.new_instance_loader,
+                                    self.new_instance_ram,
+                                )
+                                .map(|t| t.id)
+                                    == Some(tmpl.id);
+                                if choice_chip(
+                                    ui,
+                                    lang.tmpl_name(tmpl.id),
+                                    130.0,
+                                    32.0,
+                                    12.0,
+                                    active,
+                                ) {
+                                    self.apply_template(tmpl, lang);
+                                }
+                            }
+                        });
+                        let tmpl_desc = InstanceTemplate::matching(
+                            self.new_instance_loader,
+                            self.new_instance_ram,
+                        )
+                        .map(|t| lang.tmpl_desc(t.id))
+                        .unwrap_or_else(|| lang.tmpl_custom_note());
+                        ui.label(egui::RichText::new(tmpl_desc).color(TEXT_MUTED));
+                        ui.add_space(8.0);
+                        ui.label(egui::RichText::new(lang.inst_modal_name()).color(TEXT_PRIMARY));
+                        ui.add(
+                            TextEdit::singleline(&mut self.new_instance_name).desired_width(400.0),
+                        );
+
+                        ui.add_space(10.0);
+                        ui.label(
+                            egui::RichText::new(lang.inst_modal_version()).color(TEXT_PRIMARY),
+                        );
+                        ui.add(
+                            TextEdit::singleline(&mut self.new_instance_version)
+                                .desired_width(400.0),
+                        );
+
+                        ui.add_space(10.0);
+                        ui.label(egui::RichText::new(lang.inst_modal_loader()).color(TEXT_PRIMARY));
+                        egui::ComboBox::from_id_salt("loader_select")
+                            .selected_text(self.new_instance_loader.as_str())
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(
+                                    &mut self.new_instance_loader,
+                                    LoaderType::Vanilla,
+                                    "Vanilla",
+                                );
+                                ui.selectable_value(
+                                    &mut self.new_instance_loader,
+                                    LoaderType::Fabric,
+                                    "Fabric",
+                                );
+                                ui.selectable_value(
+                                    &mut self.new_instance_loader,
+                                    LoaderType::Quilt,
+                                    "Quilt",
+                                );
+                                ui.selectable_value(
+                                    &mut self.new_instance_loader,
+                                    LoaderType::Forge,
+                                    "Forge",
+                                );
+                                ui.selectable_value(
+                                    &mut self.new_instance_loader,
+                                    LoaderType::NeoForge,
+                                    "NeoForge",
+                                );
+                                ui.selectable_value(
+                                    &mut self.new_instance_loader,
+                                    LoaderType::OptiFine,
+                                    "OptiFine",
+                                );
+                            });
+                        if self.new_instance_loader == LoaderType::Forge
+                            && amc_minecraft::loaders::forge::is_legacy_unsafe_line(
                                 &self.new_instance_version,
-                                self.new_instance_loader,
+                            )
+                        {
+                            ui.label(
+                                egui::RichText::new(lang.inst_warn_legacy_forge())
+                                    .font(egui::FontId::proportional(12.0))
+                                    .color(WARNING),
                             );
-                            inst.ram_mb = Some(self.new_instance_ram);
-                            *selected_instance = Some(inst.id);
-                            action = InstanceAction::Created(inst);
-                            self.show_create_modal = false;
                         }
 
-                        if ui.button(lang.inst_modal_btn_cancel()).clicked() {
-                            self.show_create_modal = false;
-                        }
+                        ui.add_space(10.0);
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "{}: {} MB",
+                                lang.inst_modal_ram(),
+                                self.new_instance_ram
+                            ))
+                            .color(TEXT_PRIMARY),
+                        );
+                        ui.add(
+                            egui::Slider::new(&mut self.new_instance_ram, 1024..=16384)
+                                .step_by(512.0),
+                        );
+
+                        ui.add_space(18.0);
+                        ui.horizontal(|ui| {
+                            let can_create = !self.new_instance_name.trim().is_empty()
+                                && !self.new_instance_version.trim().is_empty();
+                            let create = egui::Button::new(
+                                egui::RichText::new(lang.inst_modal_btn_create())
+                                    .strong()
+                                    .color(dialog_button_fg(ui)),
+                            );
+                            if ui.add_enabled(can_create, create).clicked() {
+                                let mut inst = Instance::new(
+                                    &self.new_instance_name,
+                                    &self.new_instance_version,
+                                    self.new_instance_loader,
+                                );
+                                inst.ram_mb = Some(self.new_instance_ram);
+                                *selected_instance = Some(inst.id);
+                                action = InstanceAction::Created(inst);
+                                self.show_create_modal = false;
+                            }
+
+                            if ui.button(lang.inst_modal_btn_cancel()).clicked() {
+                                self.show_create_modal = false;
+                            }
+                        });
                     });
-                });
-            if !open {
-                self.show_create_modal = false;
+                if !open {
+                    self.show_create_modal = false;
+                }
             }
         }
 
@@ -4070,7 +4586,7 @@ impl InstancesPage {
                             );
                             if !ctx.group_names.is_empty() {
                                 ui.label(
-                                    egui::RichText::new(ctx.group_names.join(" • "))
+                                    egui::RichText::new(ctx.group_names.join(" â€¢ "))
                                         .font(egui::FontId::proportional(11.0))
                                         .color(TEXT_MUTED),
                                 );
@@ -4285,7 +4801,7 @@ mod tests {
         assert_eq!(truncate_name("Short", 22), "Short");
         assert_eq!(
             truncate_name("Exactly twenty-two chars!!", 22),
-            "Exactly twenty-two cha…"
+            "Exactly twenty-two chaâ€¦"
         );
         assert_eq!(truncate_name("", 22), "");
     }
