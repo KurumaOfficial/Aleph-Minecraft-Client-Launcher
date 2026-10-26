@@ -3805,6 +3805,9 @@ impl InstancesPage {
                     ScrollArea::vertical()
                         .max_height(scroll_h)
                         .auto_shrink([false, false])
+                        .scroll_bar_visibility(
+                            egui::scroll_area::ScrollBarVisibility::AlwaysVisible,
+                        )
                         .show(ui, |ui| {
                             ui.add_space(8.0);
                             ui.label(

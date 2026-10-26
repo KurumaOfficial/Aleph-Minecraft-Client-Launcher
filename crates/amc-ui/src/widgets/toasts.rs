@@ -59,6 +59,12 @@ pub fn show_toasts(ctx: &egui::Context, toasts: &mut Vec<Toast>) {
     if toasts.is_empty() {
         return;
     }
+    // egui is reactive: without a scheduled repaint an idle window would keep
+    // a painted toast on screen long after it expired.
+    if let Some(next) = toasts.iter().map(|t| t.until).min() {
+        let remaining = next.saturating_duration_since(Instant::now());
+        ctx.request_repaint_after(remaining.max(Duration::from_millis(16)));
+    }
     egui::Area::new(egui::Id::new("toasts"))
         .order(egui::Order::Foreground)
         .fixed_pos(egui::pos2(
@@ -88,7 +94,11 @@ pub fn show_toasts(ctx: &egui::Context, toasts: &mut Vec<Toast>) {
                     ui.painter().text(
                         rect.center(),
                         Align2::CENTER_CENTER,
-                        &toast.text,
+                        if toast.text.chars().count() > 40 {
+                            format!("{}…", toast.text.chars().take(39).collect::<String>())
+                        } else {
+                            toast.text.clone()
+                        },
                         egui::FontId::proportional(12.0),
                         TEXT_PRIMARY.into(),
                     );
