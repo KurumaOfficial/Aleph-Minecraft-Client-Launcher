@@ -26,12 +26,12 @@
 - Branch: `main`
 - Коммиты сессии 2026-10-26: `5417adb` (minimum-size layouts),
   `c46eded` (Modrinth rail overlay), `e31a00f` (Discover/empty state),
-  `c9288e5` (Quick Play), `012b40e` (signed-out/friends states);
+  `c9288e5` (Quick Play), `012b40e` (signed-out/friends states), `f1b7aa9` (empty accounts action);
   финальный коммит сессии добавляет этот файл и release-заметки.
 - Все изменения запушены, рабочее дерево чистое.
 - Локальный release, выложенный в `dist`, имеет SHA-256
-  `BCDA67216ECA0F67E15D7DDEE8E3066094A7E573DDE19F1111611ABFFF8C9F48`.
-- Перед деплоем 26.10.2026 создан бэкап `dist/amc-launcher.exe.bak-20261026-1017`.
+  `3BF6DAF0480FD8323103C9E56209F36770185798726B7CFF47C08CCCC25F626F`.
+- Перед деплоем 26.10.2026 создан бэкап `dist/amc-launcher.exe.bak-20261026-1051`.
 
 ## Сессия 2026-10-26: адаптивность и взаимодействия
 
@@ -74,6 +74,9 @@ physical при 125% DPI), а также на 1120×700 logical (1400×875 physi
     News — колонка снова занимает всю высоту; клик ведёт в Profile, а у
     гостя открывает вход. Карточки обрезанных имён сборок показывают полное
     имя по hover.
+13. **Пустые аккаунты в настройках**: у Modrinth/LabyMod/Millida/MultiMC
+    вместо тупиковой карточки появились локальная подсказка и кнопка
+    «Войти», открывающая общий login modal. Aleph-режимы не затронуты.
 
 ## Обязательные правила
 
