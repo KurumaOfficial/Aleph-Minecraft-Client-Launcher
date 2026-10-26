@@ -1,12 +1,12 @@
 use crate::theme;
 use crate::theme::{
-    lerp_color, with_alpha, BG_CARD, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, MODRINTH_BG,
+    lerp_color, with_alpha, BG_ACTIVE, BG_CARD, BG_ELEVATED, BG_HOVER, BORDER_DEFAULT, MODRINTH_BG,
     MODRINTH_GREEN, MODRINTH_SURFACE, MODRINTH_SURFACE_HIGH, MODRINTH_SURFACE_HOVER,
     MODRINTH_TEXT_CONTRAST, MODRINTH_TEXT_SECONDARY, RUBY, RUBY_LIGHT, TEXT_HEADING, TEXT_MUTED,
     TEXT_PRIMARY,
 };
 use crate::widgets::choice_chip;
-use crate::widgets::icons::{icon_button, Icon};
+use crate::widgets::icons::{self, icon_button, Icon};
 use crate::widgets::modrinth_ui;
 use crate::widgets::pixel;
 use amc_auth::AccountManager;
@@ -14,8 +14,8 @@ use amc_core::config::{AppMode, LauncherConfig};
 use amc_core::paths::LauncherPaths;
 use amc_core::Language;
 use egui::{
-    pos2, vec2, Color32, FontFamily, FontId, Rect, Rounding, ScrollArea, Sense, Stroke, TextEdit,
-    Ui,
+    pos2, vec2, Align2, Color32, FontFamily, FontId, Rect, Rounding, ScrollArea, Sense, Stroke,
+    TextEdit, Ui,
 };
 
 /// Settings page language. Aleph keeps the original compact composition;
@@ -625,7 +625,7 @@ impl SettingsPage {
 
         ui.add_space(14.0);
 
-        // Operation mode group (CONCEPT "Режимы работы", ROADMAP P1).
+        // Operation mode group (CONCEPT "ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚ÂµÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¶ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¸ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¼ÃƒÆ’Ã¢â‚¬ËœÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹ ÃƒÆ’Ã¢â‚¬ËœÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â°ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â±ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¾ÃƒÆ’Ã¢â‚¬ËœÃƒÂ¢Ã¢â€šÂ¬Ã…Â¡ÃƒÆ’Ã¢â‚¬ËœÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¹", ROADMAP P1).
         // Switchable here at any time; the first-run wizard will ask it once.
         ui.group(|ui| {
             if self.skin != SettingsSkin::Amc {
@@ -894,7 +894,7 @@ impl SettingsPage {
 
         ui.add_space(14.0);
 
-        // World backups folder + schedule (CONCEPT "Управление мирами", P9).
+        // World backups folder + schedule (CONCEPT "ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â£ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¿ÃƒÆ’Ã¢â‚¬ËœÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â°ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â²ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â»ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚ÂµÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â½ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¸ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Âµ ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¼ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬ËœÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â°ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¼ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¸", P9).
         ui.group(|ui| {
             if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
@@ -949,7 +949,7 @@ impl SettingsPage {
 
         ui.add_space(14.0);
 
-        // Notifications per type (CONCEPT "Уведомления").
+        // Notifications per type (CONCEPT "ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â£ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â²ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚ÂµÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â´ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¾ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¼ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â»ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚ÂµÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â½ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬ËœÃƒâ€šÃ‚Â").
         ui.group(|ui| {
             if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
@@ -991,7 +991,7 @@ impl SettingsPage {
 
         ui.add_space(14.0);
 
-        // Rebindable hotkeys (CONCEPT "Горячие клавиши", P10).
+        // Rebindable hotkeys (CONCEPT "ÃƒÆ’Ã‚ÂÃƒÂ¢Ã¢â€šÂ¬Ã…â€œÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¾ÃƒÆ’Ã¢â‚¬ËœÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã¢â‚¬ËœÃƒâ€šÃ‚ÂÃƒÆ’Ã¢â‚¬ËœÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¸ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Âµ ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚ÂºÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â»ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â°ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â²ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬ËœÃƒâ€¹Ã¢â‚¬Â ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¸", P10).
         ui.group(|ui| {
             if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
@@ -1098,7 +1098,7 @@ impl SettingsPage {
         ui.add_space(14.0);
 
         // Manual settings transfer for moving to another PC
-        // (CONCEPT "Облачная синхронизация", P10 — no cloud in v1.0).
+        // (CONCEPT "ÃƒÆ’Ã‚ÂÃƒâ€¦Ã‚Â¾ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â±ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â»ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬ËœÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¡ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â½ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬ËœÃƒâ€šÃ‚Â ÃƒÆ’Ã¢â‚¬ËœÃƒâ€šÃ‚ÂÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¸ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â½ÃƒÆ’Ã¢â‚¬ËœÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ÃƒÆ’Ã¢â‚¬ËœÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¾ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â½ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¸ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â·ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â°ÃƒÆ’Ã¢â‚¬ËœÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã‚ÂÃƒâ€šÃ‚Â¸ÃƒÆ’Ã¢â‚¬ËœÃƒâ€šÃ‚Â", P10 ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â no cloud in v1.0).
         ui.group(|ui| {
             if self.skin != SettingsSkin::Amc {
                 ui.set_min_width(ui.available_width());
@@ -1800,30 +1800,40 @@ impl SettingsPage {
 
             if accounts.is_empty() && self.skin != SettingsSkin::Amc {
                 ui.add_space(4.0);
-                ui.horizontal(|ui| {
-                    ui.label(
-                        egui::RichText::new(lang.settings_no_accounts())
-                            .font(egui::FontId::proportional(12.5))
-                            .color(TEXT_MUTED),
-                    );
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let clicked = if mr {
-                            modrinth_ui::button(
-                                ui,
-                                lang.modrinth_sign_in(),
-                                Some(Icon::Person),
-                                modrinth_ui::ModrinthButtonKind::Primary,
-                                150.0,
-                            )
-                            .clicked()
-                        } else {
-                            ui.button(lang.modrinth_sign_in()).clicked()
-                        };
-                        if clicked {
-                            self.login_request = true;
-                        }
+                let clicked = if self.skin == SettingsSkin::Labymod {
+                    labymod_empty_accounts(ui, lang)
+                } else if self.skin == SettingsSkin::Millida {
+                    millida_empty_accounts(ui, lang)
+                } else {
+                    let mut clicked = false;
+                    ui.horizontal(|ui| {
+                        ui.label(
+                            egui::RichText::new(lang.settings_no_accounts())
+                                .font(egui::FontId::proportional(12.5))
+                                .color(TEXT_MUTED),
+                        );
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            let button = if mr {
+                                modrinth_ui::button(
+                                    ui,
+                                    lang.modrinth_sign_in(),
+                                    Some(Icon::Person),
+                                    modrinth_ui::ModrinthButtonKind::Primary,
+                                    150.0,
+                                )
+                            } else {
+                                ui.button(lang.modrinth_sign_in())
+                            };
+                            if button.clicked() {
+                                clicked = true;
+                            }
+                        });
                     });
-                });
+                    clicked
+                };
+                if clicked {
+                    self.login_request = true;
+                }
                 ui.add_space(4.0);
                 ui.separator();
             }
@@ -1833,6 +1843,19 @@ impl SettingsPage {
 
             for acc in accounts {
                 let is_active = active_id == Some(acc.id);
+
+                if matches!(self.skin, SettingsSkin::Labymod | SettingsSkin::Millida) {
+                    let (set_active, remove) =
+                        shell_account_card(ui, self.skin, &acc, is_active, lang);
+                    if set_active {
+                        set_active_id = Some(acc.id);
+                    }
+                    if remove {
+                        remove_id = Some(acc.id);
+                    }
+                    ui.add_space(6.0);
+                    continue;
+                }
 
                 ui.horizontal(|ui| {
                     let (badge, accent) = if mr {
@@ -1925,7 +1948,25 @@ impl SettingsPage {
 
             if has_accounts && self.skin != SettingsSkin::Amc {
                 ui.add_space(6.0);
-                let clicked = if mr {
+                let clicked = if self.skin == SettingsSkin::Labymod {
+                    labymod_account_button(
+                        ui,
+                        lang.settings_add_account(),
+                        Some(Icon::Plus),
+                        false,
+                        170.0,
+                        36.0,
+                    )
+                } else if self.skin == SettingsSkin::Millida {
+                    millida_account_button(
+                        ui,
+                        lang.settings_add_account(),
+                        Some(Icon::Plus),
+                        false,
+                        170.0,
+                        32.0,
+                    )
+                } else if mr {
                     modrinth_ui::button(
                         ui,
                         lang.settings_add_account(),
@@ -1956,6 +1997,405 @@ impl SettingsPage {
             }
         });
     }
+}
+
+/// LabyMod account action: blue primary or dark secondary, rounded 10.
+fn labymod_account_button(
+    ui: &mut Ui,
+    label: &str,
+    icon: Option<Icon>,
+    primary: bool,
+    min_width: f32,
+    height: f32,
+) -> bool {
+    let galley = ui.painter().layout_no_wrap(
+        label.to_owned(),
+        egui::FontId::proportional(13.0),
+        Color32::PLACEHOLDER,
+    );
+    let width = (galley.size().x + if icon.is_some() { 24.0 } else { 0.0 } + 24.0)
+        .max(min_width)
+        .max(32.0);
+    let (rect, resp) = ui.allocate_exact_size(vec2(width, height), Sense::click());
+    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+    let fill = if primary {
+        lerp_color(theme::ACCENT, theme::ACCENT_LIGHT, hover)
+    } else {
+        lerp_color(BG_HOVER, BG_ELEVATED, hover)
+    };
+    ui.painter().rect_filled(rect, Rounding::same(10.0), fill);
+    if !primary {
+        ui.painter().rect_stroke(
+            rect,
+            Rounding::same(10.0),
+            Stroke::new(1.0_f32, BORDER_DEFAULT),
+        );
+    }
+    let content = if primary {
+        Color32::WHITE
+    } else {
+        theme::TEXT_HEADING.into()
+    };
+    let content_w = galley.size().x + if icon.is_some() { 24.0 } else { 0.0 };
+    let left = rect.center().x - content_w / 2.0;
+    if let Some(icon) = icon {
+        icons::draw(
+            ui.painter(),
+            icon,
+            Rect::from_center_size(pos2(left + 8.0, rect.center().y), vec2(16.0, 16.0)),
+            content,
+            1.5,
+        );
+    }
+    ui.painter().galley(
+        pos2(
+            left + if icon.is_some() { 24.0 } else { 0.0 },
+            rect.center().y - galley.size().y / 2.0,
+        ),
+        galley,
+        content,
+    );
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp.clicked()
+}
+
+/// Millida account action: cut-corner plate with the mint accent.
+fn millida_account_button(
+    ui: &mut Ui,
+    label: &str,
+    icon: Option<Icon>,
+    primary: bool,
+    min_width: f32,
+    height: f32,
+) -> bool {
+    let galley = ui.painter().layout_no_wrap(
+        label.to_owned(),
+        egui::FontId::proportional(12.5),
+        Color32::PLACEHOLDER,
+    );
+    let width = (galley.size().x + if icon.is_some() { 22.0 } else { 0.0 } + 22.0)
+        .max(min_width)
+        .max(32.0);
+    let (rect, resp) = ui.allocate_exact_size(vec2(width, height), Sense::click());
+    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+    let (fill, outline) = if primary {
+        (
+            lerp_color(theme::ACCENT, theme::ACCENT_LIGHT, hover),
+            theme::ACCENT_LIGHT.into(),
+        )
+    } else {
+        (
+            lerp_color(BG_HOVER, BG_ACTIVE, hover),
+            BORDER_DEFAULT.into(),
+        )
+    };
+    pixel::plate(ui.painter(), rect, 4.0, fill, outline);
+    let content = if primary {
+        theme::BG.into()
+    } else {
+        theme::TEXT_HEADING.into()
+    };
+    let content_w = galley.size().x + if icon.is_some() { 22.0 } else { 0.0 };
+    let left = rect.center().x - content_w / 2.0;
+    if let Some(icon) = icon {
+        icons::draw(
+            ui.painter(),
+            icon,
+            Rect::from_center_size(pos2(left + 7.0, rect.center().y), vec2(14.0, 14.0)),
+            content,
+            1.5,
+        );
+    }
+    ui.painter().galley(
+        pos2(
+            left + if icon.is_some() { 22.0 } else { 0.0 },
+            rect.center().y - galley.size().y / 2.0,
+        ),
+        galley,
+        content,
+    );
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp.clicked()
+}
+
+/// Empty accounts card for LabyMod: dark surface, blue avatar, sign-in action.
+fn labymod_empty_accounts(ui: &mut Ui, lang: Language) -> bool {
+    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 92.0), Sense::hover());
+    ui.painter()
+        .rect_filled(rect, Rounding::same(14.0), BG_CARD);
+    ui.painter().rect_stroke(
+        rect,
+        Rounding::same(14.0),
+        Stroke::new(1.0_f32, Color32::from(BORDER_DEFAULT)),
+    );
+    let avatar =
+        Rect::from_center_size(pos2(rect.left() + 44.0, rect.center().y), vec2(48.0, 48.0));
+    ui.painter()
+        .circle_filled(avatar.center(), 24.0, Color32::from(theme::ACCENT_SOFT));
+    icons::draw_centered(
+        ui.painter(),
+        Icon::Person,
+        avatar.center(),
+        22.0,
+        theme::ACCENT_LIGHT,
+    );
+    ui.painter().text(
+        pos2(rect.left() + 80.0, rect.center().y - 9.0),
+        Align2::LEFT_CENTER,
+        lang.settings_no_accounts(),
+        egui::FontId::proportional(14.0),
+        theme::TEXT_HEADING.into(),
+    );
+    ui.painter().text(
+        pos2(rect.left() + 80.0, rect.center().y + 12.0),
+        Align2::LEFT_CENTER,
+        lang.settings_accounts_empty_hint(),
+        egui::FontId::proportional(11.5),
+        TEXT_MUTED.into(),
+    );
+    let button = Rect::from_min_size(
+        pos2(rect.right() - 148.0, rect.center().y - 19.0),
+        vec2(132.0, 38.0),
+    );
+    let resp = ui.interact(
+        button,
+        ui.id().with("labymod_accounts_empty_login"),
+        Sense::click(),
+    );
+    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+    ui.painter().rect_filled(
+        button,
+        Rounding::same(10.0),
+        lerp_color(theme::ACCENT, theme::ACCENT_LIGHT, hover),
+    );
+    icons::draw(
+        ui.painter(),
+        Icon::Person,
+        Rect::from_center_size(
+            pos2(button.left() + 30.0, button.center().y),
+            vec2(16.0, 16.0),
+        ),
+        Color32::WHITE,
+        1.5,
+    );
+    ui.painter().text(
+        pos2(button.left() + 46.0, button.center().y),
+        Align2::LEFT_CENTER,
+        lang.modrinth_sign_in(),
+        egui::FontId::proportional(13.0),
+        Color32::WHITE,
+    );
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp.clicked()
+}
+
+/// Empty accounts card for Millida: cut-corner plate, mint avatar and action.
+fn millida_empty_accounts(ui: &mut Ui, lang: Language) -> bool {
+    let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 92.0), Sense::hover());
+    pixel::plate(
+        ui.painter(),
+        rect,
+        6.0,
+        BG_CARD.into(),
+        BORDER_DEFAULT.into(),
+    );
+    let avatar =
+        Rect::from_center_size(pos2(rect.left() + 44.0, rect.center().y), vec2(46.0, 46.0));
+    pixel::plate(
+        ui.painter(),
+        avatar,
+        5.0,
+        theme::ACCENT_SOFT.into(),
+        theme::ACCENT.into(),
+    );
+    icons::draw_centered(
+        ui.painter(),
+        Icon::Person,
+        avatar.center(),
+        21.0,
+        theme::ACCENT_LIGHT,
+    );
+    ui.painter().text(
+        pos2(rect.left() + 80.0, rect.center().y - 9.0),
+        Align2::LEFT_CENTER,
+        lang.settings_no_accounts(),
+        egui::FontId::proportional(13.5),
+        theme::TEXT_HEADING.into(),
+    );
+    ui.painter().text(
+        pos2(rect.left() + 80.0, rect.center().y + 12.0),
+        Align2::LEFT_CENTER,
+        lang.settings_accounts_empty_hint(),
+        egui::FontId::proportional(11.0),
+        TEXT_MUTED.into(),
+    );
+    let button = Rect::from_min_size(
+        pos2(rect.right() - 146.0, rect.center().y - 17.0),
+        vec2(130.0, 34.0),
+    );
+    let resp = ui.interact(
+        button,
+        ui.id().with("millida_accounts_empty_login"),
+        Sense::click(),
+    );
+    let hover = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
+    pixel::plate(
+        ui.painter(),
+        button,
+        4.0,
+        lerp_color(theme::ACCENT, theme::ACCENT_LIGHT, hover),
+        Color32::from(theme::ACCENT_LIGHT),
+    );
+    icons::draw(
+        ui.painter(),
+        Icon::Person,
+        Rect::from_center_size(
+            pos2(button.left() + 28.0, button.center().y),
+            vec2(14.0, 14.0),
+        ),
+        Color32::from(theme::BG),
+        1.5,
+    );
+    ui.painter().text(
+        pos2(button.left() + 42.0, button.center().y),
+        Align2::LEFT_CENTER,
+        lang.modrinth_sign_in(),
+        egui::FontId::proportional(12.5),
+        theme::BG.into(),
+    );
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    resp.clicked()
+}
+
+/// One account row for LabyMod/Millida: shell-styled card with avatar, badge,
+/// active marker and shell-styled actions. Returns (set active, remove).
+fn shell_account_card(
+    ui: &mut Ui,
+    skin: SettingsSkin,
+    acc: &amc_auth::Account,
+    is_active: bool,
+    lang: Language,
+) -> (bool, bool) {
+    let labymod = skin == SettingsSkin::Labymod;
+    let (rect, card_resp) =
+        ui.allocate_exact_size(vec2(ui.available_width(), 66.0), Sense::hover());
+    if labymod {
+        ui.painter()
+            .rect_filled(rect, Rounding::same(14.0), BG_CARD);
+        ui.painter().rect_stroke(
+            rect,
+            Rounding::same(14.0),
+            Stroke::new(1.0_f32, Color32::from(BORDER_DEFAULT)),
+        );
+    } else {
+        pixel::plate(
+            ui.painter(),
+            rect,
+            6.0,
+            BG_CARD.into(),
+            BORDER_DEFAULT.into(),
+        );
+    }
+    let avatar =
+        Rect::from_center_size(pos2(rect.left() + 38.0, rect.center().y), vec2(40.0, 40.0));
+    if labymod {
+        ui.painter()
+            .circle_filled(avatar.center(), 20.0, Color32::from(theme::ACCENT_SOFT));
+    } else {
+        pixel::plate(
+            ui.painter(),
+            avatar,
+            5.0,
+            theme::ACCENT_SOFT.into(),
+            theme::ACCENT.into(),
+        );
+    }
+    icons::draw_centered(
+        ui.painter(),
+        Icon::Person,
+        avatar.center(),
+        19.0,
+        theme::ACCENT_LIGHT,
+    );
+
+    let badge = match acc.account_type {
+        amc_auth::AccountType::Microsoft => lang.account_tag_ms(),
+        amc_auth::AccountType::WetId => lang.account_tag_wetid(),
+        amc_auth::AccountType::Offline => lang.account_tag_offline(),
+    };
+    ui.painter().text(
+        pos2(rect.left() + 68.0, rect.center().y - 9.0),
+        Align2::LEFT_CENTER,
+        crate::shells::short_name(&acc.username, 28),
+        egui::FontId::new(14.0, egui::FontFamily::Name("bold".into())),
+        theme::TEXT_HEADING.into(),
+    );
+    ui.painter().text(
+        pos2(rect.left() + 68.0, rect.center().y + 12.0),
+        Align2::LEFT_CENTER,
+        badge,
+        egui::FontId::proportional(10.5),
+        Color32::from(theme::ACCENT_LIGHT),
+    );
+
+    let mut set_active = false;
+    let mut remove = false;
+    let inner = rect.shrink2(vec2(12.0, 8.0));
+    ui.scope_builder(
+        egui::UiBuilder::new()
+            .max_rect(inner)
+            .layout(egui::Layout::right_to_left(egui::Align::Center)),
+        |ui| {
+            let delete = icons::icon_button(ui, Icon::Trash, TEXT_MUTED);
+            if delete
+                .on_hover_text(lang.settings_btn_delete_acc())
+                .clicked()
+            {
+                remove = true;
+            }
+            ui.add_space(4.0);
+            if is_active {
+                let (dot, _) = ui.allocate_exact_size(vec2(8.0, 8.0), Sense::hover());
+                ui.painter()
+                    .circle_filled(dot.center(), 3.5, Color32::from(theme::ACCENT_LIGHT));
+                ui.label(
+                    egui::RichText::new(lang.modrinth_settings_active())
+                        .font(egui::FontId::proportional(11.5))
+                        .color(theme::ACCENT_LIGHT),
+                );
+            } else if labymod {
+                if labymod_account_button(
+                    ui,
+                    lang.settings_btn_set_active(),
+                    None,
+                    false,
+                    150.0,
+                    32.0,
+                ) {
+                    set_active = true;
+                }
+            } else if millida_account_button(
+                ui,
+                lang.settings_btn_set_active(),
+                None,
+                false,
+                150.0,
+                30.0,
+            ) {
+                set_active = true;
+            }
+        },
+    );
+    card_resp.on_hover_text(&acc.username);
+    (set_active, remove)
 }
 
 /// One boolean setting: the reference switch on Modrinth, the original
