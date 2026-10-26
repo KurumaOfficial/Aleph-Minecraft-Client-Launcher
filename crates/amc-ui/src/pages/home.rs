@@ -56,7 +56,7 @@ pub struct HomePage {
     installed_cache: HashSet<String>,
     installed_for: usize,
     /// Memoized version filter (the full Mojang list is ~1000 entries):
-    /// recomputed only when the query, tab, order or list changes —
+    /// recomputed only when the query, tab, order or list changes â€”
     /// never per frame. First/last ids guard against same-length
     /// manifest swaps that a bare `len` key would miss.
     filter_cache: Vec<GameVersion>,
@@ -188,7 +188,7 @@ impl HomePage {
             ui.add_space(8.0);
 
             // Sort Toggle Button (label plus a painter-drawn caret: the
-            // bundled fonts carry no ▾/▴ coverage in the UI face).
+            // bundled fonts carry no â–¾/â–´ coverage in the UI face).
             let sort_label = match self.sort_order {
                 SortOrder::Newest => lang.home_sort_newest(),
                 SortOrder::Oldest => lang.home_sort_oldest(),
@@ -626,62 +626,92 @@ impl HomePage {
         }
 
         let mut remove_idx: Option<usize> = None;
-        for (idx, fav) in favorites.iter().enumerate() {
-            ui.horizontal(|ui| {
-                ui.label(
-                    egui::RichText::new(&fav.name)
-                        .font(egui::FontId::proportional(13.0))
-                        .strong()
-                        .color(TEXT_PRIMARY),
-                );
-                ui.add_space(8.0);
-                ui.label(
-                    egui::RichText::new(&fav.address)
-                        .font(egui::FontId::proportional(12.0))
-                        .color(TEXT_MUTED),
-                );
-                ui.add_space(8.0);
-                if let Some(status) = self.fav_status.get(&fav.address) {
-                    let (dot_color, text) = if status.is_online {
-                        (
-                            SUCCESS,
-                            format!(
-                                "{} ms • {}/{} • {}",
-                                status.ping_ms,
-                                status.online_players,
-                                status.max_players,
-                                status.motd
-                            ),
-                        )
-                    } else {
-                        (RUBY_LIGHT, status.motd.clone())
-                    };
+        egui::ScrollArea::vertical()
+            .id_salt("labymod_fav_list")
+            .max_height(240.0)
+            .auto_shrink([false, true])
+            .show(ui, |ui| {
+                for (idx, fav) in favorites.iter().enumerate() {
                     ui.horizontal(|ui| {
-                        let (dot_rect, _) =
-                            ui.allocate_exact_size(vec2(10.0, 10.0), Sense::hover());
-                        icons::draw_centered(
-                            ui.painter(),
-                            Icon::Dot,
-                            dot_rect.center(),
-                            10.0,
-                            dot_color,
+                        // Fixed columns keep a long server name or address
+                        // from running under the Remove button at 960 px.
+                        let full = ui.available_width();
+                        let remove_w = 72.0;
+                        let name_w = (full * 0.32).clamp(96.0, 150.0);
+                        let has_status = self.fav_status.contains_key(&fav.address);
+                        let status_w = if has_status || self.fav_pinging {
+                            18.0
+                        } else {
+                            0.0
+                        };
+                        let addr_w = (full - name_w - remove_w - status_w - 24.0).max(80.0);
+
+                        ui.allocate_ui_with_layout(
+                            vec2(name_w, 22.0),
+                            egui::Layout::left_to_right(egui::Align::Center),
+                            |ui| {
+                                ui.add(
+                                    egui::Label::new(
+                                        egui::RichText::new(&fav.name)
+                                            .font(egui::FontId::proportional(13.0))
+                                            .strong()
+                                            .color(TEXT_PRIMARY),
+                                    )
+                                    .truncate(),
+                                );
+                            },
                         );
-                        ui.label(
-                            egui::RichText::new(text)
-                                .font(egui::FontId::proportional(12.0))
-                                .color(TEXT_MUTED),
+                        ui.add_space(8.0);
+                        ui.allocate_ui_with_layout(
+                            vec2(addr_w, 22.0),
+                            egui::Layout::left_to_right(egui::Align::Center),
+                            |ui| {
+                                ui.add(
+                                    egui::Label::new(
+                                        egui::RichText::new(&fav.address)
+                                            .font(egui::FontId::proportional(12.0))
+                                            .color(TEXT_MUTED),
+                                    )
+                                    .truncate(),
+                                );
+                            },
                         );
+                        if let Some(status) = self.fav_status.get(&fav.address) {
+                            let (dot_color, text) = if status.is_online {
+                                (
+                                    SUCCESS,
+                                    format!(
+                                        "{} ms â€¢ {}/{} â€¢ {}",
+                                        status.ping_ms,
+                                        status.online_players,
+                                        status.max_players,
+                                        status.motd
+                                    ),
+                                )
+                            } else {
+                                (RUBY_LIGHT, status.motd.clone())
+                            };
+                            let (dot_rect, dot_resp) =
+                                ui.allocate_exact_size(vec2(14.0, 14.0), Sense::hover());
+                            icons::draw_centered(
+                                ui.painter(),
+                                Icon::Dot,
+                                dot_rect.center(),
+                                10.0,
+                                dot_color,
+                            );
+                            let _ = dot_resp.on_hover_text(text);
+                        } else if self.fav_pinging {
+                            ui.add(egui::Spinner::new().size(12.0));
+                        }
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui.button(lang.fav_remove()).clicked() {
+                                remove_idx = Some(idx);
+                            }
+                        });
                     });
-                } else if self.fav_pinging {
-                    ui.spinner();
                 }
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button(lang.fav_remove()).clicked() {
-                        remove_idx = Some(idx);
-                    }
-                });
             });
-        }
         if let Some(idx) = remove_idx {
             favorites.remove(idx);
             self.request_fav_ping(favorites);
@@ -1425,7 +1455,7 @@ impl HomePage {
                             ui.add_space(4.0);
                             ui.label(
                                 egui::RichText::new(format!(
-                                    "{} • {}",
+                                    "{} â€¢ {}",
                                     v.release_type.as_str(),
                                     v.release_time.format("%d.%m.%Y")
                                 ))
