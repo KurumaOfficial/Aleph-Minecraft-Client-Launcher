@@ -58,7 +58,7 @@ pub struct HomePage {
     installed_cache: HashSet<String>,
     installed_for: usize,
     /// Memoized version filter (the full Mojang list is ~1000 entries):
-    /// recomputed only when the query, tab, order or list changes â€”
+    /// recomputed only when the query, tab, order or list changes —
     /// never per frame. First/last ids guard against same-length
     /// manifest swaps that a bare `len` key would miss.
     filter_cache: Vec<GameVersion>,
@@ -684,7 +684,7 @@ impl HomePage {
                                 (
                                     SUCCESS,
                                     format!(
-                                        "{} ms â€¢ {}/{} â€¢ {}",
+                                        "{} ms • {}/{} • {}",
                                         status.ping_ms,
                                         status.online_players,
                                         status.max_players,
@@ -1510,7 +1510,7 @@ impl HomePage {
                             ui.add_space(4.0);
                             ui.label(
                                 egui::RichText::new(format!(
-                                    "{} â€¢ {}",
+                                    "{} • {}",
                                     v.release_type.as_str(),
                                     v.release_time.format("%d.%m.%Y")
                                 ))

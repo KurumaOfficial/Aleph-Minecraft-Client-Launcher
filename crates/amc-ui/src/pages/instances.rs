@@ -144,7 +144,7 @@ pub struct InstancesPage {
     pub edit_instance_pre: String,
     pub edit_instance_post: String,
 
-    // Background disk-usage scan (CONCEPT "ÐœÐµÑÑ‚Ð¾ Ð½Ð° Ð´Ð¸ÑÐºÐµ").
+    // Background disk-usage scan (CONCEPT disk space).
     disk_sizes: HashMap<Uuid, u64>,
     disk_scanned_for: Vec<Uuid>,
     disk_rx: Option<std::sync::mpsc::Receiver<Vec<(Uuid, u64, bool)>>>,
@@ -307,8 +307,43 @@ fn truncate_name(name: &str, max_chars: usize) -> String {
     if name.chars().count() <= max_chars {
         name.to_string()
     } else {
-        format!("{}â€¦", name.chars().take(max_chars).collect::<String>())
+        format!("{}…", name.chars().take(max_chars).collect::<String>())
     }
+}
+
+/// MultiMC instance-view label: at most two wrapped lines with an ellipsis.
+/// Keeps one very long instance name from stretching its whole grid row.
+fn multimc_name_galley(
+    painter: &egui::Painter,
+    name: &str,
+    font: egui::FontId,
+    max_w: f32,
+) -> std::sync::Arc<egui::Galley> {
+    let full = painter.layout(name.to_owned(), font.clone(), Color32::PLACEHOLDER, max_w);
+    let line_h = painter
+        .layout_no_wrap("Mg".to_owned(), font.clone(), Color32::PLACEHOLDER)
+        .size()
+        .y;
+    let max_h = line_h * 2.0 + 1.0;
+    if full.size().y <= max_h || name.is_empty() {
+        return full;
+    }
+    let chars: Vec<char> = name.chars().collect();
+    let mut lo = 0usize;
+    let mut hi = chars.len();
+    let mut best = "…".to_string();
+    while lo < hi {
+        let mid = (lo + hi).div_ceil(2);
+        let candidate = format!("{}…", chars[..mid].iter().collect::<String>().trim_end());
+        let galley = painter.layout(candidate.clone(), font.clone(), Color32::PLACEHOLDER, max_w);
+        if galley.size().y <= max_h {
+            best = candidate;
+            lo = mid;
+        } else {
+            hi = mid.saturating_sub(1);
+        }
+    }
+    painter.layout(best, font, Color32::PLACEHOLDER, max_w)
 }
 
 /// Foreground for native dialog action buttons: light MultiMC needs dark
@@ -1348,7 +1383,7 @@ impl InstancesPage {
     }
 
     /// Poll a finished background scan, or (re)start one when the instance
-    /// set changed. Measuring runs on a worker thread â€” the UI never blocks.
+    /// set changed. Measuring runs on a worker thread — the UI never blocks.
     /// Besides sizes it flags instances holding local (non-launcher) mods.
     fn poll_disk_sizes(&mut self, instances: &[Instance], instances_dir: &Path) {
         if let Some(rx) = &self.disk_rx {
@@ -1467,7 +1502,7 @@ impl InstancesPage {
         self.filter_cache.clone()
     }
 
-    /// Modrinth App shell: the library page â€” "Library" heading, search and
+    /// Modrinth App shell: the library page — "Library" heading, search and
     /// New buttons, sort/group/filter bar, big cards with a hover Play
     /// button. Layout mirrors `apps/app-frontend` (`library` components);
     /// colors are the reference's dark-theme CSS tokens.
@@ -2075,7 +2110,7 @@ impl InstancesPage {
     }
 
     /// Reference `ContextMenu` for an instance card: Play, Edit, Duplicate,
-    /// Manage, shortcut, folder, Delete â€” same order and icon placement.
+    /// Manage, shortcut, folder, Delete — same order and icon placement.
     fn modrinth_context_menu(
         &mut self,
         ctx: &egui::Context,
@@ -3092,13 +3127,54 @@ impl InstancesPage {
     }
 
     /// Modrinth-style search input (reference `InputFrame`: rounded-xl,
-    /// surface-4 fill, surface-5 border, leading search icon).
+    /// surface-4 fill, surface-5 border, leading search icon). A native
+    /// `TextEdit` inside a styled scope keeps click-to-caret behaviour intact;
+    /// the icon and clear action are painted on top.
     fn modrinth_search_field(&mut self, ui: &mut Ui, width: f32, lang: Language) {
-        let (rect, resp) = ui.allocate_exact_size(vec2(width, 36.0), Sense::click());
-        let radius = Rounding::same(12.0);
-        ui.painter().rect_filled(rect, radius, MODRINTH_FIELD);
-        ui.painter()
-            .rect_stroke(rect, radius, Stroke::new(1.0_f32, MODRINTH_SURFACE_HIGH));
+        let edit_id = ui.id().with("modrinth_library_search");
+        let has_query = !self.search_query.is_empty();
+        let right_pad = if has_query { 36.0 } else { 14.0 };
+        let text_w = (width - 38.0 - right_pad).max(80.0);
+        let field_left = ui.cursor().left();
+        let edit = TextEdit::singleline(&mut self.search_query)
+            .id(edit_id)
+            .frame(true)
+            .desired_width(text_w)
+            .margin(egui::Margin {
+                left: 38.0,
+                right: right_pad,
+                top: 9.0,
+                bottom: 9.0,
+            })
+            .hint_text(
+                egui::RichText::new(lang.inst_library_search()).color(MODRINTH_TEXT_SECONDARY),
+            )
+            .font(egui::FontId::proportional(15.0));
+        let resp = ui
+            .scope(|ui| {
+                let visuals = &mut ui.style_mut().visuals;
+                visuals.extreme_bg_color = MODRINTH_FIELD;
+                visuals.widgets.inactive.bg_fill = MODRINTH_FIELD;
+                visuals.widgets.inactive.weak_bg_fill = MODRINTH_FIELD;
+                visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, MODRINTH_SURFACE_HIGH);
+                visuals.widgets.inactive.rounding = Rounding::same(12.0);
+                visuals.widgets.hovered.bg_fill = MODRINTH_FIELD;
+                visuals.widgets.hovered.weak_bg_fill = MODRINTH_FIELD;
+                visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, MODRINTH_SURFACE_HIGH);
+                visuals.widgets.hovered.rounding = Rounding::same(12.0);
+                visuals.widgets.active.bg_fill = MODRINTH_FIELD;
+                visuals.widgets.active.weak_bg_fill = MODRINTH_FIELD;
+                visuals.widgets.active.bg_stroke = Stroke::new(1.0_f32, MODRINTH_GREEN);
+                visuals.widgets.active.rounding = Rounding::same(12.0);
+                visuals.override_text_color = Some(MODRINTH_TEXT_CONTRAST);
+                visuals.selection.bg_fill = with_alpha(MODRINTH_GREEN, 90);
+                ui.add(edit)
+            })
+            .inner;
+        let rect = Rect::from_min_size(
+            pos2(field_left, resp.rect.center().y - 18.0),
+            vec2(width, 36.0),
+        );
         icons::draw(
             ui.painter(),
             Icon::Search,
@@ -3106,33 +3182,13 @@ impl InstancesPage {
             MODRINTH_TEXT_SECONDARY,
             1.5,
         );
-        let edit_id = ui.id().with("modrinth_library_search");
-        let has_query = !self.search_query.is_empty();
-        let text_rect = Rect::from_min_max(
-            pos2(rect.left() + 38.0, rect.top() + 7.0),
-            pos2(
-                rect.right() - if has_query { 36.0 } else { 10.0 },
-                rect.bottom() - 7.0,
-            ),
-        );
-        ui.scope_builder(
-            egui::UiBuilder::new()
-                .max_rect(text_rect)
-                .layout(egui::Layout::left_to_right(egui::Align::Center)),
-            |ui| {
-                ui.add(
-                    TextEdit::singleline(&mut self.search_query)
-                        .id(edit_id)
-                        .frame(false)
-                        .desired_width(text_rect.width())
-                        .hint_text(
-                            egui::RichText::new(lang.inst_library_search())
-                                .color(MODRINTH_TEXT_SECONDARY),
-                        )
-                        .font(egui::FontId::proportional(15.0)),
-                );
-            },
-        );
+        if resp.has_focus() {
+            ui.painter().rect_stroke(
+                rect,
+                Rounding::same(12.0),
+                Stroke::new(1.0_f32, MODRINTH_GREEN),
+            );
+        }
         if has_query {
             let clear_rect = Rect::from_center_size(
                 pos2(rect.right() - 19.0, rect.center().y),
@@ -3170,9 +3226,6 @@ impl InstancesPage {
         if ui.memory(|m| m.has_focus(edit_id)) && ui.input(|i| i.key_pressed(egui::Key::Escape)) {
             self.search_query.clear();
         }
-        if resp.clicked() {
-            ui.memory_mut(|m| m.request_focus(edit_id));
-        }
         if resp.hovered() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::Text);
         }
@@ -3207,7 +3260,7 @@ impl InstancesPage {
         self.manage.open_for(id);
     }
 
-    /// MultiMC shell: the reference instance view â€” 100px cells with a 48px
+    /// MultiMC shell: the reference instance view — 100px cells with a 48px
     /// icon and the name plate below, grouped under framed headers with a
     /// collapse square. Metrics follow `ui/instanceview/InstanceDelegate`
     /// and `VisualGroup`: 5px margins and spacing, 105px cell pitch.
@@ -3292,15 +3345,14 @@ impl InstancesPage {
                         let text_h = row
                             .iter()
                             .map(|&idx| {
-                                ui.painter()
-                                    .layout(
-                                        instances[idx].name.clone(),
-                                        egui::FontId::proportional(12.0),
-                                        Color32::PLACEHOLDER,
-                                        94.0,
-                                    )
-                                    .size()
-                                    .y
+                                multimc_name_galley(
+                                    ui.painter(),
+                                    &instances[idx].name,
+                                    egui::FontId::proportional(12.0),
+                                    94.0,
+                                )
+                                .size()
+                                .y
                             })
                             .fold(0.0_f32, f32::max);
                         let cell_h = 48.0 + 5.0 + text_h + 6.0;
@@ -3328,7 +3380,8 @@ impl InstancesPage {
         /// rules, a collapse square and the bold group name at 60% alpha).
         fn multimc_group_header(ui: &mut Ui, name: &str, collapsed: bool) -> bool {
             let h = 26.0;
-            let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), h), Sense::hover());
+            let (rect, resp) =
+                ui.allocate_exact_size(vec2(ui.available_width(), h), Sense::click());
             let painter = ui.painter();
             let line = with_alpha(TEXT_PRIMARY, 90);
             let top = rect.top() + 0.5;
@@ -3361,21 +3414,27 @@ impl InstancesPage {
                 );
             }
             if !name.is_empty() {
+                // Qt uses a bold sans face here, not the display family.
+                let font = egui::FontId::new(12.5, egui::FontFamily::Name("bold".into()));
+                let max_w = (rect.right() - (square.right() + 7.0) - 8.0).max(24.0);
+                let visible = crate::shells::short_name(name, ((max_w / 7.2) as usize).max(1));
                 painter.text(
                     pos2(square.right() + 7.0, rect.center().y),
                     Align2::LEFT_CENTER,
-                    name,
-                    crate::theme::display(12.5),
+                    &visible,
+                    font,
                     with_alpha(TEXT_PRIMARY, 153),
                 );
             }
-            // The reference hit area is the square plus its margins.
-            let hit = Rect::from_min_size(
-                pos2(rect.left() + 2.0, rect.top() + 2.0),
-                vec2(h - 4.0, h - 4.0),
-            );
-            ui.interact(hit, ui.id().with(("multimc_group", name)), Sense::click())
-                .clicked()
+            if resp.hovered() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+            }
+            let resp = if name.chars().count() > 36 {
+                resp.on_hover_text(name)
+            } else {
+                resp
+            };
+            resp.clicked()
         }
 
         /// One instance cell: 48px icon (custom texture or the default
@@ -3446,10 +3505,10 @@ impl InstancesPage {
                 ui.painter()
                     .rect_filled(plate, Rounding::ZERO, with_alpha(crate::theme::BG, 160));
             }
-            let galley = ui.painter().layout(
-                inst.name.clone(),
+            let galley = multimc_name_galley(
+                ui.painter(),
+                &inst.name,
                 egui::FontId::proportional(12.0),
-                Color32::PLACEHOLDER,
                 94.0,
             );
             let color = if is_selected {
@@ -3718,7 +3777,7 @@ impl InstancesPage {
                     ui.add_space(8.0);
                 }
 
-                // Filter + sort instances (memoized â€” see `filtered_indices`).
+                // Filter + sort instances (memoized — see `filtered_indices`).
                 let filtered_indices = self.filtered_indices(instances);
 
                 // Instances list
@@ -3923,7 +3982,7 @@ impl InstancesPage {
             };
             let size_text = match page.disk_sizes.get(&inst_id) {
                 Some(bytes) => lang.disk_size(*bytes),
-                None => "â€¦".to_string(),
+                None => "…".to_string(),
             };
             card.horizontal(|ui| {
                 icons::icon_label(
@@ -4058,8 +4117,8 @@ impl InstancesPage {
             }
         }
 
-        // Trash (CONCEPT "ÐšÐ¾Ñ€Ð·Ð¸Ð½Ð°", P2): soft-deleted instances wait here
-        // for restore or permanent deletion. FS scan throttled to 2s â€”
+        // Trash (CONCEPT trash, P2): soft-deleted instances wait here
+        // for restore or permanent deletion. FS scan throttled to 2s —
         // never per frame. The Modrinth library skin has no trash section.
         if !matches!(ctx.skin, LibrarySkin::Modrinth | LibrarySkin::Multimc) {
             let trash_stale = match self.trash_at {
@@ -4099,7 +4158,7 @@ impl InstancesPage {
                 ui.horizontal(|ui| {
                     ui.label(
                         egui::RichText::new(format!(
-                            "{} â€¢ {} {}",
+                            "{} • {} {}",
                             truncate_name(&entry.instance.name, 28),
                             entry.instance.game_version,
                             entry.instance.loader.as_str(),
@@ -4586,7 +4645,7 @@ impl InstancesPage {
                             );
                             if !ctx.group_names.is_empty() {
                                 ui.label(
-                                    egui::RichText::new(ctx.group_names.join(" â€¢ "))
+                                    egui::RichText::new(ctx.group_names.join(" • "))
                                         .font(egui::FontId::proportional(11.0))
                                         .color(TEXT_MUTED),
                                 );
@@ -4801,7 +4860,7 @@ mod tests {
         assert_eq!(truncate_name("Short", 22), "Short");
         assert_eq!(
             truncate_name("Exactly twenty-two chars!!", 22),
-            "Exactly twenty-two chaâ€¦"
+            "Exactly twenty-two cha…"
         );
         assert_eq!(truncate_name("", 22), "");
     }
