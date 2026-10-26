@@ -26,12 +26,12 @@
 - Branch: `main`
 - Коммиты сессии 2026-10-26: `5417adb` (minimum-size layouts),
   `c46eded` (Modrinth rail overlay), `e31a00f` (Discover/empty state),
-  `c9288e5` (Quick Play), `012b40e` (signed-out/friends states), `f1b7aa9` (empty accounts action);
+  `c9288e5` (Quick Play), `012b40e` (signed-out/friends states), `f1b7aa9` (empty accounts action), `6084535` (add account);
   финальный коммит сессии добавляет этот файл и release-заметки.
 - Все изменения запушены, рабочее дерево чистое.
 - Локальный release, выложенный в `dist`, имеет SHA-256
-  `3BF6DAF0480FD8323103C9E56209F36770185798726B7CFF47C08CCCC25F626F`.
-- Перед деплоем 26.10.2026 создан бэкап `dist/amc-launcher.exe.bak-20261026-1051`.
+  `749EFA45BB1B94A6AEAC16F2E3244BE20C877740F4A139BE8E218FCFB6333AD2`.
+- Перед деплоем 26.10.2026 создан бэкап `dist/amc-launcher.exe.bak-20261026-1101`.
 
 ## Сессия 2026-10-26: адаптивность и взаимодействия
 
@@ -77,6 +77,9 @@ physical при 125% DPI), а также на 1120×700 logical (1400×875 physi
 13. **Пустые аккаунты в настройках**: у Modrinth/LabyMod/Millida/MultiMC
     вместо тупиковой карточки появились локальная подсказка и кнопка
     «Войти», открывающая общий login modal. Aleph-режимы не затронуты.
+14. **Несколько аккаунтов**: если аккаунт уже сохранён, под списком есть
+    локализованная кнопка «Добавить аккаунт» — можно войти вторым профилем
+    без выхода из текущего.
 
 ## Обязательные правила
 
