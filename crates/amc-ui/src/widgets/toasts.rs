@@ -54,7 +54,8 @@ pub fn push_toast(
 }
 
 /// Top-right stacked toasts. Call every frame; expired ones are dropped.
-pub fn show_toasts(ctx: &egui::Context, toasts: &mut Vec<Toast>) {
+/// `bottom_inset` keeps the stack above a shell's bottom bar/status strip.
+pub fn show_toasts(ctx: &egui::Context, toasts: &mut Vec<Toast>, bottom_inset: f32) {
     toasts.retain(|t| Instant::now() < t.until);
     if toasts.is_empty() {
         return;
@@ -65,12 +66,14 @@ pub fn show_toasts(ctx: &egui::Context, toasts: &mut Vec<Toast>) {
         let remaining = next.saturating_duration_since(Instant::now());
         ctx.request_repaint_after(remaining.max(Duration::from_millis(16)));
     }
+    // Stack from the bottom-right so transient notices never cover the
+    // titlebar utilities or a page toolbar.
+    let screen = ctx.screen_rect();
+    let stack_h = toasts.len() as f32 * 52.0;
+    let top = (screen.bottom() - bottom_inset - stack_h - 12.0).max(screen.top() + 96.0);
     egui::Area::new(egui::Id::new("toasts"))
         .order(egui::Order::Foreground)
-        .fixed_pos(egui::pos2(
-            ctx.screen_rect().right() - 330.0,
-            ctx.screen_rect().top() + 88.0,
-        ))
+        .fixed_pos(egui::pos2(screen.right() - 330.0, top))
         .interactable(false)
         .show(ctx, |ui| {
             ui.vertical(|ui| {
