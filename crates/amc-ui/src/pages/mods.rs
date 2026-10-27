@@ -1300,6 +1300,7 @@ impl ModsPage {
         on_install: impl FnOnce(ModSearchResult),
     ) {
         let millida = skin == ModsSkin::Millida;
+        let modrinth = skin == ModsSkin::Modrinth;
         let chip = |ui: &mut Ui, icon: Icon, label: &str, active: bool| -> bool {
             if millida {
                 millida_action_button(ui, label, active)
@@ -1680,17 +1681,35 @@ impl ModsPage {
 
                     // Title & Description with truncation
                     let max_card_text_w = (child.available_width() - 140.0).max(120.0);
+                    let title_font = egui::FontId::proportional(14.0);
+                    let title_full_w = child
+                        .painter()
+                        .layout_no_wrap(
+                            item.title.clone(),
+                            title_font.clone(),
+                            Color32::PLACEHOLDER,
+                        )
+                        .size()
+                        .x;
+                    let title_w = (max_card_text_w - 300.0).max(100.0);
+                    let title_box_w = title_full_w.min(title_w);
                     child.vertical(|ui| {
                         ui.set_max_width(max_card_text_w);
                         ui.horizontal(|ui| {
-                            ui.label(
-                                egui::RichText::new(&item.title)
-                                    .font(egui::FontId::proportional(14.0))
-                                    .strong()
-                                    .color(TEXT_HEADING),
+                            ui.add_sized(
+                                [title_box_w, 16.0],
+                                egui::Label::new(
+                                    egui::RichText::new(&item.title)
+                                        .font(title_font)
+                                        .strong()
+                                        .color(TEXT_HEADING),
+                                )
+                                .truncate()
+                                .halign(egui::Align::LEFT),
                             );
+                            let author = crate::shells::short_name(&item.author, 18);
                             ui.label(
-                                egui::RichText::new(format!("by {}", item.author))
+                                egui::RichText::new(format!("by {author}"))
                                     .font(egui::FontId::proportional(11.0))
                                     .color(TEXT_MUTED),
                             );
@@ -1855,7 +1874,21 @@ impl ModsPage {
                             .ctx()
                             .animate_bool_responsive(ib_resp.id, ib_resp.hovered());
                         let ib_bg = lerp_color(RUBY, RUBY_LIGHT, ib_hover);
-                        let ib_stroke = lerp_color(RUBY_LIGHT, Color32::WHITE, ib_hover);
+                        let ib_stroke = if modrinth {
+                            Color32::TRANSPARENT
+                        } else {
+                            lerp_color(RUBY_LIGHT, Color32::WHITE, ib_hover)
+                        };
+                        let ib_text = if modrinth {
+                            crate::theme::MODRINTH_BG
+                        } else {
+                            Color32::WHITE
+                        };
+                        let ib_label = if modrinth {
+                            lang.mods_btn_install_title()
+                        } else {
+                            lang.mods_btn_install()
+                        };
 
                         child
                             .painter()
@@ -1868,15 +1901,19 @@ impl ModsPage {
                         child.painter().text(
                             ib_rect.center(),
                             egui::Align2::CENTER_CENTER,
-                            lang.mods_btn_install(),
+                            ib_label,
                             egui::FontId::proportional(11.5),
-                            Color32::WHITE,
+                            ib_text,
                         );
 
                         if ib_resp.clicked() {
                             self.installing_ids.insert(item.id.clone());
                             to_install = Some(item.clone());
                         }
+                    }
+                    if title_full_w > title_w || item.author.chars().count() > 18 {
+                        resp.clone()
+                            .on_hover_text(format!("{}\nby {}", item.title, item.author));
                     }
                 }
 

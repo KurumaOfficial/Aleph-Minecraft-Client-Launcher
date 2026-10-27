@@ -1203,6 +1203,15 @@ impl Language {
         }
     }
 
+    /// Sentence-case install label for the Modrinth Browse replica.
+    pub fn mods_btn_install_title(&self) -> &'static str {
+        match self {
+            Self::English => "Install",
+            Self::Russian => "Установить",
+            Self::Ukrainian => "Встановити",
+        }
+    }
+
     pub fn mods_btn_downloading(&self) -> &'static str {
         match self {
             Self::English => "DOWNLOADING...",
@@ -6085,6 +6094,7 @@ mod tests {
             assert!(!lang.mods_install_optifine().is_empty());
             assert!(!lang.mods_optifine_need_instance().is_empty());
             assert!(!lang.mods_search_clear().is_empty());
+            assert!(!lang.mods_btn_install_title().is_empty());
             assert!(!lang.mods_search_prompt_title().is_empty());
             assert!(!lang.mods_search_prompt_hint().is_empty());
             assert!(!lang.mods_search_no_results_title().is_empty());
