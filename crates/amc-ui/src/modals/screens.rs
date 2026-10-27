@@ -167,9 +167,18 @@ impl ScreensModal {
                                         );
                                         if let Some(t) = tex {
                                             let inner = rect.shrink(4.0);
+                                            // Preserve the screenshot aspect ratio;
+                                            // the card background letterboxes it.
+                                            let size = t.size_vec2();
+                                            let scale = (inner.width() / size.x)
+                                                .min(inner.height() / size.y);
+                                            let image_rect = egui::Rect::from_center_size(
+                                                inner.center(),
+                                                size * scale,
+                                            );
                                             ui.painter().image(
                                                 t.id(),
-                                                inner,
+                                                image_rect,
                                                 egui::Rect::from_min_max(
                                                     egui::pos2(0.0, 0.0),
                                                     egui::pos2(1.0, 1.0),
