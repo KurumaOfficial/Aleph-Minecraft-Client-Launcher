@@ -27,15 +27,18 @@
 - Коммиты сессии 2026-10-27: `308031e` (Modrinth create dialog/search),
   `2a3f359` (LabyMod/Millida account cards), `4845288` (search inputs and
   MultiMC labels), `5c9d04b` (utility modals), `e97f4aa` (card stats and
-  truncated-name tooltips).
+  truncated-name tooltips), `2fa5ec9` (selection persistence/MultiMC
+  no-selection), `9a87e2f` (search empty states and account names),
+  `612645f` (screenshots folder action), `b129ccb` (Professional topbar
+  account width), `bde51bb` (local-mods search action).
 - Предыдущая сессия 2026-10-26: `5417adb`, `c46eded`, `e31a00f`, `c9288e5`,
   `012b40e`, `f1b7aa9`, `6084535`, `26517f7`, `0ac49b3`, `a6e9a1d`,
   `050ecac`, `73bd20e`, `6adb133`, `fbc6cb5`, `1675083`.
 - Все изменения запушены, рабочее дерево чистое.
 - Локальный release, выложенный в `dist`, имеет SHA-256
-  `A3BD0253BA0324236798310E8574ABCEB7365CC98E2C245DD02828D863E46AC9`.
+  `CD19A23B36D149F74CB9EC594A0E937A2B858210884397498C5081E0B5233622`.
 - Перед деплоем 27.10.2026 создан бэкап
-  `dist/amc-launcher.exe.bak-20261027-0917`.
+  `dist/amc-launcher.exe.bak-20261027-1021`.
 
 ## Сессия 2026-10-26: адаптивность и взаимодействия
 
@@ -157,6 +160,28 @@ physical при 125% DPI), а также на 1120×700 logical (1400×875 physi
    «Обновить статус» получила 4 px отступ от края.
 10. **Release**: собран release, проверены заголовок «AMC Launcher»,
     библиотека Modrinth и Create Instance; SHA-256 и бэкап записаны выше.
+
+### Продолжение 2026-10-27
+
+11. **MultiMC без выбора**: при пустом `selected_instance` правый toolbar
+    полностью disabled, статус-бар показывает «Сборка не выбрана». Выбор
+    сборки теперь сохраняется в `config.json` и восстанавливается после
+    перезапуска; MultiMC не навязывает первую сборку.
+12. **Поиск модов**: добавлены локализованные пустые состояния «Найдите
+    моды» / «Ничего не найдено» с кнопкой «Очистить поиск»; проверены
+    Modrinth, LabyMod и Millida. В Professional/Simple у пустого списка
+    локальных модов появилась кнопка «Найти моды».
+13. **Библиотека Modrinth**: при пустом результате поиска показывается
+    «Сборки не найдены» вместо «Версии не найдены».
+14. **Длинные ники**: Professional topbar и LabyMod account chip
+    обрезают имя с tooltip и больше не перекрывают навигацию/Play;
+    Millida rail/lobby account tooltips показывают полное имя.
+15. **Скриншоты**: пустая галерея получила рабочую кнопку «Открыть папку
+    скриншотов» вместо декоративной подписи.
+16. **Identity picker**: проверен на 960×600 с двумя аккаунтами и длинным
+    ником; закрывается по Escape/крестику, строки аккаунтов не обрезаются.
+17. **Release**: пересобран после правок, проверены Professional topbar и
+    пустое состояние модов; финальный SHA-256 и бэкап — выше.
 
 ## Обязательные правила
 
@@ -425,8 +450,8 @@ Millida). Собранные ассеты, которые уже использ�
    API; сейчас это локальные карточки-заглушки.
 2. Точечная доводка Modrinth: cape-менеджер, полный BrowsePage и
    multi-stage Create Instance (иконка + версия загрузчика).
-3. Довести Millida на длинных никах в остальных внутренних страницах и
-   проверить identity picker в реальном запуске с несколькими аккаунтами.
+3. Довести Millida на длинных никах в остальных внутренних страницах,
+   проверить multi-account login flow и удаление активного аккаунта.
 4. После каждого шага — скриншот, проверки, commit, push, release deploy.
 
 ## Проверка релиза
@@ -435,8 +460,8 @@ Millida). Собранные ассеты, которые уже использ�
   1200×750 physical.
 - Дополнительно проверять 1400×875 physical (1120×700 logical).
 - Release 2026-10-27: SHA-256
-  `A3BD0253BA0324236798310E8574ABCEB7365CC98E2C245DD02828D863E46AC9`,
-  бэкап `dist/amc-launcher.exe.bak-20261027-0917`.
+  `CD19A23B36D149F74CB9EC594A0E937A2B858210884397498C5081E0B5233622`,
+  бэкап `dist/amc-launcher.exe.bak-20261027-1021`.
 - Скриншоты этой сессии: `%TEMP%\opencode\*_after*.png` (временные, в git
   не входят).
 
