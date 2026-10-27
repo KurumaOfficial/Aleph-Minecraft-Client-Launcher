@@ -4115,6 +4115,9 @@ impl InstancesPage {
                 *selected_instance = Some(inst_id);
                 *action = InstanceAction::Selected(inst_id);
             }
+            if inst.name.chars().count() > 22 {
+                resp.on_hover_text(inst.name.as_str());
+            }
         }
 
         // Trash (CONCEPT trash, P2): soft-deleted instances wait here

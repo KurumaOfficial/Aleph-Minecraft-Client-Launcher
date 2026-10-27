@@ -584,7 +584,7 @@ impl SkinsPage {
         });
         ui.add_space(10.0);
 
-        let (card, _) = ui.allocate_exact_size(vec2(width, 74.0), Sense::hover());
+        let (card, card_resp) = ui.allocate_exact_size(vec2(width, 74.0), Sense::hover());
         millida_pixel_plate(
             ui.painter(),
             card,
@@ -647,6 +647,9 @@ impl SkinsPage {
             egui::FontId::proportional(10.0),
             theme::ACCENT_LIGHT.into(),
         );
+        if self.active_skin_name.chars().count() > 24 {
+            card_resp.on_hover_text(&self.active_skin_name);
+        }
 
         ui.add_space(16.0);
         ui.label(
@@ -1057,7 +1060,7 @@ impl SkinsPage {
         });
         ui.add_space(10.0);
 
-        let (card, _) = ui.allocate_exact_size(vec2(width, 72.0), Sense::hover());
+        let (card, card_resp) = ui.allocate_exact_size(vec2(width, 72.0), Sense::hover());
         ui.painter()
             .rect_filled(card, egui::Rounding::same(14.0), BG_CARD);
         ui.painter().rect_stroke(
@@ -1118,6 +1121,9 @@ impl SkinsPage {
                 egui::FontId::proportional(10.5),
                 theme::ACCENT_LIGHT.into(),
             );
+        }
+        if self.active_skin_name.chars().count() > name_chars {
+            card_resp.on_hover_text(&self.active_skin_name);
         }
 
         ui.add_space(16.0);
@@ -1710,6 +1716,9 @@ impl SkinsPage {
                 if resp.hovered() && !remove_resp.hovered() {
                     ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
                 }
+                if skin.name.chars().count() > 24 {
+                    resp.clone().on_hover_text(&skin.name);
+                }
                 ui.add_space(6.0);
             }
         }
@@ -1775,7 +1784,7 @@ impl SkinsPage {
         ui.add_space(10.0);
 
         // Active skin.
-        let (card, _) = ui.allocate_exact_size(vec2(width, 72.0), Sense::hover());
+        let (card, card_resp) = ui.allocate_exact_size(vec2(width, 72.0), Sense::hover());
         ui.painter().rect_filled(
             card,
             egui::Rounding::same(12.0),
@@ -1837,6 +1846,9 @@ impl SkinsPage {
             egui::FontId::proportional(10.5),
             crate::theme::MODRINTH_GREEN,
         );
+        if self.active_skin_name.chars().count() > 28 {
+            card_resp.on_hover_text(&self.active_skin_name);
+        }
 
         ui.add_space(16.0);
         ui.label(

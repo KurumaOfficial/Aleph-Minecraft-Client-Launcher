@@ -48,8 +48,14 @@ impl IdentityPicker {
         if !self.open {
             return PickerAction::None;
         }
+        if ui.ctx().input(|i| i.key_pressed(egui::Key::Escape)) {
+            self.open = false;
+            return PickerAction::Cancelled;
+        }
         let mut action = PickerAction::None;
+        let mut open = true;
         egui::Window::new(lang.picker_title())
+            .open(&mut open)
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, vec2(0.0, 0.0))
@@ -66,6 +72,7 @@ impl IdentityPicker {
                         }
                         AccountType::Offline => acc.username.clone(),
                     };
+                    let label = crate::shells::short_name(&label, 44);
                     let active = self.picked_id == Some(acc.id);
                     if choice_chip(ui, &label, 380.0, 34.0, 12.0, active) {
                         self.picked_id = Some(acc.id);
@@ -114,6 +121,9 @@ impl IdentityPicker {
                     }
                 });
             });
+        if !open {
+            action = PickerAction::Cancelled;
+        }
         if !matches!(action, PickerAction::None) {
             self.open = false;
         }

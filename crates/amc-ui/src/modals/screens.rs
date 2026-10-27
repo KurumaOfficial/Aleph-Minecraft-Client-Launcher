@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::theme::{BG_CARD, BORDER_DEFAULT, TEXT_MUTED};
-use crate::widgets::icons::{icon_button, Icon};
+use crate::widgets::icons::{self, icon_button, Icon};
 
 /// Screenshot gallery modal (CONCEPT "Скриншоты", P10): thumbnails from
 /// every instance's `screenshots/` folder, click opens externally,
@@ -85,90 +85,129 @@ impl ScreensModal {
         let mut close = false;
         let mut action = ScreensAction::None;
         let mut deleted: Vec<PathBuf> = Vec::new();
+        let screen = ctx.screen_rect();
+        let max_h = (screen.height() - 146.0).max(300.0);
+        let mut open = true;
         egui::Window::new(lang.screens_title())
+            .open(&mut open)
             .collapsible(false)
             .resizable(true)
             .anchor(egui::Align2::CENTER_CENTER, vec2(0.0, 0.0))
             .min_width(640.0)
-            .default_size(vec2(680.0, 480.0))
+            .default_size(vec2(680.0, (max_h - 20.0).max(320.0)))
+            .max_height(max_h)
             .show(ctx, |ui| {
                 if self.shots.is_empty() {
-                    ui.label(egui::RichText::new(lang.screens_empty()).color(TEXT_MUTED));
-                }
-                egui::ScrollArea::vertical()
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
-                        ui.horizontal_wrapped(|ui| {
-                            ui.spacing_mut().item_spacing = vec2(10.0, 10.0);
-                            for i in 0..self.shots.len() {
-                                let path = self.shots[i].clone();
-                                ui.vertical(|ui| {
-                                    ui.set_max_width(200.0);
-                                    let tex = self.thumb(ui.ctx(), &path);
-                                    let (rect, resp) =
-                                        ui.allocate_exact_size(vec2(200.0, 120.0), Sense::click());
-                                    ui.painter().rect_filled(
-                                        rect,
-                                        crate::theme::rounding(),
-                                        BG_CARD,
-                                    );
-                                    ui.painter().rect_stroke(
-                                        rect,
-                                        crate::theme::rounding(),
-                                        Stroke::new(1.0_f32, BORDER_DEFAULT),
-                                    );
-                                    if let Some(t) = tex {
-                                        let inner = rect.shrink(4.0);
-                                        ui.painter().image(
-                                            t.id(),
-                                            inner,
-                                            egui::Rect::from_min_max(
-                                                egui::pos2(0.0, 0.0),
-                                                egui::pos2(1.0, 1.0),
-                                            ),
-                                            Color32::WHITE,
+                    ui.add_space(36.0);
+                    ui.vertical_centered(|ui| {
+                        let (icon, _) = ui.allocate_exact_size(vec2(64.0, 64.0), Sense::hover());
+                        ui.painter()
+                            .rect_filled(icon, crate::theme::rounding(), BG_CARD);
+                        ui.painter().rect_stroke(
+                            icon,
+                            crate::theme::rounding(),
+                            Stroke::new(1.0_f32, BORDER_DEFAULT),
+                        );
+                        icons::draw_centered(
+                            ui.painter(),
+                            Icon::Gallery,
+                            icon.center(),
+                            28.0,
+                            TEXT_MUTED,
+                        );
+                        ui.add_space(12.0);
+                        ui.label(
+                            egui::RichText::new(lang.screens_empty())
+                                .font(egui::FontId::proportional(13.0))
+                                .color(TEXT_MUTED),
+                        );
+                        ui.add_space(6.0);
+                        ui.label(
+                            egui::RichText::new(lang.screens_open())
+                                .font(egui::FontId::proportional(11.0))
+                                .color(TEXT_MUTED),
+                        );
+                    });
+                } else {
+                    egui::ScrollArea::vertical()
+                        .max_height((max_h - 100.0).max(160.0))
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| {
+                            ui.horizontal_wrapped(|ui| {
+                                ui.spacing_mut().item_spacing = vec2(10.0, 10.0);
+                                for i in 0..self.shots.len() {
+                                    let path = self.shots[i].clone();
+                                    ui.vertical(|ui| {
+                                        ui.set_max_width(200.0);
+                                        let tex = self.thumb(ui.ctx(), &path);
+                                        let (rect, resp) = ui.allocate_exact_size(
+                                            vec2(200.0, 120.0),
+                                            Sense::click(),
                                         );
-                                    }
-                                    if resp.clicked() {
-                                        let _ = open::that(&path);
-                                    }
-                                    if resp.hovered() {
-                                        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                                    }
-                                    ui.horizontal(|ui| {
-                                        let mut name = path
-                                            .file_name()
-                                            .map(|n| n.to_string_lossy().to_string())
-                                            .unwrap_or_default();
-                                        if name.chars().count() > 22 {
-                                            name = format!(
-                                                "{}…",
-                                                name.chars().take(22).collect::<String>()
+                                        ui.painter().rect_filled(
+                                            rect,
+                                            crate::theme::rounding(),
+                                            BG_CARD,
+                                        );
+                                        ui.painter().rect_stroke(
+                                            rect,
+                                            crate::theme::rounding(),
+                                            Stroke::new(1.0_f32, BORDER_DEFAULT),
+                                        );
+                                        if let Some(t) = tex {
+                                            let inner = rect.shrink(4.0);
+                                            ui.painter().image(
+                                                t.id(),
+                                                inner,
+                                                egui::Rect::from_min_max(
+                                                    egui::pos2(0.0, 0.0),
+                                                    egui::pos2(1.0, 1.0),
+                                                ),
+                                                Color32::WHITE,
                                             );
                                         }
-                                        ui.label(
-                                            egui::RichText::new(name)
-                                                .font(egui::FontId::proportional(10.0))
-                                                .color(TEXT_MUTED),
-                                        );
-                                        ui.with_layout(
-                                            egui::Layout::right_to_left(egui::Align::Center),
-                                            |ui| {
-                                                if icon_button(ui, Icon::Trash, TEXT_MUTED)
-                                                    .clicked()
-                                                    && std::fs::remove_file(&path).is_ok()
-                                                {
-                                                    self.thumbs.remove(&path);
-                                                    self.failed.remove(&path);
-                                                    deleted.push(path);
-                                                }
-                                            },
-                                        );
+                                        if resp.clicked() {
+                                            let _ = open::that(&path);
+                                        }
+                                        if resp.hovered() {
+                                            ui.ctx()
+                                                .set_cursor_icon(egui::CursorIcon::PointingHand);
+                                        }
+                                        ui.horizontal(|ui| {
+                                            let mut name = path
+                                                .file_name()
+                                                .map(|n| n.to_string_lossy().to_string())
+                                                .unwrap_or_default();
+                                            if name.chars().count() > 22 {
+                                                name = format!(
+                                                    "{}…",
+                                                    name.chars().take(22).collect::<String>()
+                                                );
+                                            }
+                                            ui.label(
+                                                egui::RichText::new(name)
+                                                    .font(egui::FontId::proportional(10.0))
+                                                    .color(TEXT_MUTED),
+                                            );
+                                            ui.with_layout(
+                                                egui::Layout::right_to_left(egui::Align::Center),
+                                                |ui| {
+                                                    if icon_button(ui, Icon::Trash, TEXT_MUTED)
+                                                        .clicked()
+                                                        && std::fs::remove_file(&path).is_ok()
+                                                    {
+                                                        self.thumbs.remove(&path);
+                                                        self.failed.remove(&path);
+                                                        deleted.push(path);
+                                                    }
+                                                },
+                                            );
+                                        });
                                     });
-                                });
-                            }
+                                }
+                            });
                         });
-                    });
+                }
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
                     if ui.button(lang.home_drawer_close()).clicked() {
@@ -177,6 +216,12 @@ impl ScreensModal {
                     ui.label(egui::RichText::new(lang.screens_open()).color(TEXT_MUTED));
                 });
             });
+        if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+            close = true;
+        }
+        if !open {
+            close = true;
+        }
         if close {
             self.open = false;
         }

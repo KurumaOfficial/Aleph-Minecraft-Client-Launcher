@@ -150,8 +150,13 @@ impl ConsoleModal {
         if !self.is_open {
             return;
         }
+        if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+            self.is_open = false;
+            return;
+        }
 
         let mut is_open = self.is_open;
+        let max_h = (ctx.screen_rect().height() - 160.0).max(320.0);
         // Auto diagnosis memoized by (logs_len, lang); manual wins.
         let diag_key = (self.logs.len(), lang);
         if self.diag_key != Some(diag_key) {
@@ -165,7 +170,8 @@ impl ConsoleModal {
 
         egui::Window::new(lang.console_title())
             .open(&mut is_open)
-            .default_size(vec2(820.0, 520.0))
+            .default_size(vec2(820.0, (max_h - 30.0).max(320.0)))
+            .max_height(max_h)
             .min_size(vec2(540.0, 320.0))
             .resizable(true)
             .collapsible(false)
@@ -371,6 +377,7 @@ impl ConsoleModal {
 
                 ScrollArea::vertical()
                     .stick_to_bottom(self.autoscroll)
+                    .max_height((max_h - 150.0).max(160.0))
                     .auto_shrink([false, false])
                     .show_rows(ui, row_height, num_rows, |ui, row_range| {
                         ui.spacing_mut().item_spacing = vec2(0.0, 2.0);

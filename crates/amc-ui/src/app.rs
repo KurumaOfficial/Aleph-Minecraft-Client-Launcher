@@ -3648,7 +3648,9 @@ impl App for LauncherApp {
         // Post-exit session summary (clean exits only, never crashes).
         if let Some((name, mins)) = self.session_summary.clone() {
             let mut close_summary = false;
+            let mut open = true;
             egui::Window::new(lang.sess_title())
+                .open(&mut open)
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
@@ -3677,6 +3679,9 @@ impl App for LauncherApp {
                         close_summary = true;
                     }
                 });
+            if !open || ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
+                close_summary = true;
+            }
             if close_summary {
                 self.session_summary = None;
             }
