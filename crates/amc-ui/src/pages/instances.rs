@@ -2602,6 +2602,7 @@ impl InstancesPage {
 
         let mut close = false;
         let mut create = false;
+        let mut enter = false;
 
         egui::Area::new(egui::Id::new("modrinth_group_backdrop"))
             .order(egui::Order::Middle)
@@ -2676,7 +2677,7 @@ impl InstancesPage {
                                 .color(MODRINTH_TEXT_CONTRAST),
                         );
                         ui.add_space(8.0);
-                        modrinth_input(
+                        let name_resp = modrinth_input(
                             ui,
                             &mut self.new_group_name,
                             egui::Id::new("modrinth_new_group_name"),
@@ -2685,6 +2686,8 @@ impl InstancesPage {
                             lang.inst_group_name_hint(),
                             None,
                         );
+                        enter = (name_resp.has_focus() || name_resp.lost_focus())
+                            && ui.input(|i| i.key_pressed(egui::Key::Enter));
 
                         ui.add_space(20.0);
                         let (divider, _) =
@@ -3100,7 +3103,7 @@ impl InstancesPage {
             close = true;
         }
 
-        if create {
+        if create || enter {
             let name: String = self
                 .new_group_name
                 .trim()
