@@ -114,6 +114,9 @@ pub struct ModsPage {
     pub is_searching: bool,
     pub search_results: Vec<ModSearchResult>,
     pub local_mods: Vec<LocalMod>,
+    /// Folder the cached local-mod list was scanned from. The app rescans
+    /// when the selected instance (or its `mods/` folder) changes.
+    pub(crate) local_source: Option<std::path::PathBuf>,
     pub installing_ids: HashSet<String>,
     pub installed_titles: HashSet<String>,
     pub status_message: Option<(String, bool)>,
@@ -162,6 +165,7 @@ impl Default for ModsPage {
             is_searching: false,
             search_results: Vec::new(),
             local_mods: Vec::new(),
+            local_source: None,
             installing_ids: HashSet::new(),
             installed_titles: HashSet::new(),
             status_message: None,

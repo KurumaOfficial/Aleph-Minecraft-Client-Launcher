@@ -4574,6 +4574,14 @@ impl App for LauncherApp {
                             self.paths.root_dir.clone()
                         };
                         let mods_dir = base_dir.join("mods");
+                        // The cached local list may belong to another instance
+                        // or to the central mods folder. Rescan only when the
+                        // source changes, never every frame.
+                        if self.mods_page.local_source.as_deref() != Some(mods_dir.as_path()) {
+                            self.mods_page.local_mods =
+                                LocalModManager::scan_mods(&mods_dir).unwrap_or_default();
+                            self.mods_page.local_source = Some(mods_dir.clone());
+                        }
                         let mut search_req = None;
                         let mut mod_to_install = None;
 
