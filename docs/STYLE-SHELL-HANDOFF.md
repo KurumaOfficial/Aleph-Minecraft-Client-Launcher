@@ -33,15 +33,16 @@
   account width), `bde51bb` (local-mods search action), `eb575d0` (rescan
   instance mods), `a5d8bf6` (screenshot aspect ratio), `4b4bb1f` (Qt RAM
   sliders), `5a7cbc2` (MultiMC mod accent), `0d67ef2` (input focus/Enter),
-  `9555862` (Modrinth search-result polish), `9dbc0a1` (group Enter).
+  `9555862` (Modrinth search-result polish), `9dbc0a1` (group Enter),
+  `23fe3e1` (compact Quick Play manager).
 - Предыдущая сессия 2026-10-26: `5417adb`, `c46eded`, `e31a00f`, `c9288e5`,
   `012b40e`, `f1b7aa9`, `6084535`, `26517f7`, `0ac49b3`, `a6e9a1d`,
   `050ecac`, `73bd20e`, `6adb133`, `fbc6cb5`, `1675083`.
 - Все изменения запушены, рабочее дерево чистое.
 - Локальный release, выложенный в `dist`, имеет SHA-256
-  `9E6CFCEB4301833CB26D1628190C3A4905578C149A26DB46582BC7EB06D644AD`.
+  `B770C034B0C210B89559BF19B92FD9CFD74FC7855B2C8C3CC7BB3E1354729094`.
 - Перед деплоем 27.10.2026 создан бэкап
-  `dist/amc-launcher.exe.bak-20261027-1222`.
+  `dist/amc-launcher.exe.bak-20261027-1452`.
 
 ## Сессия 2026-10-26: адаптивность и взаимодействия
 
@@ -199,8 +200,12 @@ physical при 125% DPI), а также на 1120×700 logical (1400×875 physi
 22. **Modrinth search results**: длинные названия обрезаются с tooltip,
     автор/провайдер/загрузки остаются в строке; кнопка установки стала
     sentence-case зелёной с тёмным текстом, как в BrowsePage.
-23. **Release**: пересобран после правок, проверены Create по Enter,
-    поисковая выдача и MultiMC Java; финальный SHA-256 и бэкап — выше.
+23. **LabyMod Quick Play**: пустой менеджер серверов больше не растягивается
+    на полэкрана — ScrollArea показывается только при наличии серверов;
+    проверено на 960×600.
+24. **Release**: пересобран после правок, проверены Create по Enter,
+    поисковая выдача, MultiMC Java и Quick Play; финальный SHA-256 и
+    бэкап — выше.
 
 ## Обязательные правила
 
@@ -479,8 +484,8 @@ Millida). Собранные ассеты, которые уже использ�
   1200×750 physical.
 - Дополнительно проверять 1400×875 physical (1120×700 logical).
 - Release 2026-10-27: SHA-256
-  `9E6CFCEB4301833CB26D1628190C3A4905578C149A26DB46582BC7EB06D644AD`,
-  бэкап `dist/amc-launcher.exe.bak-20261027-1222`.
+  `B770C034B0C210B89559BF19B92FD9CFD74FC7855B2C8C3CC7BB3E1354729094`,
+  бэкап `dist/amc-launcher.exe.bak-20261027-1452`.
 - Скриншоты этой сессии: `%TEMP%\opencode\*_after*.png` (временные, в git
   не входят).
 
