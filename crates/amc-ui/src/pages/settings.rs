@@ -1210,10 +1210,21 @@ impl SettingsPage {
                 )
                 .color(TEXT_PRIMARY),
             );
-            ui.add(
-                egui::Slider::new(&mut config.default_launch_options.memory_min_mb, 512..=8192)
-                    .step_by(256.0),
-            );
+            if self.skin == SettingsSkin::Multimc {
+                multimc_ram_slider(
+                    ui,
+                    &mut config.default_launch_options.memory_min_mb,
+                    512,
+                    8192,
+                    256,
+                    "min_ram",
+                );
+            } else {
+                ui.add(
+                    egui::Slider::new(&mut config.default_launch_options.memory_min_mb, 512..=8192)
+                        .step_by(256.0),
+                );
+            }
 
             ui.add_space(10.0);
 
@@ -1223,13 +1234,24 @@ impl SettingsPage {
                 )
                 .color(TEXT_PRIMARY),
             );
-            ui.add(
-                egui::Slider::new(
+            if self.skin == SettingsSkin::Multimc {
+                multimc_ram_slider(
+                    ui,
                     &mut config.default_launch_options.memory_max_mb,
-                    1024..=32768,
-                )
-                .step_by(512.0),
-            );
+                    1024,
+                    32768,
+                    512,
+                    "max_ram",
+                );
+            } else {
+                ui.add(
+                    egui::Slider::new(
+                        &mut config.default_launch_options.memory_max_mb,
+                        1024..=32768,
+                    )
+                    .step_by(512.0),
+                );
+            }
         });
 
         ui.add_space(14.0);
@@ -2396,6 +2418,85 @@ fn shell_account_card(
     );
     card_resp.on_hover_text(&acc.username);
     (set_active, remove)
+}
+
+/// Qt/Fusion-style RAM slider for the MultiMC settings page: flat groove,
+/// rectangular handle and a spinbox-like value plate. Other shells keep the
+/// native egui slider so their visuals stay unchanged.
+fn multimc_ram_slider(
+    ui: &mut Ui,
+    value: &mut u32,
+    min: u32,
+    max: u32,
+    step: u32,
+    salt: &str,
+) -> egui::Response {
+    let width = ui.available_width();
+    let (rect, _) = ui.allocate_exact_size(vec2(width, 24.0), Sense::hover());
+    let plate_w = 86.0;
+    let groove_w = (width - plate_w - 14.0).max(80.0);
+    let groove = Rect::from_center_size(
+        pos2(rect.left() + groove_w / 2.0, rect.center().y),
+        vec2(groove_w, 4.0),
+    );
+    let resp = ui.interact(
+        Rect::from_min_max(
+            pos2(rect.left(), rect.top()),
+            pos2(groove.right() + 8.0, rect.bottom()),
+        ),
+        ui.id().with(("multimc_ram_slider", salt)),
+        Sense::click_and_drag(),
+    );
+    if resp.dragged() || resp.clicked() {
+        if let Some(pointer) = ui.input(|i| i.pointer.interact_pos()) {
+            let t = ((pointer.x - groove.left()) / groove.width()).clamp(0.0, 1.0);
+            let raw = min as f32 + t * (max - min) as f32;
+            let stepped = ((raw / step as f32).round() as u32) * step;
+            *value = stepped.clamp(min, max);
+        }
+    }
+    let value = (*value).clamp(min, max);
+    let t = (value - min) as f32 / (max - min) as f32;
+    ui.painter()
+        .rect_filled(groove, Rounding::ZERO, theme::BORDER_SOFT);
+    ui.painter().rect_filled(
+        Rect::from_min_size(groove.min, vec2(groove.width() * t, groove.height())),
+        Rounding::ZERO,
+        theme::ACCENT,
+    );
+    let handle = Rect::from_center_size(
+        pos2(groove.left() + groove.width() * t, rect.center().y),
+        vec2(10.0, 18.0),
+    );
+    ui.painter()
+        .rect_filled(handle, Rounding::ZERO, theme::ACCENT);
+    ui.painter().rect_stroke(
+        handle,
+        Rounding::ZERO,
+        Stroke::new(1.0_f32, theme::BORDER_STRONG),
+    );
+    let plate = Rect::from_min_size(
+        pos2(rect.right() - plate_w, rect.center().y - 12.0),
+        vec2(plate_w, 24.0),
+    );
+    ui.painter()
+        .rect_filled(plate, Rounding::ZERO, theme::FIELD);
+    ui.painter().rect_stroke(
+        plate,
+        Rounding::ZERO,
+        Stroke::new(1.0_f32, theme::BORDER_DEFAULT),
+    );
+    ui.painter().text(
+        plate.center(),
+        Align2::CENTER_CENTER,
+        format!("{value} MB"),
+        egui::FontId::proportional(11.0),
+        theme::TEXT.into(),
+    );
+    if resp.hovered() || resp.dragged() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeHorizontal);
+    }
+    resp
 }
 
 /// One boolean setting: the reference switch on Modrinth, the original
