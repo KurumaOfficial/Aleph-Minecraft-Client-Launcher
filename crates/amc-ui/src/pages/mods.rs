@@ -1198,7 +1198,7 @@ impl ModsPage {
                             lang.mods_status_disabled()
                         };
                         let toggle_color: Color32 = if m.enabled {
-                            if skin == ModsSkin::Labymod {
+                            if matches!(skin, ModsSkin::Labymod | ModsSkin::Multimc) {
                                 crate::theme::ACCENT.into()
                             } else {
                                 SUCCESS.into()
