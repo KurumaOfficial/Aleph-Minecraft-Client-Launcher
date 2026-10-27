@@ -972,6 +972,17 @@ impl ModsPage {
                         .font(egui::FontId::proportional(15.0))
                         .color(TEXT_MUTED),
                 );
+                ui.add_space(12.0);
+                let button = egui::Button::new(
+                    egui::RichText::new(lang.mods_browse_action())
+                        .font(egui::FontId::proportional(12.0))
+                        .color(Color32::WHITE),
+                )
+                .fill(RUBY)
+                .min_size(vec2(140.0, 32.0));
+                if ui.add(button).clicked() {
+                    self.sub_tab = ModsSubTab::Search;
+                }
             });
             return;
         }
