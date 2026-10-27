@@ -30,15 +30,16 @@
   truncated-name tooltips), `2fa5ec9` (selection persistence/MultiMC
   no-selection), `9a87e2f` (search empty states and account names),
   `612645f` (screenshots folder action), `b129ccb` (Professional topbar
-  account width), `bde51bb` (local-mods search action).
+  account width), `bde51bb` (local-mods search action), `eb575d0` (rescan
+  instance mods), `a5d8bf6` (screenshot aspect ratio).
 - Предыдущая сессия 2026-10-26: `5417adb`, `c46eded`, `e31a00f`, `c9288e5`,
   `012b40e`, `f1b7aa9`, `6084535`, `26517f7`, `0ac49b3`, `a6e9a1d`,
   `050ecac`, `73bd20e`, `6adb133`, `fbc6cb5`, `1675083`.
 - Все изменения запушены, рабочее дерево чистое.
 - Локальный release, выложенный в `dist`, имеет SHA-256
-  `CD19A23B36D149F74CB9EC594A0E937A2B858210884397498C5081E0B5233622`.
+  `0CB755F47F67E77EE37B72FBAD064017E5536B0CAFFFA3D0E795CA4EB8330D60`.
 - Перед деплоем 27.10.2026 создан бэкап
-  `dist/amc-launcher.exe.bak-20261027-1021`.
+  `dist/amc-launcher.exe.bak-20261027-1039`.
 
 ## Сессия 2026-10-26: адаптивность и взаимодействия
 
@@ -180,8 +181,13 @@ physical при 125% DPI), а также на 1120×700 logical (1400×875 physi
     скриншотов» вместо декоративной подписи.
 16. **Identity picker**: проверен на 960×600 с двумя аккаунтами и длинным
     ником; закрывается по Escape/крестику, строки аккаунтов не обрезаются.
-17. **Release**: пересобран после правок, проверены Professional topbar и
-    пустое состояние модов; финальный SHA-256 и бэкап — выше.
+17. **Локальные моды**: список теперь пересканируется при смене сборки
+    (`mods/` выбранного инстанса), а не остаётся от предыдущего/центрального
+    каталога. Проверено с тремя JAR, длинными именами и disabled-модом.
+18. **Галерея скриншотов**: превью сохраняют пропорции исходника и
+    центрируются с letterbox вместо растягивания; проверено с реальными PNG.
+19. **Release**: пересобран после правок, проверены Professional topbar,
+    локальные моды и галерея; финальный SHA-256 и бэкап — выше.
 
 ## Обязательные правила
 
@@ -460,8 +466,8 @@ Millida). Собранные ассеты, которые уже использ�
   1200×750 physical.
 - Дополнительно проверять 1400×875 physical (1120×700 logical).
 - Release 2026-10-27: SHA-256
-  `CD19A23B36D149F74CB9EC594A0E937A2B858210884397498C5081E0B5233622`,
-  бэкап `dist/amc-launcher.exe.bak-20261027-1021`.
+  `0CB755F47F67E77EE37B72FBAD064017E5536B0CAFFFA3D0E795CA4EB8330D60`,
+  бэкап `dist/amc-launcher.exe.bak-20261027-1039`.
 - Скриншоты этой сессии: `%TEMP%\opencode\*_after*.png` (временные, в git
   не входят).
 
