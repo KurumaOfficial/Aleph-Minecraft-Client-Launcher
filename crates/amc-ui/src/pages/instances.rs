@@ -1222,55 +1222,65 @@ fn modrinth_input(
     hint: &str,
     icon: Option<Icon>,
 ) -> egui::Response {
-    let (rect, resp) = ui.allocate_exact_size(vec2(width, height), Sense::click());
-    let radius = Rounding::same(12.0);
-    ui.painter().rect_filled(rect, radius, MODRINTH_FIELD);
-    let text_left = if icon.is_some() {
-        if let Some(icon) = icon {
-            icons::draw(
-                ui.painter(),
-                icon,
-                Rect::from_center_size(pos2(rect.left() + 22.0, rect.center().y), vec2(18.0, 18.0)),
-                MODRINTH_TEXT_SECONDARY,
-                1.5,
-            );
-        }
-        rect.left() + 38.0
-    } else {
-        rect.left() + 14.0
-    };
-    let text_rect = Rect::from_min_max(
-        pos2(text_left, rect.top() + 9.0),
-        pos2(rect.right() - 12.0, rect.bottom() - 9.0),
+    let left_pad = if icon.is_some() { 38.0 } else { 14.0 };
+    let right_pad = 12.0;
+    let field_left = ui.cursor().left();
+    let text_w = (width - left_pad - right_pad).max(40.0);
+    let v_pad = ((height - 18.0) / 2.0).max(4.0);
+    let edit = TextEdit::singleline(text)
+        .id(id)
+        .frame(true)
+        .desired_width(text_w)
+        .margin(egui::Margin {
+            left: left_pad,
+            right: right_pad,
+            top: v_pad,
+            bottom: v_pad,
+        })
+        .hint_text(egui::RichText::new(hint).color(MODRINTH_TEXT_SECONDARY))
+        .font(egui::FontId::proportional(14.0));
+    let resp = ui
+        .scope(|ui| {
+            let visuals = &mut ui.style_mut().visuals;
+            visuals.extreme_bg_color = MODRINTH_FIELD;
+            visuals.widgets.inactive.bg_fill = MODRINTH_FIELD;
+            visuals.widgets.inactive.weak_bg_fill = MODRINTH_FIELD;
+            visuals.widgets.inactive.bg_stroke = Stroke::new(1.0_f32, MODRINTH_SURFACE_HIGH);
+            visuals.widgets.inactive.rounding = Rounding::same(12.0);
+            visuals.widgets.hovered.bg_fill = MODRINTH_FIELD;
+            visuals.widgets.hovered.weak_bg_fill = MODRINTH_FIELD;
+            visuals.widgets.hovered.bg_stroke = Stroke::new(1.0_f32, MODRINTH_SURFACE_HIGH);
+            visuals.widgets.hovered.rounding = Rounding::same(12.0);
+            visuals.widgets.active.bg_fill = MODRINTH_FIELD;
+            visuals.widgets.active.weak_bg_fill = MODRINTH_FIELD;
+            visuals.widgets.active.bg_stroke = Stroke::new(1.0_f32, MODRINTH_GREEN);
+            visuals.widgets.active.rounding = Rounding::same(12.0);
+            visuals.override_text_color = Some(MODRINTH_TEXT_CONTRAST);
+            visuals.selection.bg_fill = with_alpha(MODRINTH_GREEN, 90);
+            ui.add(edit)
+        })
+        .inner;
+    let rect = Rect::from_min_size(
+        pos2(field_left, resp.rect.center().y - height / 2.0),
+        vec2(width, height),
     );
-    ui.scope_builder(
-        egui::UiBuilder::new()
-            .max_rect(text_rect)
-            .layout(egui::Layout::left_to_right(egui::Align::Center)),
-        |ui| {
-            ui.style_mut().visuals.override_text_color = Some(MODRINTH_TEXT_CONTRAST);
-            ui.style_mut().visuals.selection.bg_fill = with_alpha(MODRINTH_GREEN, 90);
-            ui.add(
-                TextEdit::singleline(text)
-                    .id(id)
-                    .frame(false)
-                    .desired_width(text_rect.width())
-                    .hint_text(egui::RichText::new(hint).color(MODRINTH_TEXT_SECONDARY)),
-            );
-        },
-    );
-    if resp.clicked() {
-        ui.memory_mut(|mem| mem.request_focus(id));
+    if let Some(icon) = icon {
+        icons::draw(
+            ui.painter(),
+            icon,
+            Rect::from_center_size(pos2(rect.left() + 22.0, rect.center().y), vec2(18.0, 18.0)),
+            MODRINTH_TEXT_SECONDARY,
+            1.5,
+        );
     }
-    let focused = ui.memory(|mem| mem.has_focus(id));
-    let border = if focused {
-        MODRINTH_GREEN
-    } else {
-        MODRINTH_SURFACE_HIGH
-    };
-    ui.painter()
-        .rect_stroke(rect, radius, Stroke::new(1.0_f32, border));
-    if resp.hovered() || focused {
+    if resp.has_focus() {
+        ui.painter().rect_stroke(
+            rect,
+            Rounding::same(12.0),
+            Stroke::new(1.0_f32, MODRINTH_GREEN),
+        );
+    }
+    if resp.hovered() || resp.has_focus() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::Text);
     }
     resp
@@ -2513,7 +2523,10 @@ impl InstancesPage {
 
                         let can_create = !self.new_instance_name.trim().is_empty()
                             && !self.new_instance_version.trim().is_empty();
-                        let enter = (name_resp.has_focus() || version_resp.has_focus())
+                        let enter = (name_resp.has_focus()
+                            || version_resp.has_focus()
+                            || name_resp.lost_focus()
+                            || version_resp.lost_focus())
                             && ui.input(|i| i.key_pressed(egui::Key::Enter));
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                             if m_button_enabled(
