@@ -32,15 +32,16 @@
   `612645f` (screenshots folder action), `b129ccb` (Professional topbar
   account width), `bde51bb` (local-mods search action), `eb575d0` (rescan
   instance mods), `a5d8bf6` (screenshot aspect ratio), `4b4bb1f` (Qt RAM
-  sliders), `5a7cbc2` (MultiMC mod accent).
+  sliders), `5a7cbc2` (MultiMC mod accent), `0d67ef2` (input focus/Enter),
+  `9555862` (Modrinth search-result polish), `9dbc0a1` (group Enter).
 - Предыдущая сессия 2026-10-26: `5417adb`, `c46eded`, `e31a00f`, `c9288e5`,
   `012b40e`, `f1b7aa9`, `6084535`, `26517f7`, `0ac49b3`, `a6e9a1d`,
   `050ecac`, `73bd20e`, `6adb133`, `fbc6cb5`, `1675083`.
 - Все изменения запушены, рабочее дерево чистое.
 - Локальный release, выложенный в `dist`, имеет SHA-256
-  `C9068FA0DF2E3D573165447AB0E9894402511D50DB4C18C8BC1D9887E15CC63B`.
+  `9E6CFCEB4301833CB26D1628190C3A4905578C149A26DB46582BC7EB06D644AD`.
 - Перед деплоем 27.10.2026 создан бэкап
-  `dist/amc-launcher.exe.bak-20261027-1140`.
+  `dist/amc-launcher.exe.bak-20261027-1222`.
 
 ## Сессия 2026-10-26: адаптивность и взаимодействия
 
@@ -192,8 +193,14 @@ physical при 125% DPI), а также на 1120×700 logical (1400×875 physi
     проверены, предупреждений об одинаковых widget ID больше нет.
 20. **MultiMC Mods**: включённый мод использует голубой Qt-акцент вместо
     зелёного; длинные имена и панель пакетных действий проверены на 960.
-21. **Release**: пересобран после правок, проверены Professional topbar,
-    локальные моды, галерея и MultiMC Java; финальный SHA-256 и бэкап — выше.
+21. **Modrinth Create/Group inputs**: клик по текстовой области теперь
+    ставит каретку (как в library search), а Enter создаёт сборку/группу
+    из поля имени; проверено на 960.
+22. **Modrinth search results**: длинные названия обрезаются с tooltip,
+    автор/провайдер/загрузки остаются в строке; кнопка установки стала
+    sentence-case зелёной с тёмным текстом, как в BrowsePage.
+23. **Release**: пересобран после правок, проверены Create по Enter,
+    поисковая выдача и MultiMC Java; финальный SHA-256 и бэкап — выше.
 
 ## Обязательные правила
 
@@ -472,8 +479,8 @@ Millida). Собранные ассеты, которые уже использ�
   1200×750 physical.
 - Дополнительно проверять 1400×875 physical (1120×700 logical).
 - Release 2026-10-27: SHA-256
-  `C9068FA0DF2E3D573165447AB0E9894402511D50DB4C18C8BC1D9887E15CC63B`,
-  бэкап `dist/amc-launcher.exe.bak-20261027-1140`.
+  `9E6CFCEB4301833CB26D1628190C3A4905578C149A26DB46582BC7EB06D644AD`,
+  бэкап `dist/amc-launcher.exe.bak-20261027-1222`.
 - Скриншоты этой сессии: `%TEMP%\opencode\*_after*.png` (временные, в git
   не входят).
 
