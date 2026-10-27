@@ -4,6 +4,7 @@ use crate::theme::{
     TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
 };
 use crate::widgets::icons::{self, icon_button, Icon};
+use crate::widgets::pixel;
 use amc_core::Language;
 use amc_mods::types::{LocalMod, ModCategory, ModSearchResult, ModSource, SearchSort};
 use egui::{pos2, vec2, Color32, ScrollArea, Sense, Stroke, TextEdit, Ui};
@@ -1493,6 +1494,69 @@ impl ModsPage {
             ui.vertical_centered(|ui| {
                 ui.spinner();
                 ui.label(egui::RichText::new(lang.mods_searching()).color(TEXT_MUTED));
+            });
+            return;
+        }
+
+        if self.search_results.is_empty() {
+            let has_query = !self.search_query.trim().is_empty();
+            ui.add_space(28.0);
+            ui.vertical_centered(|ui| {
+                let (icon_rect, _) = ui.allocate_exact_size(vec2(56.0, 56.0), Sense::hover());
+                if millida {
+                    pixel::plate(
+                        ui.painter(),
+                        icon_rect,
+                        6.0,
+                        Color32::from(BG_CARD),
+                        Color32::from(BORDER_DEFAULT),
+                    );
+                } else {
+                    ui.painter()
+                        .rect_filled(icon_rect, theme::rounding(), BG_CARD);
+                    ui.painter().rect_stroke(
+                        icon_rect,
+                        theme::rounding(),
+                        Stroke::new(1.0_f32, BORDER_DEFAULT),
+                    );
+                }
+                icons::draw_centered(
+                    ui.painter(),
+                    Icon::Search,
+                    icon_rect.center(),
+                    24.0,
+                    Color32::from(theme::ACCENT),
+                );
+                ui.add_space(12.0);
+                let (title, hint) = if has_query {
+                    (
+                        lang.mods_search_no_results_title(),
+                        lang.mods_search_no_results_hint(),
+                    )
+                } else {
+                    (
+                        lang.mods_search_prompt_title(),
+                        lang.mods_search_prompt_hint(),
+                    )
+                };
+                ui.label(
+                    egui::RichText::new(title)
+                        .font(egui::FontId::proportional(15.0))
+                        .strong()
+                        .color(TEXT_HEADING),
+                );
+                ui.add_space(4.0);
+                ui.label(
+                    egui::RichText::new(hint)
+                        .font(egui::FontId::proportional(12.0))
+                        .color(TEXT_MUTED),
+                );
+                if has_query {
+                    ui.add_space(12.0);
+                    if chip(ui, Icon::Close, lang.mods_search_clear(), true) {
+                        self.search_query.clear();
+                    }
+                }
             });
             return;
         }

@@ -238,10 +238,12 @@ impl TitleBar {
                 1.5,
             );
         }
+        let account_label = account.unwrap_or_else(|| lang.modrinth_sign_in());
+        let account_visible = crate::shells::short_name(account_label, 22);
         ui.painter().text(
             Pos2::new(account_rect.left() + 42.0, account_rect.center().y - 7.0),
             egui::Align2::LEFT_CENTER,
-            account.unwrap_or_else(|| lang.modrinth_sign_in()),
+            account_visible,
             egui::FontId::proportional(12.5),
             TEXT_PRIMARY.into(),
         );
@@ -264,6 +266,9 @@ impl TitleBar {
         );
         if account_resp.hovered() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+        }
+        if account_label.chars().count() > 22 {
+            account_resp.clone().on_hover_text(account_label);
         }
         if account_resp.clicked() {
             response.account_clicked = true;

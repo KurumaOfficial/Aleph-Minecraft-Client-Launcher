@@ -380,6 +380,15 @@ impl Language {
         }
     }
 
+    /// Modrinth App shell: empty result after filtering the library.
+    pub fn inst_library_no_results(&self) -> &'static str {
+        match self {
+            Self::English => "No instances found",
+            Self::Russian => "Сборки не найдены",
+            Self::Ukrainian => "Збірки не знайдено",
+        }
+    }
+
     /// Modrinth App shell: secondary "New group" toolbar button.
     pub fn inst_btn_new_group(&self) -> &'static str {
         match self {
@@ -1086,6 +1095,38 @@ impl Language {
             Self::English => "Clear search",
             Self::Russian => "Очистить поиск",
             Self::Ukrainian => "Очистити пошук",
+        }
+    }
+
+    pub fn mods_search_prompt_title(&self) -> &'static str {
+        match self {
+            Self::English => "Find mods",
+            Self::Russian => "Найдите моды",
+            Self::Ukrainian => "Знайдіть моди",
+        }
+    }
+
+    pub fn mods_search_prompt_hint(&self) -> &'static str {
+        match self {
+            Self::English => "Type a query or open Trending",
+            Self::Russian => "Введите запрос или откройте «В тренде»",
+            Self::Ukrainian => "Введіть запит або відкрийте «У тренді»",
+        }
+    }
+
+    pub fn mods_search_no_results_title(&self) -> &'static str {
+        match self {
+            Self::English => "Nothing found",
+            Self::Russian => "Ничего не найдено",
+            Self::Ukrainian => "Нічого не знайдено",
+        }
+    }
+
+    pub fn mods_search_no_results_hint(&self) -> &'static str {
+        match self {
+            Self::English => "Try another query or clear the search",
+            Self::Russian => "Попробуйте другой запрос или очистите поиск",
+            Self::Ukrainian => "Спробуйте інший запит або очистіть пошук",
         }
     }
 
@@ -5651,6 +5692,7 @@ mod tests {
             assert!(!lang.inst_btn_clone().is_empty());
             assert!(!lang.inst_library_title().is_empty());
             assert!(!lang.inst_library_search().is_empty());
+            assert!(!lang.inst_library_no_results().is_empty());
             assert!(!lang.inst_btn_new_group().is_empty());
             assert!(!lang.inst_btn_new_instance().is_empty());
             assert!(!lang.inst_group_none().is_empty());
@@ -6034,6 +6076,10 @@ mod tests {
             assert!(!lang.mods_install_optifine().is_empty());
             assert!(!lang.mods_optifine_need_instance().is_empty());
             assert!(!lang.mods_search_clear().is_empty());
+            assert!(!lang.mods_search_prompt_title().is_empty());
+            assert!(!lang.mods_search_prompt_hint().is_empty());
+            assert!(!lang.mods_search_no_results_title().is_empty());
+            assert!(!lang.mods_search_no_results_hint().is_empty());
             assert!(!lang.toast_mod_installed("x").is_empty());
             assert!(!lang.err_mod_copy_failed("x", "y").is_empty());
             assert!(!lang.toast_world_imported("x").is_empty());

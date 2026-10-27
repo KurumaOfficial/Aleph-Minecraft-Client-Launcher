@@ -590,6 +590,11 @@ pub fn show_rail(
         theme::MUTED,
         1.4,
     );
+    if let Some(name) = account_name {
+        if name.chars().count() > 13 {
+            resp.clone().on_hover_text(name);
+        }
+    }
     if resp.clicked() {
         if account_name.is_some() {
             action.tab = Some(NavTab::Profile);
@@ -1030,6 +1035,11 @@ fn draw_cluster(
         theme::MUTED,
         1.4,
     );
+    if let Some(full) = ctx.account {
+        if full.chars().count() > 14 {
+            pill_resp.clone().on_hover_text(full);
+        }
+    }
     if pill_resp.clicked() {
         if ctx.account.is_some() {
             action.tab = Some(NavTab::Profile);

@@ -1731,7 +1731,7 @@ impl InstancesPage {
                     ui.add_space(30.0);
                     ui.vertical_centered(|ui| {
                         ui.label(
-                            egui::RichText::new(lang.home_empty())
+                            egui::RichText::new(lang.inst_library_no_results())
                                 .font(egui::FontId::proportional(14.0))
                                 .color(MODRINTH_TEXT_SECONDARY),
                         );
