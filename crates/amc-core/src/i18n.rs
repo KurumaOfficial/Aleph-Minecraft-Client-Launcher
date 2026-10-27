@@ -2066,6 +2066,14 @@ impl Language {
         }
     }
 
+    pub fn screens_open_folder(&self) -> &'static str {
+        match self {
+            Self::English => "Open screenshots folder",
+            Self::Russian => "Открыть папку скриншотов",
+            Self::Ukrainian => "Відкрити папку скріншотів",
+        }
+    }
+
     // ---- Notifications (CONCEPT, P10) ----
     pub fn notif_title(&self) -> &'static str {
         match self {
@@ -5974,6 +5982,7 @@ mod tests {
             assert!(!lang.screens_title().is_empty());
             assert!(!lang.screens_empty().is_empty());
             assert!(!lang.screens_open().is_empty());
+            assert!(!lang.screens_open_folder().is_empty());
             assert!(!lang.notif_title().is_empty());
             assert!(!lang.notif_updates().is_empty());
             assert!(!lang.notif_downloads().is_empty());

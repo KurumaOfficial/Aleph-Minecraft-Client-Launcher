@@ -34,6 +34,23 @@ pub enum ScreensAction {
     Deleted(PathBuf),
 }
 
+/// First instance screenshots folder, or the instances root when none exists.
+/// Used by the empty gallery's "Open screenshots folder" action.
+fn screenshots_folder(instances_dir: &Path) -> PathBuf {
+    if let Ok(entries) = std::fs::read_dir(instances_dir) {
+        let mut dirs: Vec<PathBuf> = entries
+            .flatten()
+            .map(|entry| entry.path())
+            .filter(|path| path.is_dir())
+            .collect();
+        dirs.sort();
+        if let Some(first) = dirs.into_iter().next() {
+            return first.join("screenshots");
+        }
+    }
+    instances_dir.join("screenshots")
+}
+
 fn list_shots(instances_dir: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     let Ok(entries) = std::fs::read_dir(instances_dir) else {
@@ -119,12 +136,6 @@ impl ScreensModal {
                         ui.label(
                             egui::RichText::new(lang.screens_empty())
                                 .font(egui::FontId::proportional(13.0))
-                                .color(TEXT_MUTED),
-                        );
-                        ui.add_space(6.0);
-                        ui.label(
-                            egui::RichText::new(lang.screens_open())
-                                .font(egui::FontId::proportional(11.0))
                                 .color(TEXT_MUTED),
                         );
                     });
@@ -213,7 +224,15 @@ impl ScreensModal {
                     if ui.button(lang.home_drawer_close()).clicked() {
                         close = true;
                     }
-                    ui.label(egui::RichText::new(lang.screens_open()).color(TEXT_MUTED));
+                    if self.shots.is_empty() {
+                        if ui.button(lang.screens_open_folder()).clicked() {
+                            let dir = screenshots_folder(instances_dir);
+                            let _ = std::fs::create_dir_all(&dir);
+                            let _ = open::that(&dir);
+                        }
+                    } else {
+                        ui.label(egui::RichText::new(lang.screens_open()).color(TEXT_MUTED));
+                    }
                 });
             });
         if ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
