@@ -45,6 +45,8 @@ pub struct LauncherApp {
     current_tab: NavTab,
     selected_version: Option<String>,
     selected_instance: Option<uuid::Uuid>,
+    /// Last selection persisted to `config.json`; a change triggers one write.
+    selected_instance_snapshot: Option<uuid::Uuid>,
     versions: Vec<GameVersion>,
     instances: Vec<Instance>,
     is_launching: bool,
@@ -182,7 +184,20 @@ impl LauncherApp {
 
         // Load persisted instances
         let instances = Instance::load_all(&paths.instances_file()).unwrap_or_default();
-        let selected_instance = instances.first().map(|i| i.id);
+        // Restore the saved selection when it still exists. MultiMC also has
+        // a genuine "nothing selected" state (right toolbar disabled), so it
+        // must not auto-select the first instance on a fresh config.
+        let selected_instance = config
+            .selected_instance
+            .filter(|id| instances.iter().any(|inst| inst.id == *id))
+            .or_else(|| {
+                if config.app_mode == amc_core::config::AppMode::Multimc {
+                    None
+                } else {
+                    instances.first().map(|i| i.id)
+                }
+            });
+        let selected_instance_snapshot = config.selected_instance;
         // Quick start defaults to the last played version (CONCEPT,
         // Simple mode), then the first instance, then a hardcoded fallback.
         let selected_version = config
@@ -235,6 +250,7 @@ impl LauncherApp {
             current_tab: initial_tab,
             selected_version,
             selected_instance,
+            selected_instance_snapshot,
             versions: Vec::new(),
             instances,
             is_launching: false,
@@ -5081,6 +5097,18 @@ impl App for LauncherApp {
         match self.download_manager.show(ctx, &history, lang) {
             ManagerAction::Clear => self.download_engine.clear_history(),
             ManagerAction::None => {}
+        }
+
+        // Persist the selected instance across restarts. MultiMC can keep
+        // `None` (right toolbar disabled); other shells normally auto-select
+        // the first instance only on a fresh config.
+        if self.selected_instance != self.selected_instance_snapshot {
+            self.selected_instance_snapshot = self.selected_instance;
+            self.config.selected_instance = self.selected_instance;
+            match self.config.save_to_path(&self.paths.config_file()) {
+                Ok(()) => self.settings_saved_config = Some(self.config.clone()),
+                Err(e) => tracing::warn!("config save failed: {e}"),
+            }
         }
     }
 }
