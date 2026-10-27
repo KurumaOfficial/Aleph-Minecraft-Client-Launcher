@@ -3985,6 +3985,9 @@ impl InstancesPage {
                 None => "…".to_string(),
             };
             card.horizontal(|ui| {
+                // Four compact stats must fit the 270px card at the minimum
+                // window size; the default 8px gaps clip the session count.
+                ui.spacing_mut().item_spacing.x = 4.0;
                 icons::icon_label(
                     ui,
                     Icon::Clock,

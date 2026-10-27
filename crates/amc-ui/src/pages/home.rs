@@ -562,6 +562,8 @@ impl HomePage {
                     .color(TEXT_HEADING),
             );
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                // Keep the refresh action off the panel edge at 960 px.
+                ui.add_space(4.0);
                 if ui.button(lang.fav_refresh()).clicked() {
                     self.request_fav_ping(favorites);
                 }
