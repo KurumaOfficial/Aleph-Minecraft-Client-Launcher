@@ -118,9 +118,12 @@ pub fn show_topbar(
             ui.add_space(10.0);
 
             let display = account_name.unwrap_or_else(|| lang.bottom_btn_login());
-            let name_w =
-                crate::widgets::full::text_width(ui, &display.to_uppercase(), &theme::mono(11.0))
-                    .clamp(30.0, 150.0);
+            let account_font = theme::mono(11.0);
+            let display_upper = display.to_uppercase();
+            let name_w = crate::widgets::full::text_width(ui, &display_upper, &account_font)
+                .clamp(30.0, 110.0);
+            let visible_name =
+                crate::widgets::full::fit_text(ui, &display_upper, &account_font, name_w);
             let w = 8.0 + 30.0 + 10.0 + name_w + 12.0;
             let (rect, response) = ui.allocate_exact_size(vec2(w, 40.0), Sense::click());
             let anim =
@@ -173,12 +176,15 @@ pub fn show_topbar(
             painter.text(
                 pos2(rect.min.x + 45.0, rect.center().y),
                 Align2::LEFT_CENTER,
-                display.to_uppercase(),
-                theme::mono(11.0),
+                visible_name.as_str(),
+                account_font,
                 theme::lerp_color(TEXT_MUTED, theme::HEAD, anim),
             );
             if response.hovered() {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+            }
+            if visible_name != display_upper {
+                response.clone().on_hover_text(display);
             }
             if response.clicked() {
                 resp.account_clicked = true;
