@@ -35,15 +35,16 @@
   sliders), `5a7cbc2` (MultiMC mod accent), `0d67ef2` (input focus/Enter),
   `9555862` (Modrinth search-result polish), `9dbc0a1` (group Enter),
   `23fe3e1` (compact Quick Play manager), `888cfc0` (Quick Play hover),
-  `fb1a695` (long account names in MultiMC chrome).
+  `fb1a695` (long account names in MultiMC chrome), `319a710` (long
+  instance names in MultiMC toolbar).
 - Предыдущая сессия 2026-10-26: `5417adb`, `c46eded`, `e31a00f`, `c9288e5`,
   `012b40e`, `f1b7aa9`, `6084535`, `26517f7`, `0ac49b3`, `a6e9a1d`,
   `050ecac`, `73bd20e`, `6adb133`, `fbc6cb5`, `1675083`.
 - Все изменения запушены, рабочее дерево чистое.
 - Локальный release, выложенный в `dist`, имеет SHA-256
-  `54925140B52CEDDE858AD820A996AC352B822B89883B352830DB7CDCE2532001`.
+  `24E8776FCBFF36247364A38B0D64B6C3A94BDA24EC13C54A94BB393C76B727C8`.
 - Перед деплоем 28.10.2026 создан бэкап
-  `dist/amc-launcher.exe.bak-20261028-1123`.
+  `dist/amc-launcher.exe.bak-20261028-1238`.
 
 ## Сессия 2026-10-26: адаптивность и взаимодействия
 
@@ -210,9 +211,13 @@ physical при 125% DPI), а также на 1120×700 logical (1400×875 physi
 25. **MultiMC accounts**: длинный ник обрезается в toolbar и в Settings →
     Accounts, кнопки не выезжают за группу; dropdown аккаунтов ограничен
     шириной экрана и обрезает подписи. Проверено с ником на 60+ символов.
-26. **Release**: пересобран после правок; заголовок, домашний экран,
-    Quick Play и MultiMC accounts проверены на release, правый rail — на
-    debug-сборке с тем же кодом; финальный SHA-256 и бэкап — выше.
+26. **MultiMC instance name**: длинное имя в правом toolbar ограничено
+    32 символами с tooltip, поэтому действия не уезжают за низ окна;
+    проверено с именем на 100+ символов.
+27. **Release**: пересобран после правок; заголовок, домашний экран,
+    Quick Play, MultiMC accounts и длинное имя сборки проверены на
+    release, правый rail — на debug-сборке с тем же кодом; финальный
+    SHA-256 и бэкап — выше.
 
 ## Обязательные правила
 
@@ -491,8 +496,8 @@ Millida). Собранные ассеты, которые уже использ�
   1200×750 physical.
 - Дополнительно проверять 1400×875 physical (1120×700 logical).
 - Release 2026-10-28: SHA-256
-  `54925140B52CEDDE858AD820A996AC352B822B89883B352830DB7CDCE2532001`,
-  бэкап `dist/amc-launcher.exe.bak-20261028-1123`.
+  `24E8776FCBFF36247364A38B0D64B6C3A94BDA24EC13C54A94BB393C76B727C8`,
+  бэкап `dist/amc-launcher.exe.bak-20261028-1238`.
 - Скриншоты этой сессии: `%TEMP%\opencode\*_after*.png` (временные, в git
   не входят).
 
