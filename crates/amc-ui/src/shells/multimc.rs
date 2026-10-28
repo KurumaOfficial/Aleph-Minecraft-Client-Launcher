@@ -169,7 +169,8 @@ fn qt_dropdown(ctx: &egui::Context, button: &Response, items: &[QtItem<'_>]) -> 
                 w.max(14.0 + icon_w + text)
             }
         });
-        let width = (widest + 14.0).max(120.0);
+        let max_w = (ctx.screen_rect().right() - button.rect.left() - 8.0).max(140.0);
+        let width = (widest + 14.0).min(max_w).max(120.0);
         let area = egui::Area::new(button.id.with("qt_menu"))
             .order(egui::Order::Foreground)
             .fixed_pos(pos2(button.rect.left(), button.rect.bottom() + 1.0))
@@ -239,10 +240,18 @@ fn qt_dropdown(ctx: &egui::Context, button: &Response, items: &[QtItem<'_>]) -> 
                                     );
                                     x += 22.0;
                                 }
+                                let available = (rect.right() - x - 6.0).max(20.0);
+                                let visible = if crate::widgets::full::text_width(ui, label, &font)
+                                    > available
+                                {
+                                    crate::widgets::full::fit_text(ui, label, &font, available)
+                                } else {
+                                    (*label).to_string()
+                                };
                                 ui.painter().text(
                                     pos2(x, rect.center().y),
                                     Align2::LEFT_CENTER,
-                                    *label,
+                                    &visible,
                                     font.clone(),
                                     fg,
                                 );
@@ -373,19 +382,23 @@ pub fn show_toolbar(ui: &mut Ui, lang: Language, ctx: &ToolbarCtx<'_>) -> ShellA
         // Right side: the accounts dropdown (face + profile name).
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.add_space(6.0);
-            let label = ctx
+            let raw_label = ctx
                 .accounts
                 .iter()
                 .find(|a| Some(a.id) == ctx.active_account)
                 .map(|a| a.username.as_str())
                 .unwrap_or_else(|| lang.shell_accounts());
-            let account_btn = tb_button(ui, Icon::Person, label, true, false);
+            let label = crate::shells::short_name(raw_label, 18);
+            let account_btn = tb_button(ui, Icon::Person, &label, true, false);
             if let Some(pick) = qt_dropdown(ui.ctx(), &account_btn, &account_items(lang, ctx)) {
                 if pick < ctx.accounts.len() {
                     action.account = Some(ctx.accounts[pick].id);
                 } else {
                     action.tab = Some(NavTab::Profile);
                 }
+            }
+            if label != raw_label {
+                account_btn.clone().on_hover_text(raw_label);
             }
         });
     });

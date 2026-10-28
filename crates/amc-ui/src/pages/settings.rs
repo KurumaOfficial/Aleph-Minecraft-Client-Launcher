@@ -1905,8 +1905,10 @@ impl SettingsPage {
                         );
                     }
 
-                    ui.label(
-                        egui::RichText::new(&acc.username)
+                    let name_limit = if mr { 36 } else { 28 };
+                    let name_text = crate::shells::short_name(&acc.username, name_limit);
+                    let name_resp = ui.label(
+                        egui::RichText::new(name_text)
                             .font(egui::FontId::proportional(14.0))
                             .strong()
                             .color(if is_active {
@@ -1915,6 +1917,9 @@ impl SettingsPage {
                                 TEXT_PRIMARY.into()
                             }),
                     );
+                    if acc.username.chars().count() > name_limit {
+                        name_resp.on_hover_text(&acc.username);
+                    }
 
                     if is_active {
                         if mr {
