@@ -2351,8 +2351,8 @@ impl Language {
     pub fn clone_saves(&self) -> &'static str {
         match self {
             Self::English => "Copy worlds (saves)",
-            Self::Russian => "Копировать миры (saves)",
-            Self::Ukrainian => "Копіювати світи (saves)",
+            Self::Russian => "Копировать миры (сохранения)",
+            Self::Ukrainian => "Копіювати світи (збереження)",
         }
     }
 
