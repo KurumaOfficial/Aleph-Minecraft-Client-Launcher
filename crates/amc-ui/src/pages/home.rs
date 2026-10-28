@@ -1153,7 +1153,7 @@ impl HomePage {
         ui.painter().text(
             egui::pos2(friends.left() + 16.0, friends.top() + 48.0),
             egui::Align2::LEFT_CENTER,
-            "OFFLINE",
+            lang.account_tag_offline().to_uppercase(),
             egui::FontId::proportional(9.0),
             TEXT_MUTED.into(),
         );

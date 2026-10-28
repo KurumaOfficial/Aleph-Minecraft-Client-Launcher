@@ -1880,25 +1880,17 @@ impl SettingsPage {
                 }
 
                 ui.horizontal(|ui| {
-                    let (badge, accent) = if mr {
-                        match acc.account_type {
-                            amc_auth::AccountType::Microsoft => (lang.account_tag_ms(), true),
-                            amc_auth::AccountType::WetId => (lang.account_tag_wetid(), true),
-                            amc_auth::AccountType::Offline => (lang.account_tag_offline(), false),
-                        }
-                    } else {
-                        match acc.account_type {
-                            amc_auth::AccountType::Microsoft => ("MICROSOFT", true),
-                            amc_auth::AccountType::WetId => ("WETID", true),
-                            amc_auth::AccountType::Offline => ("OFFLINE", false),
-                        }
+                    let (badge, accent) = match acc.account_type {
+                        amc_auth::AccountType::Microsoft => (lang.account_tag_ms(), true),
+                        amc_auth::AccountType::WetId => (lang.account_tag_wetid(), true),
+                        amc_auth::AccountType::Offline => (lang.account_tag_offline(), false),
                     };
 
                     if mr {
                         modrinth_ui::pill(ui, badge, accent);
                     } else {
                         ui.label(
-                            egui::RichText::new(badge)
+                            egui::RichText::new(badge.to_uppercase())
                                 .font(egui::FontId::proportional(10.0))
                                 .strong()
                                 .color(RUBY_LIGHT),
