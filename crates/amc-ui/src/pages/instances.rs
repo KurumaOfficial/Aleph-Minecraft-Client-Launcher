@@ -4418,14 +4418,27 @@ impl InstancesPage {
                 open = false;
             }
 
+            let max_h = (ui.ctx().screen_rect().height() - 160.0).max(320.0);
+            let old_heading = ui
+                .ctx()
+                .style()
+                .text_styles
+                .get(&egui::TextStyle::Heading)
+                .cloned();
+            ui.ctx().style_mut(|style| {
+                style
+                    .text_styles
+                    .insert(egui::TextStyle::Heading, egui::FontId::proportional(18.0));
+            });
             egui::Window::new(lang.inst_modal_edit_title())
                 .open(&mut open)
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, vec2(0.0, 0.0))
                 .min_width(440.0)
+                .max_height(max_h)
                 .show(ui.ctx(), |ui| {
-                    let scroll_h = (ui.ctx().screen_rect().height() - 150.0).max(260.0);
+                    let scroll_h = (max_h - 110.0).max(220.0);
                     ScrollArea::vertical()
                         .max_height(scroll_h)
                         .auto_shrink([false, false])
@@ -4783,6 +4796,12 @@ impl InstancesPage {
                         }
                     });
                 });
+
+            if let Some(font) = old_heading {
+                ui.ctx().style_mut(|style| {
+                    style.text_styles.insert(egui::TextStyle::Heading, font);
+                });
+            }
 
             if !open {
                 close_edit = true;
