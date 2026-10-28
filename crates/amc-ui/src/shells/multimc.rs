@@ -670,11 +670,14 @@ pub fn show_instance_bar(
             action.edit_instance = true;
         }
 
-        // Name button: renames the instance in the reference.
+        // Name button: renames the instance in the reference. Very long
+        // names are capped so the instance actions cannot be pushed below
+        // the bottom of the 960x600 window.
         match sel {
             Some(sel) => {
+                let display_name = crate::shells::short_name(&sel.name, 32);
                 let galley = ui.painter().layout(
-                    sel.name.clone(),
+                    display_name,
                     egui::FontId::proportional(12.0),
                     Color32::PLACEHOLDER,
                     ui.available_width() - 12.0,
@@ -698,6 +701,9 @@ pub fn show_instance_bar(
                     galley,
                     theme::TEXT.into(),
                 );
+                if sel.name.chars().count() > 32 {
+                    resp.clone().on_hover_text(&sel.name);
+                }
                 if resp.clicked() {
                     action.edit_instance = true;
                 }
