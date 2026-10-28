@@ -1,9 +1,10 @@
 use crate::pages::instance_manage::InstanceManage;
 use crate::theme::{
-    lerp_color, with_alpha, BG_CARD, BG_HOVER, BORDER_DEFAULT, MODRINTH_BG, MODRINTH_FIELD,
-    MODRINTH_GREEN, MODRINTH_MUTED, MODRINTH_SURFACE, MODRINTH_SURFACE_HIGH,
-    MODRINTH_SURFACE_HOVER, MODRINTH_TEXT, MODRINTH_TEXT_CONTRAST, MODRINTH_TEXT_SECONDARY, RUBY,
-    RUBY_DIM, RUBY_LIGHT, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY, WARNING,
+    lerp_color, palette_id, with_alpha, PaletteId, BG_CARD, BG_HOVER, BORDER_DEFAULT,
+    BORDER_STRONG, MODRINTH_BG, MODRINTH_FIELD, MODRINTH_GREEN, MODRINTH_MUTED, MODRINTH_SURFACE,
+    MODRINTH_SURFACE_HIGH, MODRINTH_SURFACE_HOVER, MODRINTH_TEXT, MODRINTH_TEXT_CONTRAST,
+    MODRINTH_TEXT_SECONDARY, RUBY, RUBY_DIM, RUBY_LIGHT, TEXT_HEADING, TEXT_MUTED, TEXT_PRIMARY,
+    WARNING,
 };
 use crate::widgets::choice_chip;
 use crate::widgets::full::tag;
@@ -354,6 +355,17 @@ fn dialog_button_fg(ui: &Ui) -> Color32 {
     } else {
         TEXT_HEADING.into()
     }
+}
+
+/// Accent primary action for the LabyMod and Millida dialogs. It mirrors the
+/// shell's toolbar create button; other shells keep the native egui button so
+/// the original Simple/Professional visuals stay untouched.
+fn shell_primary_button(ui: &mut Ui, label: &str, enabled: bool) -> bool {
+    let button = egui::Button::new(egui::RichText::new(label).strong().color(Color32::WHITE))
+        .fill(RUBY)
+        .stroke(Stroke::new(1.0_f32, RUBY_LIGHT))
+        .rounding(crate::theme::rounding());
+    ui.add_enabled(enabled, button).clicked()
 }
 
 /// Instance list ordering (CONCEPT: folders/tags/sort, P2).
@@ -4214,149 +4226,216 @@ impl InstancesPage {
                 {
                     open = false;
                 }
-                egui::Window::new(lang.inst_modal_create_title())
+                let labymod = ctx.skin == LibrarySkin::Labymod;
+                let shell_accent = labymod || palette_id() == PaletteId::Millida;
+                let max_h = (ui.ctx().screen_rect().height() - 120.0).max(320.0);
+                let old_heading = if shell_accent {
+                    let old = ui
+                        .ctx()
+                        .style()
+                        .text_styles
+                        .get(&egui::TextStyle::Heading)
+                        .cloned();
+                    ui.ctx().style_mut(|style| {
+                        style
+                            .text_styles
+                            .insert(egui::TextStyle::Heading, egui::FontId::proportional(18.0));
+                    });
+                    old
+                } else {
+                    None
+                };
+                // The LabyMod frame adds inner padding; nudge the dialog down so
+                // its top edge stays clear of the custom titlebar.
+                let anchor_offset = if labymod {
+                    vec2(0.0, 16.0)
+                } else {
+                    vec2(0.0, 0.0)
+                };
+                let mut window = egui::Window::new(lang.inst_modal_create_title())
                     .open(&mut open)
                     .collapsible(false)
                     .resizable(false)
-                    .anchor(egui::Align2::CENTER_CENTER, vec2(0.0, 0.0))
+                    .anchor(egui::Align2::CENTER_CENTER, anchor_offset)
                     .min_width(420.0)
-                    .show(ui.ctx(), |ui| {
-                        ui.add_space(8.0);
-                        ui.label(
-                            egui::RichText::new(lang.tmpl_title())
-                                .strong()
-                                .color(TEXT_HEADING),
-                        );
-                        ui.horizontal(|ui| {
-                            for tmpl in InstanceTemplate::ALL {
-                                let active = InstanceTemplate::matching(
-                                    self.new_instance_loader,
-                                    self.new_instance_ram,
-                                )
-                                .map(|t| t.id)
-                                    == Some(tmpl.id);
-                                if choice_chip(
-                                    ui,
-                                    lang.tmpl_name(tmpl.id),
-                                    130.0,
-                                    32.0,
-                                    12.0,
-                                    active,
-                                ) {
-                                    self.apply_template(tmpl, lang);
-                                }
-                            }
-                        });
-                        let tmpl_desc = InstanceTemplate::matching(
-                            self.new_instance_loader,
-                            self.new_instance_ram,
+                    .max_height(max_h);
+                if labymod {
+                    window = window.frame(
+                        egui::Frame::none()
+                            .fill(BG_CARD.into())
+                            .stroke(Stroke::new(1.0_f32, BORDER_STRONG))
+                            .rounding(Rounding::same(16.0))
+                            .inner_margin(egui::Margin::same(18.0)),
+                    );
+                }
+                window.show(ui.ctx(), |ui| {
+                    let scroll_h = (max_h - 120.0).max(220.0);
+                    ScrollArea::vertical()
+                        .max_height(scroll_h)
+                        .auto_shrink([false, true])
+                        .scroll_bar_visibility(
+                            egui::scroll_area::ScrollBarVisibility::VisibleWhenNeeded,
                         )
-                        .map(|t| lang.tmpl_desc(t.id))
-                        .unwrap_or_else(|| lang.tmpl_custom_note());
-                        ui.label(egui::RichText::new(tmpl_desc).color(TEXT_MUTED));
-                        ui.add_space(8.0);
-                        ui.label(egui::RichText::new(lang.inst_modal_name()).color(TEXT_PRIMARY));
-                        ui.add(
-                            TextEdit::singleline(&mut self.new_instance_name).desired_width(400.0),
-                        );
-
-                        ui.add_space(10.0);
-                        ui.label(
-                            egui::RichText::new(lang.inst_modal_version()).color(TEXT_PRIMARY),
-                        );
-                        ui.add(
-                            TextEdit::singleline(&mut self.new_instance_version)
-                                .desired_width(400.0),
-                        );
-
-                        ui.add_space(10.0);
-                        ui.label(egui::RichText::new(lang.inst_modal_loader()).color(TEXT_PRIMARY));
-                        egui::ComboBox::from_id_salt("loader_select")
-                            .selected_text(self.new_instance_loader.as_str())
-                            .show_ui(ui, |ui| {
-                                ui.selectable_value(
-                                    &mut self.new_instance_loader,
-                                    LoaderType::Vanilla,
-                                    "Vanilla",
-                                );
-                                ui.selectable_value(
-                                    &mut self.new_instance_loader,
-                                    LoaderType::Fabric,
-                                    "Fabric",
-                                );
-                                ui.selectable_value(
-                                    &mut self.new_instance_loader,
-                                    LoaderType::Quilt,
-                                    "Quilt",
-                                );
-                                ui.selectable_value(
-                                    &mut self.new_instance_loader,
-                                    LoaderType::Forge,
-                                    "Forge",
-                                );
-                                ui.selectable_value(
-                                    &mut self.new_instance_loader,
-                                    LoaderType::NeoForge,
-                                    "NeoForge",
-                                );
-                                ui.selectable_value(
-                                    &mut self.new_instance_loader,
-                                    LoaderType::OptiFine,
-                                    "OptiFine",
-                                );
-                            });
-                        if self.new_instance_loader == LoaderType::Forge
-                            && amc_minecraft::loaders::forge::is_legacy_unsafe_line(
-                                &self.new_instance_version,
-                            )
-                        {
+                        .show(ui, |ui| {
+                            ui.add_space(8.0);
                             ui.label(
-                                egui::RichText::new(lang.inst_warn_legacy_forge())
-                                    .font(egui::FontId::proportional(12.0))
-                                    .color(WARNING),
+                                egui::RichText::new(lang.tmpl_title())
+                                    .strong()
+                                    .color(TEXT_HEADING),
                             );
-                        }
+                            ui.horizontal(|ui| {
+                                for tmpl in InstanceTemplate::ALL {
+                                    let active = InstanceTemplate::matching(
+                                        self.new_instance_loader,
+                                        self.new_instance_ram,
+                                    )
+                                    .map(|t| t.id)
+                                        == Some(tmpl.id);
+                                    if choice_chip(
+                                        ui,
+                                        lang.tmpl_name(tmpl.id),
+                                        130.0,
+                                        32.0,
+                                        12.0,
+                                        active,
+                                    ) {
+                                        self.apply_template(tmpl, lang);
+                                    }
+                                }
+                            });
+                            let tmpl_desc = InstanceTemplate::matching(
+                                self.new_instance_loader,
+                                self.new_instance_ram,
+                            )
+                            .map(|t| lang.tmpl_desc(t.id))
+                            .unwrap_or_else(|| lang.tmpl_custom_note());
+                            ui.label(egui::RichText::new(tmpl_desc).color(TEXT_MUTED));
+                            ui.add_space(8.0);
+                            ui.label(
+                                egui::RichText::new(lang.inst_modal_name()).color(TEXT_PRIMARY),
+                            );
+                            ui.add(
+                                TextEdit::singleline(&mut self.new_instance_name)
+                                    .desired_width(400.0),
+                            );
 
+                            ui.add_space(10.0);
+                            ui.label(
+                                egui::RichText::new(lang.inst_modal_version()).color(TEXT_PRIMARY),
+                            );
+                            ui.add(
+                                TextEdit::singleline(&mut self.new_instance_version)
+                                    .desired_width(400.0),
+                            );
+
+                            ui.add_space(10.0);
+                            ui.label(
+                                egui::RichText::new(lang.inst_modal_loader()).color(TEXT_PRIMARY),
+                            );
+                            egui::ComboBox::from_id_salt("loader_select")
+                                .selected_text(self.new_instance_loader.as_str())
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(
+                                        &mut self.new_instance_loader,
+                                        LoaderType::Vanilla,
+                                        "Vanilla",
+                                    );
+                                    ui.selectable_value(
+                                        &mut self.new_instance_loader,
+                                        LoaderType::Fabric,
+                                        "Fabric",
+                                    );
+                                    ui.selectable_value(
+                                        &mut self.new_instance_loader,
+                                        LoaderType::Quilt,
+                                        "Quilt",
+                                    );
+                                    ui.selectable_value(
+                                        &mut self.new_instance_loader,
+                                        LoaderType::Forge,
+                                        "Forge",
+                                    );
+                                    ui.selectable_value(
+                                        &mut self.new_instance_loader,
+                                        LoaderType::NeoForge,
+                                        "NeoForge",
+                                    );
+                                    ui.selectable_value(
+                                        &mut self.new_instance_loader,
+                                        LoaderType::OptiFine,
+                                        "OptiFine",
+                                    );
+                                });
+                            if self.new_instance_loader == LoaderType::Forge
+                                && amc_minecraft::loaders::forge::is_legacy_unsafe_line(
+                                    &self.new_instance_version,
+                                )
+                            {
+                                ui.label(
+                                    egui::RichText::new(lang.inst_warn_legacy_forge())
+                                        .font(egui::FontId::proportional(12.0))
+                                        .color(WARNING),
+                                );
+                            }
+
+                            ui.add_space(10.0);
+                            ui.label(
+                                egui::RichText::new(format!(
+                                    "{} {} MB",
+                                    lang.inst_modal_ram(),
+                                    self.new_instance_ram
+                                ))
+                                .color(TEXT_PRIMARY),
+                            );
+                            ui.add(
+                                egui::Slider::new(&mut self.new_instance_ram, 1024..=16384)
+                                    .step_by(512.0),
+                            );
+                        });
+                    if shell_accent {
                         ui.add_space(10.0);
-                        ui.label(
-                            egui::RichText::new(format!(
-                                "{}: {} MB",
-                                lang.inst_modal_ram(),
-                                self.new_instance_ram
-                            ))
-                            .color(TEXT_PRIMARY),
-                        );
-                        ui.add(
-                            egui::Slider::new(&mut self.new_instance_ram, 1024..=16384)
-                                .step_by(512.0),
-                        );
-
+                        ui.separator();
+                        ui.add_space(6.0);
+                    } else {
                         ui.add_space(18.0);
-                        ui.horizontal(|ui| {
-                            let can_create = !self.new_instance_name.trim().is_empty()
-                                && !self.new_instance_version.trim().is_empty();
+                    }
+                    ui.horizontal(|ui| {
+                        let can_create = !self.new_instance_name.trim().is_empty()
+                            && !self.new_instance_version.trim().is_empty();
+                        let clicked = if shell_accent {
+                            shell_primary_button(ui, lang.inst_modal_btn_create(), can_create)
+                        } else {
                             let create = egui::Button::new(
                                 egui::RichText::new(lang.inst_modal_btn_create())
                                     .strong()
                                     .color(dialog_button_fg(ui)),
                             );
-                            if ui.add_enabled(can_create, create).clicked() {
-                                let mut inst = Instance::new(
-                                    &self.new_instance_name,
-                                    &self.new_instance_version,
-                                    self.new_instance_loader,
-                                );
-                                inst.ram_mb = Some(self.new_instance_ram);
-                                *selected_instance = Some(inst.id);
-                                action = InstanceAction::Created(inst);
-                                self.show_create_modal = false;
-                            }
+                            ui.add_enabled(can_create, create).clicked()
+                        };
+                        if clicked {
+                            let mut inst = Instance::new(
+                                &self.new_instance_name,
+                                &self.new_instance_version,
+                                self.new_instance_loader,
+                            );
+                            inst.ram_mb = Some(self.new_instance_ram);
+                            *selected_instance = Some(inst.id);
+                            action = InstanceAction::Created(inst);
+                            self.show_create_modal = false;
+                        }
 
-                            if ui.button(lang.inst_modal_btn_cancel()).clicked() {
-                                self.show_create_modal = false;
-                            }
-                        });
+                        if ui.button(lang.inst_modal_btn_cancel()).clicked() {
+                            self.show_create_modal = false;
+                        }
                     });
+                });
+
+                if let Some(font) = old_heading {
+                    ui.ctx().style_mut(|style| {
+                        style.text_styles.insert(egui::TextStyle::Heading, font);
+                    });
+                }
+
                 if !open {
                     self.show_create_modal = false;
                 }
@@ -4372,36 +4451,71 @@ impl InstancesPage {
             {
                 open = false;
             }
-            egui::Window::new(lang.clone_title())
+            let accent = ctx.skin == LibrarySkin::Labymod || palette_id() == PaletteId::Millida;
+            let labymod = ctx.skin == LibrarySkin::Labymod;
+            let old_heading = if accent {
+                let old = ui
+                    .ctx()
+                    .style()
+                    .text_styles
+                    .get(&egui::TextStyle::Heading)
+                    .cloned();
+                ui.ctx().style_mut(|style| {
+                    style
+                        .text_styles
+                        .insert(egui::TextStyle::Heading, egui::FontId::proportional(18.0));
+                });
+                old
+            } else {
+                None
+            };
+            let mut window = egui::Window::new(lang.clone_title())
                 .open(&mut open)
                 .collapsible(false)
                 .resizable(false)
                 .anchor(egui::Align2::CENTER_CENTER, vec2(0.0, 0.0))
-                .min_width(360.0)
-                .show(ui.ctx(), |ui| {
-                    ui.add_space(8.0);
-                    ui.checkbox(&mut self.clone_with_saves, lang.clone_saves());
-                    ui.add_space(14.0);
-                    ui.horizontal(|ui| {
-                        if ui
-                            .button(
-                                egui::RichText::new(lang.inst_btn_clone())
-                                    .strong()
-                                    .color(dialog_button_fg(ui)),
-                            )
-                            .clicked()
-                        {
-                            if let Some(id) = self.clone_instance_id {
-                                action = InstanceAction::Cloned(id, self.clone_with_saves);
-                            }
-                            self.show_clone_modal = false;
+                .min_width(360.0);
+            if labymod {
+                window = window.frame(
+                    egui::Frame::none()
+                        .fill(BG_CARD.into())
+                        .stroke(Stroke::new(1.0_f32, BORDER_STRONG))
+                        .rounding(Rounding::same(16.0))
+                        .inner_margin(egui::Margin::same(18.0)),
+                );
+            }
+            window.show(ui.ctx(), |ui| {
+                ui.add_space(8.0);
+                ui.checkbox(&mut self.clone_with_saves, lang.clone_saves());
+                ui.add_space(14.0);
+                ui.horizontal(|ui| {
+                    let clicked = if accent {
+                        shell_primary_button(ui, lang.inst_btn_clone(), true)
+                    } else {
+                        ui.button(
+                            egui::RichText::new(lang.inst_btn_clone())
+                                .strong()
+                                .color(dialog_button_fg(ui)),
+                        )
+                        .clicked()
+                    };
+                    if clicked {
+                        if let Some(id) = self.clone_instance_id {
+                            action = InstanceAction::Cloned(id, self.clone_with_saves);
                         }
+                        self.show_clone_modal = false;
+                    }
 
-                        if ui.button(lang.inst_modal_btn_cancel()).clicked() {
-                            self.show_clone_modal = false;
-                        }
-                    });
+                    if ui.button(lang.inst_modal_btn_cancel()).clicked() {
+                        self.show_clone_modal = false;
+                    }
                 });
+            });
+            if let Some(font) = old_heading {
+                ui.ctx().style_mut(|style| {
+                    style.text_styles.insert(egui::TextStyle::Heading, font);
+                });
+            }
             if !open {
                 self.show_clone_modal = false;
             }
@@ -4412,6 +4526,7 @@ impl InstancesPage {
             let mut close_edit = false;
             let mut save_edit = false;
             let mut open = true;
+            let accent = ctx.skin == LibrarySkin::Labymod || palette_id() == PaletteId::Millida;
             if ui.ctx().input(|i| i.key_pressed(egui::Key::Escape))
                 && !ui.ctx().memory(|m| m.any_popup_open())
             {
@@ -4534,7 +4649,7 @@ impl InstancesPage {
                             ui.add_space(10.0);
                             ui.label(
                                 egui::RichText::new(format!(
-                                    "{}: {} MB",
+                                    "{} {} MB",
                                     lang.inst_modal_ram(),
                                     self.edit_instance_ram
                                 ))
@@ -4782,12 +4897,17 @@ impl InstancesPage {
                     ui.horizontal(|ui| {
                         let can_save = !self.edit_instance_name.trim().is_empty()
                             && !self.edit_instance_version.trim().is_empty();
-                        let save = egui::Button::new(
-                            egui::RichText::new(lang.inst_modal_btn_save())
-                                .strong()
-                                .color(dialog_button_fg(ui)),
-                        );
-                        if ui.add_enabled(can_save, save).clicked() {
+                        let clicked = if accent {
+                            shell_primary_button(ui, lang.inst_modal_btn_save(), can_save)
+                        } else {
+                            let save = egui::Button::new(
+                                egui::RichText::new(lang.inst_modal_btn_save())
+                                    .strong()
+                                    .color(dialog_button_fg(ui)),
+                            );
+                            ui.add_enabled(can_save, save).clicked()
+                        };
+                        if clicked {
                             save_edit = true;
                         }
 
