@@ -656,7 +656,7 @@ impl HomePage {
                                 vec2(name_w, 22.0),
                                 egui::Layout::left_to_right(egui::Align::Center),
                                 |ui| {
-                                    ui.add(
+                                    let label = ui.add(
                                         egui::Label::new(
                                             egui::RichText::new(&fav.name)
                                                 .font(egui::FontId::proportional(13.0))
@@ -665,6 +665,9 @@ impl HomePage {
                                         )
                                         .truncate(),
                                     );
+                                    if fav.name.chars().count() > 20 {
+                                        label.on_hover_text(&fav.name);
+                                    }
                                 },
                             );
                             ui.add_space(8.0);
@@ -672,7 +675,7 @@ impl HomePage {
                                 vec2(addr_w, 22.0),
                                 egui::Layout::left_to_right(egui::Align::Center),
                                 |ui| {
-                                    ui.add(
+                                    let label = ui.add(
                                         egui::Label::new(
                                             egui::RichText::new(&fav.address)
                                                 .font(egui::FontId::proportional(12.0))
@@ -680,6 +683,9 @@ impl HomePage {
                                         )
                                         .truncate(),
                                     );
+                                    if fav.address.chars().count() > 24 {
+                                        label.on_hover_text(&fav.address);
+                                    }
                                 },
                             );
                             if let Some(status) = self.fav_status.get(&fav.address) {
@@ -1038,6 +1044,8 @@ impl HomePage {
             if resp.hovered() {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
             }
+            resp.clone()
+                .on_hover_text(format!("{}\n{}", fav.name, fav.address));
             if resp.clicked() {
                 if let Some((host, port)) = amc_minecraft::parse_server_address(&fav.address) {
                     self.direct_connect_request = Some((host, port));
