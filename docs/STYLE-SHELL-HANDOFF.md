@@ -37,15 +37,16 @@
   `23fe3e1` (compact Quick Play manager), `888cfc0` (Quick Play hover),
   `fb1a695` (long account names in MultiMC chrome), `319a710` (long
   instance names in MultiMC toolbar), `1c13455` (localized account tags),
-  `2ee8648` (edit dialog fits at minimum).
+  `2ee8648` (edit dialog fits at minimum), `e9e9b42` (localized clone
+  label), `2663fcf` (create/edit/clone dialog polish).
 - Предыдущая сессия 2026-10-26: `5417adb`, `c46eded`, `e31a00f`, `c9288e5`,
   `012b40e`, `f1b7aa9`, `6084535`, `26517f7`, `0ac49b3`, `a6e9a1d`,
   `050ecac`, `73bd20e`, `6adb133`, `fbc6cb5`, `1675083`.
 - Все изменения запушены, рабочее дерево чистое.
 - Локальный release, выложенный в `dist`, имеет SHA-256
-  `B81AE7B769F136DCB5596D1E8A911322624858FE95962E5766D159BFD4AFC32E`.
+  `9A63639526F4700EEE926598163FD89AF88367ED453F034418ECF368B2DF9F00`.
 - Перед деплоем 28.10.2026 создан бэкап
-  `dist/amc-launcher.exe.bak-20261028-1314`.
+  `dist/amc-launcher.exe.bak-20261028-1349`.
 
 ## Сессия 2026-10-26: адаптивность и взаимодействия
 
@@ -221,9 +222,14 @@ physical при 125% DPI), а также на 1120×700 logical (1400×875 physi
 28. **Edit Instance**: модалка ограничена высотой экрана, заголовок
     больше не обрезается, контент прокручивается, Save/Cancel всегда
     видны на 960×600.
-29. **Release**: пересобран после правок; заголовок, LabyMod Friends,
-    MultiMC chrome и Edit Instance проверены на release, правый rail — на
-    debug-сборке с тем же кодом; финальный SHA-256 и бэкап — выше.
+29. **Create/Clone dialogs**: в LabyMod и Millida заголовок компактный,
+    основная кнопка использует акцент оболочки (синий/зелёный), окно
+    создания ограничено высотой и прокручивается, подпись копирования
+    миров локализована. В Simple/Professional/MultiMC сохранена прежняя
+    композиция; исправлено двойное двоеточие в строке RAM.
+30. **Release**: пересобран после правок; LabyMod/Millida create и clone,
+    заголовок, LabyMod Friends, MultiMC chrome и Edit Instance проверены
+    на release; финальный SHA-256 и бэкап — выше.
 
 ## Обязательные правила
 
@@ -502,8 +508,8 @@ Millida). Собранные ассеты, которые уже использ�
   1200×750 physical.
 - Дополнительно проверять 1400×875 physical (1120×700 logical).
 - Release 2026-10-28: SHA-256
-  `B81AE7B769F136DCB5596D1E8A911322624858FE95962E5766D159BFD4AFC32E`,
-  бэкап `dist/amc-launcher.exe.bak-20261028-1314`.
+  `9A63639526F4700EEE926598163FD89AF88367ED453F034418ECF368B2DF9F00`,
+  бэкап `dist/amc-launcher.exe.bak-20261028-1349`.
 - Скриншоты этой сессии: `%TEMP%\opencode\*_after*.png` (временные, в git
   не входят).
 
