@@ -832,6 +832,9 @@ impl SkinsPage {
                     egui::FontId::proportional(10.5),
                     theme::MUTED.into(),
                 );
+                if skin.name.chars().count() > 24 {
+                    resp.clone().on_hover_text(&skin.name);
+                }
                 let remove = Rect::from_min_size(
                     pos2(row.right() - 74.0, row.center().y - 11.0),
                     vec2(64.0, 22.0),
@@ -986,6 +989,17 @@ impl SkinsPage {
             egui::FontId::proportional(11.5),
             theme::TEXT_MUTED.into(),
         );
+        if self.active_skin_name.chars().count() > 28 {
+            ui.interact(
+                egui::Rect::from_center_size(
+                    egui::pos2(rect.center().x, rect.bottom() - 16.0),
+                    vec2((width - 24.0).max(80.0), 20.0),
+                ),
+                ui.id().with("labymod_active_skin_tip"),
+                Sense::hover(),
+            )
+            .on_hover_text(&self.active_skin_name);
+        }
 
         ui.add_space(8.0);
         if let Some(new_slim) = labymod_model_switch(ui, self.is_slim_model, lang, width) {
@@ -1319,6 +1333,9 @@ impl SkinsPage {
                     egui::FontId::proportional(10.5),
                     TEXT_MUTED.into(),
                 );
+                if skin.name.chars().count() > 24 {
+                    resp.clone().on_hover_text(&skin.name);
+                }
                 let remove = egui::Rect::from_min_size(
                     egui::pos2(row.right() - 74.0, row.center().y - 11.0),
                     vec2(64.0, 22.0),
@@ -1670,6 +1687,9 @@ impl SkinsPage {
                     egui::FontId::proportional(10.5),
                     crate::theme::MODRINTH_TEXT_SECONDARY,
                 );
+                if skin.name.chars().count() > 24 {
+                    resp.clone().on_hover_text(&skin.name);
+                }
                 let remove = Rect::from_min_size(
                     pos2(row.right() - 74.0, row.center().y - 11.0),
                     vec2(64.0, 22.0),
@@ -1715,9 +1735,6 @@ impl SkinsPage {
                 }
                 if resp.hovered() && !remove_resp.hovered() {
                     ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-                }
-                if skin.name.chars().count() > 24 {
-                    resp.clone().on_hover_text(&skin.name);
                 }
                 ui.add_space(6.0);
             }

@@ -1323,6 +1323,11 @@ fn draw_dock(
         Color32::from_white_alpha(220),
         1.5,
     );
+    if let Some(instance) = &ctx.instance {
+        if instance.name.chars().count() > 11 {
+            mode_resp.clone().on_hover_text(instance.name);
+        }
+    }
     if mode_resp.clicked() {
         action.tab = Some(NavTab::Modpacks);
     }

@@ -36,6 +36,8 @@ pub const INSTANCE_BAR_WIDTH: f32 = 176.0;
 const HIGHLIGHTED_TEXT: Color32 = Color32::from_rgb(0xEF, 0xF0, 0xF1);
 /// Project links (our own repository, never the reference's pages).
 const PROJECT_URL: &str = "https://github.com/KurumaOfficial/Aleph-Minecraft-Client-Launcher";
+const RELEASES_URL: &str =
+    "https://github.com/KurumaOfficial/Aleph-Minecraft-Client-Launcher/releases";
 
 /// Ambient data of the main toolbar.
 pub struct ToolbarCtx<'a> {
@@ -113,6 +115,9 @@ fn tb_button(ui: &mut Ui, icon: Icon, label: &str, menu: bool, checked: bool) ->
             theme::TEXT,
             1.3,
         );
+    }
+    if resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
     }
     resp
 }
@@ -255,6 +260,12 @@ fn qt_dropdown(ctx: &egui::Context, button: &Response, items: &[QtItem<'_>]) -> 
                                     font.clone(),
                                     fg,
                                 );
+                                if visible != *label {
+                                    resp.clone().on_hover_text(*label);
+                                }
+                                if resp.hovered() {
+                                    ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+                                }
                                 if resp.clicked() {
                                     clicked = Some(entry);
                                 }
@@ -362,14 +373,20 @@ pub fn show_toolbar(ui: &mut Ui, lang: Language, ctx: &ToolbarCtx<'_>) -> ShellA
             }
         }
 
-        // Update (the reference updates in place; AMC ships its own exe).
-        let _ = tb_button(ui, Icon::Refresh, lang.shell_update(), false, false);
+        // Update opens the project's release page; the portable exe cannot
+        // replace itself in place.
+        if tb_button(ui, Icon::Refresh, lang.shell_update(), false, false).clicked() {
+            let _ = open::that(RELEASES_URL);
+        }
 
         tb_separator(ui);
 
         if !compact {
-            // Support (visual entry of the reference toolbar).
-            let _ = tb_button(ui, Icon::Heart, lang.shell_support(), false, false);
+            // Support opens the project page (no donation platform is
+            // configured yet, so do not pretend there is one).
+            if tb_button(ui, Icon::Heart, lang.shell_support(), false, false).clicked() {
+                let _ = open::that(PROJECT_URL);
+            }
 
             // Meow: checkable easter egg of the reference.
             let meow_id = ui.id().with("multimc_meow");
@@ -512,6 +529,9 @@ pub fn show_news_bar(ui: &mut Ui, lang: Language) {
                 galley,
                 theme::TEXT.into(),
             );
+            if resp.hovered() {
+                ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+            }
             if resp.clicked() {
                 let _ = open::that(PROJECT_URL);
             }
@@ -608,6 +628,9 @@ fn bar_button(ui: &mut Ui, label: &str, enabled: bool) -> bool {
         galley,
         color,
     );
+    if enabled && resp.hovered() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
     clicked
 }
 
@@ -656,6 +679,7 @@ pub fn show_instance_bar(
         if enabled && icon_resp.hovered() {
             ui.painter()
                 .rect_filled(icon_rect.shrink(2.0), Rounding::ZERO, theme::CARD_HOVER);
+            ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
         }
         if let Some(sel) = sel {
             icons::draw_centered(

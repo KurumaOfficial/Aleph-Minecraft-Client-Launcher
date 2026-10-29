@@ -3441,11 +3441,13 @@ impl InstancesPage {
                     Stroke::new(1.0_f32, line),
                 );
             }
+            let mut name_truncated = false;
             if !name.is_empty() {
                 // Qt uses a bold sans face here, not the display family.
                 let font = egui::FontId::new(12.5, egui::FontFamily::Name("bold".into()));
                 let max_w = (rect.right() - (square.right() + 7.0) - 8.0).max(24.0);
                 let visible = crate::shells::short_name(name, ((max_w / 7.2) as usize).max(1));
+                name_truncated = visible != name;
                 painter.text(
                     pos2(square.right() + 7.0, rect.center().y),
                     Align2::LEFT_CENTER,
@@ -3457,7 +3459,7 @@ impl InstancesPage {
             if resp.hovered() {
                 ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
             }
-            let resp = if name.chars().count() > 36 {
+            let resp = if name_truncated {
                 resp.on_hover_text(name)
             } else {
                 resp
@@ -4056,13 +4058,18 @@ impl InstancesPage {
                 );
             }
             if !inst.tags.is_empty() {
-                icons::icon_label(
+                let tags = inst.tags.join(", ");
+                let visible = truncate_name(&tags, 40);
+                let tag_resp = icons::icon_label(
                     &mut card,
                     Icon::Tag,
-                    &truncate_name(&inst.tags.join(", "), 40),
+                    &visible,
                     TEXT_MUTED,
                     egui::FontId::proportional(11.0),
                 );
+                if visible != tags {
+                    tag_resp.on_hover_text(tags);
+                }
             }
 
             card.add_space(6.0);

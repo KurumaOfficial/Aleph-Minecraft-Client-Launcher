@@ -2769,6 +2769,23 @@ impl Language {
         }
     }
 
+    pub fn mods_by_author(&self, author: &str) -> String {
+        match self {
+            Self::English => format!("by {author}"),
+            Self::Russian => format!("автор: {author}"),
+            Self::Ukrainian => format!("автор: {author}"),
+        }
+    }
+
+    /// Modrinth/CurseForge are product names; locally scanned jars are not.
+    pub fn mods_source_local(&self) -> &'static str {
+        match self {
+            Self::English => "Local",
+            Self::Russian => "Локальный",
+            Self::Ukrainian => "Локальний",
+        }
+    }
+
     pub fn mods_update_all(&self) -> &'static str {
         match self {
             Self::English => "Update all",
@@ -6193,6 +6210,8 @@ mod tests {
             assert!(!lang.console_clear_filter().is_empty());
             assert!(!lang.console_copied().is_empty());
             assert!(!lang.console_line_count(4, 10).is_empty());
+            assert!(!lang.mods_by_author("Author").is_empty());
+            assert!(!lang.mods_source_local().is_empty());
             assert!(!lang.inst_sort_title().is_empty());
             assert!(!lang.inst_sort_name().is_empty());
             assert!(!lang.inst_sort_recent().is_empty());
@@ -6480,6 +6499,16 @@ mod tests {
         assert_eq!(Language::Ukrainian.inst_sessions_label(3), "3 сесії");
         assert_eq!(Language::Ukrainian.inst_sessions_label(12), "12 сесій");
         assert_eq!(Language::Ukrainian.inst_sessions_label(24), "24 сесії");
+    }
+
+    #[test]
+    fn test_mod_author_and_local_source_are_localized() {
+        assert_eq!(Language::English.mods_by_author("Alex"), "by Alex");
+        assert_eq!(Language::Russian.mods_by_author("Alex"), "автор: Alex");
+        assert_eq!(Language::Ukrainian.mods_by_author("Alex"), "автор: Alex");
+        assert_eq!(Language::English.mods_source_local(), "Local");
+        assert_eq!(Language::Russian.mods_source_local(), "Локальный");
+        assert_eq!(Language::Ukrainian.mods_source_local(), "Локальний");
     }
 
     #[test]

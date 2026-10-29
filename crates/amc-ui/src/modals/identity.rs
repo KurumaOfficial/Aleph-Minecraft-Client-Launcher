@@ -3,7 +3,6 @@ use amc_core::Language;
 use egui::{vec2, Align2, Color32, Sense, Stroke, Ui};
 
 use crate::theme::{BG_ELEVATED, BORDER_DEFAULT, RUBY, RUBY_LIGHT, TEXT_MUTED};
-use crate::widgets::choice_chip;
 
 /// Pre-launch identity picker (CONCEPT "Аккаунты", P6): shown when the user
 /// asked to choose on every launch and several identities exist.
@@ -63,7 +62,7 @@ impl IdentityPicker {
             .show(ui.ctx(), |ui| {
                 ui.add_space(8.0);
                 for acc in accounts {
-                    let label = match acc.account_type {
+                    let full_label = match acc.account_type {
                         AccountType::Microsoft => {
                             format!("{} ({})", acc.username, lang.account_tag_ms())
                         }
@@ -72,9 +71,14 @@ impl IdentityPicker {
                         }
                         AccountType::Offline => acc.username.clone(),
                     };
-                    let label = crate::shells::short_name(&label, 44);
+                    let label = crate::shells::short_name(&full_label, 44);
                     let active = self.picked_id == Some(acc.id);
-                    if choice_chip(ui, &label, 380.0, 34.0, 12.0, active) {
+                    let chip =
+                        crate::widgets::choice_chip_response(ui, &label, 380.0, 34.0, 12.0, active);
+                    if label != full_label {
+                        chip.clone().on_hover_text(&full_label);
+                    }
+                    if chip.clicked() {
                         self.picked_id = Some(acc.id);
                     }
                 }

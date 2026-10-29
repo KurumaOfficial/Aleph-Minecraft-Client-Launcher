@@ -920,12 +920,13 @@ impl SettingsPage {
                     .unwrap_or_else(|| paths.backups_dir().to_string_lossy().to_string());
                 ui.add(
                     egui::Label::new(
-                        egui::RichText::new(current)
+                        egui::RichText::new(&current)
                             .font(egui::FontId::proportional(12.0))
                             .color(TEXT_PRIMARY),
                     )
                     .truncate(),
-                );
+                )
+                .on_hover_text(&current);
             });
             ui.add_space(4.0);
             ui.horizontal_wrapped(|ui| {
@@ -1637,7 +1638,8 @@ impl SettingsPage {
                                 .color(TEXT_PRIMARY),
                         )
                         .truncate(),
-                    );
+                    )
+                    .on_hover_text(arg);
                     if icon_button(ui, Icon::Close, TEXT_MUTED).clicked() {
                         to_remove = Some(idx);
                     }
@@ -1754,7 +1756,8 @@ impl SettingsPage {
                                 .color(TEXT_PRIMARY),
                         )
                         .truncate(),
-                    );
+                    )
+                    .on_hover_text(arg);
                     if icon_button(ui, Icon::Close, TEXT_MUTED).clicked() {
                         game_arg_to_remove = Some(idx);
                     }

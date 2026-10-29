@@ -14,6 +14,19 @@ pub fn choice_chip(
     font_size: f32,
     is_active: bool,
 ) -> bool {
+    choice_chip_response(ui, label, w, h, font_size, is_active).clicked()
+}
+
+/// Same chip with its raw response, so callers can attach a full-text
+/// tooltip when a long label had to be shortened.
+pub fn choice_chip_response(
+    ui: &mut Ui,
+    label: &str,
+    w: f32,
+    h: f32,
+    font_size: f32,
+    is_active: bool,
+) -> egui::Response {
     let (rect, resp) = ui.allocate_exact_size(vec2(w, h), Sense::click());
     let hover_t = ui.ctx().animate_bool_responsive(resp.id, resp.hovered());
     let act_t = ui.ctx().animate_bool(resp.id.with("act"), is_active);
@@ -50,5 +63,5 @@ pub fn choice_chip(
         text_col,
     );
 
-    resp.clicked()
+    resp
 }

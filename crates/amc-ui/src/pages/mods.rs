@@ -1691,12 +1691,16 @@ impl ModsPage {
                         )
                         .size()
                         .x;
-                    let title_w = (max_card_text_w - 300.0).max(100.0);
+                    let title_w = (max_card_text_w - 330.0).max(100.0);
                     let title_box_w = title_full_w.min(title_w);
                     child.vertical(|ui| {
                         ui.set_max_width(max_card_text_w);
                         ui.horizontal(|ui| {
-                            ui.add_sized(
+                            // The ScrollArea zeroes horizontal spacing to avoid
+                            // vertical card gaps; the metadata row needs its
+                            // own standard gap or title/author run together.
+                            ui.spacing_mut().item_spacing.x = 8.0;
+                            let title_resp = ui.add_sized(
                                 [title_box_w, 16.0],
                                 egui::Label::new(
                                     egui::RichText::new(&item.title)
@@ -1707,16 +1711,22 @@ impl ModsPage {
                                 .truncate()
                                 .halign(egui::Align::LEFT),
                             );
+                            if title_full_w > title_box_w {
+                                title_resp.on_hover_text(&item.title);
+                            }
                             let author = crate::shells::short_name(&item.author, 18);
-                            ui.label(
-                                egui::RichText::new(format!("by {author}"))
+                            let author_resp = ui.label(
+                                egui::RichText::new(lang.mods_by_author(&author))
                                     .font(egui::FontId::proportional(11.0))
                                     .color(TEXT_MUTED),
                             );
+                            if item.author.chars().count() > 18 {
+                                author_resp.on_hover_text(lang.mods_by_author(&item.author));
+                            }
                             let src_tag = match item.source {
                                 ModSource::Modrinth => "Modrinth",
                                 ModSource::CurseForge => "CurseForge",
-                                ModSource::Local => "Local",
+                                ModSource::Local => lang.mods_source_local(),
                             };
                             ui.label(
                                 egui::RichText::new(format!("• {src_tag}"))
@@ -1743,14 +1753,28 @@ impl ModsPage {
                             }
                         });
 
-                        ui.add(
+                        let desc_font = egui::FontId::proportional(12.0);
+                        let desc_available = ui.available_width();
+                        let desc_full_w = ui
+                            .painter()
+                            .layout_no_wrap(
+                                item.description.clone(),
+                                desc_font.clone(),
+                                Color32::PLACEHOLDER,
+                            )
+                            .size()
+                            .x;
+                        let desc_resp = ui.add(
                             egui::Label::new(
                                 egui::RichText::new(&item.description)
-                                    .font(egui::FontId::proportional(12.0))
+                                    .font(desc_font)
                                     .color(TEXT_MUTED),
                             )
                             .truncate(),
                         );
+                        if desc_full_w > desc_available {
+                            desc_resp.on_hover_text(&item.description);
+                        }
                         // Compat hint (CONCEPT P4): known-good builds get a
                         // check against the selected instance; unknown
                         // metadata stays silent instead of guessing.

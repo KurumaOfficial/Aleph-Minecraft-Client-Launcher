@@ -14,7 +14,7 @@ pub mod topbar;
 
 pub use badge::draw_custom_badge;
 pub use bottom_bar::BottomBar;
-pub use choice_chip::choice_chip;
+pub use choice_chip::{choice_chip, choice_chip_response};
 pub use sidebar::{NavTab, Sidebar};
 pub use titlebar::TitleBar;
 pub use toasts::{push_toast, show_toasts, Toast, ToastKind};

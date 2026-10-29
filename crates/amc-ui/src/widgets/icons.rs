@@ -809,14 +809,15 @@ pub fn icon_label(
     text: &str,
     color: impl Into<Color32>,
     font: egui::FontId,
-) {
+) -> Response {
     let color = color.into();
     ui.horizontal(|ui| {
         let size = font.size + 1.0;
         let (rect, _) = ui.allocate_exact_size(Vec2::splat(size), Sense::hover());
         draw(ui.painter(), icon, rect.shrink(1.0), color, 1.3);
         ui.label(egui::RichText::new(text).font(font).color(color));
-    });
+    })
+    .response
 }
 
 /// Flat button with a leading icon and an optional trailing icon (e.g. an
