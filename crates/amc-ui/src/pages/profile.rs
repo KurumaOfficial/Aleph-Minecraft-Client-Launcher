@@ -127,12 +127,16 @@ impl ProfilePage {
                             .font(egui::FontId::proportional(12.0))
                             .color(TEXT_MUTED),
                     );
-                    ui.label(
-                        egui::RichText::new(name)
+                    let name_visible = crate::shells::short_name(name, 36);
+                    let name_resp = ui.label(
+                        egui::RichText::new(&name_visible)
                             .font(egui::FontId::proportional(16.0))
                             .strong()
                             .color(TEXT_HEADING),
                     );
+                    if name.chars().count() > 36 {
+                        name_resp.on_hover_text(name);
+                    }
                     if let Some(acc) = account {
                         super::super::modals::identity::account_tag(ui, acc.account_type, lang);
                     }
@@ -244,22 +248,40 @@ impl ProfilePage {
                 let name = account
                     .map(|a| a.username.as_str())
                     .unwrap_or_else(|| lang.modrinth_no_account());
+                let badge_w = 72.0;
+                let max_name_w = if account.is_some() {
+                    (card.right() - 20.0 - text_x - badge_w - 10.0).max(80.0)
+                } else {
+                    (card.right() - 20.0 - text_x).max(80.0)
+                };
+                let name_font = theme::display(24.0);
+                let name_visible = fit_text(ui, name, &name_font, max_name_w);
                 ui.painter().text(
                     pos2(text_x, card.top() + 38.0),
                     egui::Align2::LEFT_CENTER,
-                    name,
-                    theme::display(24.0),
+                    &name_visible,
+                    name_font.clone(),
                     theme::HEAD.into(),
                 );
+                if name_visible != name {
+                    ui.interact(
+                        Rect::from_min_size(
+                            pos2(text_x, card.top() + 22.0),
+                            vec2(max_name_w, 32.0),
+                        ),
+                        ui.id().with("millida_profile_name"),
+                        Sense::hover(),
+                    )
+                    .on_hover_text(name);
+                }
                 if let Some(acc) = account {
                     let label = account_type_label(acc, lang);
-                    let badge_w = 72.0;
                     let badge = Rect::from_min_size(
                         pos2(
                             text_x
                                 + ui.painter()
                                     .layout_no_wrap(
-                                        name.to_owned(),
+                                        name_visible,
                                         theme::display(24.0),
                                         Color32::PLACEHOLDER,
                                     )
@@ -566,21 +588,35 @@ impl ProfilePage {
                     .map(|a| a.username.as_str())
                     .unwrap_or_else(|| lang.modrinth_no_account());
                 let name_pos = pos2(avatar.right() + 20.0, card.top() + 42.0);
+                let name_font = FontId::new(25.0, FontFamily::Name("bold".into()));
+                let max_name_w = if account.is_some() {
+                    (card.right() - 20.0 - name_pos.x - 112.0).max(80.0)
+                } else {
+                    (card.right() - 20.0 - name_pos.x).max(80.0)
+                };
+                let name_visible = fit_text(ui, name, &name_font, max_name_w);
                 ui.painter().text(
                     name_pos,
                     egui::Align2::LEFT_CENTER,
-                    name,
-                    FontId::new(25.0, FontFamily::Name("bold".into())),
+                    &name_visible,
+                    name_font.clone(),
                     TEXT_HEADING.into(),
                 );
+                if name_visible != name {
+                    ui.interact(
+                        Rect::from_min_size(
+                            pos2(name_pos.x, name_pos.y - 18.0),
+                            vec2(max_name_w, 36.0),
+                        ),
+                        ui.id().with("labymod_profile_name"),
+                        Sense::hover(),
+                    )
+                    .on_hover_text(name);
+                }
                 if let Some(acc) = account {
                     let name_w = ui
                         .painter()
-                        .layout_no_wrap(
-                            name.to_owned(),
-                            FontId::new(25.0, FontFamily::Name("bold".into())),
-                            Color32::PLACEHOLDER,
-                        )
+                        .layout_no_wrap(name_visible, name_font, Color32::PLACEHOLDER)
                         .size()
                         .x;
                     labymod_account_pill(
@@ -856,12 +892,16 @@ impl ProfilePage {
                             let name = account
                                 .map(|a| a.username.as_str())
                                 .unwrap_or_else(|| lang.modrinth_no_account());
-                            ui.label(
-                                egui::RichText::new(name)
+                            let name_visible = crate::shells::short_name(name, 30);
+                            let name_resp = ui.label(
+                                egui::RichText::new(&name_visible)
                                     .font(egui::FontId::proportional(24.0))
                                     .strong()
                                     .color(MODRINTH_TEXT_CONTRAST),
                             );
+                            if name.chars().count() > 30 {
+                                name_resp.on_hover_text(name);
+                            }
                             if let Some(acc) = account {
                                 let accented = acc.account_type != AccountType::Offline;
                                 modrinth_ui::pill(ui, account_type_label(acc, lang), accented);
@@ -967,6 +1007,7 @@ impl ProfilePage {
                     lang.profile_nickname(),
                     username,
                     false,
+                    if account.is_some() { 112.0 } else { 20.0 },
                 );
                 if let Some(acc) = account {
                     paint_type_badge(
@@ -989,6 +1030,7 @@ impl ProfilePage {
                     lang.modrinth_profile_player_uuid(),
                     uuid.unwrap_or_else(|| lang.modrinth_profile_no_uuid()),
                     true,
+                    68.0,
                 );
                 if let Some(uuid) = uuid {
                     let copy_rect = Rect::from_center_size(
@@ -1048,6 +1090,7 @@ impl ProfilePage {
                         lang.skins_model_classic()
                     },
                     false,
+                    50.0,
                 );
                 icons::draw(
                     ui.painter(),
@@ -1414,7 +1457,15 @@ fn account_status(account: Option<&Account>, lang: Language) -> (&'static str, C
     }
 }
 
-fn paint_detail_row(ui: &Ui, rect: Rect, icon: Icon, label: &str, value: &str, monospace: bool) {
+fn paint_detail_row(
+    ui: &mut Ui,
+    rect: Rect,
+    icon: Icon,
+    label: &str,
+    value: &str,
+    monospace: bool,
+    reserved_right: f32,
+) {
     icons::draw(
         ui.painter(),
         icon,
@@ -1434,13 +1485,24 @@ fn paint_detail_row(ui: &Ui, rect: Rect, icon: Icon, label: &str, value: &str, m
     } else {
         FontId::proportional(13.5)
     };
+    let value_x = rect.left() + 52.0;
+    let max_w = (rect.right() - 16.0 - reserved_right - value_x).max(48.0);
+    let value_visible = fit_text(ui, value, &font, max_w);
     ui.painter().text(
-        pos2(rect.left() + 52.0, rect.center().y + 10.0),
+        pos2(value_x, rect.center().y + 10.0),
         egui::Align2::LEFT_CENTER,
-        value,
+        &value_visible,
         font,
         MODRINTH_TEXT,
     );
+    if value_visible != value {
+        ui.interact(
+            Rect::from_min_size(pos2(value_x, rect.center().y + 1.0), vec2(max_w, 18.0)),
+            ui.id().with(("profile_detail_tip", label)),
+            Sense::hover(),
+        )
+        .on_hover_text(value);
+    }
 }
 
 fn paint_row_separator(ui: &Ui, row: Rect) {
@@ -1451,6 +1513,39 @@ fn paint_row_separator(ui: &Ui, row: Rect) {
         ],
         Stroke::new(1.0_f32, MODRINTH_SURFACE_HIGH),
     );
+}
+
+/// Fit a single-line label into `max_width`, appending an ellipsis. Used by
+/// the hand-painted profile cards where a long nickname must not cover the
+/// account-type badge or leave the card.
+fn fit_text(ui: &Ui, text: &str, font: &FontId, max_width: f32) -> String {
+    if max_width <= 0.0 || text.is_empty() {
+        return String::new();
+    }
+    let width = |value: &str| {
+        ui.painter()
+            .layout_no_wrap(value.to_owned(), font.clone(), Color32::PLACEHOLDER)
+            .size()
+            .x
+    };
+    if width(text) <= max_width {
+        return text.to_string();
+    }
+    let chars: Vec<char> = text.chars().collect();
+    let mut low = 0usize;
+    let mut high = chars.len();
+    while low < high {
+        let mid = (low + high).div_ceil(2);
+        let candidate: String = chars.iter().take(mid).collect::<String>() + "…";
+        if width(&candidate) <= max_width {
+            low = mid;
+        } else {
+            high = mid - 1;
+        }
+    }
+    let mut out: String = chars.iter().take(low).collect();
+    out.push('…');
+    out
 }
 
 fn paint_type_badge(ui: &Ui, row: Rect, label: &str, accent: bool) {

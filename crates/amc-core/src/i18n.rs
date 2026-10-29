@@ -13,6 +13,27 @@ pub enum Language {
     Ukrainian,
 }
 
+/// Russian/Ukrainian plural form for a counted noun: one / few / many.
+/// The caller supplies the three dictionary forms; 11–14 and 0 take `many`.
+fn slavic_plural(
+    count: u64,
+    one: &'static str,
+    few: &'static str,
+    many: &'static str,
+) -> &'static str {
+    let mod100 = count % 100;
+    let mod10 = count % 10;
+    if (11..=14).contains(&mod100) {
+        many
+    } else if mod10 == 1 {
+        one
+    } else if (2..=4).contains(&mod10) {
+        few
+    } else {
+        many
+    }
+}
+
 impl Language {
     pub const ALL: [Language; 3] = [Language::English, Language::Russian, Language::Ukrainian];
 
@@ -841,9 +862,21 @@ impl Language {
 
     pub fn inst_sessions_label(&self, count: u64) -> String {
         match self {
-            Self::English => format!("{count} sessions"),
-            Self::Russian => format!("{count} сессий"),
-            Self::Ukrainian => format!("{count} сесій"),
+            Self::English => {
+                if count == 1 {
+                    "1 session".to_string()
+                } else {
+                    format!("{count} sessions")
+                }
+            }
+            Self::Russian => {
+                let word = slavic_plural(count, "сессия", "сессии", "сессий");
+                format!("{count} {word}")
+            }
+            Self::Ukrainian => {
+                let word = slavic_plural(count, "сесія", "сесії", "сесій");
+                format!("{count} {word}")
+            }
         }
     }
 
@@ -2328,6 +2361,74 @@ impl Language {
             Self::English => "Clear history",
             Self::Russian => "Очистить историю",
             Self::Ukrainian => "Очистити історію",
+        }
+    }
+
+    pub fn dlman_empty_hint(&self) -> &'static str {
+        match self {
+            Self::English => {
+                "Files installed from catalogues and during game updates will appear here."
+            }
+            Self::Russian => "Здесь появятся файлы, скачанные из каталогов и при обновлении игры.",
+            Self::Ukrainian => {
+                "Тут з'являться файли, завантажені з каталогів і під час оновлення гри."
+            }
+        }
+    }
+
+    pub fn dlman_count(&self, count: usize) -> String {
+        match self {
+            Self::English => {
+                if count == 1 {
+                    "1 download".to_string()
+                } else {
+                    format!("{count} downloads")
+                }
+            }
+            Self::Russian => {
+                let word = slavic_plural(count as u64, "загрузка", "загрузки", "загрузок");
+                format!("{count} {word}")
+            }
+            Self::Ukrainian => {
+                let word =
+                    slavic_plural(count as u64, "завантаження", "завантаження", "завантажень");
+                format!("{count} {word}")
+            }
+        }
+    }
+
+    pub fn dlman_status_done(&self) -> &'static str {
+        match self {
+            Self::English => "Completed",
+            Self::Russian => "Завершено",
+            Self::Ukrainian => "Завершено",
+        }
+    }
+
+    pub fn dlman_status_failed(&self) -> &'static str {
+        match self {
+            Self::English => "Failed",
+            Self::Russian => "Ошибка",
+            Self::Ukrainian => "Помилка",
+        }
+    }
+
+    pub fn dlman_duration(&self, millis: u64) -> String {
+        if millis < 1000 {
+            match self {
+                Self::English => "<1 s".to_string(),
+                Self::Russian => "<1 с".to_string(),
+                Self::Ukrainian => "<1 с".to_string(),
+            }
+        } else if millis < 60_000 {
+            let value = format!("{:.1}", millis as f64 / 1000.0);
+            match self {
+                Self::English => format!("{value} s"),
+                Self::Russian | Self::Ukrainian => format!("{} с", value.replace('.', ",")),
+            }
+        } else {
+            let secs = millis / 1000;
+            format!("{}:{:02}", secs / 60, secs % 60)
         }
     }
 
@@ -4232,25 +4333,87 @@ impl Language {
 
     pub fn console_copy(&self) -> &'static str {
         match self {
-            Self::English => "📋 Copy",
-            Self::Russian => "📋 Копировать",
-            Self::Ukrainian => "📋 Копіювати",
+            Self::English => "Copy",
+            Self::Russian => "Копировать",
+            Self::Ukrainian => "Копіювати",
         }
     }
 
     pub fn console_clear(&self) -> &'static str {
         match self {
-            Self::English => "🧹 Clear",
-            Self::Russian => "🧹 Очистить",
-            Self::Ukrainian => "🧹 Очистити",
+            Self::English => "Clear",
+            Self::Russian => "Очистить",
+            Self::Ukrainian => "Очистити",
         }
     }
 
     pub fn console_export(&self) -> &'static str {
         match self {
-            Self::English => "💾 Export",
-            Self::Russian => "💾 Экспорт",
-            Self::Ukrainian => "💾 Експорт",
+            Self::English => "Export",
+            Self::Russian => "Экспорт",
+            Self::Ukrainian => "Експорт",
+        }
+    }
+
+    pub fn console_empty_title(&self) -> &'static str {
+        match self {
+            Self::English => "No game output yet",
+            Self::Russian => "Вывода игры пока нет",
+            Self::Ukrainian => "Виводу гри поки немає",
+        }
+    }
+
+    pub fn console_empty_hint(&self) -> &'static str {
+        match self {
+            Self::English => "Launch an instance — its log will stream here.",
+            Self::Russian => "Запустите сборку — журнал появится здесь.",
+            Self::Ukrainian => "Запустіть збірку — журнал з'явиться тут.",
+        }
+    }
+
+    pub fn console_no_matches(&self) -> &'static str {
+        match self {
+            Self::English => "No lines match this filter",
+            Self::Russian => "По этому фильтру строк нет",
+            Self::Ukrainian => "За цим фільтром рядків немає",
+        }
+    }
+
+    pub fn console_clear_filter(&self) -> &'static str {
+        match self {
+            Self::English => "Clear filter",
+            Self::Russian => "Сбросить фильтр",
+            Self::Ukrainian => "Скинути фільтр",
+        }
+    }
+
+    pub fn console_copied(&self) -> &'static str {
+        match self {
+            Self::English => "Copied",
+            Self::Russian => "Скопировано",
+            Self::Ukrainian => "Скопійовано",
+        }
+    }
+
+    pub fn console_line_count(&self, shown: usize, total: usize) -> String {
+        if shown == total {
+            match self {
+                Self::English => format!("{total} lines"),
+                Self::Russian => {
+                    let word = slavic_plural(total as u64, "строка", "строки", "строк");
+                    format!("{total} {word}")
+                }
+                Self::Ukrainian => {
+                    let word = slavic_plural(total as u64, "рядок", "рядки", "рядків");
+                    format!("{total} {word}")
+                }
+            }
+        } else {
+            match self {
+                Self::English => format!("{shown} of {total} lines"),
+                Self::Russian => format!("{shown} из {total}"),
+                Self::Ukrainian => format!("{shown} з {total}"),
+            }
         }
     }
 
@@ -4732,6 +4895,94 @@ impl Language {
             Self::English => "Session summary",
             Self::Russian => "Сводка сессии",
             Self::Ukrainian => "Підсумок сесії",
+        }
+    }
+
+    pub fn sess_complete(&self) -> &'static str {
+        match self {
+            Self::English => "Game closed cleanly",
+            Self::Russian => "Игра завершилась без ошибок",
+            Self::Ukrainian => "Гру завершено без помилок",
+        }
+    }
+
+    pub fn sess_current_time(&self) -> &'static str {
+        match self {
+            Self::English => "This session",
+            Self::Russian => "Эта сессия",
+            Self::Ukrainian => "Ця сесія",
+        }
+    }
+
+    pub fn sess_total_time(&self) -> &'static str {
+        match self {
+            Self::English => "Total playtime",
+            Self::Russian => "Всего в игре",
+            Self::Ukrainian => "Усього у грі",
+        }
+    }
+
+    pub fn sess_last_session(&self) -> &'static str {
+        match self {
+            Self::English => "Last session",
+            Self::Russian => "Последняя сессия",
+            Self::Ukrainian => "Остання сесія",
+        }
+    }
+
+    pub fn sess_sessions(&self) -> &'static str {
+        match self {
+            Self::English => "Sessions",
+            Self::Russian => "Сессии",
+            Self::Ukrainian => "Сесії",
+        }
+    }
+
+    pub fn sess_session_number(&self, n: u64) -> String {
+        match self {
+            Self::English => format!("Session #{n}"),
+            Self::Russian => format!("Сессия №{n}"),
+            Self::Ukrainian => format!("Сесія №{n}"),
+        }
+    }
+
+    pub fn sess_first_session(&self) -> &'static str {
+        match self {
+            Self::English => "First session",
+            Self::Russian => "Первая сессия",
+            Self::Ukrainian => "Перша сесія",
+        }
+    }
+
+    pub fn sess_empty_history(&self) -> &'static str {
+        match self {
+            Self::English => "No previous sessions — this is the beginning of your history.",
+            Self::Russian => "Предыдущих сессий нет — история только начинается.",
+            Self::Ukrainian => "Попередніх сесій немає — історія лише починається.",
+        }
+    }
+
+    pub fn sess_less_than_minute(&self) -> &'static str {
+        match self {
+            Self::English => "<1 min",
+            Self::Russian => "<1 мин",
+            Self::Ukrainian => "<1 хв",
+        }
+    }
+
+    pub fn sess_close(&self) -> &'static str {
+        match self {
+            Self::English => "Close",
+            Self::Russian => "Закрыть",
+            Self::Ukrainian => "Закрити",
+        }
+    }
+
+    pub fn sess_days_suffix(&self) -> &'static str {
+        match self {
+            Self::English => "d",
+            Self::Russian => "д",
+            Self::Ukrainian => "д",
         }
     }
 
@@ -5920,6 +6171,28 @@ mod tests {
             assert!(!lang.settings_btn_use_java().is_empty());
             assert!(!lang.settings_runtimes_title().is_empty());
             assert!(!lang.sess_title().is_empty());
+            assert!(!lang.sess_complete().is_empty());
+            assert!(!lang.sess_current_time().is_empty());
+            assert!(!lang.sess_total_time().is_empty());
+            assert!(!lang.sess_last_session().is_empty());
+            assert!(!lang.sess_sessions().is_empty());
+            assert!(!lang.sess_session_number(2).is_empty());
+            assert!(!lang.sess_first_session().is_empty());
+            assert!(!lang.sess_empty_history().is_empty());
+            assert!(!lang.sess_less_than_minute().is_empty());
+            assert!(!lang.sess_close().is_empty());
+            assert!(!lang.sess_days_suffix().is_empty());
+            assert!(!lang.dlman_empty_hint().is_empty());
+            assert!(!lang.dlman_count(2).is_empty());
+            assert!(!lang.dlman_status_done().is_empty());
+            assert!(!lang.dlman_status_failed().is_empty());
+            assert!(!lang.dlman_duration(1500).is_empty());
+            assert!(!lang.console_empty_title().is_empty());
+            assert!(!lang.console_empty_hint().is_empty());
+            assert!(!lang.console_no_matches().is_empty());
+            assert!(!lang.console_clear_filter().is_empty());
+            assert!(!lang.console_copied().is_empty());
+            assert!(!lang.console_line_count(4, 10).is_empty());
             assert!(!lang.inst_sort_title().is_empty());
             assert!(!lang.inst_sort_name().is_empty());
             assert!(!lang.inst_sort_recent().is_empty());
@@ -6191,5 +6464,34 @@ mod tests {
             assert!(!lang.hotkey_tabs_suffix().is_empty());
             assert!(!lang.profile_uuid_label("x").is_empty());
         }
+    }
+
+    #[test]
+    fn test_session_count_pluralizes() {
+        assert_eq!(Language::English.inst_sessions_label(1), "1 session");
+        assert_eq!(Language::English.inst_sessions_label(2), "2 sessions");
+        assert_eq!(Language::Russian.inst_sessions_label(1), "1 сессия");
+        assert_eq!(Language::Russian.inst_sessions_label(2), "2 сессии");
+        assert_eq!(Language::Russian.inst_sessions_label(5), "5 сессий");
+        assert_eq!(Language::Russian.inst_sessions_label(11), "11 сессий");
+        assert_eq!(Language::Russian.inst_sessions_label(21), "21 сессия");
+        assert_eq!(Language::Russian.inst_sessions_label(22), "22 сессии");
+        assert_eq!(Language::Ukrainian.inst_sessions_label(1), "1 сесія");
+        assert_eq!(Language::Ukrainian.inst_sessions_label(3), "3 сесії");
+        assert_eq!(Language::Ukrainian.inst_sessions_label(12), "12 сесій");
+        assert_eq!(Language::Ukrainian.inst_sessions_label(24), "24 сесії");
+    }
+
+    #[test]
+    fn test_download_duration_and_count_are_localized() {
+        assert_eq!(Language::English.dlman_duration(450), "<1 s");
+        assert_eq!(Language::English.dlman_duration(1500), "1.5 s");
+        assert_eq!(Language::Russian.dlman_duration(1500), "1,5 с");
+        assert_eq!(Language::English.dlman_duration(65_000), "1:05");
+        assert_eq!(Language::English.dlman_count(1), "1 download");
+        assert_eq!(Language::English.dlman_count(3), "3 downloads");
+        assert_eq!(Language::Russian.dlman_count(2), "2 загрузки");
+        assert_eq!(Language::Russian.dlman_count(5), "5 загрузок");
+        assert_eq!(Language::Ukrainian.dlman_count(3), "3 завантаження");
     }
 }

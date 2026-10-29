@@ -196,6 +196,7 @@ pub fn show_sidebar(
     let (chip_row, _) = ui.allocate_exact_size(vec2(bar.width(), 46.0), Sense::hover());
     let chip = chip_row.shrink2(vec2(PAD, 4.0));
     let display = account_name.unwrap_or_else(|| lang.modrinth_sign_in());
+    let display_short = crate::shells::short_name(display, 18);
     let resp = ui
         .interact(chip, ui.id().with("modrinth_account"), Sense::click())
         .on_hover_text(display);
@@ -230,7 +231,7 @@ pub fn show_sidebar(
     }
     let galley =
         ui.painter()
-            .layout_no_wrap(display.to_owned(), theme::mono(11.5), Color32::PLACEHOLDER);
+            .layout_no_wrap(display_short, theme::mono(11.5), Color32::PLACEHOLDER);
     ui.painter().galley(
         pos2(center.x + 20.0, chip.center().y - galley.size().y / 2.0),
         galley,
@@ -427,8 +428,9 @@ fn account_card(ui: &mut Ui, width: f32, lang: Language, account_name: Option<&s
     }
 
     let name = account_name.unwrap_or_else(|| lang.modrinth_no_account());
+    let name_short = crate::shells::short_name(name, 25);
     let name_galley = ui.painter().layout_no_wrap(
-        name.to_owned(),
+        name_short,
         egui::FontId::proportional(13.5),
         theme::MODRINTH_TEXT_CONTRAST,
     );
@@ -467,6 +469,9 @@ fn account_card(ui: &mut Ui, width: f32, lang: Language, account_name: Option<&s
 
     if resp.hovered() {
         ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
+    }
+    if name.chars().count() > 25 {
+        resp.clone().on_hover_text(name);
     }
     resp.clicked()
 }

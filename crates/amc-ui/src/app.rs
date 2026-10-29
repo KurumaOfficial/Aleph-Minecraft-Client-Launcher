@@ -23,7 +23,7 @@ use uuid::Uuid;
 use crate::modals::{
     ConsoleModal, DownloadManager, DownloadOverlay, HwNoticeAction, IdentityPicker, LoginModal,
     LoginMode, ManagerAction, OverlayAction, PickerAction, ScreensAction, ScreensModal,
-    WizardAction, WizardFlow,
+    SessionSummaryAction, SessionSummaryData, WizardAction, WizardFlow,
 };
 use crate::pages::{
     icon_cache_file, icon_key, HomeContext, HomePage, InstanceAction, InstancesContext,
@@ -121,7 +121,7 @@ pub struct LauncherApp {
     /// Set while a download is paused (overlay stays open with Resume).
     download_paused: bool,
     /// Clean-exit session summary modal (CONCEPT "После запуска игры").
-    session_summary: Option<(String, u64)>,
+    session_summary: Option<SessionSummaryData>,
     ms_code_rx: Option<mpsc::Receiver<Result<DeviceCodeResponse, String>>>,
     ms_poll_rx: Option<mpsc::Receiver<Result<Account, String>>>,
     /// Last autosaved config for the Settings tab (avoids per-frame FS
@@ -312,6 +312,36 @@ impl LauncherApp {
             modrinth_rail_overlay: false,
             pending_direct_connect: None,
         }
+    }
+
+    /// Utility windows (console, downloads, screenshots) are alternatives,
+    /// not a stack: opening one closes the others so a large log window can
+    /// never leave the download list half-hidden behind it.
+    fn toggle_console_modal(&mut self) {
+        let open = !self.console_modal.is_open;
+        if open {
+            self.download_manager.open = false;
+            self.screens_modal.open = false;
+        }
+        self.console_modal.is_open = open;
+    }
+
+    fn toggle_download_manager(&mut self) {
+        let open = !self.download_manager.open;
+        if open {
+            self.console_modal.is_open = false;
+            self.screens_modal.open = false;
+        }
+        self.download_manager.open = open;
+    }
+
+    fn toggle_screens_modal(&mut self) {
+        let open = !self.screens_modal.open;
+        if open {
+            self.console_modal.is_open = false;
+            self.download_manager.open = false;
+        }
+        self.screens_modal.open = open;
     }
 
     /// Store an account, surfacing storage errors (e.g. a second WetID,
@@ -3474,7 +3504,8 @@ impl App for LauncherApp {
                         self.console_modal.push_line(format!("[AMC] {msg}"));
                         self.is_launching = false;
                         if let Some(start) = self.session_start_time.take() {
-                            let elapsed_mins = (start.elapsed().as_secs() / 60).max(1);
+                            let elapsed_secs = start.elapsed().as_secs().max(1);
+                            let elapsed_mins = (elapsed_secs / 60).max(1);
                             if let Some(inst_id) = self.launched_instance_id {
                                 Self::add_playtime(
                                     &self.paths,
@@ -3491,8 +3522,13 @@ impl App for LauncherApp {
                                     if let Some(inst) =
                                         self.instances.iter().find(|i| i.id == inst_id)
                                     {
-                                        self.session_summary =
-                                            Some((inst.name.clone(), elapsed_mins));
+                                        self.session_summary = Some(SessionSummaryData {
+                                            instance_name: inst.name.clone(),
+                                            session_seconds: elapsed_secs,
+                                            total_minutes: inst.total_played_minutes,
+                                            sessions: inst.sessions,
+                                            last_played: inst.last_played,
+                                        });
                                     }
                                 }
                             }
@@ -3662,43 +3698,9 @@ impl App for LauncherApp {
         }
 
         // Post-exit session summary (clean exits only, never crashes).
-        if let Some((name, mins)) = self.session_summary.clone() {
-            let mut close_summary = false;
-            let mut open = true;
-            egui::Window::new(lang.sess_title())
-                .open(&mut open)
-                .collapsible(false)
-                .resizable(false)
-                .anchor(egui::Align2::CENTER_CENTER, egui::vec2(0.0, 0.0))
-                .min_width(360.0)
-                .show(ctx, |ui| {
-                    ui.add_space(8.0);
-                    ui.label(egui::RichText::new(&name).strong());
-                    let play_time_str = if mins == 0 {
-                        lang.inst_never_played().to_string()
-                    } else if mins < 60 {
-                        format!("{} {}", mins, lang.inst_mins_suffix())
-                    } else {
-                        format!(
-                            "{} {} {} {}",
-                            mins / 60,
-                            lang.inst_hours_suffix(),
-                            mins % 60,
-                            lang.inst_mins_suffix()
-                        )
-                    };
-                    ui.label(egui::RichText::new(
-                        lang.inst_playtime_label(&play_time_str),
-                    ));
-                    ui.add_space(12.0);
-                    if ui.button(lang.wizard_hw_ok()).clicked() {
-                        close_summary = true;
-                    }
-                });
-            if !open || ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
-                close_summary = true;
-            }
-            if close_summary {
+        if let Some(summary) = self.session_summary.as_ref() {
+            let action = crate::modals::session_summary::show(ctx, lang, summary);
+            if action == SessionSummaryAction::Close {
                 self.session_summary = None;
             }
         }
@@ -3770,13 +3772,13 @@ impl App for LauncherApp {
                     TitleBar::show(ui, "AMC Launcher", lang)
                 };
                 if tb_resp.console_clicked {
-                    self.console_modal.is_open = !self.console_modal.is_open;
+                    self.toggle_console_modal();
                 }
                 if tb_resp.gallery_clicked {
-                    self.screens_modal.open = !self.screens_modal.open;
+                    self.toggle_screens_modal();
                 }
                 if tb_resp.downloads_clicked {
-                    self.download_manager.open = !self.download_manager.open;
+                    self.toggle_download_manager();
                 }
                 if tb_resp.sidebar_toggle {
                     if modrinth_narrow {
@@ -4030,13 +4032,13 @@ impl App for LauncherApp {
                             self.login_modal.is_open = true;
                         }
                         if action.console {
-                            self.console_modal.is_open = !self.console_modal.is_open;
+                            self.toggle_console_modal();
                         }
                         if action.downloads {
-                            self.download_manager.open = !self.download_manager.open;
+                            self.toggle_download_manager();
                         }
                         if action.gallery {
-                            self.screens_modal.open = !self.screens_modal.open;
+                            self.toggle_screens_modal();
                         }
                     });
             }
@@ -4322,10 +4324,10 @@ impl App for LauncherApp {
                                 self.login_modal.is_open = true;
                             }
                             if action.console {
-                                self.console_modal.is_open = !self.console_modal.is_open;
+                                self.toggle_console_modal();
                             }
                             if action.downloads {
-                                self.download_manager.open = !self.download_manager.open;
+                                self.toggle_download_manager();
                             }
                             return;
                         }

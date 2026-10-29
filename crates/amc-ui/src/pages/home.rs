@@ -845,13 +845,31 @@ impl HomePage {
             .account_name
             .or(ctx.profile_name)
             .unwrap_or_else(|| lang.legacy_guest());
-        ui.painter().text(
+        let name_visible = short_name(name, 26);
+        let name_font = egui::FontId::proportional(29.0);
+        let name_galley =
+            ui.painter()
+                .layout_no_wrap(name_visible, name_font, Color32::PLACEHOLDER);
+        let name_rect = egui::Rect::from_center_size(
             egui::pos2(cx, card.top() + 34.0),
-            egui::Align2::CENTER_CENTER,
-            short_name(name, 26),
-            egui::FontId::proportional(29.0),
+            name_galley.size() + vec2(8.0, 4.0),
+        );
+        ui.painter().galley(
+            egui::pos2(
+                name_rect.center().x - name_galley.size().x / 2.0,
+                name_rect.center().y - name_galley.size().y / 2.0,
+            ),
+            name_galley,
             Color32::WHITE,
         );
+        if name.chars().count() > 26 {
+            ui.interact(
+                name_rect,
+                ui.id().with("labymod_hero_name_tip"),
+                Sense::hover(),
+            )
+            .on_hover_text(name);
+        }
 
         let default_chip = egui::Rect::from_center_size(
             egui::pos2(cx + width * 0.19, card.bottom() - 134.0),
