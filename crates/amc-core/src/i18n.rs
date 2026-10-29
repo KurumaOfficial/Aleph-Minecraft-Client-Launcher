@@ -944,6 +944,14 @@ impl Language {
         }
     }
 
+    pub fn inst_default_name(&self) -> &'static str {
+        match self {
+            Self::English => "My Instance",
+            Self::Russian => "Моя сборка",
+            Self::Ukrainian => "Моя збірка",
+        }
+    }
+
     pub fn inst_modal_version(&self) -> &'static str {
         match self {
             Self::English => "Game Version:",
@@ -989,6 +997,116 @@ impl Language {
             Self::English => "CANCEL",
             Self::Russian => "ОТМЕНА",
             Self::Ukrainian => "СКАСУВАТИ",
+        }
+    }
+
+    pub fn inst_modal_btn_next(&self) -> &'static str {
+        match self {
+            Self::English => "NEXT",
+            Self::Russian => "ДАЛЕЕ",
+            Self::Ukrainian => "ДАЛІ",
+        }
+    }
+
+    pub fn inst_modal_btn_back(&self) -> &'static str {
+        match self {
+            Self::English => "BACK",
+            Self::Russian => "НАЗАД",
+            Self::Ukrainian => "НАЗАД",
+        }
+    }
+
+    pub fn inst_modal_step(&self, current: u8, total: u8) -> String {
+        match self {
+            Self::English => format!("Step {current} of {total}"),
+            Self::Russian => format!("Шаг {current} из {total}"),
+            Self::Ukrainian => format!("Крок {current} з {total}"),
+        }
+    }
+
+    pub fn inst_modal_loader_version(&self) -> &'static str {
+        match self {
+            Self::English => "Loader version",
+            Self::Russian => "Версия загрузчика",
+            Self::Ukrainian => "Версія завантажувача",
+        }
+    }
+
+    pub fn inst_modal_loader_version_hint(&self) -> &'static str {
+        match self {
+            Self::English => "Latest (automatic)",
+            Self::Russian => "Последняя (автоматически)",
+            Self::Ukrainian => "Остання (автоматично)",
+        }
+    }
+
+    pub fn inst_icon_preset_name(&self, key: &str) -> &'static str {
+        match key {
+            "pickaxe" => match self {
+                Self::English => "Pickaxe",
+                Self::Russian => "Кирка",
+                Self::Ukrainian => "Кирка",
+            },
+            "sword" => match self {
+                Self::English => "Sword",
+                Self::Russian => "Меч",
+                Self::Ukrainian => "Меч",
+            },
+            "shield" => match self {
+                Self::English => "Shield",
+                Self::Russian => "Щит",
+                Self::Ukrainian => "Щит",
+            },
+            "bow" => match self {
+                Self::English => "Bow",
+                Self::Russian => "Лук",
+                Self::Ukrainian => "Лук",
+            },
+            "potion" => match self {
+                Self::English => "Potion",
+                Self::Russian => "Зелье",
+                Self::Ukrainian => "Зілля",
+            },
+            "dragon" => match self {
+                Self::English => "Dragon",
+                Self::Russian => "Дракон",
+                Self::Ukrainian => "Дракон",
+            },
+            "castle" => match self {
+                Self::English => "Castle",
+                Self::Russian => "Замок",
+                Self::Ukrainian => "Замок",
+            },
+            "wheat" => match self {
+                Self::English => "Wheat",
+                Self::Russian => "Пшеница",
+                Self::Ukrainian => "Пшениця",
+            },
+            "gear" => match self {
+                Self::English => "Gear",
+                Self::Russian => "Шестерёнка",
+                Self::Ukrainian => "Шестерня",
+            },
+            "alien" => match self {
+                Self::English => "Alien",
+                Self::Russian => "Пришелец",
+                Self::Ukrainian => "Прибулець",
+            },
+            "art" => match self {
+                Self::English => "Art",
+                Self::Russian => "Творчество",
+                Self::Ukrainian => "Творчість",
+            },
+            "fire" => match self {
+                Self::English => "Fire",
+                Self::Russian => "Огонь",
+                Self::Ukrainian => "Вогонь",
+            },
+            _ => match self {
+                Self::English => "Instance icon",
+                Self::Russian => "Иконка сборки",
+                Self::Ukrainian => "Іконка збірки",
+            },
         }
     }
 
@@ -6222,6 +6340,13 @@ mod tests {
             assert!(!lang.inst_icon_custom().is_empty());
             assert!(!lang.inst_icon_none().is_empty());
             assert!(!lang.inst_icon_remove().is_empty());
+            assert!(!lang.inst_icon_preset_name("pickaxe").is_empty());
+            assert!(!lang.inst_default_name().is_empty());
+            assert!(!lang.inst_modal_btn_next().is_empty());
+            assert!(!lang.inst_modal_btn_back().is_empty());
+            assert!(!lang.inst_modal_step(1, 2).is_empty());
+            assert!(!lang.inst_modal_loader_version().is_empty());
+            assert!(!lang.inst_modal_loader_version_hint().is_empty());
             assert!(!lang.inst_tags_label().is_empty());
             assert!(!lang.inst_tags_hint().is_empty());
             assert!(!lang.inst_pin_label().is_empty());
@@ -6499,6 +6624,38 @@ mod tests {
         assert_eq!(Language::Ukrainian.inst_sessions_label(3), "3 сесії");
         assert_eq!(Language::Ukrainian.inst_sessions_label(12), "12 сесій");
         assert_eq!(Language::Ukrainian.inst_sessions_label(24), "24 сесії");
+    }
+
+    #[test]
+    fn test_every_instance_icon_preset_has_a_name() {
+        for (key, english) in [
+            ("pickaxe", "Pickaxe"),
+            ("sword", "Sword"),
+            ("shield", "Shield"),
+            ("bow", "Bow"),
+            ("potion", "Potion"),
+            ("dragon", "Dragon"),
+            ("castle", "Castle"),
+            ("wheat", "Wheat"),
+            ("gear", "Gear"),
+            ("alien", "Alien"),
+            ("art", "Art"),
+            ("fire", "Fire"),
+        ] {
+            assert_eq!(Language::English.inst_icon_preset_name(key), english);
+            for lang in Language::ALL {
+                assert!(!lang.inst_icon_preset_name(key).is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn test_create_flow_labels_are_localized() {
+        assert_eq!(Language::English.inst_default_name(), "My Instance");
+        assert_eq!(Language::Russian.inst_default_name(), "Моя сборка");
+        assert_eq!(Language::Ukrainian.inst_default_name(), "Моя збірка");
+        assert_eq!(Language::Russian.inst_modal_step(1, 2), "Шаг 1 из 2");
+        assert_eq!(Language::Ukrainian.inst_modal_step(2, 2), "Крок 2 з 2");
     }
 
     #[test]

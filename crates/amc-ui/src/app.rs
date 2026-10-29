@@ -208,6 +208,8 @@ impl LauncherApp {
             .or_else(|| Some("1.20.1".to_string()));
 
         let lang = config.ui.language();
+        let mut instances_page = InstancesPage::default();
+        instances_page.new_instance_name = lang.inst_default_name().to_string();
 
         // Professional-style chrome opens on instances (computed before
         // `config` moves into the app struct below).
@@ -258,7 +260,7 @@ impl LauncherApp {
             hw_suggested_ram,
             launch_status_text: lang.status_preparing().to_string(),
             home_page: HomePage::default(),
-            instances_page: InstancesPage::default(),
+            instances_page,
             mods_page,
             skins_page: SkinsPage::default(),
             settings_page: SettingsPage::default(),
