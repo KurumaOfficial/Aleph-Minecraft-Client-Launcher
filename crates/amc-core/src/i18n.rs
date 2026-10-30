@@ -1281,6 +1281,15 @@ impl Language {
         }
     }
 
+    /// Modrinth search: empty result caused by the loader/version filters.
+    pub fn mods_search_no_results_filters_hint(&self) -> &'static str {
+        match self {
+            Self::English => "No projects match these filters",
+            Self::Russian => "Нет проектов под эти фильтры",
+            Self::Ukrainian => "Немає проєктів під ці фільтри",
+        }
+    }
+
     /// Settings → Accounts empty card subtitle for the LabyMod/Millida shells.
     pub fn settings_accounts_empty_hint(&self) -> &'static str {
         match self {
@@ -5612,6 +5621,102 @@ impl Language {
         }
     }
 
+    pub fn mods_sort_follows(&self) -> &'static str {
+        match self {
+            Self::English => "Follows",
+            Self::Russian => "По подпискам",
+            Self::Ukrainian => "За підписками",
+        }
+    }
+
+    pub fn mods_sort_newest(&self) -> &'static str {
+        match self {
+            Self::English => "Newest",
+            Self::Russian => "Новые",
+            Self::Ukrainian => "Нові",
+        }
+    }
+
+    pub fn mods_sort_updated(&self) -> &'static str {
+        match self {
+            Self::English => "Updated",
+            Self::Russian => "Обновлённые",
+            Self::Ukrainian => "Оновлені",
+        }
+    }
+
+    pub fn mods_filters(&self) -> &'static str {
+        match self {
+            Self::English => "Filters",
+            Self::Russian => "Фильтры",
+            Self::Ukrainian => "Фільтри",
+        }
+    }
+
+    pub fn mods_filters_count(&self, count: usize) -> String {
+        match self {
+            Self::English => format!("Filters ({count})"),
+            Self::Russian => format!("Фильтры ({count})"),
+            Self::Ukrainian => format!("Фільтри ({count})"),
+        }
+    }
+
+    pub fn mods_filters_hint(&self) -> &'static str {
+        match self {
+            Self::English => "Filter by loader and Minecraft version",
+            Self::Russian => "Фильтр по загрузчику и версии Minecraft",
+            Self::Ukrainian => "Фільтр за завантажувачем і версією Minecraft",
+        }
+    }
+
+    pub fn mods_filter_loader(&self) -> &'static str {
+        match self {
+            Self::English => "Loader",
+            Self::Russian => "Загрузчик",
+            Self::Ukrainian => "Завантажувач",
+        }
+    }
+
+    pub fn mods_filter_any(&self) -> &'static str {
+        match self {
+            Self::English => "Any",
+            Self::Russian => "Любой",
+            Self::Ukrainian => "Будь-який",
+        }
+    }
+
+    pub fn mods_filter_mc(&self) -> &'static str {
+        match self {
+            Self::English => "Minecraft version",
+            Self::Russian => "Версия Minecraft",
+            Self::Ukrainian => "Версія Minecraft",
+        }
+    }
+
+    pub fn mods_filter_mc_hint(&self) -> &'static str {
+        match self {
+            Self::English => "e.g. 1.20.1",
+            Self::Russian => "напр. 1.20.1",
+            Self::Ukrainian => "напр. 1.20.1",
+        }
+    }
+
+    pub fn mods_filter_reset(&self) -> &'static str {
+        match self {
+            Self::English => "Reset to instance",
+            Self::Russian => "Сбросить к сборке",
+            Self::Ukrainian => "Скинути до збірки",
+        }
+    }
+
+    pub fn mods_filter_reset_hint(&self) -> &'static str {
+        match self {
+            Self::English => "Use this instance's loader and version",
+            Self::Russian => "Вернуть загрузчик и версию этой сборки",
+            Self::Ukrainian => "Повернути завантажувач і версію цієї збірки",
+        }
+    }
+
     pub fn mods_install_optifine(&self) -> &'static str {
         match self {
             Self::English => "Install OptiFine",
@@ -6517,6 +6622,18 @@ mod tests {
             assert!(!lang.mods_unpin().is_empty());
             assert!(!lang.mods_sort_relevance().is_empty());
             assert!(!lang.mods_sort_downloads().is_empty());
+            assert!(!lang.mods_sort_follows().is_empty());
+            assert!(!lang.mods_sort_newest().is_empty());
+            assert!(!lang.mods_sort_updated().is_empty());
+            assert!(!lang.mods_filters().is_empty());
+            assert!(!lang.mods_filters_count(2).is_empty());
+            assert!(!lang.mods_filters_hint().is_empty());
+            assert!(!lang.mods_filter_loader().is_empty());
+            assert!(!lang.mods_filter_any().is_empty());
+            assert!(!lang.mods_filter_mc().is_empty());
+            assert!(!lang.mods_filter_mc_hint().is_empty());
+            assert!(!lang.mods_filter_reset().is_empty());
+            assert!(!lang.mods_filter_reset_hint().is_empty());
             assert!(!lang.mods_install_optifine().is_empty());
             assert!(!lang.mods_optifine_need_instance().is_empty());
             assert!(!lang.mods_search_clear().is_empty());
@@ -6525,6 +6642,7 @@ mod tests {
             assert!(!lang.mods_search_prompt_hint().is_empty());
             assert!(!lang.mods_search_no_results_title().is_empty());
             assert!(!lang.mods_search_no_results_hint().is_empty());
+            assert!(!lang.mods_search_no_results_filters_hint().is_empty());
             assert!(!lang.toast_mod_installed("x").is_empty());
             assert!(!lang.err_mod_copy_failed("x", "y").is_empty());
             assert!(!lang.toast_world_imported("x").is_empty());

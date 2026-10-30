@@ -105,11 +105,36 @@ pub fn icon_cache_file(key: &str) -> String {
         .collect()
 }
 
+/// Loader slug understood by the Modrinth facet filter. Vanilla, OptiFine
+/// and a missing instance mean "any loader" and map to an empty string.
+fn normalize_search_loader(loader: &str) -> String {
+    match loader.to_lowercase().as_str() {
+        "fabric" | "quilt" | "forge" | "neoforge" => loader.to_lowercase(),
+        _ => String::new(),
+    }
+}
+
 pub struct ModsPage {
     pub sub_tab: ModsSubTab,
     pub search_provider: ModSource,
     pub search_category: ModCategory,
     pub search_sort: SearchSort,
+    /// Modrinth-only search filters. An empty loader/version means "any".
+    /// Manual overrides last until the selected instance changes or the
+    /// reset action restores the instance's loader/version.
+    pub(crate) filters_open: bool,
+    pub(crate) filter_loader: String,
+    pub(crate) filter_mc: String,
+    pub(crate) filter_manual: bool,
+    pub(crate) filter_mc_edited: bool,
+    /// Last instance (loader, version) applied to the filters.
+    pub(crate) filter_base: Option<(String, String)>,
+    /// Instance change detected while a search was already made: re-run it
+    /// with the synced filters once the page is shown.
+    pub(crate) filter_resync_pending: bool,
+    /// True after at least one marketplace request; an instance change only
+    /// refreshes the results when there is already something to refresh.
+    pub(crate) has_searched: bool,
     pub search_query: String,
     pub is_searching: bool,
     pub search_results: Vec<ModSearchResult>,
@@ -161,6 +186,14 @@ impl Default for ModsPage {
             search_provider: ModSource::Modrinth,
             search_category: ModCategory::Mod,
             search_sort: SearchSort::Relevance,
+            filters_open: false,
+            filter_loader: String::new(),
+            filter_mc: String::new(),
+            filter_manual: false,
+            filter_mc_edited: false,
+            filter_base: None,
+            filter_resync_pending: false,
+            has_searched: false,
             search_query: String::new(),
             is_searching: false,
             search_results: Vec::new(),
@@ -202,6 +235,34 @@ pub struct ModsActions<'a, S, I> {
 }
 
 impl ModsPage {
+    /// Keep the Modrinth filter defaults aligned with the selected instance
+    /// unless the user has overridden them. Switching to another instance
+    /// clears manual overrides so stale loader/version pairs never leak.
+    fn sync_filters(&mut self) {
+        let base = (
+            normalize_search_loader(&self.compat_loader),
+            self.compat_mc.clone().unwrap_or_default(),
+        );
+        if self.filter_base.as_ref() != Some(&base) {
+            self.filter_base = Some(base.clone());
+            self.filter_manual = false;
+            self.filter_mc_edited = false;
+            self.filter_loader = base.0;
+            self.filter_mc = base.1;
+            if self.has_searched {
+                self.filter_resync_pending = true;
+            }
+        }
+    }
+
+    /// Active filters shown in the toggle label. The loader facet only
+    /// applies to mods (Modrinth ignores it for resource packs/shaders).
+    fn filter_count(&self, category: ModCategory) -> usize {
+        let loader = usize::from(category == ModCategory::Mod && !self.filter_loader.is_empty());
+        let version = usize::from(!self.filter_mc.trim().is_empty());
+        loader + version
+    }
+
     pub fn show<S, I>(
         &mut self,
         ui: &mut Ui,
@@ -211,9 +272,14 @@ impl ModsPage {
         instance_meta: Option<&str>,
         actions: ModsActions<'_, S, I>,
     ) where
-        S: FnOnce(String, ModSource, ModCategory, SearchSort),
+        S: FnOnce(String, ModSource, ModCategory, SearchSort, Option<String>, Option<String>),
         I: FnOnce(ModSearchResult),
     {
+        // Filter state is a Modrinth BrowsePage feature; other shells keep
+        // their existing instance-scoped search behaviour untouched.
+        if skin == ModsSkin::Modrinth {
+            self.sync_filters();
+        }
         ui.add_space(if skin == ModsSkin::Millida {
             14.0
         } else if skin == ModsSkin::Labymod {
@@ -1290,17 +1356,158 @@ impl ModsPage {
             });
     }
 
+    /// Floating Modrinth filter popover. `left` is the content edge and
+    /// `top` the anchor edge; the panel overlays the results instead of
+    /// consuming their vertical space. Returns true when a filter changed.
+    fn show_modrinth_filters(
+        &mut self,
+        ui: &mut Ui,
+        lang: Language,
+        left: f32,
+        top: f32,
+        just_toggled: bool,
+    ) -> bool {
+        let mut changed = false;
+        let screen = ui.ctx().screen_rect();
+        let panel_w = (screen.right() - left - 12.0)
+            .min(ui.available_width())
+            .clamp(360.0, 900.0);
+        let panel_y = top.min(screen.bottom() - 120.0);
+        let area = egui::Area::new(egui::Id::new("modrinth_mod_filters"))
+            .order(egui::Order::Foreground)
+            .fixed_pos(pos2(left, panel_y))
+            .constrain(true)
+            .show(ui.ctx(), |ui| {
+                ui.set_min_width(panel_w);
+                egui::Frame::none()
+                    .fill(BG_CARD.into())
+                    .stroke(Stroke::new(1.0_f32, BORDER_DEFAULT))
+                    .rounding(crate::theme::rounding())
+                    .inner_margin(egui::Margin::symmetric(10.0, 8.0))
+                    .show(ui, |ui| {
+                        ui.set_min_width(ui.available_width());
+                        let chip = |ui: &mut Ui, icon: Icon, label: &str, active: bool| -> bool {
+                            icons::icon_text_button(
+                                ui,
+                                icon,
+                                None,
+                                label,
+                                if active {
+                                    Color32::WHITE
+                                } else {
+                                    TEXT_MUTED.into()
+                                },
+                                egui::FontId::proportional(11.0),
+                                if active { RUBY } else { BG_ELEVATED },
+                            )
+                            .clicked()
+                        };
+                        if self.search_category == ModCategory::Mod {
+                            ui.horizontal_wrapped(|ui| {
+                                ui.spacing_mut().item_spacing.x = 6.0;
+                                ui.label(
+                                    egui::RichText::new(lang.mods_filter_loader())
+                                        .font(egui::FontId::proportional(11.0))
+                                        .color(TEXT_MUTED),
+                                );
+                                let loaders = [
+                                    ("", lang.mods_filter_any(), Icon::Globe),
+                                    ("fabric", "Fabric", Icon::Spool),
+                                    ("quilt", "Quilt", Icon::Needle),
+                                    ("forge", "Forge", Icon::Hammer),
+                                    ("neoforge", "NeoForge", Icon::Hammer),
+                                ];
+                                for (slug, label, icon) in loaders {
+                                    let active = self.filter_loader == slug;
+                                    if chip(ui, icon, label, active) && !active {
+                                        self.filter_loader = slug.to_string();
+                                        self.filter_manual = true;
+                                        changed = true;
+                                    }
+                                }
+                            });
+                            ui.add_space(6.0);
+                        }
+
+                        ui.horizontal_wrapped(|ui| {
+                            ui.spacing_mut().item_spacing.x = 6.0;
+                            ui.label(
+                                egui::RichText::new(lang.mods_filter_mc())
+                                    .font(egui::FontId::proportional(11.0))
+                                    .color(TEXT_MUTED),
+                            );
+                            let field = ui.add_sized(
+                                [118.0, 26.0],
+                                TextEdit::singleline(&mut self.filter_mc)
+                                    .hint_text(
+                                        egui::RichText::new(lang.mods_filter_mc_hint())
+                                            .color(TEXT_MUTED),
+                                    )
+                                    .font(egui::FontId::proportional(12.0)),
+                            );
+                            if field.changed() {
+                                self.filter_manual = true;
+                                self.filter_mc_edited = true;
+                            }
+                            if field.lost_focus() && self.filter_mc_edited {
+                                self.filter_mc_edited = false;
+                                changed = true;
+                            }
+
+                            let reset = icon_button(
+                                ui,
+                                Icon::Refresh,
+                                if self.filter_manual {
+                                    TEXT_PRIMARY
+                                } else {
+                                    TEXT_MUTED
+                                },
+                            )
+                            .on_hover_text(format!(
+                                "{}\n{}",
+                                lang.mods_filter_reset(),
+                                lang.mods_filter_reset_hint()
+                            ));
+                            if reset.clicked() {
+                                self.filter_loader = normalize_search_loader(&self.compat_loader);
+                                self.filter_mc = self.compat_mc.clone().unwrap_or_default();
+                                self.filter_manual = false;
+                                self.filter_mc_edited = false;
+                                changed = true;
+                            }
+                        });
+                    });
+            });
+        if !just_toggled && ui.input(|i| i.pointer.any_click()) && !area.response.contains_pointer()
+        {
+            self.filters_open = false;
+        }
+        changed
+    }
+
     fn show_search(
         &mut self,
         ui: &mut Ui,
         lang: Language,
         skin: ModsSkin,
         wishlist: &mut Vec<String>,
-        on_search: impl FnOnce(String, ModSource, ModCategory, SearchSort),
+        on_search: impl FnOnce(
+            String,
+            ModSource,
+            ModCategory,
+            SearchSort,
+            Option<String>,
+            Option<String>,
+        ),
         on_install: impl FnOnce(ModSearchResult),
     ) {
         let millida = skin == ModsSkin::Millida;
         let modrinth = skin == ModsSkin::Modrinth;
+        let mut on_search = Some(on_search);
+        let mut request_search = false;
+        let mut provider_changed = false;
+        let mut filters_anchor: Option<egui::Rect> = None;
+        let mut filter_toggled = false;
         let chip = |ui: &mut Ui, icon: Icon, label: &str, active: bool| -> bool {
             if millida {
                 millida_action_button(ui, label, active)
@@ -1343,8 +1550,9 @@ impl ModsPage {
             } else {
                 ui.add(mr_btn).clicked()
             };
-            if mr_clicked {
+            if mr_clicked && self.search_provider != ModSource::Modrinth {
                 self.search_provider = ModSource::Modrinth;
+                provider_changed = true;
             }
 
             let cf_btn = egui::Button::new(
@@ -1365,9 +1573,15 @@ impl ModsPage {
             } else {
                 ui.add(cf_btn).clicked()
             };
-            if cf_clicked {
+            if cf_clicked && self.search_provider != ModSource::CurseForge {
                 self.search_provider = ModSource::CurseForge;
                 self.search_category = ModCategory::Mod;
+                // CurseTools has no follows/newest/updated ordering; do not
+                // leave a Modrinth-only sort silently active.
+                if !self.search_sort.curseforge_supported() {
+                    self.search_sort = SearchSort::Relevance;
+                }
+                provider_changed = true;
             }
 
             ui.add_space(8.0);
@@ -1412,7 +1626,6 @@ impl ModsPage {
 
             ui.add_space(8.0);
 
-            let mut on_search = Some(on_search);
             let search_clicked = if millida {
                 millida_action_button(ui, lang.mods_btn_search(), false)
             } else {
@@ -1424,14 +1637,7 @@ impl ModsPage {
                 .clicked()
             };
             if search_clicked || enter_pressed {
-                if let Some(f) = on_search.take() {
-                    f(
-                        self.search_query.clone(),
-                        self.search_provider,
-                        self.search_category,
-                        self.search_sort,
-                    );
-                }
+                request_search = true;
             }
 
             if self.search_provider == ModSource::Modrinth {
@@ -1454,53 +1660,177 @@ impl ModsPage {
                 };
                 if trending_clicked {
                     self.search_query.clear();
-                    if let Some(f) = on_search.take() {
-                        f(
-                            String::new(),
-                            self.search_provider,
-                            self.search_category,
-                            self.search_sort,
-                        );
+                    request_search = true;
+                }
+
+                if modrinth {
+                    ui.add_space(8.0);
+                    let count = self.filter_count(self.search_category);
+                    let label = if count > 0 {
+                        lang.mods_filters_count(count)
+                    } else {
+                        lang.mods_filters().to_string()
+                    };
+                    let resp = icons::icon_text_button(
+                        ui,
+                        Icon::Filter,
+                        None,
+                        &label,
+                        if self.filters_open {
+                            Color32::WHITE
+                        } else {
+                            TEXT_MUTED.into()
+                        },
+                        egui::FontId::proportional(11.0),
+                        if self.filters_open { RUBY } else { BG_ELEVATED },
+                    )
+                    .on_hover_text(lang.mods_filters_hint());
+                    filters_anchor = Some(resp.rect);
+                    if resp.clicked() {
+                        self.filters_open = !self.filters_open;
+                        filter_toggled = true;
                     }
                 }
             }
         });
 
+        // Modrinth-only filter popover: loader + Minecraft version, scoped
+        // to the selected instance by default. It floats over the results
+        // instead of consuming vertical space, which keeps 960x600 usable.
+        let use_filters = modrinth && self.search_provider == ModSource::Modrinth;
+        let mut filters_changed = false;
+        let mut category_changed = false;
+        let mut sort_changed = false;
+
         // Category selection row (Modrinth) + result ordering (both
         // providers: Modrinth sorts server-side, CurseForge client-side).
-        {
+        // Other shells keep the original single-row layout and spacing.
+        let row_rect = {
             ui.add_space(8.0);
-            ui.horizontal(|ui| {
+            let mut contents = |ui: &mut Ui| {
                 if self.search_provider == ModSource::Modrinth {
                     let cat_mod = self.search_category == ModCategory::Mod;
                     let cat_rp = self.search_category == ModCategory::ResourcePack;
                     let cat_sh = self.search_category == ModCategory::Shader;
 
-                    if chip(ui, Icon::Puzzle, lang.mods_cat_mods(), cat_mod) {
+                    if chip(ui, Icon::Puzzle, lang.mods_cat_mods(), cat_mod) && !cat_mod {
                         self.search_category = ModCategory::Mod;
+                        category_changed = true;
                     }
 
-                    if chip(ui, Icon::Palette, lang.mods_cat_resourcepacks(), cat_rp) {
+                    if chip(ui, Icon::Palette, lang.mods_cat_resourcepacks(), cat_rp) && !cat_rp {
                         self.search_category = ModCategory::ResourcePack;
+                        category_changed = true;
                     }
 
-                    if chip(ui, Icon::Sun, lang.mods_cat_shaders(), cat_sh) {
+                    if chip(ui, Icon::Sun, lang.mods_cat_shaders(), cat_sh) && !cat_sh {
                         self.search_category = ModCategory::Shader;
+                        category_changed = true;
                     }
                 }
 
                 // Result ordering (CONCEPT P4 "фильтр по популярности"):
-                // Modrinth sorts server-side, CurseForge client-side.
-                ui.add_space(12.0);
-                let sort_rel = self.search_sort == SearchSort::Relevance;
-                let sort_dl = self.search_sort == SearchSort::Downloads;
-                if chip(ui, Icon::List, lang.mods_sort_relevance(), sort_rel) {
-                    self.search_sort = SearchSort::Relevance;
+                // Modrinth sorts server-side; CurseForge client-side and
+                // only understands relevance/downloads.
+                ui.add_space(if modrinth { 10.0 } else { 12.0 });
+                let sorts = [
+                    (
+                        SearchSort::Relevance,
+                        lang.mods_sort_relevance(),
+                        Icon::List,
+                    ),
+                    (
+                        SearchSort::Downloads,
+                        lang.mods_sort_downloads(),
+                        Icon::Download,
+                    ),
+                    (SearchSort::Follows, lang.mods_sort_follows(), Icon::Heart),
+                    (SearchSort::Newest, lang.mods_sort_newest(), Icon::Sparkle),
+                    (SearchSort::Updated, lang.mods_sort_updated(), Icon::Refresh),
+                ];
+                let count = if use_filters { sorts.len() } else { 2 };
+                for &(sort, label, icon) in &sorts[..count] {
+                    if self.search_sort == sort {
+                        chip(ui, icon, label, true);
+                    } else if chip(ui, icon, label, false) {
+                        self.search_sort = sort;
+                        sort_changed = true;
+                    }
                 }
-                if chip(ui, Icon::Download, lang.mods_sort_downloads(), sort_dl) {
-                    self.search_sort = SearchSort::Downloads;
+            };
+            if modrinth {
+                let row = ui.horizontal_wrapped(|ui| {
+                    ui.spacing_mut().item_spacing = vec2(6.0, 6.0);
+                    contents(ui);
+                });
+                row.response.rect
+            } else {
+                let row = ui.horizontal(|ui| {
+                    contents(ui);
+                });
+                row.response.rect
+            }
+        };
+        let controls_left = row_rect.left();
+
+        if use_filters && self.filters_open {
+            if let Some(anchor) = filters_anchor {
+                if self.show_modrinth_filters(
+                    ui,
+                    lang,
+                    controls_left,
+                    anchor.bottom() + 6.0,
+                    filter_toggled,
+                ) {
+                    filters_changed = true;
                 }
-            });
+            }
+        }
+
+        // Modrinth BrowsePage applies filter/sort/category/provider changes
+        // immediately, including before the first explicit search: it must
+        // never show a stale empty state after a filter edit. Other shells
+        // keep their explicit Search button behaviour.
+        if modrinth && (filters_changed || sort_changed || category_changed || provider_changed) {
+            request_search = true;
+        }
+
+        if self.filter_resync_pending {
+            self.filter_resync_pending = false;
+            if modrinth {
+                request_search = true;
+            }
+        }
+
+        if request_search {
+            let (loader, mc) = if use_filters {
+                let loader =
+                    if self.search_category == ModCategory::Mod && !self.filter_loader.is_empty() {
+                        Some(self.filter_loader.clone())
+                    } else {
+                        None
+                    };
+                let mc = self.filter_mc.trim();
+                let mc = if mc.is_empty() {
+                    None
+                } else {
+                    Some(mc.to_string())
+                };
+                (loader, mc)
+            } else {
+                (Some(self.compat_loader.clone()), self.compat_mc.clone())
+            };
+            if let Some(f) = on_search.take() {
+                f(
+                    self.search_query.clone(),
+                    self.search_provider,
+                    self.search_category,
+                    self.search_sort,
+                    loader,
+                    mc,
+                );
+            }
+            self.has_searched = true;
         }
 
         ui.add_space(14.0);
@@ -1516,6 +1846,128 @@ impl ModsPage {
 
         if self.search_results.is_empty() {
             let has_query = !self.search_query.trim().is_empty();
+            if modrinth {
+                let filters_active = use_filters && self.filter_count(self.search_category) > 0;
+                let (title, hint) = if has_query {
+                    (
+                        lang.mods_search_no_results_title(),
+                        if filters_active {
+                            lang.mods_search_no_results_filters_hint()
+                        } else {
+                            lang.mods_search_no_results_hint()
+                        },
+                    )
+                } else if filters_active {
+                    (
+                        lang.mods_search_no_results_title(),
+                        lang.mods_search_no_results_filters_hint(),
+                    )
+                } else {
+                    (
+                        lang.mods_search_prompt_title(),
+                        lang.mods_search_prompt_hint(),
+                    )
+                };
+                ui.add_space(12.0);
+                ui.vertical_centered(|ui| {
+                    // Horizontal empty state: at 960x600 a stacked icon,
+                    // copy and action did not fit above the bottom edge,
+                    // so the icon sits beside the text instead of above it.
+                    let title_w = ui
+                        .painter()
+                        .layout_no_wrap(
+                            title.to_owned(),
+                            egui::FontId::proportional(15.0),
+                            Color32::PLACEHOLDER,
+                        )
+                        .size()
+                        .x;
+                    let hint_w = ui
+                        .painter()
+                        .layout_no_wrap(
+                            hint.to_owned(),
+                            egui::FontId::proportional(12.0),
+                            Color32::PLACEHOLDER,
+                        )
+                        .size()
+                        .x;
+                    let group_w = (title_w.max(hint_w).max(150.0) + 58.0).min(ui.available_width());
+                    ui.allocate_ui_with_layout(
+                        vec2(group_w, 84.0),
+                        egui::Layout::left_to_right(egui::Align::Center),
+                        |ui| {
+                            ui.spacing_mut().item_spacing = vec2(14.0, 0.0);
+                            let (icon_rect, _) =
+                                ui.allocate_exact_size(vec2(44.0, 44.0), Sense::hover());
+                            ui.painter()
+                                .rect_filled(icon_rect, theme::rounding(), BG_CARD);
+                            ui.painter().rect_stroke(
+                                icon_rect,
+                                theme::rounding(),
+                                Stroke::new(1.0_f32, BORDER_DEFAULT),
+                            );
+                            icons::draw_centered(
+                                ui.painter(),
+                                Icon::Search,
+                                icon_rect.center(),
+                                22.0,
+                                Color32::from(theme::ACCENT),
+                            );
+                            ui.vertical(|ui| {
+                                ui.spacing_mut().item_spacing.y = 2.0;
+                                ui.label(
+                                    egui::RichText::new(title)
+                                        .font(egui::FontId::proportional(15.0))
+                                        .strong()
+                                        .color(TEXT_HEADING),
+                                );
+                                ui.label(
+                                    egui::RichText::new(hint)
+                                        .font(egui::FontId::proportional(12.0))
+                                        .color(TEXT_MUTED),
+                                );
+                                if has_query {
+                                    ui.add_space(6.0);
+                                    if chip(ui, Icon::Close, lang.mods_search_clear(), true) {
+                                        self.search_query.clear();
+                                    }
+                                } else if filters_active {
+                                    ui.add_space(6.0);
+                                    if self.filter_manual {
+                                        if chip(ui, Icon::Refresh, lang.mods_filter_reset(), true) {
+                                            self.filter_loader =
+                                                normalize_search_loader(&self.compat_loader);
+                                            self.filter_mc =
+                                                self.compat_mc.clone().unwrap_or_default();
+                                            self.filter_manual = false;
+                                            self.filter_mc_edited = false;
+                                            self.filter_resync_pending = true;
+                                        }
+                                    } else if !self.filters_open
+                                        && chip(ui, Icon::Filter, lang.mods_filters(), true)
+                                    {
+                                        self.filters_open = true;
+                                    }
+                                }
+                            });
+                        },
+                    );
+                });
+                return;
+            }
+
+            // Other shells keep the original stacked empty state.
+            let (title, hint) = if has_query {
+                (
+                    lang.mods_search_no_results_title(),
+                    lang.mods_search_no_results_hint(),
+                )
+            } else {
+                (
+                    lang.mods_search_prompt_title(),
+                    lang.mods_search_prompt_hint(),
+                )
+            };
             ui.add_space(28.0);
             ui.vertical_centered(|ui| {
                 let (icon_rect, _) = ui.allocate_exact_size(vec2(56.0, 56.0), Sense::hover());
@@ -1544,17 +1996,6 @@ impl ModsPage {
                     Color32::from(theme::ACCENT),
                 );
                 ui.add_space(12.0);
-                let (title, hint) = if has_query {
-                    (
-                        lang.mods_search_no_results_title(),
-                        lang.mods_search_no_results_hint(),
-                    )
-                } else {
-                    (
-                        lang.mods_search_prompt_title(),
-                        lang.mods_search_prompt_hint(),
-                    )
-                };
                 ui.label(
                     egui::RichText::new(title)
                         .font(egui::FontId::proportional(15.0))
@@ -2158,5 +2599,30 @@ mod tests {
         let preview = changelog_preview("3.0", &Some(long));
         assert!(preview.starts_with(&format!("{arrow} 3.0")));
         assert!(preview.ends_with(ellipsis));
+    }
+
+    #[test]
+    fn test_normalize_search_loader() {
+        assert_eq!(normalize_search_loader("Fabric"), "fabric");
+        assert_eq!(normalize_search_loader("NeoForge"), "neoforge");
+        assert_eq!(normalize_search_loader("Quilt"), "quilt");
+        assert_eq!(normalize_search_loader("Forge"), "forge");
+        assert_eq!(normalize_search_loader("Vanilla"), "");
+        assert_eq!(normalize_search_loader("OptiFine"), "");
+        assert_eq!(normalize_search_loader(""), "");
+    }
+
+    #[test]
+    fn test_filter_count_scopes_loader_to_mods() {
+        let mut page = ModsPage {
+            filter_loader: "fabric".into(),
+            filter_mc: "1.20.1".into(),
+            ..ModsPage::default()
+        };
+        assert_eq!(page.filter_count(ModCategory::Mod), 2);
+        assert_eq!(page.filter_count(ModCategory::ResourcePack), 1);
+        assert_eq!(page.filter_count(ModCategory::Shader), 1);
+        page.filter_mc = "   ".into();
+        assert_eq!(page.filter_count(ModCategory::Mod), 1);
     }
 }

@@ -995,6 +995,14 @@ impl LauncherApp {
         tokio::spawn(async move {
             match provider {
                 ModSource::CurseForge => {
+                    // CurseTools has no server-side ordering and no
+                    // follows/newest/updated metadata: those modes fall back
+                    // to relevance instead of pretending to sort.
+                    let sort = if sort.curseforge_supported() {
+                        sort
+                    } else {
+                        SearchSort::Relevance
+                    };
                     let client = CurseForgeClient::default();
                     match client
                         .search(&query, loader.as_deref(), mc_version.as_deref(), 30)
@@ -1016,29 +1024,24 @@ impl LauncherApp {
                 }
                 _ => {
                     let client = ModrinthClient::default();
-                    // Empty query = Discover: most downloaded first, still
-                    // scoped to the instance filters when present.
-                    let result = if query.trim().is_empty() {
-                        client
-                            .search_trending_filtered(
-                                category,
-                                loader.as_deref(),
-                                mc_version.as_deref(),
-                                20,
-                            )
-                            .await
+                    // Empty query = Discover: default to most downloaded,
+                    // but honor an explicit follows/newest/updated sort.
+                    let discover = query.trim().is_empty();
+                    let sort = if discover && sort == SearchSort::Relevance {
+                        SearchSort::Downloads
                     } else {
-                        client
-                            .search(
-                                &query,
-                                loader.as_deref(),
-                                mc_version.as_deref(),
-                                category,
-                                30,
-                                sort,
-                            )
-                            .await
+                        sort
                     };
+                    let result = client
+                        .search(
+                            &query,
+                            loader.as_deref(),
+                            mc_version.as_deref(),
+                            category,
+                            if discover { 20 } else { 30 },
+                            sort,
+                        )
+                        .await;
                     match result {
                         Ok(results) => {
                             let _ = tx.send(results).await;
@@ -4742,8 +4745,9 @@ impl App for LauncherApp {
                             ModsActions {
                                 wishlist: &mut self.config.wishlist,
                                 update_install: &mut update_install,
-                                on_search: |query, provider, category, sort| {
-                                    search_req = Some((query, provider, category, sort));
+                                on_search: |query, provider, category, sort, loader, mc| {
+                                    search_req =
+                                        Some((query, provider, category, sort, loader, mc));
                                 },
                                 on_install: |result| {
                                     mod_to_install = Some(result);
@@ -4826,21 +4830,16 @@ impl App for LauncherApp {
                             }
                         }
 
-                        if let Some((q, prov, cat, sort)) = search_req {
+                        if let Some((q, prov, cat, sort, loader, mc)) = search_req {
                             // Server-side pre-filter (CONCEPT P4): the
-                            // marketplace only returns builds for this
+                            // marketplace only returns builds for the chosen
                             // MC version/loader; row hints still show why.
-                            let filter_loader = ModrinthClient::search_loader_filter(
-                                &self.mods_page.compat_loader.clone(),
-                            );
-                            self.search_mods(
-                                q,
-                                prov,
-                                cat,
-                                filter_loader,
-                                self.mods_page.compat_mc.clone(),
-                                sort,
-                            );
+                            // The page passes raw loader names; normalize here
+                            // for both Modrinth and CurseForge.
+                            let filter_loader = loader
+                                .as_deref()
+                                .and_then(ModrinthClient::search_loader_filter);
+                            self.search_mods(q, prov, cat, filter_loader, mc, sort);
                         }
                         if let Some(item) = mod_to_install {
                             self.install_mod(item, None);

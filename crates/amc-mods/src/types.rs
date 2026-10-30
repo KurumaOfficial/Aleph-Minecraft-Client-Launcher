@@ -24,6 +24,12 @@ pub enum SearchSort {
     Relevance,
     /// Most downloaded first.
     Downloads,
+    /// Most followed first (Modrinth `follows`).
+    Follows,
+    /// Recently published first (Modrinth `newest`).
+    Newest,
+    /// Recently updated first (Modrinth `updated`).
+    Updated,
 }
 
 impl SearchSort {
@@ -32,7 +38,17 @@ impl SearchSort {
         match self {
             Self::Relevance => "relevance",
             Self::Downloads => "downloads",
+            Self::Follows => "follows",
+            Self::Newest => "newest",
+            Self::Updated => "updated",
         }
+    }
+
+    /// CurseTools exposes no ordering parameter. Relevance and downloads
+    /// (sorted by the caller) are meaningful; the rest fall back to
+    /// relevance instead of pretending to work.
+    pub fn curseforge_supported(self) -> bool {
+        matches!(self, Self::Relevance | Self::Downloads)
     }
 }
 
@@ -156,5 +172,17 @@ mod tests {
         assert_eq!(SearchSort::default(), SearchSort::Relevance);
         assert_eq!(SearchSort::Relevance.modrinth_index(), "relevance");
         assert_eq!(SearchSort::Downloads.modrinth_index(), "downloads");
+        assert_eq!(SearchSort::Follows.modrinth_index(), "follows");
+        assert_eq!(SearchSort::Newest.modrinth_index(), "newest");
+        assert_eq!(SearchSort::Updated.modrinth_index(), "updated");
+    }
+
+    #[test]
+    fn test_curseforge_sort_support() {
+        assert!(SearchSort::Relevance.curseforge_supported());
+        assert!(SearchSort::Downloads.curseforge_supported());
+        assert!(!SearchSort::Follows.curseforge_supported());
+        assert!(!SearchSort::Newest.curseforge_supported());
+        assert!(!SearchSort::Updated.curseforge_supported());
     }
 }
