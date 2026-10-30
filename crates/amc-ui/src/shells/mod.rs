@@ -69,6 +69,8 @@ pub struct ShellAction {
     pub launch: bool,
     /// Open the login/account modal.
     pub login: bool,
+    /// Open Settings → Accounts (MultiMC account manager).
+    pub manage_accounts: bool,
     /// Close the launcher window.
     pub exit: bool,
     /// Open the create-instance dialog (MultiMC "Add Instance").
@@ -114,6 +116,7 @@ impl ShellAction {
         self.gallery |= other.gallery;
         self.launch |= other.launch;
         self.login |= other.login;
+        self.manage_accounts |= other.manage_accounts;
         self.exit |= other.exit;
         self.new_instance |= other.new_instance;
         self.edit_instance |= other.edit_instance;
@@ -151,6 +154,7 @@ mod tests {
         base.merge(ShellAction {
             tab: Some(NavTab::Modpacks),
             login: true,
+            manage_accounts: true,
             exit: true,
             new_instance: true,
             account: Some(account),
@@ -165,6 +169,7 @@ mod tests {
         assert!(base.console);
         assert!(base.gallery);
         assert!(base.login);
+        assert!(base.manage_accounts);
         assert!(base.exit);
         assert!(base.new_instance);
         assert!(!base.launch);

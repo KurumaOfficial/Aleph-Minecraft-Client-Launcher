@@ -186,6 +186,11 @@ impl ScreensModal {
                                                 Color32::WHITE,
                                             );
                                         }
+                                        let full_name = path
+                                            .file_name()
+                                            .map(|n| n.to_string_lossy().to_string())
+                                            .unwrap_or_default();
+                                        let resp = resp.on_hover_text(&full_name);
                                         if resp.clicked() {
                                             let _ = open::that(&path);
                                         }
@@ -194,25 +199,26 @@ impl ScreensModal {
                                                 .set_cursor_icon(egui::CursorIcon::PointingHand);
                                         }
                                         ui.horizontal(|ui| {
-                                            let mut name = path
-                                                .file_name()
-                                                .map(|n| n.to_string_lossy().to_string())
-                                                .unwrap_or_default();
+                                            let mut name = full_name.clone();
                                             if name.chars().count() > 22 {
                                                 name = format!(
                                                     "{}…",
                                                     name.chars().take(22).collect::<String>()
                                                 );
                                             }
-                                            ui.label(
-                                                egui::RichText::new(name)
+                                            let name_resp = ui.label(
+                                                egui::RichText::new(&name)
                                                     .font(egui::FontId::proportional(10.0))
                                                     .color(TEXT_MUTED),
                                             );
+                                            if name != full_name {
+                                                name_resp.on_hover_text(&full_name);
+                                            }
                                             ui.with_layout(
                                                 egui::Layout::right_to_left(egui::Align::Center),
                                                 |ui| {
                                                     if icon_button(ui, Icon::Trash, TEXT_MUTED)
+                                                        .on_hover_text(lang.screens_delete())
                                                         .clicked()
                                                         && std::fs::remove_file(&path).is_ok()
                                                     {

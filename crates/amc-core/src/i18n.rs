@@ -2226,6 +2226,14 @@ impl Language {
         }
     }
 
+    pub fn screens_delete(&self) -> &'static str {
+        match self {
+            Self::English => "Delete screenshot",
+            Self::Russian => "Удалить скриншот",
+            Self::Ukrainian => "Видалити скриншот",
+        }
+    }
+
     pub fn screens_open_folder(&self) -> &'static str {
         match self {
             Self::English => "Open screenshots folder",
@@ -6408,6 +6416,7 @@ mod tests {
             assert!(!lang.screens_title().is_empty());
             assert!(!lang.screens_empty().is_empty());
             assert!(!lang.screens_open().is_empty());
+            assert!(!lang.screens_delete().is_empty());
             assert!(!lang.screens_open_folder().is_empty());
             assert!(!lang.notif_title().is_empty());
             assert!(!lang.notif_updates().is_empty());

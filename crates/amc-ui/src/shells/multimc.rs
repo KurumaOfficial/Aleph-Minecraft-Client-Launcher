@@ -396,7 +396,7 @@ pub fn show_toolbar(ui: &mut Ui, lang: Language, ctx: &ToolbarCtx<'_>) -> ShellA
             }
         }
 
-        // Right side: the accounts dropdown (face + profile name).
+        // Right side: the accounts dropdown (face + active account name).
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.add_space(6.0);
             let raw_label = ctx
@@ -411,7 +411,9 @@ pub fn show_toolbar(ui: &mut Ui, lang: Language, ctx: &ToolbarCtx<'_>) -> ShellA
                 if pick < ctx.accounts.len() {
                     action.account = Some(ctx.accounts[pick].id);
                 } else {
-                    action.tab = Some(NavTab::Profile);
+                    // MultiMC's "Manage Accounts" is an account manager,
+                    // not the shared player profile page.
+                    action.manage_accounts = true;
                 }
             }
             if label != raw_label {
@@ -768,7 +770,7 @@ pub fn show_instance_bar(
             action.manage = true;
         }
         if bar_button(ui, lang.shell_manage_screenshots(), enabled) {
-            action.manage = true;
+            action.gallery = true;
         }
         bar_separator(ui);
 

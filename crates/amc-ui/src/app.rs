@@ -3977,6 +3977,13 @@ impl App for LauncherApp {
                     tracing::warn!("set active account failed: {e}");
                 }
             }
+            if shell_action.manage_accounts {
+                self.current_tab = NavTab::Settings;
+                self.settings_page.sub_tab = SettingsSubTab::Accounts;
+            }
+            if shell_action.gallery {
+                self.toggle_screens_modal();
+            }
             if shell_action.launch {
                 self.handle_launch();
             }

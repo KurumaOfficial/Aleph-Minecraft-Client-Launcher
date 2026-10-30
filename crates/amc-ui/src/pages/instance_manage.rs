@@ -55,6 +55,7 @@ impl InstanceManage {
     pub fn open_for(&mut self, id: Uuid) {
         self.open = true;
         self.instance_id = Some(id);
+        self.tab = ManageTab::Worlds;
         self.status = None;
     }
 
@@ -146,13 +147,30 @@ impl InstanceManage {
             self.refresh_lists(&game_dir, backups_root, &inst.name);
         }
         let mut close = false;
-        egui::Window::new(inst.name.clone())
+        // Do not feed the instance name into egui's native title: even a
+        // shortened Cyrillic name can grow the frame past the screen. The
+        // selected instance is already visible in the library and footer.
+        let window_title = lang.inst_ctx_manage();
+        egui::Window::new(window_title)
             .collapsible(false)
             .resizable(true)
             .anchor(egui::Align2::CENTER_CENTER, vec2(0.0, 0.0))
             .min_width(640.0)
+            .max_width(760.0)
             .default_size(vec2(700.0, 520.0))
+            .max_height((ctx.screen_rect().height() - 100.0).max(360.0))
             .show(ctx, |ui| {
+                let name_visible = crate::shells::short_name(&inst.name, 48);
+                let name_resp = ui.label(
+                    egui::RichText::new(&name_visible)
+                        .font(egui::FontId::proportional(13.0))
+                        .strong()
+                        .color(TEXT_HEADING),
+                );
+                if name_visible != inst.name {
+                    name_resp.on_hover_text(&inst.name);
+                }
+                ui.add_space(6.0);
                 ui.horizontal(|ui| {
                     for (tab, label) in [
                         (ManageTab::Worlds, lang.worlds_title()),
@@ -196,7 +214,7 @@ impl InstanceManage {
                     }
                 });
             });
-        if close {
+        if close || ctx.input(|i| i.key_pressed(egui::Key::Escape)) {
             self.open = false;
         }
     }
