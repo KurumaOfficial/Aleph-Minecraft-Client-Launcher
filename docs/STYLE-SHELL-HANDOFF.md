@@ -28,7 +28,8 @@
   long-name profile chrome), `2d9bb24` (complete tooltip and localization
   sweep), `dfd3b4f` (two-stage Modrinth create flow).
 - Сессия 2026-10-30: `ab5050c` (MultiMC account/screenshot actions and
-  manage-dialog polish), `610baf4` (Modrinth BrowsePage filters and sorts).
+  manage-dialog polish), `610baf4` (Modrinth BrowsePage filters and sorts),
+  `a558994` (whitespace-only search falls back to Discover).
 - Коммиты сессии 2026-10-27: `308031e` (Modrinth create dialog/search),
   `2a3f359` (LabyMod/Millida account cards), `4845288` (search inputs and
   MultiMC labels), `5c9d04b` (utility modals), `e97f4aa` (card stats and
@@ -49,9 +50,9 @@
   `050ecac`, `73bd20e`, `6adb133`, `fbc6cb5`, `1675083`.
 - Все изменения запушены, рабочее дерево чистое.
 - Локальный release, выложенный в `dist`, имеет SHA-256
-  `507FFB37736B97F392ED209380DA10634788F9B80F595A6960D8FE75301A6BFF`.
+  `A2062F37A32B501C26AC19E8B25039C72C72DEC62433381F64FFBD659BBB5532`.
 - Перед деплоем 30.10.2026 создан бэкап
-  `dist/amc-launcher.exe.bak-20261030-1517`.
+  `dist/amc-launcher.exe.bak-20261030-1620`.
 
 ## Сессия 2026-10-26: адаптивность и взаимодействия
 
@@ -370,6 +371,12 @@ physical при 125% DPI), а также на 1120×700 logical (1400×875 physi
     загрузчика Any/Forge, версии 1.19.2/1.8.9/0.0.0, сброс к сборке,
     Follows/Newest/Updated, переход на CurseForge и обратно, пустое состояние
     с действием. SHA-256 и бэкап — в шапке.
+30. **Discover edge case**: запрос из одних пробелов теперь уходит в Modrinth
+    как пустой Discover-запрос; иначе API возвращал пустую выдачу. Проверено
+    прямым запросом к API (пробельный query — 0 hits, пустой — обычный
+    Discover) и финальной release-сборкой; UI-проверка ввода совпала с
+    блокировкой Windows-сессии, поэтому финальный экран снят через
+    `PrintWindow`.
 
 ## Обязательные правила
 
@@ -648,8 +655,8 @@ Millida). Собранные ассеты, которые уже использ�
   1200×750 physical.
 - Дополнительно проверять 1400×875 physical (1120×700 logical).
 - Release 2026-10-30: SHA-256
-  `507FFB37736B97F392ED209380DA10634788F9B80F595A6960D8FE75301A6BFF`,
-  бэкап `dist/amc-launcher.exe.bak-20261030-1517`.
+  `A2062F37A32B501C26AC19E8B25039C72C72DEC62433381F64FFBD659BBB5532`,
+  бэкап `dist/amc-launcher.exe.bak-20261030-1620`.
 - Скриншоты этой сессии: `%TEMP%\opencode\s29_*.png` … `s34_*.png`,
   `final_*` и `release_final_*` (временные, в git не входят).
 
