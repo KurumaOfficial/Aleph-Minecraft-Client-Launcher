@@ -1034,7 +1034,9 @@ impl LauncherApp {
                     };
                     let result = client
                         .search(
-                            &query,
+                            // Whitespace-only input is Discover, not a
+                            // query that happens to contain spaces.
+                            if discover { "" } else { query.as_str() },
                             loader.as_deref(),
                             mc_version.as_deref(),
                             category,
