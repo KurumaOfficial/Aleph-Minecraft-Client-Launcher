@@ -1,6 +1,6 @@
 # AMC Launcher — Style/Shell Handoff
 
-Состояние на 2026-10-29. Этот файл — точка входа для продолжения работы над
+Состояние на 2026-10-30. Этот файл — точка входа для продолжения работы над
 визуальными оболочками на другом устройстве.
 
 ## Цель
@@ -27,6 +27,8 @@
 - Сессия 2026-10-29: `3d457bb` (session summary, console, downloads,
   long-name profile chrome), `2d9bb24` (complete tooltip and localization
   sweep), `dfd3b4f` (two-stage Modrinth create flow).
+- Сессия 2026-10-30: `ab5050c` (MultiMC account/screenshot actions and
+  manage-dialog polish).
 - Коммиты сессии 2026-10-27: `308031e` (Modrinth create dialog/search),
   `2a3f359` (LabyMod/Millida account cards), `4845288` (search inputs and
   MultiMC labels), `5c9d04b` (utility modals), `e97f4aa` (card stats and
@@ -47,9 +49,9 @@
   `050ecac`, `73bd20e`, `6adb133`, `fbc6cb5`, `1675083`.
 - Все изменения запушены, рабочее дерево чистое.
 - Локальный release, выложенный в `dist`, имеет SHA-256
-  `6A30D7342667CB3F2E9BD0EC894C4495596F6D4BE2AC6681B106C77871B599CE`.
-- Перед деплоем 29.10.2026 создан бэкап
-  `dist/amc-launcher.exe.bak-20261029-1129`.
+  `FE8803619B2D3EC6E2BEC114A0610F1C030948B8A220B3A8B3994997EF6E2BEA`.
+- Перед деплоем 30.10.2026 создан бэкап
+  `dist/amc-launcher.exe.bak-20261030-1040`.
 
 ## Сессия 2026-10-26: адаптивность и взаимодействия
 
@@ -324,6 +326,26 @@ physical при 125% DPI), а также на 1120×700 logical (1400×875 physi
 20. **Проверено**: 960×600 RU/UK (обе стадии, Back, Enter, выбор иконки),
     1120×700 UK (release, вторая стадия), создание инстанса с иконкой и
     `loader_version: "0.16.5"`; release SHA-256 и бэкап — в шапке.
+
+### Продолжение 2026-10-30: MultiMC actions и manage-dialog
+
+21. **Manage Accounts**: пункт в account dropdown MultiMC теперь ведёт в
+    Settings → «Аккаунты», а не в общий профиль Aleph. Проверено с реальным
+    кликом по меню.
+22. **Manage Screenshots**: кнопка правого instance toolbar открывает
+    галерею скриншотов, а не случайную вкладку manage-диалога. Проверено на
+    пустой галерее.
+23. **Manage dialog**: нативное окно больше не получает полное имя сборки
+    в заголовок — длинное кириллическое имя распирало окно за экран.
+    Заголовок теперь «Управление», имя показано внутри с ellipsis/tooltip,
+    ширина ограничена 760 px, высота — экраном; открытие всегда сбрасывает
+    вкладку на «Миры», Escape закрывает окно.
+24. **Screenshots**: имена файлов и кнопки удаления получили tooltip,
+    длинные имена дополнительно обрезаются; удаление локализовано
+    (`Удалить скриншот` / `Видалити скриншот`).
+25. **Release**: проверен через PrintWindow при заблокированной сессии
+    Windows; ключевой экран MultiMC и правый instance toolbar отрисованы.
+    SHA-256 и бэкап — в шапке.
 
 ## Обязательные правила
 
@@ -600,11 +622,11 @@ Millida). Собранные ассеты, которые уже использ�
 - Минимальный размер окна: 960×600 logical; на машине с 125% DPI это
   1200×750 physical.
 - Дополнительно проверять 1400×875 physical (1120×700 logical).
-- Release 2026-10-29: SHA-256
-  `6A30D7342667CB3F2E9BD0EC894C4495596F6D4BE2AC6681B106C77871B599CE`,
-  бэкап `dist/amc-launcher.exe.bak-20261029-1129`.
-- Скриншоты этой сессии: `%TEMP%\opencode\s29_*.png`, `s30_*.png`,
-  `s31_*.png`, `s32_*.png` (временные, в git не входят).
+- Release 2026-10-30: SHA-256
+  `FE8803619B2D3EC6E2BEC114A0610F1C030948B8A220B3A8B3994997EF6E2BEA`,
+  бэкап `dist/amc-launcher.exe.bak-20261030-1040`.
+- Скриншоты этой сессии: `%TEMP%\opencode\s29_*.png` … `s33_*.png`
+  (временные, в git не входят).
 
 ## Готовый мастер-промт
 
